@@ -1,0 +1,30 @@
+#include "Rendering/Backend/Device.h"
+
+#include "Rendering/Backend/CommandList.h"
+
+#ifdef WIN32
+#include "Rendering/DX12/Device_DX12.h"
+#endif
+
+#include "Logging/Asserts.h"
+
+namespace Gecko {
+
+	Ref<Device> Device::CreateDevice()
+	{
+		switch (s_RenderAPI)
+		{
+		case RenderAPI::None:
+			ASSERT_MSG(false, "No RenderAPI is selected");
+			break;
+#ifdef WIN32
+		case RenderAPI::DX12:
+			return CreateRef<DX12::Device_DX12>();
+			break;
+#endif // WIN32
+		}
+
+		ASSERT_MSG(false, "Unkown RenderAPI selected");
+		return nullptr;
+	}
+}
