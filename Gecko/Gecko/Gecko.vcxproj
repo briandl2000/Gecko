@@ -82,9 +82,10 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\ImGuiBuild.cpp" />
+    <ClCompile Include="src\UI\DebugUIRenderer.cpp" />
     <ClCompile Include="src\Logging\Logger.cpp" />
     <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Memory\Memory.cpp" />
     <ClCompile Include="src\Platform\win32\Platform_WIN32.cpp" />
     <ClCompile Include="src\Rendering\Backend\CommandList.cpp" />
     <ClCompile Include="src\Rendering\Backend\Device.cpp" />
@@ -93,7 +94,7 @@
     <ClCompile Include="src\Rendering\DX12\Device_DX12.cpp" />
     <ClCompile Include="src\Rendering\DX12\Objects_DX12.cpp" />
     <ClCompile Include="src\Rendering\DX12\Resources_DX12.cpp" />
-    <ClCompile Include="src\Rendering\Frontend\Context.cpp" />
+    <ClCompile Include="src\Rendering\Frontend\ApplicationContext.cpp" />
     <ClCompile Include="src\Rendering\Frontend\Renderer\RenderPasses\BloomPass.cpp" />
     <ClCompile Include="src\Rendering\Frontend\Renderer\RenderPasses\DeferredPBRPass.cpp" />
     <ClCompile Include="src\Rendering\Frontend\Renderer\RenderPasses\FXAAPass.cpp" />
@@ -106,11 +107,16 @@
     <ClCompile Include="src\Rendering\Frontend\Scene\GLTFSceneLoader.cpp" />
     <ClCompile Include="src\Rendering\Frontend\Scene\Scene.cpp" />
     <ClCompile Include="src\Rendering\Frontend\Scene\SceneManager.cpp" />
+    <ClCompile Include="src\Rendering\Frontend\Scene\SceneObjects\SceneCamera.cpp" />
+    <ClCompile Include="src\ThirdPartyBuilds\GLTFBuild.cpp" />
+    <ClCompile Include="src\ThirdPartyBuilds\ImGuiBuild.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\UI\DebugUIRenderer.h" />
     <ClInclude Include="src\Logging\Asserts.h" />
     <ClInclude Include="src\Logging\Logger.h" />
     <ClInclude Include="src\Defines.h" />
+    <ClInclude Include="src\Memory\Memory.h" />
     <ClInclude Include="src\Rendering\Backend\CommandList.h" />
     <ClInclude Include="src\Rendering\Backend\Device.h" />
     <ClInclude Include="src\Rendering\Backend\Objects.h" />
@@ -120,7 +126,7 @@
     <ClInclude Include="src\Rendering\DX12\Device_DX12.h" />
     <ClInclude Include="src\Rendering\DX12\Objects_DX12.h" />
     <ClInclude Include="src\Rendering\DX12\Resources_DX12.h" />
-    <ClInclude Include="src\Rendering\Frontend\Context.h" />
+    <ClInclude Include="src\Rendering\Frontend\ApplicationContext.h" />
     <ClInclude Include="src\Rendering\Frontend\Renderer\RenderPasses\BloomPass.h" />
     <ClInclude Include="src\Rendering\Frontend\Renderer\RenderPasses\DeferredPBRPass.h" />
     <ClInclude Include="src\Rendering\Frontend\Renderer\RenderPasses\FXAAPass.h" />
@@ -136,7 +142,10 @@
     <ClInclude Include="src\Rendering\Frontend\Scene\GLTFSceneLoader.h" />
     <ClInclude Include="src\Rendering\Frontend\Scene\Scene.h" />
     <ClInclude Include="src\Rendering\Frontend\Scene\SceneManager.h" />
-    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects.h" />
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects\SceneCamera.h" />
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects\SceneLight.h" />
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects\SceneRenderObject.h" />
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneRenderInfo.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="ShadersSource\hlsl\Bloom\BloomComposite.hlsl">
@@ -206,6 +215,12 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.1</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+    </FxCompile>
+    <FxCompile Include="ShadersSource\hlsl\Raytracing\Raytracing.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6.3</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Library</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6.3</ShaderModel>
     </FxCompile>
     <FxCompile Include="ShadersSource\hlsl\ShadowPixel.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>

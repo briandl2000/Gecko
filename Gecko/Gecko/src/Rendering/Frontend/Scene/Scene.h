@@ -2,75 +2,120 @@
 
 #include "Defines.h"
 
-#include "Rendering/Frontend/Scene/SceneObjects.h"
+#include "Rendering/Frontend/Scene/SceneObjects/SceneCamera.h"
+#include "Rendering/Frontend/Scene/SceneObjects/SceneLight.h"
+#include "Rendering/Frontend/Scene/SceneObjects/SceneRenderObject.h"
 
+namespace Gecko {
 
-namespace Gecko
-{
+	struct SceneRenderInfo;
+	class ResourceManager;
 
-class ResourceManager;
+	class NodeTransform
+	{
+	public:
 
-class Scene;
+		NodeTransform() = default;
 
-class SceneNode
-{
-public:
-	friend class Scene;
+		glm::vec3 Position{ 0.f };
+		glm::vec3 Rotation{ 0.f };
+		glm::vec3 Scale{ 1.f };
 
-	SceneNode() = default;
-	~SceneNode() {};
+		inline glm::mat4 GetMat4() const
+		{
+			glm::mat4 nodeTranslationMatrix = glm::translate(glm::mat4(1.), Position);
+			glm::mat4 nodeRotationMatrix = glm::toMat4(glm::quat(glm::radians(Rotation)));
+			glm::mat4 nodeScaleMatrix = glm::scale(glm::mat4(1.), Scale);
 
-	Ref<SceneNode> AddNode();
+			return nodeTranslationMatrix * nodeRotationMatrix * nodeScaleMatrix;
+		}
+	};
 
-	void AddMeshInstance(MeshHandle meshHandle, MaterialHandle materialHandle);
-	void AddLight();
-	void AddCamera(f32 FOV, f32 near = 0.1f, f32 far = 100.f, f32 aspectRatio = 1.f, bool keepAspect = true);
-	void AddScene(Ref<Scene> scene);
+	class Scene;
 
-public:
-	NodeTransform Transform;
+	// TODO: add names to scenes and scene nodes
 
-private:
+	class SceneNode
+	{
+	public:
+		friend class Scene;
 
-	void ImGuiRender();
+		SceneNode() = default;
+		~SceneNode() {};
 
-	u32 m_ParentIndex{ 0 };
-	u32 m_Index{ 0 };
-
-	std::vector<Ref<Scene>> m_Scenes;
-	std::vector<MeshInstance> m_MeshesInstances;
-	std::vector<Light> m_Lights;
-	Camera camera;
-	bool hasCamera = false;
-
-	Scene* m_Scene;
-};
-
-class Scene
-{
-public:
-	friend class SceneNode;
-
-	Scene() = default;
-	~Scene() {};
-
-	void Init();
+		[[nodiscard]] SceneNode* AddNode(const std::string& name);
 	
-	const SceneDescriptor GetSceneDescriptor(glm::mat4 transform = glm::mat4(1.f)) const;
-	Ref<SceneNode> GetRootNode();
+		void AppendSceneRenderObject(SceneRenderObject* sceneRenderObject);
+		void AppendLight(SceneLight* light);
+		void AttachCamera(SceneCamera* camera);
+		void AppendScene(Scene* scene);
+		
+		u32 GetChildrenCount();
+		SceneNode* GetChild(u32 nodeIndex);
 
-	EnvironmentMapHandle EnvironmentMapHandle{ 0 };
+		const void SetName(const std::string& name);
+		const std::string& GetName();
 
-	void ImGuiRender();
+	public:
+		NodeTransform Transform;
 
-private:
-	void DisplayNode(u32 nodeIndex, u32& selectedNode);
+	private:
+		const void PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const;
 
-	const void PopulateSceneDescriptor(SceneDescriptor& sceneDescriptor, glm::mat4 transform) const;
-	Ref<SceneNode> CreateNode(u32 parentIndex = 0);
-	u32 m_RootNodeIndex{ 0 };
-	std::vector<Ref<SceneNode>> m_Nodes;
+	private:
+		std::vector<Scope<SceneNode>> m_Children;
 
-};
+		std::vector<Scene*> m_Scenes;
+		std::vector<SceneRenderObject*> m_SceneRenderObjects;
+		std::vector<SceneLight*> m_Lights;
+		SceneCamera* m_Camera{ nullptr };
+
+		std::string m_Name{ "Node" };
+	};
+
+	class Scene
+	{
+	public:
+		friend class SceneNode;
+		friend class SceneManager;
+
+		Scene() = default;
+		~Scene() {};
+
+		void Init(const std::string& name);
+	
+		SceneNode* GetRootNode();
+
+		[[nodiscard]] SceneRenderObject* CreateSceneRenderObject();
+		[[nodiscard]] SceneCamera* CreateCamera();
+		[[nodiscard]] SceneLight* CreateLight(LightType lightType);
+		[[nodiscard]] SceneDirectionalLight* CreateDirectionalLight();
+		[[nodiscard]] ScenePointLight* CreatePointLight();
+		[[nodiscard]] SceneSpotLight* CreateSpotLight();
+		
+		[[nodiscard]] const SceneRenderInfo GetSceneRenderInfo() const;
+
+		EnvironmentMapHandle GetEnvironmentMapHandle() const;
+		void SetEnvironmentMapHandle(EnvironmentMapHandle handle);
+
+		const std::string& GetName() { return m_Name; };
+
+	private:
+		void OnResize(u32 width, u32 height);
+
+		const void PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const;
+	
+	private:
+		Scope<SceneNode> m_RootNode;
+
+		std::vector<Scope<SceneRenderObject>> m_SceneRenderObject;
+		std::vector<Scope<SceneLight>> m_Lights;
+		std::vector<Scope<SceneCamera>> m_Cameras;
+
+		EnvironmentMapHandle m_EnvironmentMapHandle{ 0 };
+
+		std::string m_Name{ "Scene" };
+
+	};
 
 }

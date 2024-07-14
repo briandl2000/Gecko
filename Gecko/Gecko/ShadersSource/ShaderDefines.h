@@ -19,7 +19,6 @@
 #define SAMPLE_TEXTURE2D_LEVEL(texture, sampler, uv, level) texture.SampleLevel(sampler, float3(uv, 0.), level)
 #define N_THREADS(X,Y,Z) numthreads(X, Y, Z)
 #define S_INPUT_DISPATCH_ID SV_DispatchThreadID
-#define DYNAMIC_CALL_DATA(bufferType, bufferName, bufferLocation) ConstantBuffer<bufferType> bufferName : register(bufferLocation);
 #else
 struct float3 {};
 struct float4 {
@@ -35,6 +34,10 @@ struct ConstantBuffer {
 float4x4 mul(float4x4, float4x4) {};
 float4 mul(float4x4, float4) {};
 float4 mul(float4, float4x4) {};
+#endif
+
+#if defined(HLSL)
+#define DYNAMIC_CALL_DATA(bufferType, bufferName, bufferLocation) ConstantBuffer<bufferType> bufferName : register(bufferLocation);
 #endif
 
 struct SceneData

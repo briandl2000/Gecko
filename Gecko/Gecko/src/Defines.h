@@ -79,4 +79,7 @@ STATIC_ASSERT(sizeof(f64) == 8, "Expected f64 to be 8 byte.");
 	{
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
+
+	template<typename T>
+	using WeakRef = std::weak_ptr<T>;
 }

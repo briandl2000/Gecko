@@ -3,14 +3,13 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
-#include "Rendering/Frontend/Scene/Scene.h"
 
 #include <algorithm>
 
 namespace Gecko
 {
 
-const void BloomPass::Init(ResourceManager* resourceManager)
+const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
 {
 	// BloomDownScale Compute Pipeline
 	{
@@ -86,8 +85,8 @@ const void BloomPass::Init(ResourceManager* resourceManager)
 
 	TextureDesc textureDesc;
 
-	textureDesc.Width = 1920;
-	textureDesc.Height = 1080;
+	textureDesc.Width = appInfo.Width;
+	textureDesc.Height = appInfo.Height;
 	textureDesc.Type = TextureType::Tex2D;
 	textureDesc.Format = Format::R32G32B32A32_FLOAT;
 	textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
@@ -99,8 +98,8 @@ const void BloomPass::Init(ResourceManager* resourceManager)
 	RenderTargetDesc renderTargetDesc;
 
 	renderTargetDesc.AllowRenderTargetTexture = true;
-	renderTargetDesc.Width = 1920;
-	renderTargetDesc.Height = 1080;
+	renderTargetDesc.Width = appInfo.Width;
+	renderTargetDesc.Height = appInfo.Height;
 	renderTargetDesc.NumRenderTargets = 1;
 	for (u32 i = 0; i < renderTargetDesc.NumRenderTargets; i++)
 	{
@@ -111,14 +110,15 @@ const void BloomPass::Init(ResourceManager* resourceManager)
 	}
 	renderTargetDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT;
 
-	m_OutputTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput");
+	m_OutputTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput", true);
 
-	m_BloomData.Width = 1920;
-	m_BloomData.Height = 1080;
+	m_BloomData.Width = appInfo.Width;
+	m_BloomData.Height = appInfo.Height;
 	m_BloomData.Threshold = .9f;
+
 }
 
-const void BloomPass::Render(const SceneDescriptor& sceneDescriptor, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 
 	Ref<RenderTarget> inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("FXAAOutput"));

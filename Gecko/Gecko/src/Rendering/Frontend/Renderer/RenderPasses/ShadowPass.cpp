@@ -3,12 +3,11 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
-#include "Rendering/Frontend/Scene/Scene.h"
 
 namespace Gecko
 {
 
-const void ShadowPass::Init(ResourceManager* resourceManager)
+const void ShadowPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
 {
 	// Shadow map Graphics Pipeline
 	{
@@ -39,24 +38,24 @@ const void ShadowPass::Init(ResourceManager* resourceManager)
 
 	}
 
-	{
-		Gecko::RenderTargetDesc ShadowMapTargetDesc;
-		ShadowMapTargetDesc.AllowDepthStencilTexture = true;
-		ShadowMapTargetDesc.RenderTargetFormats[0] = Gecko::Format::R8G8B8A8_UNORM; // Matallic Roughness Occlusion
-		ShadowMapTargetDesc.NumRenderTargets = 1;
-		ShadowMapTargetDesc.RenderTargetClearValues[0].Values[0] = 0.f;
-		ShadowMapTargetDesc.RenderTargetClearValues[0].Values[1] = 0.f;
-		ShadowMapTargetDesc.RenderTargetClearValues[0].Values[2] = 0.f;
-		ShadowMapTargetDesc.RenderTargetClearValues[0].Values[3] = 0.f;
-		ShadowMapTargetDesc.DepthStencilFormat = Gecko::Format::R32_FLOAT;
-		ShadowMapTargetDesc.DepthTargetClearValue.Depth = 1.0f;
-		ShadowMapTargetDesc.Width = 4096;
-		ShadowMapTargetDesc.Height = 4096;
-		m_OutputHandle = resourceManager->CreateRenderTarget(ShadowMapTargetDesc, "ShadowMap");
-	}
+	
+	Gecko::RenderTargetDesc ShadowMapTargetDesc;
+	ShadowMapTargetDesc.AllowDepthStencilTexture = true;
+	ShadowMapTargetDesc.RenderTargetFormats[0] = Gecko::Format::R8G8B8A8_UNORM; // Matallic Roughness Occlusion
+	ShadowMapTargetDesc.NumRenderTargets = 1;
+	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[0] = 0.f;
+	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[1] = 0.f;
+	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[2] = 0.f;
+	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[3] = 0.f;
+	ShadowMapTargetDesc.DepthStencilFormat = Gecko::Format::R32_FLOAT;
+	ShadowMapTargetDesc.DepthTargetClearValue.Depth = 1.0f;
+	ShadowMapTargetDesc.Width = 4096;
+	ShadowMapTargetDesc.Height = 4096;
+	m_OutputHandle = resourceManager->CreateRenderTarget(ShadowMapTargetDesc, "ShadowMap", false);
+
 }
 
-const void ShadowPass::Render(const SceneDescriptor& sceneDescriptor, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void ShadowPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 	Ref<RenderTarget> outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 	GraphicsPipeline ShadowPipeline = resourceManager->GetGraphicsPipeline(ShadowPipelineHandle);
@@ -65,22 +64,22 @@ const void ShadowPass::Render(const SceneDescriptor& sceneDescriptor, ResourceMa
 
 	commandList->BindGraphicsPipeline(ShadowPipeline);
 	commandList->BindRenderTarget(outputTarget);
-	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer);
+	u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
+	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 
-	for (u32 i = 0; i < sceneDescriptor.Meshes.size(); i++)
+	for (u32 i = 0; i < sceneRenderInfo.RenderObjects.size(); i++)
 	{
-		const MeshInstanceDescriptor& meshInstanceDescriptor = sceneDescriptor.Meshes[i];
+		const RenderObjectRenderInfo& meshInstanceDescriptor = sceneRenderInfo.RenderObjects[i];
 
-		glm::mat4 transformMatrix = sceneDescriptor.NodeTransformMatrices[meshInstanceDescriptor.NodeTransformMatrixIndex];
+		glm::mat4 transformMatrix = meshInstanceDescriptor.Transform;
 
 		commandList->SetDynamicCallData(sizeof(glm::mat4), (void*)(&transformMatrix));
 
-		Mesh& mesh = resourceManager->GetMesh(meshInstanceDescriptor.MeshInstance.MeshHandle);
+		Mesh& mesh = resourceManager->GetMesh(meshInstanceDescriptor.MeshHandle);
 		commandList->BindVertexBuffer(mesh.VertexBuffer);
 		commandList->BindIndexBuffer(mesh.IndexBuffer);
 
 		commandList->Draw(mesh.IndexBuffer->Desc.NumIndices);
 	}
 }
-
 }

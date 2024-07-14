@@ -8,7 +8,9 @@ namespace Gecko {
 	enum class RenderAPI
 	{
 		None = 0,
-		DX12
+#ifdef WIN32
+		DX12,
+#endif
 	};
 
 	static constexpr RenderAPI s_RenderAPI =
@@ -57,6 +59,9 @@ namespace Gecko {
 		virtual void ImGuiRender(Ref<CommandList> commandList) = 0;
 
 		virtual bool Destroy() = 0;
+
+		virtual u32 GetNumBackBuffers() = 0;
+		virtual u32 GetCurrentBackBufferIndex() = 0;
 
 	private:
 

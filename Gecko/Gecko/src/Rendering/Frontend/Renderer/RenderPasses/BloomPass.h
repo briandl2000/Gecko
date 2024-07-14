@@ -20,8 +20,9 @@ public:
 	BloomPass() = default;
 	virtual ~BloomPass() {}
 
-	virtual const void Init(ResourceManager* resourceManager) override;
-	virtual const void Render(const SceneDescriptor& sceneDescriptor, ResourceManager* resourceManager, Ref<CommandList> commandList) override;
+	virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) override;
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList) override;
+
 protected:
 
 private:

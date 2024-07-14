@@ -5,14 +5,13 @@
 namespace Gecko
 {
 
-class Scene;
-class ResourceManager;
+	class Scene;
+	class ApplicationContext;
 
-class GLTFSceneLoader
-{
-public:
-	static void LoadScene(Ref<Scene>& scene, const std::string& pathString, ResourceManager* resourceManager);
-};
-
+	class GLTFSceneLoader
+	{
+	public:
+		[[nodiscard]] static Scene* LoadScene(const std::string& pathString, ApplicationContext& ctx);
+	};
 
 }

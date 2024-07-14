@@ -45,16 +45,13 @@
     <ClCompile Include="src\Rendering\Backend\Objects.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\ImGuiBuild.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Rendering\Frontend\Renderer\Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Rendering\Frontend\Scene\Scene.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Rendering\Frontend\Context.cpp">
+    <ClCompile Include="src\Rendering\Frontend\ApplicationContext.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Rendering\Frontend\ResourceManager\ResourceManager.cpp">
@@ -85,6 +82,21 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Rendering\Frontend\Renderer\RenderPasses\ShadowRaytracePass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Memory\Memory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ThirdPartyBuilds\GLTFBuild.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ThirdPartyBuilds\ImGuiBuild.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rendering\Frontend\Scene\SceneObjects\SceneCamera.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\UI\DebugUIRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -137,7 +149,7 @@
     <ClInclude Include="src\Rendering\Frontend\Renderer\RenderPasses\RenderPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Rendering\Frontend\Context.h">
+    <ClInclude Include="src\Rendering\Frontend\ApplicationContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Rendering\Frontend\ResourceManager\ResourceManager.h">
@@ -164,7 +176,7 @@
     <ClInclude Include="src\Rendering\Frontend\Renderer\RenderPasses\ToneMappingGammaCorrectionPass.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects.h">
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneRenderInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Rendering\Frontend\ResourceManager\ResourceObjects.h">
@@ -174,6 +186,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Rendering\Frontend\Renderer\RenderPasses\ShadowRaytracePass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Memory\Memory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects\SceneCamera.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects\SceneLight.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\Frontend\Scene\SceneObjects\SceneRenderObject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\UI\DebugUIRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -195,6 +222,7 @@
     <FxCompile Include="ShadersSource\hlsl\Bloom\BloomComposite.hlsl" />
     <FxCompile Include="ShadersSource\hlsl\FXAA.hlsl" />
     <FxCompile Include="ShadersSource\hlsl\ShadowVertex.hlsl" />
+    <FxCompile Include="ShadersSource\hlsl\Raytracing\Raytracing.hlsl" />
     <FxCompile Include="ShadersSource\hlsl\ShadowPixel.hlsl" />
   </ItemGroup>
 </Project>

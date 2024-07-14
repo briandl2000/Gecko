@@ -21,8 +21,10 @@ const VertexLayout fullScreenQuadVertexLayout({
 });
 
 
-void Renderer::Init(Platform::AppInfo info, ResourceManager* resourceManager, Device* _device)
+void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, Device* _device)
 {
+	m_Info = info;
+
 	device = _device;
 
 	m_ResourceManager = resourceManager;
@@ -110,7 +112,7 @@ void Renderer::Shutdown()
 	m_ResourceManager = nullptr;
 }
 
-void Renderer::RenderScene(SceneDescriptor& sceneDescriptor)
+void Renderer::RenderScene(const SceneRenderInfo& sceneRenderInfo)
 {
 	/*TLASRefitDesc refitDesc;
 
@@ -124,21 +126,26 @@ void Renderer::RenderScene(SceneDescriptor& sceneDescriptor)
 		refitDesc.BLASInstances.push_back({blas, transform});
 	}*/
 
-	// Upload Scene Data for this frame
-	m_ResourceManager->SceneData->useRaytracing = false;
-	m_ResourceManager->SceneData->ViewMatrix = sceneDescriptor.NodeTransformMatrices[sceneDescriptor.Camera.ViewMatrixIndex];
-	m_ResourceManager->SceneData->CameraPosition = glm::vec3(m_ResourceManager->SceneData->ViewMatrix * glm::vec4(0.f, 0.f, 0.f, 1.f));
-	m_ResourceManager->SceneData->ViewOrientation = glm::mat4(glm::mat3(m_ResourceManager->SceneData->ViewMatrix));
-	m_ResourceManager->SceneData->InvViewOrientation = glm::inverse(m_ResourceManager->SceneData->ViewOrientation);
-	m_ResourceManager->SceneData->ProjectionMatrix = sceneDescriptor.Camera.Projection;
-	m_ResourceManager->SceneData->InvViewMatrix = glm::inverse(m_ResourceManager->SceneData->ViewMatrix);
-	m_ResourceManager->SceneData->invProjectionMatrix = glm::inverse(m_ResourceManager->SceneData->ProjectionMatrix);
+	u32 currentBackBufferIndex = device->GetCurrentBackBufferIndex();
 
-	glm::mat4 LighDirectionMatrix = glm::eulerAngleYX(0.f, 0.f);
-	LighDirectionMatrix = glm::translate(glm::mat4(1.), m_ResourceManager->SceneData->CameraPosition - m_ResourceManager->SceneData->LightDirection * 50.f) * LighDirectionMatrix;
-	m_ResourceManager->SceneData->ShadowMapProjection = glm::ortho(-30.f, 30.f, -30.f, 30.f, -100.f, 100.f) * glm::inverse(LighDirectionMatrix);
-	m_ResourceManager->SceneData->ShadowMapProjectionInv = glm::inverse(m_ResourceManager->SceneData->ShadowMapProjection);
-	m_ResourceManager->SceneData->LightDirection = glm::normalize(glm::vec3(LighDirectionMatrix * glm::vec4(0., 0., -1., 0.)));
+	// Upload Scene Data for this frame
+	m_ResourceManager->SceneData[currentBackBufferIndex]->useRaytracing = false;
+	m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix = sceneRenderInfo.Camera.View;
+	m_ResourceManager->SceneData[currentBackBufferIndex]->CameraPosition = glm::vec3(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix * glm::vec4(0.f, 0.f, 0.f, 1.f));
+	m_ResourceManager->SceneData[currentBackBufferIndex]->ViewOrientation = glm::mat4(glm::mat3(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix));
+	m_ResourceManager->SceneData[currentBackBufferIndex]->InvViewOrientation = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewOrientation);
+	m_ResourceManager->SceneData[currentBackBufferIndex]->ProjectionMatrix = sceneRenderInfo.Camera.Projection;
+	m_ResourceManager->SceneData[currentBackBufferIndex]->InvViewMatrix = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix);
+	m_ResourceManager->SceneData[currentBackBufferIndex]->invProjectionMatrix = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ProjectionMatrix);
+
+	if (sceneRenderInfo.DirectionalLights.size() > 0)
+	{
+		glm::mat4 LighDirectionMatrix = glm::mat3(sceneRenderInfo.DirectionalLights[0].Transform);
+		LighDirectionMatrix = glm::translate(glm::mat4(1.), m_ResourceManager->SceneData[currentBackBufferIndex]->CameraPosition - m_ResourceManager->SceneData[currentBackBufferIndex]->LightDirection * 50.f) * LighDirectionMatrix;
+		m_ResourceManager->SceneData[currentBackBufferIndex]->ShadowMapProjection = glm::ortho(-30.f, 30.f, -30.f, 30.f, -100.f, 100.f) * glm::inverse(LighDirectionMatrix);
+		m_ResourceManager->SceneData[currentBackBufferIndex]->ShadowMapProjectionInv = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ShadowMapProjection);
+		m_ResourceManager->SceneData[currentBackBufferIndex]->LightDirection = glm::normalize(glm::vec3(LighDirectionMatrix * glm::vec4(0., 0., -1., 0.)));
+	}
 
 
 	// Create a command list for this frame
@@ -147,7 +154,7 @@ void Renderer::RenderScene(SceneDescriptor& sceneDescriptor)
 	// Render the render passes
 	for (const Ref<RenderPass>& renderPass : m_RenderPassStack)
 	{
-		renderPass->Render(sceneDescriptor, m_ResourceManager, commandList);
+		renderPass->Render(sceneRenderInfo, m_ResourceManager, commandList);
 	}
 
 	// Render to the back buffer
@@ -176,54 +183,6 @@ void Renderer::RenderScene(SceneDescriptor& sceneDescriptor)
 
 void Renderer::Present() 
 {
-
-}
-
-void Renderer::ImGuiRender()
-{
-	static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None | ImGuiDockNodeFlags_PassthruCentralNode;
-	static bool showImGui = false;
-
-	ImGuiWindowFlags window_flags =   ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground
-									| ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize 
-									| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-	
-	const ImGuiViewport* viewport = ImGui::GetMainViewport();
-	ImGui::SetNextWindowPos(viewport->WorkPos);
-	ImGui::SetNextWindowSize(viewport->WorkSize);
-	ImGui::SetNextWindowViewport(viewport->ID);
-	
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 1.f);
-
-	ImGui::Begin("DockSpace Demo", nullptr, window_flags);
-
-	ImGui::PopStyleVar(4);
-
-	ImGuiIO& io = ImGui::GetIO();
-	if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
-	{
-		ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-		ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
-	}
-
-	ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 1.f);
-	if (ImGui::BeginMenuBar())
-	{
-		ImGui::Checkbox("Show Imgui", &showImGui);
-
-		ImGui::EndMenuBar();
-	}
-	ImGui::PopStyleVar(1);
-
-	if (showImGui)
-		ImGui::GetStyle().Alpha = .7f;
-	else
-		ImGui::GetStyle().Alpha = .0f;
-
-	ImGui::End();
 
 }
 

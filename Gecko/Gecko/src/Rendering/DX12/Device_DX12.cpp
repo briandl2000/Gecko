@@ -120,7 +120,6 @@ namespace Gecko { namespace DX12
 		//io.ConfigViewportsNoAutoMerge = true;
 		//io.ConfigViewportsNoTaskBarIcon = true;
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-		ImGui::GetStyle().Alpha = .0f;
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
@@ -212,7 +211,6 @@ namespace Gecko { namespace DX12
 	void Device_DX12::ExecuteComputeCommandList(Ref<CommandList> commandList)
 	{
 		CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
-
 
 		DIRECTX12_ASSERT(commandListDx12.CommandBuffer->CommandList->Close());
 		ID3D12CommandList* const commandLists[]{ commandListDx12.CommandBuffer->CommandList.Get() };
@@ -2813,3 +2811,4 @@ namespace Gecko { namespace DX12
 } }
 
 #endif // WIN32
+

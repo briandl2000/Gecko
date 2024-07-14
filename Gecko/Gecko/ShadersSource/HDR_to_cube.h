@@ -49,7 +49,7 @@ void main(uint3 DTid : S_INPUT_DISPATCH_ID)
 	float inputWidth, inputHeight, inputDepth;
 	inTexture.GetDimensions(inputWidth, inputHeight, inputDepth);
 
-	float3 subPixelSize = 1. / float3(inputWidth, inputHeight, 1.);
+	float3 subPixelSize = float3(1./float2(inputWidth, inputHeight), 1.);
 
 
 

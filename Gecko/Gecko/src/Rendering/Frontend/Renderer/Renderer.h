@@ -20,14 +20,14 @@ public:
 	Renderer() = default;
 	~Renderer();
 	
-	void Init(Platform::AppInfo info, ResourceManager* resourceManager, Device* _device);
+	void Init(Platform::AppInfo& info, ResourceManager* resourceManager, Device* _device);
 	void Shutdown();
 
 	template<typename T>
 	Ref<T> CreateRenderPass()
 	{
 		Ref<T> renderPass = CreateRef<T>();
-		renderPass->Init(m_ResourceManager);
+		renderPass->Init(m_Info, m_ResourceManager);
 		m_RenderPasses.push_back(renderPass);
 		return renderPass;
 	}
@@ -37,10 +37,8 @@ public:
 		m_RenderPassStack = renderPassStack;
 	}
 
-	void RenderScene(SceneDescriptor& scene);
+	void RenderScene(const SceneRenderInfo& sceneRenderInfo);
 	void Present();
-
-	void ImGuiRender();
 
 private:
 	Device* device;
@@ -53,6 +51,8 @@ private:
 	GraphicsPipelineHandle FullScreenTexturePipelineHandle;
 
 	MeshHandle quadMeshHandle{ 0 };
+
+	Platform::AppInfo m_Info;
 };
 
 }

@@ -9,12 +9,14 @@
 
 #include "Rendering/Backend/Objects.h"
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
+#include "Rendering/Frontend/Scene/SceneRenderInfo.h"
+
+#include "Platform/Platform.h"
 
 namespace Gecko
 {
 
 class ResourceManager;
-struct SceneDescriptor;
 class CommandList;
 
 class RenderPass
@@ -23,8 +25,9 @@ public:
 	RenderPass() = default;
 	virtual ~RenderPass() {}
 
-	virtual const void Init(ResourceManager* resourceManager) = 0;
-	virtual const void Render(const SceneDescriptor& sceneDescriptor ,ResourceManager* resourceManager, Ref<CommandList> commandList) = 0;
+	virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) = 0;
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo,ResourceManager* resourceManager, Ref<CommandList> commandList) = 0;
+
 protected:
 
 private:

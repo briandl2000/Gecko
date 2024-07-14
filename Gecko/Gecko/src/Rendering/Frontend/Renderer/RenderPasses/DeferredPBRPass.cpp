@@ -3,13 +3,12 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
-#include "Rendering/Frontend/Scene/Scene.h"
 #include <stb_image.h>
 
 namespace Gecko
 {
 
-const void DeferredPBRPass::Init(ResourceManager* resourceManager)
+const void DeferredPBRPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
 {
 
 	// PBR Compute Pipeline
@@ -43,11 +42,11 @@ const void DeferredPBRPass::Init(ResourceManager* resourceManager)
 
 		PBRPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}
-
+	
 	Gecko::RenderTargetDesc PBROutputDesc;
 	PBROutputDesc.AllowRenderTargetTexture = true;
-	PBROutputDesc.Width = 1920;
-	PBROutputDesc.Height = 1080;
+	PBROutputDesc.Width = appInfo.Width;
+	PBROutputDesc.Height = appInfo.Height;
 	PBROutputDesc.NumRenderTargets = 1;
 	for (u32 i = 0; i < PBROutputDesc.NumRenderTargets; i++)
 	{
@@ -57,7 +56,7 @@ const void DeferredPBRPass::Init(ResourceManager* resourceManager)
 		PBROutputDesc.RenderTargetClearValues[i].Values[3] = 0.f;
 	}
 	PBROutputDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT; // output
-	PBROutputHandle = resourceManager->CreateRenderTarget(PBROutputDesc, "PBROutput");
+	PBROutputHandle = resourceManager->CreateRenderTarget(PBROutputDesc, "PBROutput", true);
 
 	int width, height, n;
 	unsigned char* image = stbi_load(Platform::GetLocalPath("Assets/BRDF_LUT.png").c_str(), &width, &height, &n, 4);
@@ -75,7 +74,7 @@ const void DeferredPBRPass::Init(ResourceManager* resourceManager)
 	
 }
 
-const void DeferredPBRPass::Render(const SceneDescriptor& sceneDescriptor, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 
 	Ref<RenderTarget> GBuffer = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("GBuffer"));
@@ -93,7 +92,8 @@ const void DeferredPBRPass::Render(const SceneDescriptor& sceneDescriptor, Resou
 	{
 		commandList->BindComputePipeline(PBRPipeline);
 
-		commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer);
+		u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
+		commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 		commandList->SetDynamicCallData(sizeof(PBRData), &pbrData);
 		commandList->BindAsRWTexture(0, PBROutput, Gecko::RenderTargetType::Target0);
 		commandList->BindAsRWTexture(1, GBuffer, Gecko::RenderTargetType::Target0);
@@ -103,7 +103,7 @@ const void DeferredPBRPass::Render(const SceneDescriptor& sceneDescriptor, Resou
 		commandList->BindAsRWTexture(5, GBuffer, Gecko::RenderTargetType::Target4);
 
 		commandList->BindTexture(0, BRDFLUTTexture);
-		EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneDescriptor.EnvironmentMap);
+		EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneRenderInfo.EnvironmentMap);
 		Ref<Texture> environmentTexture = resourceManager->GetTexture(environmentMap.EnvironmentTextureHandle);
 		Ref<Texture> irradianceTexture = resourceManager->GetTexture(environmentMap.IrradianceTextureHandle);
 		commandList->BindTexture(1, environmentTexture);

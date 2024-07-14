@@ -3,12 +3,11 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
-#include "Rendering/Frontend/Scene/Scene.h"
 
 namespace Gecko
 {
 
-const void GeometryPass::Init(ResourceManager* resourceManager)
+const void GeometryPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
 {
 	// GBuffer Graphics Pipeline
 	{
@@ -109,14 +108,15 @@ const void GeometryPass::Init(ResourceManager* resourceManager)
 
 		CubemapPipelineHandle = resourceManager->CreateGraphicsPipeline(pipelineDesc);
 	}
+	
 
 	RenderTargetDesc gbufferTargetDesc;
 	gbufferTargetDesc.AllowDepthStencilTexture = true;
 	gbufferTargetDesc.AllowRenderTargetTexture = true;
 	gbufferTargetDesc.DepthStencilFormat = Gecko::Format::R32_FLOAT;
 	gbufferTargetDesc.DepthTargetClearValue.Depth = 1.0f;
-	gbufferTargetDesc.Width = 1920;
-	gbufferTargetDesc.Height = 1080;
+	gbufferTargetDesc.Width = appInfo.Width;
+	gbufferTargetDesc.Height = appInfo.Height;
 	gbufferTargetDesc.NumRenderTargets = 5;
 	for (u32 i = 0; i < gbufferTargetDesc.NumRenderTargets; i++)
 	{
@@ -131,10 +131,12 @@ const void GeometryPass::Init(ResourceManager* resourceManager)
 	gbufferTargetDesc.RenderTargetFormats[3] = Gecko::Format::R32G32B32A32_FLOAT; // Emissive
 	gbufferTargetDesc.RenderTargetFormats[4] = Gecko::Format::R32G32B32A32_FLOAT; // Matallic Roughness Occlusion
 
-	m_OutputHandle = resourceManager->CreateRenderTarget(gbufferTargetDesc, "GBuffer");
+	m_OutputHandle = resourceManager->CreateRenderTarget(gbufferTargetDesc, "GBuffer", true);
+
+
 }
 
-const void GeometryPass::Render(const SceneDescriptor& sceneDescriptor, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 	Ref<RenderTarget> OutputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
@@ -146,11 +148,12 @@ const void GeometryPass::Render(const SceneDescriptor& sceneDescriptor, Resource
 	commandList->BindRenderTarget(OutputTarget);
 
 	commandList->BindGraphicsPipeline(CubemapPipeline);
-	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer);
+	u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
+	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 	Mesh& cubeMesh = resourceManager->GetMesh(resourceManager->GetCubeMeshHandle());
 	commandList->BindVertexBuffer(cubeMesh.VertexBuffer);
 	commandList->BindIndexBuffer(cubeMesh.IndexBuffer);
-	EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneDescriptor.EnvironmentMap);
+	EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneRenderInfo.EnvironmentMap);
 	commandList->BindTexture(0, resourceManager->GetTexture(environmentMap.EnvironmentTextureHandle));
 
 	commandList->Draw(cubeMesh.IndexBuffer->Desc.NumIndices);
@@ -158,20 +161,20 @@ const void GeometryPass::Render(const SceneDescriptor& sceneDescriptor, Resource
 	// Geometry pass
 
 	commandList->BindGraphicsPipeline(GBufferPipeline);
-	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer);
-	for (u32 i = 0; i < sceneDescriptor.Meshes.size(); i++)
+	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
+	for (u32 i = 0; i < sceneRenderInfo.RenderObjects.size(); i++)
 	{
-		const MeshInstanceDescriptor& meshInstanceDescriptor = sceneDescriptor.Meshes[i];
+		const RenderObjectRenderInfo& meshInstanceDescriptor = sceneRenderInfo.RenderObjects[i];
 
-		glm::mat4 transformMatrix = sceneDescriptor.NodeTransformMatrices[meshInstanceDescriptor.NodeTransformMatrixIndex];
+		glm::mat4 transformMatrix = meshInstanceDescriptor.Transform;
 
 		commandList->SetDynamicCallData(sizeof(glm::mat4), (void*)(&transformMatrix));
 
-		Mesh& mesh = resourceManager->GetMesh(meshInstanceDescriptor.MeshInstance.MeshHandle);
+		Mesh& mesh = resourceManager->GetMesh(meshInstanceDescriptor.MeshHandle);
 		commandList->BindVertexBuffer(mesh.VertexBuffer);
 		commandList->BindIndexBuffer(mesh.IndexBuffer);
 
-		Material& material = resourceManager->GetMaterial(meshInstanceDescriptor.MeshInstance.MaterialHandle);
+		Material& material = resourceManager->GetMaterial(meshInstanceDescriptor.MaterialHandle);
 		commandList->BindTexture(0, resourceManager->GetTexture(material.AlbedoTextureHandle));
 		commandList->BindTexture(1, resourceManager->GetTexture(material.NormalTextureHandle));
 		commandList->BindTexture(2, resourceManager->GetTexture(material.MetalicRoughnessTextureHandle));
@@ -182,5 +185,6 @@ const void GeometryPass::Render(const SceneDescriptor& sceneDescriptor, Resource
 		commandList->Draw(mesh.IndexBuffer->Desc.NumIndices);
 	}
 }
+
 
 }

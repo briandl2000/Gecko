@@ -182,9 +182,11 @@ namespace Gecko { namespace DX12
 
 		virtual bool Destroy() override;
 
+		virtual u32 GetNumBackBuffers() { return m_NumBackBuffers; };
+		virtual u32 GetCurrentBackBufferIndex() { return m_CurrentBackBufferIndex; };
+
 		const ComPtr<ID3D12Device8> GetDevice() { return m_Device; };
 
-		u32 GetCurrentBackBufferIndex() { return m_CurrentBackBufferIndex; }
 		void SetDeferredReleasesFlag();
 
 		u32 GetBackBufferCount() { return m_NumBackBuffers; }

@@ -2,33 +2,31 @@
 
 #include "Defines.h"
 
-namespace Gecko
-{
+#include "Rendering/Frontend/Scene/Scene.h"
 
-class Scene;
-class ResourceManager;
+namespace Gecko {
+	
+	class ResourceManager;
 
-class SceneManager
-{
-public:
+	class SceneManager
+	{
+	public:
+		SceneManager() = default;
+		~SceneManager() {};
 
-	SceneManager() = default;
-	~SceneManager() {};
+		void Init();
+		void Shutdown();
 
-	void Init();
-	void Shutdown();
+		[[nodiscard]] Scene* CreateScene(const std::string& name);
 
-	Ref<Scene> CreateScene();
-	Ref<Scene> LoadGLTFScene(const std::string& pathString, ResourceManager* resourceManager);
+		u32 GetSceneCount() const;
+		
+		Scene* GetScene(u32 sceneIndex) const;
 
+		static void OnResize(u32 width, u32 height, void* listener);
 
-	// TODO: Resizeing of each scene to update the cameras
-	static void Resize() {};
-
-	void ImGuiRender();
-
-private:
-	std::vector<Ref<Scene>> m_Scenes;
-};
+	private:
+		std::vector<Scope<Scene>> m_Scenes;
+	};
 
 }

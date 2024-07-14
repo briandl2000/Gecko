@@ -3,14 +3,13 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
-#include "Rendering/Frontend/Scene/Scene.h"
 
 #include <algorithm>
 
 namespace Gecko
 {
 
-const void ToneMappingGammaCorrectionPass::Init(ResourceManager* resourceManager)
+const void ToneMappingGammaCorrectionPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
 {
 	// TonemapAndGammaCorrect Compute Pipeline
 	{
@@ -24,8 +23,8 @@ const void ToneMappingGammaCorrectionPass::Init(ResourceManager* resourceManager
 
 	Gecko::RenderTargetDesc renderTargetDesc;
 	renderTargetDesc.AllowRenderTargetTexture = true;
-	renderTargetDesc.Width = 1920;
-	renderTargetDesc.Height = 1080;
+	renderTargetDesc.Width = appInfo.Width;
+	renderTargetDesc.Height = appInfo.Height;
 	renderTargetDesc.NumRenderTargets = 1;
 	for (u32 i = 0; i < renderTargetDesc.NumRenderTargets; i++)
 	{
@@ -36,10 +35,10 @@ const void ToneMappingGammaCorrectionPass::Init(ResourceManager* resourceManager
 	}
 	renderTargetDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT; // output
 
-	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "ToneMappingGammaCorrection");
+	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "ToneMappingGammaCorrection", true);
 }
 
-const void ToneMappingGammaCorrectionPass::Render(const SceneDescriptor& sceneDescriptor, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void ToneMappingGammaCorrectionPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 	Ref<RenderTarget> inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("BloomOutput"));
 	Ref<RenderTarget> outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
@@ -49,12 +48,14 @@ const void ToneMappingGammaCorrectionPass::Render(const SceneDescriptor& sceneDe
 	commandList->BindComputePipeline(TonemapAndGammaCorrectPipeline);
 	commandList->BindAsRWTexture(0, inputTarget, Gecko::RenderTargetType::Target0);
 	commandList->BindAsRWTexture(1, outputTarget, Gecko::RenderTargetType::Target0);
-	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer);
+	u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
+	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 	commandList->Dispatch(
 		std::max(1u, outputTarget->Desc.Width / 8 + 1),
 		std::max(1u, outputTarget->Desc.Height / 8 + 1),
 		1
 	);
 }
+
 
 }

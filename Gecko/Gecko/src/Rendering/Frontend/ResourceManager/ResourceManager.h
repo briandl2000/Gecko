@@ -23,7 +23,7 @@ public:
 	MeshHandle CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, bool CreateBLAS);
 	TextureHandle CreateTexture(TextureDesc textureDesc, void* imageData = nullptr, bool mipMap = false);
 	MaterialHandle CreateMaterial();
-	RenderTargetHandle CreateRenderTarget(RenderTargetDesc renderTargetDesc, std::string name);
+	RenderTargetHandle CreateRenderTarget(RenderTargetDesc renderTargetDesc, std::string name, bool KeepWindowAspectRatio);
 	EnvironmentMapHandle CreateEnvironmentMap(std::string path);
 	GraphicsPipelineHandle CreateGraphicsPipeline(GraphicsPipelineDesc graphicsPipelineDesc);
 	ComputePipelineHandle CreateComputePipeline(ComputePipelineDesc computePipelineDesc);
@@ -44,9 +44,13 @@ public:
 	MaterialHandle GetMissingMaterialHandle() { return m_MissingMaterialHandle; }
 	MaterialHandle GetCubeMeshHandle() { return m_CubeMeshHandle; }
 
+	static void OnResize(u32 width, u32 height, void* listener);
+
+	u32 GetCurrentBackBufferIndex() { return m_Device->GetCurrentBackBufferIndex(); }
+
 	// TEMP
-	Gecko::Ref<Gecko::ConstantBuffer> SceneDataBuffer;
-	SceneDataStruct* SceneData;
+	std::vector<Gecko::Ref<Gecko::ConstantBuffer>> SceneDataBuffer;
+	std::vector<SceneDataStruct*> SceneData;
 
 private:
 	void MipMapTexture(Ref<Texture> texture);
@@ -75,7 +79,7 @@ private:
 	std::unordered_map<MeshHandle, Mesh> m_Meshes;
 	std::unordered_map<TextureHandle, Ref<Texture>> m_Textures;
 	std::unordered_map<MaterialHandle, Material> m_Materials;
-	std::unordered_map<RenderTargetHandle, Ref<RenderTarget>> m_RenderTargets;
+	std::unordered_map<RenderTargetHandle, RenderTargetResource> m_RenderTargets;
 	std::unordered_map<EnvironmentMapHandle, EnvironmentMap> m_EnvironmentMaps;
 
 	std::unordered_map<GraphicsPipelineHandle, GraphicsPipeline> m_GraphicsPipelines;
