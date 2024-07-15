@@ -138,7 +138,7 @@ const void GeometryPass::Init(Platform::AppInfo& appInfo, ResourceManager* resou
 
 const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
-	Ref<RenderTarget> OutputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
+	RenderTarget OutputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	GraphicsPipeline CubemapPipeline = resourceManager->GetGraphicsPipeline(CubemapPipelineHandle);
 	GraphicsPipeline GBufferPipeline = resourceManager->GetGraphicsPipeline(GBufferPipelineHandle);
@@ -156,7 +156,7 @@ const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, Resource
 	EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneRenderInfo.EnvironmentMap);
 	commandList->BindTexture(0, resourceManager->GetTexture(environmentMap.EnvironmentTextureHandle));
 
-	commandList->Draw(cubeMesh.IndexBuffer->Desc.NumIndices);
+	commandList->Draw(cubeMesh.IndexBuffer.Desc.NumIndices);
 
 	// Geometry pass
 
@@ -182,7 +182,7 @@ const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, Resource
 		commandList->BindTexture(4, resourceManager->GetTexture(material.OcclusionTextureHandle));
 		commandList->BindConstantBuffer(1, material.MaterialConstantBuffer);
 
-		commandList->Draw(mesh.IndexBuffer->Desc.NumIndices);
+		commandList->Draw(mesh.IndexBuffer.Desc.NumIndices);
 	}
 }
 

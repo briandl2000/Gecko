@@ -32,9 +32,9 @@ public:
 	RenderTargetHandle GetRenderTargetHandle(std::string name);
 
 	Mesh& GetMesh(const MeshHandle& meshHandle);
-	Ref<Texture>& GetTexture(const TextureHandle& textureHandle);
+	Texture& GetTexture(const TextureHandle& textureHandle);
 	Material& GetMaterial(const MaterialHandle& materialHandle);
-	Ref<RenderTarget>& GetRenderTarget(const RenderTargetHandle& renderTargetHandle);
+	RenderTarget& GetRenderTarget(const RenderTargetHandle& renderTargetHandle);
 	EnvironmentMap& GetEnvironmentMap(const EnvironmentMapHandle& environmentMapHandle);
 	GraphicsPipeline& GetGraphicsPipeline(const GraphicsPipelineHandle& graphicsPipelineHandle);
 	ComputePipeline& GetComputePipeline(const ComputePipelineHandle& computePipelineHandle);
@@ -49,11 +49,11 @@ public:
 	u32 GetCurrentBackBufferIndex() { return m_Device->GetCurrentBackBufferIndex(); }
 
 	// TEMP
-	std::vector<Gecko::Ref<Gecko::ConstantBuffer>> SceneDataBuffer;
+	std::vector<ConstantBuffer> SceneDataBuffer;
 	std::vector<SceneDataStruct*> SceneData;
 
 private:
-	void MipMapTexture(Ref<Texture> texture);
+	void MipMapTexture(Texture texture);
 
 private:
 
@@ -77,7 +77,7 @@ private:
 	u32 m_CurrentRaytracePipelineIndex{ 0 };
 
 	std::unordered_map<MeshHandle, Mesh> m_Meshes;
-	std::unordered_map<TextureHandle, Ref<Texture>> m_Textures;
+	std::unordered_map<TextureHandle, Texture> m_Textures;
 	std::unordered_map<MaterialHandle, Material> m_Materials;
 	std::unordered_map<RenderTargetHandle, RenderTargetResource> m_RenderTargets;
 	std::unordered_map<EnvironmentMapHandle, EnvironmentMap> m_EnvironmentMaps;

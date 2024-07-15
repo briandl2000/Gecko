@@ -37,25 +37,25 @@ namespace Gecko {
 		virtual Ref<CommandList> CreateComputeCommandList() = 0;
 		virtual void ExecuteComputeCommandList(Ref<CommandList> commandList) = 0;
 
-		virtual Ref<RenderTarget> GetCurrentBackBuffer() = 0;
+		virtual RenderTarget GetCurrentBackBuffer() = 0;
 
-		virtual Ref<RenderTarget> CreateRenderTarget(const RenderTargetDesc& desc) = 0;
-		virtual Ref<VertexBuffer> CreateVertexBuffer(const VertexBufferDesc& desc) = 0;
-		virtual Ref<IndexBuffer> CreateIndexBuffer(const IndexBufferDesc& desc) = 0;
+		virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) = 0;
+		virtual VertexBuffer CreateVertexBuffer(const VertexBufferDesc& desc) = 0;
+		virtual IndexBuffer CreateIndexBuffer(const IndexBufferDesc& desc) = 0;
 		virtual GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) = 0;
 		virtual ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) = 0;
-		virtual Ref<Texture> CreateTexture(const TextureDesc& desc) = 0;
-		virtual Ref<ConstantBuffer> CreateConstantBuffer(const ConstantBufferDesc& desc) = 0;
+		virtual Texture CreateTexture(const TextureDesc& desc) = 0;
+		virtual ConstantBuffer CreateConstantBuffer(const ConstantBufferDesc& desc) = 0;
 
 		// Raytracing stuff
 		virtual RaytracingPipeline CreateRaytracingPipeline(const RaytracingPipelineDesc& desc) = 0;
 		virtual BLAS CreateBLAS(const BLASDesc& desc) = 0;
 		virtual TLAS CreateTLAS(const TLASRefitDesc& desc) = 0;
 
-		virtual void UploadTextureData(Ref<Texture> texture, void* Data, u32 mip = 0, u32 slice = 0) = 0;
+		virtual void UploadTextureData(Texture texture, void* Data, u32 mip = 0, u32 slice = 0) = 0;
 
-		virtual void DrawTextureInImGui(Ref<Texture> texture, u32 width = 0, u32 height = 0) = 0;
-		virtual void DrawRenderTargetInImGui(Ref<RenderTarget> renderTarget, u32 width = 0, u32 height = 0, RenderTargetType type = RenderTargetType::Target0) = 0;
+		virtual void DrawTextureInImGui(Texture texture, u32 width = 0, u32 height = 0) = 0;
+		virtual void DrawRenderTargetInImGui(RenderTarget renderTarget, u32 width = 0, u32 height = 0, RenderTargetType type = RenderTargetType::Target0) = 0;
 		virtual void ImGuiRender(Ref<CommandList> commandList) = 0;
 
 		virtual bool Destroy() = 0;

@@ -40,8 +40,8 @@ const void ToneMappingGammaCorrectionPass::Init(Platform::AppInfo& appInfo, Reso
 
 const void ToneMappingGammaCorrectionPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
-	Ref<RenderTarget> inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("BloomOutput"));
-	Ref<RenderTarget> outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("BloomOutput"));
+	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	ComputePipeline TonemapAndGammaCorrectPipeline = resourceManager->GetComputePipeline(TonemapAndGammaCorrectPipelineHandle);
 
@@ -51,8 +51,8 @@ const void ToneMappingGammaCorrectionPass::Render(const SceneRenderInfo& sceneRe
 	u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
 	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 	commandList->Dispatch(
-		std::max(1u, outputTarget->Desc.Width / 8 + 1),
-		std::max(1u, outputTarget->Desc.Height / 8 + 1),
+		std::max(1u, outputTarget.Desc.Width / 8 + 1),
+		std::max(1u, outputTarget.Desc.Height / 8 + 1),
 		1
 	);
 }

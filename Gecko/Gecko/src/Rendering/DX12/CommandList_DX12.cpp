@@ -18,26 +18,26 @@ namespace Gecko { namespace DX12 {
 		return CommandBuffer->CommandList.Get() != nullptr;
 	}
 	
-	void CommandList_DX12::ClearRenderTarget(Ref<RenderTarget> renderTarget)
+	void CommandList_DX12::ClearRenderTarget(RenderTarget renderTarget)
 	{
-		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget->Data.get();
+		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget.Data.get();
 		TransitionRenderTarget(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-		for (u32 i = 0; i < renderTarget->Desc.NumRenderTargets; i++)
+		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
 		{
 			CommandBuffer->CommandList->ClearRenderTargetView(
 				renderTargetDX12->rtvs[i].CPU,
-				renderTarget->Desc.RenderTargetClearValues[i].Values,
+				renderTarget.Desc.RenderTargetClearValues[i].Values,
 				1,
 				&renderTargetDX12->rect
 			);
 		}
 
-		if (renderTarget->Desc.DepthStencilFormat != Format::None)
+		if (renderTarget.Desc.DepthStencilFormat != Format::None)
 		{
 			CommandBuffer->CommandList->ClearDepthStencilView(
 				renderTargetDX12->dsv.CPU,
 				D3D12_CLEAR_FLAG_DEPTH,
-				renderTarget->Desc.DepthTargetClearValue.Depth,
+				renderTarget.Desc.DepthTargetClearValue.Depth,
 				0,
 				1,
 				&renderTargetDX12->rect
@@ -45,10 +45,10 @@ namespace Gecko { namespace DX12 {
 		}
 	}
 
-	void CommandList_DX12::CopyToRenderTarget(Ref<RenderTarget> src, RenderTargetType srcType, Ref<RenderTarget> dst, RenderTargetType dstType)
+	void CommandList_DX12::CopyToRenderTarget(RenderTarget src, RenderTargetType srcType, RenderTarget dst, RenderTargetType dstType)
 	{
-		RenderTarget_DX12* srcRenderTarget_DX12 = (RenderTarget_DX12*)src->Data.get();
-		RenderTarget_DX12* dstRenderTarget_DX12 = (RenderTarget_DX12*)dst->Data.get();
+		RenderTarget_DX12* srcRenderTarget_DX12 = (RenderTarget_DX12*)src.Data.get();
+		RenderTarget_DX12* dstRenderTarget_DX12 = (RenderTarget_DX12*)dst.Data.get();
 		
 		Format srcFormat = Format::None;
 		Format dstFormat = Format::None;
@@ -58,25 +58,25 @@ namespace Gecko { namespace DX12 {
 
 		if (srcType == RenderTargetType::TargetDepth)
 		{
-			srcFormat = src->Desc.DepthStencilFormat;
+			srcFormat = src.Desc.DepthStencilFormat;
 			srcRenderTargetResource = srcRenderTarget_DX12->DepthBufferResource;
 		}
 		else
 		{
 			u32 resourceIndex = GetRenderTargetResourceIndex(srcType);
-			srcFormat = src->Desc.RenderTargetFormats[resourceIndex];
+			srcFormat = src.Desc.RenderTargetFormats[resourceIndex];
 			srcRenderTargetResource = srcRenderTarget_DX12->RenderTargetResources[resourceIndex];
 		}
 
 		if (dstType == RenderTargetType::TargetDepth)
 		{
-			dstFormat = dst->Desc.DepthStencilFormat;
+			dstFormat = dst.Desc.DepthStencilFormat;
 			dstRenderTargetResource = dstRenderTarget_DX12->DepthBufferResource;
 		}
 		else
 		{
 			u32 resourceIndex = GetRenderTargetResourceIndex(dstType);
-			dstFormat = dst->Desc.RenderTargetFormats[resourceIndex];
+			dstFormat = dst.Desc.RenderTargetFormats[resourceIndex];
 			dstRenderTargetResource = dstRenderTarget_DX12->RenderTargetResources[resourceIndex];
 		}
 
@@ -96,10 +96,10 @@ namespace Gecko { namespace DX12 {
 		);
 	}
 	
-	void CommandList_DX12::CopyFromRenderTarget(Ref<RenderTarget> src, RenderTargetType srcType, Ref<Texture> dst)
+	void CommandList_DX12::CopyFromRenderTarget(RenderTarget src, RenderTargetType srcType, Texture dst)
 	{
-		RenderTarget_DX12* srcRenderTarget_DX12 = (RenderTarget_DX12*)src->Data.get();
-		Texture_DX12* dstTexture_DX12 = (Texture_DX12*)dst->Data.get();
+		RenderTarget_DX12* srcRenderTarget_DX12 = (RenderTarget_DX12*)src.Data.get();
+		Texture_DX12* dstTexture_DX12 = (Texture_DX12*)dst.Data.get();
 		
 		Format srcFormat = Format::None;
 		Format dstFormat = Format::None;
@@ -109,17 +109,17 @@ namespace Gecko { namespace DX12 {
 
 		if (srcType == RenderTargetType::TargetDepth)
 		{
-			srcFormat = src->Desc.DepthStencilFormat;
+			srcFormat = src.Desc.DepthStencilFormat;
 			srcRenderTargetResource = srcRenderTarget_DX12->DepthBufferResource;
 		}
 		else
 		{
 			u32 resourceIndex = GetRenderTargetResourceIndex(srcType);
-			srcFormat = src->Desc.RenderTargetFormats[resourceIndex];
+			srcFormat = src.Desc.RenderTargetFormats[resourceIndex];
 			srcRenderTargetResource = srcRenderTarget_DX12->RenderTargetResources[resourceIndex];
 		}
 
-		dstFormat = dst->Desc.Format;
+		dstFormat = dst.Desc.Format;
 		dstRenderTargetResource = dstTexture_DX12->TextureResource;
 		
 		TransitionResource(dstRenderTargetResource, D3D12_RESOURCE_STATE_COPY_DEST, 1, 1);
@@ -138,11 +138,11 @@ namespace Gecko { namespace DX12 {
 		);
 	}
 
-	void CommandList_DX12::CopyFromTexture(Ref<Texture> src, Ref<RenderTarget> dst, RenderTargetType dstType)
+	void CommandList_DX12::CopyFromTexture(Texture src, RenderTarget dst, RenderTargetType dstType)
 	{
 
-		Texture_DX12* srcTexture_DX12 = (Texture_DX12*)src->Data.get();
-		RenderTarget_DX12* dstRenderTarget_DX12 = (RenderTarget_DX12*)dst->Data.get();
+		Texture_DX12* srcTexture_DX12 = (Texture_DX12*)src.Data.get();
+		RenderTarget_DX12* dstRenderTarget_DX12 = (RenderTarget_DX12*)dst.Data.get();
 
 		Format srcFormat = Format::None;
 		Format dstFormat = Format::None;
@@ -150,18 +150,18 @@ namespace Gecko { namespace DX12 {
 		Ref<Resource> srcRenderTargetResource;
 		Ref<Resource> dstRenderTargetResource;
 
-		srcFormat = src->Desc.Format;
+		srcFormat = src.Desc.Format;
 		srcRenderTargetResource = srcTexture_DX12->TextureResource;
 
 		if (dstType == RenderTargetType::TargetDepth)
 		{
-			dstFormat = dst->Desc.DepthStencilFormat;
+			dstFormat = dst.Desc.DepthStencilFormat;
 			dstRenderTargetResource = dstRenderTarget_DX12->DepthBufferResource;
 		}
 		else
 		{
 			u32 resourceIndex = GetRenderTargetResourceIndex(dstType);
-			dstFormat = dst->Desc.RenderTargetFormats[resourceIndex];
+			dstFormat = dst.Desc.RenderTargetFormats[resourceIndex];
 			dstRenderTargetResource = dstRenderTarget_DX12->RenderTargetResources[resourceIndex];
 		}
 
@@ -238,62 +238,62 @@ namespace Gecko { namespace DX12 {
 		resource->subResourceStates[subResourceIndex] = transtion;
 	}
 
-	void CommandList_DX12::BindRenderTarget(Ref<RenderTarget> renderTarget)
+	void CommandList_DX12::BindRenderTarget(RenderTarget renderTarget)
 	{
 		//ASSERT_MSG(CurrentlyGraphicsBoundPipeline != nullptr, "Graphics pipeline needs to be bound for this!");
 
-		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget->Data.get();
+		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget.Data.get();
 
 		TransitionRenderTarget(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 		CommandBuffer->CommandList->RSSetViewports(1, &renderTargetDX12->ViewPort);
 		CommandBuffer->CommandList->RSSetScissorRects(1, &renderTargetDX12->rect);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetCpuHandles[8];
-		for (u32 i = 0; i < renderTarget->Desc.NumRenderTargets; i++)
+		D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetCpuHandles[8]{0};
+		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
 		{
 			RenderTargetCpuHandles[i] = renderTargetDX12->rtvs[i].CPU;
 		}
 
 		CommandBuffer->CommandList->OMSetRenderTargets(
-			renderTarget->Desc.NumRenderTargets, 
+			renderTarget.Desc.NumRenderTargets, 
 			RenderTargetCpuHandles,
 			renderTargetDX12->DepthBufferResource != nullptr, 
 			renderTargetDX12->DepthBufferResource != nullptr ? &renderTargetDX12->dsv.CPU : nullptr);
 	}
 
-	void CommandList_DX12::BindVertexBuffer(Ref<VertexBuffer> vertexBuffer)
+	void CommandList_DX12::BindVertexBuffer(VertexBuffer vertexBuffer)
 	{
 		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound for this!");
-		VertexBuffer_DX12* vertexBuffer_DX12 = (VertexBuffer_DX12*)vertexBuffer->Data.get();
+		VertexBuffer_DX12* vertexBuffer_DX12 = (VertexBuffer_DX12*)vertexBuffer.Data.get();
 
 		CommandBuffer->CommandList->IASetVertexBuffers(0, 1, &vertexBuffer_DX12->VertexBufferView);
 	}
 	
-	void CommandList_DX12::BindIndexBuffer(Ref<IndexBuffer> indexBuffer)
+	void CommandList_DX12::BindIndexBuffer(IndexBuffer indexBuffer)
 	{
 		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound for this!");
-		IndexBuffer_DX12* indexBuffer_DX12 = (IndexBuffer_DX12*)indexBuffer->Data.get();
+		IndexBuffer_DX12* indexBuffer_DX12 = (IndexBuffer_DX12*)indexBuffer.Data.get();
 
 		CommandBuffer->CommandList->IASetIndexBuffer(&indexBuffer_DX12->IndexBufferView);
 
 	}
 	
-	void CommandList_DX12::BindTexture(u32 slot, Ref<Texture> texture)
+	void CommandList_DX12::BindTexture(u32 slot, Texture texture)
 	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture->Data.get();
+		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
 
 		u32 rootDescriptorTableSlot = 0;
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, texture->Desc.NumMips, texture->Desc.NumArraySlices);
+			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, texture.Desc.NumMips, texture.Desc.NumArraySlices);
 			GraphicsPipeline_DX12* graphicsPipeline_DX12 = (GraphicsPipeline_DX12*)m_GraphicsPipeline.Data.get();
 			rootDescriptorTableSlot = graphicsPipeline_DX12->TextureIndices[slot];
 			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->srv.GPU);
 		}
 		else if(m_BoundPipelineType == PipelineType::Compute)
 		{
-			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, texture->Desc.NumMips, texture->Desc.NumArraySlices);
+			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, texture.Desc.NumMips, texture.Desc.NumArraySlices);
 			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
 			rootDescriptorTableSlot = computePipeline_DX12->TextureIndices[slot];
 			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->srv.GPU);
@@ -306,9 +306,9 @@ namespace Gecko { namespace DX12 {
 
 	}
 
-	void CommandList_DX12::BindTexture(u32 slot, Ref<Texture> texture, u32 mipLevel)
+	void CommandList_DX12::BindTexture(u32 slot, Texture texture, u32 mipLevel)
 	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture->Data.get();
+		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
 		
 		u32 rootDescriptorTableSlot = 0;
 		if (m_BoundPipelineType == PipelineType::Graphics)
@@ -316,8 +316,8 @@ namespace Gecko { namespace DX12 {
 			TransitionSubResource(
 				texture_DX12->TextureResource, 
 				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-				texture->Desc.NumMips,
-				texture->Desc.NumArraySlices, 
+				texture.Desc.NumMips,
+				texture.Desc.NumArraySlices, 
 				mipLevel
 			);
 			GraphicsPipeline_DX12* graphicsPipeline_DX12 = (GraphicsPipeline_DX12*)m_GraphicsPipeline.Data.get();
@@ -331,8 +331,8 @@ namespace Gecko { namespace DX12 {
 			TransitionSubResource(
 				texture_DX12->TextureResource, 
 				D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, 
-				texture->Desc.NumMips,
-				texture->Desc.NumArraySlices, 
+				texture.Desc.NumMips,
+				texture.Desc.NumArraySlices, 
 				mipLevel
 			);
 			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
@@ -347,9 +347,9 @@ namespace Gecko { namespace DX12 {
 
 	}
 
-	void CommandList_DX12::BindTexture(u32 slot, Ref<RenderTarget> renderTarget, RenderTargetType type)
+	void CommandList_DX12::BindTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type)
 	{
-		RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)renderTarget->Data.get();
+		RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)renderTarget.Data.get();
 
 		DescriptorHandle* descriptorHandle;
 		switch (type)
@@ -390,16 +390,16 @@ namespace Gecko { namespace DX12 {
 		}
 	}
 
-	void CommandList_DX12::BindAsRWTexture(u32 slot, Ref<Texture> texture)
+	void CommandList_DX12::BindAsRWTexture(u32 slot, Texture texture)
 	{
 		//ASSERT_MSG(CurrentlyComputeBoundPipeline != nullptr, "A compute shader needs to be bound for this!");
 
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture->Data.get();
+		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
 
 		u32 rootDescriptorTableSlot = 0;
 		if (m_BoundPipelineType == PipelineType::Compute)
 		{
-			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, texture->Desc.NumMips, texture->Desc.NumArraySlices);
+			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, texture.Desc.NumMips, texture.Desc.NumArraySlices);
 			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
 			rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
 			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->uav.GPU);
@@ -413,11 +413,11 @@ namespace Gecko { namespace DX12 {
 
 	}
 
-	void CommandList_DX12::BindAsRWTexture(u32 slot, Ref<Texture> texture, u32 mipLevel)
+	void CommandList_DX12::BindAsRWTexture(u32 slot, Texture texture, u32 mipLevel)
 	{
 		//ASSERT_MSG(CurrentlyComputeBoundPipeline != nullptr, "A compute shader needs to be bound for this!");
 
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture->Data.get();
+		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
 
 		
 		u32 rootDescriptorTableSlot = 0;
@@ -427,8 +427,8 @@ namespace Gecko { namespace DX12 {
 			TransitionSubResource(
 				texture_DX12->TextureResource,
 				D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-				texture->Desc.NumMips,
-				texture->Desc.NumArraySlices,
+				texture.Desc.NumMips,
+				texture.Desc.NumArraySlices,
 				mipLevel
 			);
 			
@@ -443,11 +443,11 @@ namespace Gecko { namespace DX12 {
 		}
 	}
 
-	void CommandList_DX12::BindAsRWTexture(u32 slot, Ref<RenderTarget> renderTarget, RenderTargetType type)
+	void CommandList_DX12::BindAsRWTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type)
 	{
 		//ASSERT_MSG(CurrentlyComputeBoundPipeline != nullptr, "A compute shader needs to be bound for this!");
 
-		RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)renderTarget->Data.get();
+		RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)renderTarget.Data.get();
 
 
 		DescriptorHandle* descriptorHandle;
@@ -525,9 +525,9 @@ namespace Gecko { namespace DX12 {
 		m_RaytracingPipeline = raytracingPipeline;
 	}
 
-	void CommandList_DX12::BindConstantBuffer(u32 slot, Ref<ConstantBuffer> buffer)
+	void CommandList_DX12::BindConstantBuffer(u32 slot, ConstantBuffer buffer)
 	{
-		ConstantBuffer_DX12* constantBuffer_DX12 = (ConstantBuffer_DX12*)buffer->Data.get();
+		ConstantBuffer_DX12* constantBuffer_DX12 = (ConstantBuffer_DX12*)buffer.Data.get();
 		
 
 		u32 rootDescriptorTableSlot = 0;
@@ -639,11 +639,11 @@ namespace Gecko { namespace DX12 {
 		}
 	}
 
-	void CommandList_DX12::TransitionRenderTarget(Ref<RenderTarget> renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, D3D12_RESOURCE_STATES newDepthStencilState)
+	void CommandList_DX12::TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, D3D12_RESOURCE_STATES newDepthStencilState)
 	{
-		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget->Data.get();
+		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget.Data.get();
 
-		for (u32 i = 0; i < renderTarget->Desc.NumRenderTargets; i++)
+		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
 		{
 			TransitionResource(
 				renderTargetDX12->RenderTargetResources[i],

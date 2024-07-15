@@ -221,19 +221,19 @@ namespace Gecko { namespace DX12
 		commandListDx12.CommandBuffer = nullptr;
 	}
 
-	Ref<RenderTarget> Device_DX12::GetCurrentBackBuffer()
+	RenderTarget Device_DX12::GetCurrentBackBuffer()
 	{
 		return m_BackBuffers[m_CurrentBackBufferIndex];
 	}
 
-	Ref<RenderTarget> Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc)
+	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc)
 	{
 		Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
 
 		return CreateRenderTarget(desc, renderTargetDX12);
 	}
 
-	Ref<RenderTarget> Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc, Ref<RenderTarget_DX12>& renderTargetDX12)
+	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc, Ref<RenderTarget_DX12>& renderTargetDX12)
 	{
 
 		DescriptorHandle renderTargetSrvs[8];
@@ -393,14 +393,14 @@ namespace Gecko { namespace DX12
 		
 		renderTargetDX12->device = this;
 
-		Ref<RenderTarget> renderTarget = CreateRef<RenderTarget>();
-		renderTarget->Desc = desc;
-		renderTarget->Data = renderTargetDX12;
+		RenderTarget renderTarget;
+		renderTarget.Desc = desc;
+		renderTarget.Data = renderTargetDX12;
 
 		return renderTarget;
 	}
 
-	Ref<VertexBuffer> Device_DX12::CreateVertexBuffer(const VertexBufferDesc& desc)
+	VertexBuffer Device_DX12::CreateVertexBuffer(const VertexBufferDesc& desc)
 	{
 		Ref<VertexBuffer_DX12> vertexBuffer_DX12 = CreateRef<VertexBuffer_DX12>();
 		
@@ -433,15 +433,15 @@ namespace Gecko { namespace DX12
 		vertexBuffer_DX12->VertexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
 		vertexBuffer_DX12->VertexBufferView.StrideInBytes = desc.Layout.Stride;
 
-		Ref<VertexBuffer> vertexBuffer = CreateRef<VertexBuffer>();
-		vertexBuffer->Desc = desc;
-		vertexBuffer->Data = vertexBuffer_DX12;
+		VertexBuffer vertexBuffer;
+		vertexBuffer.Desc = desc;
+		vertexBuffer.Data = vertexBuffer_DX12;
 		
 
 		return vertexBuffer;
 	}
 
-	Ref<IndexBuffer> Device_DX12::CreateIndexBuffer(const IndexBufferDesc& desc)
+	IndexBuffer Device_DX12::CreateIndexBuffer(const IndexBufferDesc& desc)
 	{
 		Ref<IndexBuffer_DX12> indexBuffer_DX12 = CreateRef<IndexBuffer_DX12>();
 
@@ -474,14 +474,14 @@ namespace Gecko { namespace DX12
 		indexBuffer_DX12->IndexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
 		indexBuffer_DX12->IndexBufferView.Format = FormatToD3D12Format(desc.IndexFormat);
 
-		Ref<IndexBuffer> indexBuffer = CreateRef<IndexBuffer>();
-		indexBuffer->Desc = desc;
-		indexBuffer->Data = indexBuffer_DX12;
+		IndexBuffer indexBuffer;
+		indexBuffer.Desc = desc;
+		indexBuffer.Data = indexBuffer_DX12;
 
 		return indexBuffer;
 	}
 
-	Ref<Texture> Device_DX12::CreateTexture(const TextureDesc& desc)
+	Texture Device_DX12::CreateTexture(const TextureDesc& desc)
 	{
 
 		Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
@@ -702,9 +702,9 @@ namespace Gecko { namespace DX12
 
 		texture_DX12->device = this;
 
-		Ref<Texture> texture = CreateRef<Texture>();
-		texture->Desc = desc;
-		texture->Data = texture_DX12;
+		Texture texture;
+		texture.Desc = desc;
+		texture.Data = texture_DX12;
 
 		return texture;
 	}
@@ -1172,7 +1172,7 @@ namespace Gecko { namespace DX12
 		return computePipeline;
 	}
 
-	Ref<ConstantBuffer> Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
+	ConstantBuffer Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
 	{
 		Ref<ConstantBuffer_DX12> constantBuffer_DX12 = CreateRef<ConstantBuffer_DX12>();
 		constantBuffer_DX12->ConstantBufferResource = CreateRef<Resource>();
@@ -1201,10 +1201,10 @@ namespace Gecko { namespace DX12
 
 		constantBuffer_DX12->device = this;
 
-		Ref<ConstantBuffer> constantBuffer = CreateRef<ConstantBuffer>();
-		constantBuffer->Desc = desc;
-		constantBuffer->Data = constantBuffer_DX12;
-		constantBuffer->Buffer = constantBuffer_DX12->GPUAddress;
+		ConstantBuffer constantBuffer;
+		constantBuffer.Desc = desc;
+		constantBuffer.Data = constantBuffer_DX12;
+		constantBuffer.Buffer = constantBuffer_DX12->GPUAddress;
 
 		return constantBuffer;
 	}
@@ -1491,8 +1491,8 @@ namespace Gecko { namespace DX12
 	{
 		Ref<BLAS_DX12> blas_DX12 = CreateRef<BLAS_DX12>();
 
-		VertexBuffer_DX12* vertexBuffer_DX12 = (VertexBuffer_DX12*)desc.VertexBuffer->Data.get();
-		IndexBuffer_DX12* indexBuffer_DX12 = (IndexBuffer_DX12*)desc.IndexBuffer->Data.get();
+		VertexBuffer_DX12* vertexBuffer_DX12 = (VertexBuffer_DX12*)desc.VertexBuffer.Data.get();
+		IndexBuffer_DX12* indexBuffer_DX12 = (IndexBuffer_DX12*)desc.IndexBuffer.Data.get();
 
 		Ref<CommandBuffer> commandBuffer = GetFreeGraphicsCommandBuffer();
 				
@@ -1501,15 +1501,15 @@ namespace Gecko { namespace DX12
 		D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 		geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 		geometryDesc.Triangles.IndexBuffer = indexBuffer_DX12->IndexBufferResource->Resource->GetGPUVirtualAddress();
-		geometryDesc.Triangles.IndexCount = desc.IndexBuffer->Desc.NumIndices;
+		geometryDesc.Triangles.IndexCount = desc.IndexBuffer.Desc.NumIndices;
 		geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 		
 		geometryDesc.Triangles.Transform3x4 = 0;
 		
 		geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		geometryDesc.Triangles.VertexCount = desc.VertexBuffer->Desc.NumVertices;
+		geometryDesc.Triangles.VertexCount = desc.VertexBuffer.Desc.NumVertices;
 		geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer_DX12->VertexBufferResource->Resource->GetGPUVirtualAddress();
-		geometryDesc.Triangles.VertexBuffer.StrideInBytes = desc.VertexBuffer->Desc.Layout.Stride;
+		geometryDesc.Triangles.VertexBuffer.StrideInBytes = desc.VertexBuffer.Desc.Layout.Stride;
 				
 		// Mark the geometry as opaque. 
 		// PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
@@ -1719,16 +1719,16 @@ namespace Gecko { namespace DX12
 		return tlas;
 	}
 
-	void Device_DX12::UploadTextureData(Ref<Texture> texture, void* Data, u32 mip, u32 slice)
+	void Device_DX12::UploadTextureData(Texture texture, void* Data, u32 mip, u32 slice)
 	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture->Data.get();
+		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
 
 		D3D12_SUBRESOURCE_DATA subresourceData = {};
 		subresourceData.pData = Data;
-		subresourceData.RowPitch = static_cast<LONG_PTR>(texture->Desc.Width * FormatSizeInBytes(texture->Desc.Format));
-		subresourceData.SlicePitch = static_cast<LONG_PTR>(texture->Desc.Width * texture->Desc.Height * FormatSizeInBytes(texture->Desc.Format));
+		subresourceData.RowPitch = static_cast<LONG_PTR>(texture.Desc.Width * FormatSizeInBytes(texture.Desc.Format));
+		subresourceData.SlicePitch = static_cast<LONG_PTR>(texture.Desc.Width * texture.Desc.Height * FormatSizeInBytes(texture.Desc.Format));
 
-		u32 subResource = D3D12CalcSubresource(mip, slice, 0, texture->Desc.NumMips, texture->Desc.NumArraySlices);
+		u32 subResource = D3D12CalcSubresource(mip, slice, 0, texture.Desc.NumMips, texture.Desc.NumArraySlices);
 
 		if (texture_DX12->TextureResource->CurrentState != D3D12_RESOURCE_STATE_COMMON)
 		{
@@ -1850,9 +1850,9 @@ namespace Gecko { namespace DX12
 		ImGui::NewFrame();
 	}
 
-	void Device_DX12::DrawTextureInImGui(Ref<Texture> texture, u32 width, u32 height)
+	void Device_DX12::DrawTextureInImGui(Texture texture, u32 width, u32 height)
 	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture->Data.get();
+		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
 
 		ImVec2 size = {
 			static_cast<float>(width), 
@@ -1861,21 +1861,21 @@ namespace Gecko { namespace DX12
 		if (width == 0 || height == 0)
 		{
 			size = { 
-				static_cast<float>(texture->Desc.Width), 
-				static_cast<float>(texture->Desc.Height) 
+				static_cast<float>(texture.Desc.Width), 
+				static_cast<float>(texture.Desc.Height) 
 			};
 		}
 		
-		for (u32 i = 0; i < texture->Desc.NumMips; i++)
+		for (u32 i = 0; i < texture.Desc.NumMips; i++)
 		{
 			ImGui::Image(reinterpret_cast<void*>(texture_DX12->mipSrvs[i].GPU.ptr), size);
 		}
 
 	};
 
-	void Device_DX12::DrawRenderTargetInImGui(Ref<RenderTarget> renderTarget, u32 width, u32 height, RenderTargetType type)
+	void Device_DX12::DrawRenderTargetInImGui(RenderTarget renderTarget, u32 width, u32 height, RenderTargetType type)
 	{
-		RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)renderTarget->Data.get();
+		RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)renderTarget.Data.get();
 		ImVec2 size = {
 			static_cast<float>(width),
 			static_cast<float>(height)
@@ -1883,8 +1883,8 @@ namespace Gecko { namespace DX12
 		if (width == 0 || height == 0)
 		{
 			size = {
-				static_cast<float>(renderTarget->Desc.Width),
-				static_cast<float>(renderTarget->Desc.Height)
+				static_cast<float>(renderTarget.Desc.Width),
+				static_cast<float>(renderTarget.Desc.Height)
 			};
 		}
 
@@ -2365,7 +2365,7 @@ namespace Gecko { namespace DX12
 		(*ppResource)->Unmap(0, nullptr);
 	}
 
-	//ComPtr<ID3D12Resource> Device_DX12::GenerateAccelerationStructure(Ref<VertexBuffer> vertexBuffer, Ref<IndexBuffer> indexBuffer)
+	//ComPtr<ID3D12Resource> Device_DX12::GenerateAccelerationStructure(VertexBuffer vertexBuffer, IndexBuffer indexBuffer)
 	//{
 	//	VertexBuffer_DX12* vertexBuffer_DX12 = (VertexBuffer_DX12*)vertexBuffer->Data.get();
 	//	IndexBuffer_DX12* indexBuffer_DX12 = (IndexBuffer_DX12*)indexBuffer->Data.get();
@@ -2712,7 +2712,7 @@ namespace Gecko { namespace DX12
 
 	//}
 
-	//void Device_DX12::RayTraceRender(Ref<CommandList> commandList, Ref<Texture> target, Ref<RenderTarget> input, RenderTargetType inputPosition, RenderTargetType inputNormal, Ref<ConstantBuffer> sceneData)
+	//void Device_DX12::RayTraceRender(Ref<CommandList> commandList, Texture target, RenderTarget input, RenderTargetType inputPosition, RenderTargetType inputNormal, ConstantBuffer sceneData)
 	//{
 	//	CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
 	//	Texture_DX12* texture_DX12 = (Texture_DX12*)target->Data.get();

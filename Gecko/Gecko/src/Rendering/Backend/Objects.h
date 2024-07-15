@@ -393,8 +393,8 @@ namespace Gecko {
 
 	struct BLASDesc
 	{
-		Ref<VertexBuffer> VertexBuffer;
-		Ref<IndexBuffer> IndexBuffer;
+		VertexBuffer VertexBuffer;
+		IndexBuffer IndexBuffer;
 	};
 
 	struct BLAS

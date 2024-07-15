@@ -57,7 +57,7 @@ const void ShadowPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourc
 
 const void ShadowPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
-	Ref<RenderTarget> outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
+	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 	GraphicsPipeline ShadowPipeline = resourceManager->GetGraphicsPipeline(ShadowPipelineHandle);
 
 	commandList->ClearRenderTarget(outputTarget);
@@ -79,7 +79,7 @@ const void ShadowPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMa
 		commandList->BindVertexBuffer(mesh.VertexBuffer);
 		commandList->BindIndexBuffer(mesh.IndexBuffer);
 
-		commandList->Draw(mesh.IndexBuffer->Desc.NumIndices);
+		commandList->Draw(mesh.IndexBuffer.Desc.NumIndices);
 	}
 }
 }

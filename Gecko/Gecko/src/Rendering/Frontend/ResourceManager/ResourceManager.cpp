@@ -197,8 +197,8 @@ namespace Gecko
 		// Create missing Material
 		{
 			m_MissingMaterialHandle = CreateMaterial();
-			Gecko::Ref<ConstantBuffer> materialConstantBuffer = GetMaterial(m_MissingMaterialHandle).MaterialConstantBuffer;
-			MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer->Buffer);
+			Gecko::ConstantBuffer materialConstantBuffer = GetMaterial(m_MissingMaterialHandle).MaterialConstantBuffer;
+			MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer.Buffer);
 			materialData->materialTextureFlags |= 0b00001;
 
 		}
@@ -214,7 +214,7 @@ namespace Gecko
 			};
 
 			SceneDataBuffer[i] = m_Device->CreateConstantBuffer(bufferDesc);
-			SceneData[i] = reinterpret_cast<SceneDataStruct*>(SceneDataBuffer[i]->Buffer);
+			SceneData[i] = reinterpret_cast<SceneDataStruct*>(SceneDataBuffer[i].Buffer);
 			SceneData[i]->CameraPosition = glm::vec3(0., 0., 2.);
 			SceneData[i]->ProjectionMatrix = glm::perspective(glm::radians(90.f), Gecko::Platform::GetScreenAspectRatio(), 0.1f, 100.f);
 
@@ -280,7 +280,7 @@ namespace Gecko
 	{
 		TextureHandle handle = m_CurrentTextureIndex;
 	
-		Ref<Texture> outTex = m_Device->CreateTexture(textureDesc);
+		Texture outTex = m_Device->CreateTexture(textureDesc);
 		m_Textures[handle] = outTex;
 
 		if (imageData != nullptr)
@@ -307,8 +307,8 @@ namespace Gecko
 			sizeof(MaterialData),
 			ShaderVisibility::Pixel,
 		};
-		Gecko::Ref<ConstantBuffer> materialConstantBuffer = m_Device->CreateConstantBuffer(MaterialBufferDesc);
-		MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer->Buffer);
+		Gecko::ConstantBuffer materialConstantBuffer = m_Device->CreateConstantBuffer(MaterialBufferDesc);
+		MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer.Buffer);
 		*materialData = MaterialData();
 		materialData->materialTextureFlags = 0;
 
@@ -349,7 +349,7 @@ namespace Gecko
 	{
 		RenderTargetHandle handle = m_CurrentRenderTargetIndex;
 
-		Ref<RenderTarget> outRenderTarget = m_Device->CreateRenderTarget(renderTargetDesc);
+		RenderTarget outRenderTarget = m_Device->CreateRenderTarget(renderTargetDesc);
 		m_RenderTargets[handle].RenderTarget = outRenderTarget;
 		m_RenderTargets[handle].KeepWindowAspectRatio = KeepWindowAspectRatio;
 		m_RenderTargets[handle].WidthScale = 1.f;
@@ -366,9 +366,9 @@ namespace Gecko
 
 		EnvironmentMap outEnvironmentMap;
 
-		Ref<Texture> HDRTexture;
-		Ref<Texture> EnvironmentTexture;
-		Ref<Texture> IrradianceTexture;
+		Texture HDRTexture;
+		Texture EnvironmentTexture;
+		Texture IrradianceTexture;
 
 		// Make Cube map Texture
 		{
@@ -416,8 +416,8 @@ namespace Gecko
 				commandList->BindAsRWTexture(0, EnvironmentTexture);
 
 				commandList->Dispatch(
-					EnvironmentTexture->Desc.Width / 32,
-					EnvironmentTexture->Desc.Height / 32,
+					EnvironmentTexture.Desc.Width / 32,
+					EnvironmentTexture.Desc.Height / 32,
 					6
 				);
 
@@ -448,8 +448,8 @@ namespace Gecko
 				commandList->BindAsRWTexture(0, IrradianceTexture);
 
 				commandList->Dispatch(
-					IrradianceTexture->Desc.Width / 32,
-					IrradianceTexture->Desc.Height / 32,
+					IrradianceTexture.Desc.Width / 32,
+					IrradianceTexture.Desc.Height / 32,
 					6
 				);
 
@@ -511,7 +511,7 @@ namespace Gecko
 		return m_Meshes[meshHandle];
 	}
 
-	Ref<Texture>& ResourceManager::GetTexture(const TextureHandle& textureHandle)
+	Texture& ResourceManager::GetTexture(const TextureHandle& textureHandle)
 	{
 		if (m_Textures.find(textureHandle) == m_Textures.end())
 			return m_Textures[m_MissingTextureHandle];
@@ -527,7 +527,7 @@ namespace Gecko
 		return m_Materials[materialHandle];
 	}
 
-	Ref<RenderTarget>& ResourceManager::GetRenderTarget(const RenderTargetHandle& renderTargetHandle)
+	RenderTarget& ResourceManager::GetRenderTarget(const RenderTargetHandle& renderTargetHandle)
 	{
 		if (m_RenderTargets.find(renderTargetHandle) == m_RenderTargets.end())
 		{
@@ -580,7 +580,7 @@ namespace Gecko
 		{
 			if (val.KeepWindowAspectRatio)
 			{
-				RenderTargetDesc renderTargetDesc = val.RenderTarget->Desc;
+				RenderTargetDesc renderTargetDesc = val.RenderTarget.Desc;
 				renderTargetDesc.Width = static_cast<u32>(width * val.WidthScale);
 				renderTargetDesc.Height = static_cast<u32>(height * val.WidthScale);
 				val.RenderTarget = resourceManager->m_Device->CreateRenderTarget(renderTargetDesc);
@@ -588,16 +588,16 @@ namespace Gecko
 		}
 	}
 
-	void ResourceManager::MipMapTexture(Ref<Texture> texture)
+	void ResourceManager::MipMapTexture(Texture texture)
 	{
 		MipGenerationData mipGenerationData;
 
 		mipGenerationData.Mip = 0;
-		mipGenerationData.Srgb = texture->Desc.Format == Format::R8G8B8A8_SRGB ? 1 : 0;
-		mipGenerationData.Width = texture->Desc.Width;
-		mipGenerationData.Height = texture->Desc.Height;
+		mipGenerationData.Srgb = texture.Desc.Format == Format::R8G8B8A8_SRGB ? 1 : 0;
+		mipGenerationData.Width = texture.Desc.Width;
+		mipGenerationData.Height = texture.Desc.Height;
 
-		while (mipGenerationData.Mip < texture->Desc.NumMips - 1)
+		while (mipGenerationData.Mip < texture.Desc.NumMips - 1)
 		{
 
 			Ref<CommandList> commandList = m_Device->CreateComputeCommandList();
@@ -611,7 +611,7 @@ namespace Gecko
 			commandList->Dispatch(
 				std::max(1u, mipGenerationData.Width),
 				std::max(1u, mipGenerationData.Height),
-				std::max(1u, texture->Desc.NumArraySlices)
+				std::max(1u, texture.Desc.NumArraySlices)
 			);
 
 			mipGenerationData.Mip += 1;

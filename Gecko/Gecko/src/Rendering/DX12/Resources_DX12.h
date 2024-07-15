@@ -53,8 +53,8 @@ namespace Gecko { namespace DX12 {
     private:
         ComPtr<ID3D12DescriptorHeap> m_Heap = nullptr;
 
-        D3D12_CPU_DESCRIPTOR_HANDLE m_CPUStart;
-        D3D12_GPU_DESCRIPTOR_HANDLE m_GPUStart;
+        D3D12_CPU_DESCRIPTOR_HANDLE m_CPUStart{0};
+        D3D12_GPU_DESCRIPTOR_HANDLE m_GPUStart{0};
 
         std::mutex m_Mutex;
 

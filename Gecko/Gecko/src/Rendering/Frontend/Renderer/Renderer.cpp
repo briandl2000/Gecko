@@ -159,8 +159,8 @@ void Renderer::RenderScene(const SceneRenderInfo& sceneRenderInfo)
 
 	// Render to the back buffer
 	// TODO: move this to the present function
-	Ref<RenderTarget> inputTarget = m_ResourceManager->GetRenderTarget(m_ResourceManager->GetRenderTargetHandle("ToneMappingGammaCorrection"));
-	Ref<RenderTarget> renderTarget = device->GetCurrentBackBuffer();
+	RenderTarget inputTarget = m_ResourceManager->GetRenderTarget(m_ResourceManager->GetRenderTargetHandle("ToneMappingGammaCorrection"));
+	RenderTarget renderTarget = device->GetCurrentBackBuffer();
 	
 	GraphicsPipeline FullScreenTexturePipeline = m_ResourceManager->GetGraphicsPipeline(FullScreenTexturePipelineHandle);
 	commandList->BindGraphicsPipeline(FullScreenTexturePipeline);

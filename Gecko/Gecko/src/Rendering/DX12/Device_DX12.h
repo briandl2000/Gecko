@@ -97,8 +97,8 @@ namespace Gecko { namespace DX12
 
 	class ShaderTable : public GpuUploadBuffer
 	{
-		uint8_t* m_mappedShaderRecords;
-		UINT m_shaderRecordSize;
+		uint8_t* m_mappedShaderRecords{nullptr};
+		UINT m_shaderRecordSize{0};
 
 		// Debug support
 		std::wstring m_name;
@@ -159,26 +159,26 @@ namespace Gecko { namespace DX12
 		virtual Ref<CommandList> CreateComputeCommandList() override;
 		virtual void ExecuteComputeCommandList(Ref<CommandList> commandList) override;
 
-		virtual Ref<RenderTarget> GetCurrentBackBuffer() override;
+		virtual RenderTarget GetCurrentBackBuffer() override;
 
-		virtual Ref<RenderTarget> CreateRenderTarget(const RenderTargetDesc& desc) override;
-		virtual Ref<VertexBuffer> CreateVertexBuffer(const VertexBufferDesc& desc) override;
-		virtual Ref<IndexBuffer> CreateIndexBuffer(const IndexBufferDesc& desc) override;
+		virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) override;
+		virtual VertexBuffer CreateVertexBuffer(const VertexBufferDesc& desc) override;
+		virtual IndexBuffer CreateIndexBuffer(const IndexBufferDesc& desc) override;
 		virtual GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) override;
 		virtual ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) override;
-		virtual Ref<Texture> CreateTexture(const TextureDesc& desc) override;
-		virtual Ref<ConstantBuffer> CreateConstantBuffer(const ConstantBufferDesc& desc) override;
+		virtual Texture CreateTexture(const TextureDesc& desc) override;
+		virtual ConstantBuffer CreateConstantBuffer(const ConstantBufferDesc& desc) override;
 
 		// Raytracing
 		virtual RaytracingPipeline CreateRaytracingPipeline(const RaytracingPipelineDesc& desc) override;
 		virtual BLAS CreateBLAS(const BLASDesc& desc) override;
 		virtual TLAS CreateTLAS(const TLASRefitDesc& desc) override;
 
-		virtual void UploadTextureData(Ref<Texture> texture, void* Data, u32 mip = 0, u32 slice = 0) override;
+		virtual void UploadTextureData(Texture texture, void* Data, u32 mip = 0, u32 slice = 0) override;
 
 		virtual void ImGuiRender(Ref<CommandList> commandList) override;
-		virtual void DrawRenderTargetInImGui(Ref<RenderTarget> renderTarget, u32 width = 0, u32 height = 0, RenderTargetType type = RenderTargetType::Target0) override;
-		virtual void DrawTextureInImGui(Ref<Texture> texture, u32 width = 0, u32 height = 0) override;
+		virtual void DrawRenderTargetInImGui(RenderTarget renderTarget, u32 width = 0, u32 height = 0, RenderTargetType type = RenderTargetType::Target0) override;
+		virtual void DrawTextureInImGui(Texture texture, u32 width = 0, u32 height = 0) override;
 
 		virtual bool Destroy() override;
 
@@ -209,14 +209,14 @@ namespace Gecko { namespace DX12
 		void Resize(u32 width, u32 height);
 
 		/*void SetupRaytracing();
-		ComPtr<ID3D12Resource> GenerateAccelerationStructure(Ref<VertexBuffer>, Ref<IndexBuffer>);
+		ComPtr<ID3D12Resource> GenerateAccelerationStructure(VertexBuffer, IndexBuffer);
 		void RefitTLAS(TLASRefitDesc refitDesc);
-		void RayTraceRender(Ref<CommandList> commandList, Ref<Texture> target, Ref<RenderTarget> input, RenderTargetType inputPosition, RenderTargetType inputNormal, Ref<ConstantBuffer> sceneData);
+		void RayTraceRender(Ref<CommandList> commandList, Texture target, RenderTarget input, RenderTargetType inputPosition, RenderTargetType inputNormal, ConstantBuffer sceneData);
 		void ShutdownRaytracing();*/
 
 	private:
 
-		Ref<RenderTarget> Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc, Ref<RenderTarget_DX12>& renderTargetDX12);
+		RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc, Ref<RenderTarget_DX12>& renderTargetDX12);
 
 		void CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource = 0);
 
@@ -243,7 +243,7 @@ namespace Gecko { namespace DX12
 		std::mutex m_DeferredReleasesMutex;
 		// Back buffers
 
-		std::vector<Ref<RenderTarget>> m_BackBuffers;
+		std::vector<RenderTarget> m_BackBuffers;
 
 		ComPtr<IDXGISwapChain4> m_SwapChain;
 

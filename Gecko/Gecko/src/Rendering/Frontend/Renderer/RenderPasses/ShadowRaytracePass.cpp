@@ -42,8 +42,8 @@ const void ShadowRaytracePass::Init(Platform::AppInfo& appInfo, ResourceManager*
 
 const void ShadowRaytracePass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
-	Ref<RenderTarget> outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
-	Ref<RenderTarget> GBuffer = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("GBuffer"));
+	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
+	RenderTarget GBuffer = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("GBuffer"));
 
 
 	RaytracingPipeline ShadowPipeline = resourceManager->GetRaytracingPipeline(m_ShadowRaytracePipelineHandle);

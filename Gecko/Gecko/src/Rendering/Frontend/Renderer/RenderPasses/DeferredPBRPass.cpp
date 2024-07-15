@@ -77,18 +77,18 @@ const void DeferredPBRPass::Init(Platform::AppInfo& appInfo, ResourceManager* re
 const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 
-	Ref<RenderTarget> GBuffer = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("GBuffer"));
-	Ref<RenderTarget> ShadowMap = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("ShadowMap"));
-	Ref<RenderTarget> PBROutput = resourceManager->GetRenderTarget(PBROutputHandle);
+	RenderTarget GBuffer = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("GBuffer"));
+	RenderTarget ShadowMap = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("ShadowMap"));
+	RenderTarget PBROutput = resourceManager->GetRenderTarget(PBROutputHandle);
 
-	Ref<Texture> BRDFLUTTexture = resourceManager->GetTexture(BRDFLUTTextureHandle);
+	Texture BRDFLUTTexture = resourceManager->GetTexture(BRDFLUTTextureHandle);
 
 	ComputePipeline PBRPipeline = resourceManager->GetComputePipeline(PBRPipelineHandle);
 
 	// PBR Deferred rendering pass
 	PBRData pbrData;
-	pbrData.width = PBROutput->Desc.Width;
-	pbrData.height = PBROutput->Desc.Height;
+	pbrData.width = PBROutput.Desc.Width;
+	pbrData.height = PBROutput.Desc.Height;
 	{
 		commandList->BindComputePipeline(PBRPipeline);
 
@@ -104,8 +104,8 @@ const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, Resou
 
 		commandList->BindTexture(0, BRDFLUTTexture);
 		EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneRenderInfo.EnvironmentMap);
-		Ref<Texture> environmentTexture = resourceManager->GetTexture(environmentMap.EnvironmentTextureHandle);
-		Ref<Texture> irradianceTexture = resourceManager->GetTexture(environmentMap.IrradianceTextureHandle);
+		Texture environmentTexture = resourceManager->GetTexture(environmentMap.EnvironmentTextureHandle);
+		Texture irradianceTexture = resourceManager->GetTexture(environmentMap.IrradianceTextureHandle);
 		commandList->BindTexture(1, environmentTexture);
 		commandList->BindTexture(2, irradianceTexture);
 		commandList->BindTexture(3, ShadowMap, RenderTargetType::TargetDepth);

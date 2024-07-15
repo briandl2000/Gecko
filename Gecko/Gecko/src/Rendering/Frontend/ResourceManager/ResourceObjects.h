@@ -18,8 +18,8 @@ namespace Gecko
 
 	struct Mesh
 	{
-		Ref<VertexBuffer> VertexBuffer;
-		Ref<IndexBuffer> IndexBuffer;
+		VertexBuffer VertexBuffer;
+		IndexBuffer IndexBuffer;
 		bool HasBLAS{ false };
 		BLAS BLAS;
 	};
@@ -45,7 +45,7 @@ namespace Gecko
 
 	struct Material
 	{
-		Ref<ConstantBuffer> MaterialConstantBuffer;
+		ConstantBuffer MaterialConstantBuffer;
 		TextureHandle AlbedoTextureHandle;
 		TextureHandle NormalTextureHandle;
 		TextureHandle MetalicRoughnessTextureHandle;
@@ -101,7 +101,7 @@ namespace Gecko
 
 	struct RenderTargetResource
 	{
-		Ref<RenderTarget> RenderTarget{ nullptr };
+		RenderTarget RenderTarget;
 		bool KeepWindowAspectRatio{ false };
 		f32 WidthScale{ 1.f };
 	};

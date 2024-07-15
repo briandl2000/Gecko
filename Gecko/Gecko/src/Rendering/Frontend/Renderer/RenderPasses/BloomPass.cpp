@@ -121,10 +121,10 @@ const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resource
 const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 
-	Ref<RenderTarget> inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("FXAAOutput"));
-	Ref<Texture> downSampleTexture = resourceManager->GetTexture(m_DownScaleTextureHandle);
-	Ref<Texture> upSampleTexture = resourceManager->GetTexture(m_UpScaleTextureHandle);
-	Ref<RenderTarget> outputTarget = resourceManager->GetRenderTarget(m_OutputTargetHandle);
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("FXAAOutput"));
+	Texture downSampleTexture = resourceManager->GetTexture(m_DownScaleTextureHandle);
+	Texture upSampleTexture = resourceManager->GetTexture(m_UpScaleTextureHandle);
+	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputTargetHandle);
 
 	ComputePipeline BloomDownScale = resourceManager->GetComputePipeline(m_DownScalePipelineHandle);
 	ComputePipeline BloomUpScale = resourceManager->GetComputePipeline(m_UpScalePipelineHandle);
@@ -138,8 +138,8 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 
 	u32 mipLevel = 0;
 	BloomData tempBloomData = m_BloomData;
-	tempBloomData.Width = downSampleTexture->Desc.Width >> 1;
-	tempBloomData.Height = downSampleTexture->Desc.Height >> 1;
+	tempBloomData.Width = downSampleTexture.Desc.Width >> 1;
+	tempBloomData.Height = downSampleTexture.Desc.Height >> 1;
 
 	commandList->BindComputePipeline(BloomThreshold);
 	commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
@@ -147,18 +147,18 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	commandList->BindAsRWTexture(0, downSampleTexture, mipLevel);
 
 	commandList->Dispatch(
-		std::max(1u, downSampleTexture->Desc.Width / 8 + 1),
-		std::max(1u, downSampleTexture->Desc.Height / 8 + 1),
+		std::max(1u, downSampleTexture.Desc.Width / 8 + 1),
+		std::max(1u, downSampleTexture.Desc.Height / 8 + 1),
 		1
 	);
 
 	commandList->BindComputePipeline(BloomDownScale);
 
-	std::vector<u32> widths(downSampleTexture->Desc.NumMips);
-	std::vector<u32> heights(downSampleTexture->Desc.NumMips);
-	widths[mipLevel] = downSampleTexture->Desc.Width;
-	heights[mipLevel] = downSampleTexture->Desc.Height;
-	while (mipLevel < downSampleTexture->Desc.NumMips - 1)
+	std::vector<u32> widths(downSampleTexture.Desc.NumMips);
+	std::vector<u32> heights(downSampleTexture.Desc.NumMips);
+	widths[mipLevel] = downSampleTexture.Desc.Width;
+	heights[mipLevel] = downSampleTexture.Desc.Height;
+	while (mipLevel < downSampleTexture.Desc.NumMips - 1)
 	{
 		commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
 
@@ -207,8 +207,8 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	commandList->BindAsRWTexture(2, outputTarget, Gecko::RenderTargetType::Target0);
 
 	commandList->Dispatch(
-		std::max(1u, outputTarget->Desc.Width / 8 + 1),
-		std::max(1u, outputTarget->Desc.Height / 8 + 1),
+		std::max(1u, outputTarget.Desc.Width / 8 + 1),
+		std::max(1u, outputTarget.Desc.Height / 8 + 1),
 		1
 	);
 }

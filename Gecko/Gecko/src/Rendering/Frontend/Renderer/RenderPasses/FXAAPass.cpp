@@ -59,8 +59,8 @@ const void FXAAPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceM
 const void FXAAPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
 {
 
-	Ref<RenderTarget> inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("PBROutput"));
-	Ref<RenderTarget> outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("PBROutput"));
+	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 	
 	ComputePipeline FXAAPipeline = resourceManager->GetComputePipeline(FXAAPipelineHandle);
 
