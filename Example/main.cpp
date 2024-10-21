@@ -11,15 +11,14 @@
 #include "Rendering/Frontend/Renderer/RenderPasses/FXAAPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/BloomPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/ToneMappingGammaCorrectionPass.h"
-
 #include "UI/DebugUIRenderer.h"
 
 int main()
 {
 
 	Gecko::Platform::AppInfo info;
-	info.Width = 1920;
-	info.Height = 1080;
+	info.Width = 900;
+	info.Height = 600;
 
 	info.FullScreenWidth = 1920;
 	info.FullScreenHeight = 1080;
@@ -40,6 +39,20 @@ int main()
 	Gecko::ResourceManager* resourceManager = ctx.GetResourceManager();
 	Gecko::SceneManager* sceneManager = ctx.GetSceneManager();
 
+	Gecko::Scene* scene = sceneManager->CreateScene("Main Scene");
+
+	while (Gecko::Platform::IsRunning()) {
+		Gecko::Platform::PumpMessage();
+
+	}
+
+	ctx.Shutdown();
+
+	Gecko::Logger::Shutdown();
+
+	Gecko::Platform::Shutdown();
+
+	/*
 	// Create the render passess
 	Gecko::Ref<Gecko::ShadowPass> shadowPass = renderer->CreateRenderPass<Gecko::ShadowPass>();
 	Gecko::Ref<Gecko::GeometryPass> geometryPass = renderer->CreateRenderPass<Gecko::GeometryPass>();
@@ -118,12 +131,7 @@ int main()
 		Gecko::SceneRenderInfo sceneRenderInfo = scene->GetSceneRenderInfo();
 		renderer->RenderScene(sceneRenderInfo);
 	}
-
-	ctx.Shutdown();
-
-	Gecko::Logger::Shutdown();
-
-	Gecko::Platform::Shutdown();
+	*/
 
 	return 0;
 }
