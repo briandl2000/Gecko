@@ -59,7 +59,7 @@ const void DeferredPBRPass::Init(Platform::AppInfo& appInfo, ResourceManager* re
 	PBROutputHandle = resourceManager->CreateRenderTarget(PBROutputDesc, "PBROutput", true);
 
 	int width, height, n;
-	unsigned char* image = stbi_load(Platform::ConvertToWorkingDirPath("Assets/BRDF_LUT.png").c_str(), &width, &height, &n, 4);
+	unsigned char* image = stbi_load(Platform::GetLocalPath("Assets/BRDF_LUT.png").c_str(), &width, &height, &n, 4);
 	Gecko::TextureDesc textureDesc;
 
 	textureDesc.Width = width;
