@@ -10,6 +10,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
+
+option(PRODUCTION_BUILD "Make this a production build" OFF)
+
+
 add_library("${GECKO}")
 
 target_sources("${GECKO}" PRIVATE ${MY_SOURCES})

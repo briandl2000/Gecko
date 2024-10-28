@@ -21,6 +21,7 @@ namespace Gecko { namespace Platform
 		u32 NumBackBuffers = 2;
 
 		std::string Name = "Gecko";
+		std::string WorkingDir = "";
 	};
 
 	bool Init(AppInfo& desc);

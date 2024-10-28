@@ -26,8 +26,11 @@ int main()
 	info.Y = 200;
 	info.NumBackBuffers = 2;
 	info.Name = "Gecko App";
+	info.WorkingDir = WORKING_DIR_PATH;
 
 	Gecko::Platform::Init(info);
+
+
 
 	Gecko::Logger::Init();
 
@@ -41,9 +44,10 @@ int main()
 
 	Gecko::Scene* scene = sceneManager->CreateScene("Main Scene");
 
+
+
 	while (Gecko::Platform::IsRunning()) {
 		Gecko::Platform::PumpMessage();
-
 	}
 
 	ctx.Shutdown();

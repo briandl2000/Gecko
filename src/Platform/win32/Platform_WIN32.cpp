@@ -40,6 +40,8 @@ namespace Gecko { namespace Platform
 
 			std::vector<ResizeEventInfo> ResizeEventsInfos;
 
+			std::string WorkingDirPath{""};
+
 			bool keys[1000]{ 0 };
 		};
 
@@ -113,6 +115,7 @@ namespace Gecko { namespace Platform
 
 			ShowWindow(s_State->Window, SW_SHOW);
 		}
+
 
 		return true;
 	}
@@ -308,10 +311,12 @@ namespace Gecko { namespace Platform
 	void CustomFree(void* mem) {
 		free(mem);
 	}
-
+	
 	std::string GetLocalPath(std::string filePath)
 	{
-		return filePath;
+		ASSERT(s_State != nullptr);
+
+		return s_State->WorkingDirPath+filePath;
 	}
 
 } }
