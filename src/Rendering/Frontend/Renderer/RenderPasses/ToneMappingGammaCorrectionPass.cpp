@@ -14,7 +14,8 @@ const void ToneMappingGammaCorrectionPass::Init(Platform::AppInfo& appInfo, Reso
 	// TonemapAndGammaCorrect Compute Pipeline
 	{
 		ComputePipelineDesc computePipelineDesc;
-		computePipelineDesc.ComputeShaderPath = "Shaders/TonemapAndGammaCorrect";
+		computePipelineDesc.ComputeShaderPath = "Shaders/TonemapAndGammaCorrect.gsh";
+		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.NumUAVs = 2;
 		computePipelineDesc.NumConstantBuffers = 1;
 

@@ -319,7 +319,21 @@ namespace Gecko {
 		GraphicsPipelineDesc() = default;
 
 		const char* VertexShaderPath{ nullptr };
+		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
+		const char* VertexEntryPoint{ "main" };
+
 		const char* PixelShaderPath{ nullptr };
+		const char* PixelEntryPoint{ "main" };
+
+		/* ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y";
+			where type == vs for vertex shaders, ps for pixel shaders (type_ prefix gets added automatically in Device_DX12.cpp);
+			X == main version (e.g. 5 for hlsl shader language 5.1);
+			Y == subversion (e.g. 1 for 5.1);
+			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to
+			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders).
+			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
+			*/
+		const char* ShaderVersion{ "" };
 
 		VertexLayout VertexLayout;
 
@@ -352,7 +366,19 @@ namespace Gecko {
 	{
 		ComputePipelineDesc() = default;
 
+		// Path from executable to shader object (source or compiled)
 		const char* ComputeShaderPath{ nullptr };
+		/* ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y",
+			where type == cs for compute shaders (type_ prefix gets added automatically in Device_DX12.cpp),
+			X == main version (e.g. 5 for hlsl shader language 5.1),
+			Y == subversion (e.g. 1 for 5.1).
+			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to 
+			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders)
+			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
+			*/
+		const char* ShaderVersion{ "" };
+		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
+		const char* EntryPoint{ "main" };
 		
 		u32 NumConstantBuffers{ 0 };
 		DynamicCallData DynamicCallData;

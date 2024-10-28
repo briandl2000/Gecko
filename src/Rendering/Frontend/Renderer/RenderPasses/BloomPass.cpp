@@ -25,7 +25,8 @@ const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resource
 		};
 
 		ComputePipelineDesc computePipelineDesc;
-		computePipelineDesc.ComputeShaderPath = "Shaders/BloomDownScale";
+		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomDownScale.gsh";
+		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.DynamicCallData.BufferLocation = 0;
 		computePipelineDesc.DynamicCallData.Size = sizeof(BloomData);
 		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
@@ -49,7 +50,8 @@ const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resource
 		};
 
 		ComputePipelineDesc computePipelineDesc;
-		computePipelineDesc.ComputeShaderPath = "Shaders/BloomUpScale";
+		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomUpScale.gsh";
+		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.DynamicCallData.BufferLocation = 0;
 		computePipelineDesc.DynamicCallData.Size = sizeof(BloomData);
 		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
@@ -65,7 +67,8 @@ const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resource
 	{
 
 		ComputePipelineDesc computePipelineDesc;
-		computePipelineDesc.ComputeShaderPath = "Shaders/BloomThreshold";
+		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomThreshold.gsh";
+		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.DynamicCallData.BufferLocation = 0;
 		computePipelineDesc.DynamicCallData.Size = sizeof(BloomData);
 		computePipelineDesc.NumUAVs = 1;
@@ -77,7 +80,8 @@ const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resource
 	// BloomComposite Compute Pipeline
 	{
 		ComputePipelineDesc computePipelineDesc;
-		computePipelineDesc.ComputeShaderPath = "Shaders/BloomComposite";
+		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomComposite.gsh";
+		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.NumUAVs = 3;
 
 		m_CompositePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);

@@ -40,7 +40,7 @@ void main(uint3 DTid : S_INPUT_DISPATCH_ID)
     float3 right = normalize(cross(up, N));
     up = normalize(cross(N, right));
 
-    float sampleDelta = 0.01;
+    float sampleDelta = 0.1;
     float nrSamples = 0.0;
     for (float phi = 0.0; phi < 2.0 * PI; phi += sampleDelta)
     {

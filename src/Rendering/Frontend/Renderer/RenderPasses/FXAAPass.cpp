@@ -20,7 +20,8 @@ const void FXAAPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceM
 		};
 
 		ComputePipelineDesc computePipelineDesc;
-		computePipelineDesc.ComputeShaderPath = "Shaders/FXAA";
+		computePipelineDesc.ComputeShaderPath = "Shaders/FXAA.gsh";
+		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.DynamicCallData.BufferLocation = 0;
 		computePipelineDesc.DynamicCallData.Size = sizeof(FXAAData);
 		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;

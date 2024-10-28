@@ -13,6 +13,8 @@
 #include "Rendering/Frontend/Renderer/RenderPasses/ToneMappingGammaCorrectionPass.h"
 #include "UI/DebugUIRenderer.h"
 
+#include "CustomPass.h"
+
 int main()
 {
 
@@ -44,27 +46,20 @@ int main()
 
 	Gecko::Scene* scene = sceneManager->CreateScene("Main Scene");
 
+	Gecko::Ref<CustomPass> customPass = renderer->CreateRenderPass<CustomPass>();
+	// Configure renderpasses
+	renderer->ConfigureRenderPasses({
+		customPass
+		});
 
-
-	while (Gecko::Platform::IsRunning()) {
-		Gecko::Platform::PumpMessage();
-	}
-
-	ctx.Shutdown();
-
-	Gecko::Logger::Shutdown();
-
-	Gecko::Platform::Shutdown();
-
-	/*
+	
 	// Create the render passess
 	Gecko::Ref<Gecko::ShadowPass> shadowPass = renderer->CreateRenderPass<Gecko::ShadowPass>();
 	Gecko::Ref<Gecko::GeometryPass> geometryPass = renderer->CreateRenderPass<Gecko::GeometryPass>();
 	Gecko::Ref<Gecko::DeferredPBRPass> deferredPBRPass = renderer->CreateRenderPass<Gecko::DeferredPBRPass>();
 	Gecko::Ref<Gecko::FXAAPass> FXAAPass = renderer->CreateRenderPass<Gecko::FXAAPass>();
-	Gecko::Ref<Gecko::BloomPass> bloomPass= renderer->CreateRenderPass<Gecko::BloomPass>();
+	Gecko::Ref<Gecko::BloomPass> bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>();
 	Gecko::Ref<Gecko::ToneMappingGammaCorrectionPass> toneMappingGammaCorrectionPass = renderer->CreateRenderPass<Gecko::ToneMappingGammaCorrectionPass>();
-	
 	// Configure renderpasses
 	renderer->ConfigureRenderPasses({
 		shadowPass,
@@ -73,10 +68,7 @@ int main()
 		FXAAPass,
 		bloomPass,
 		toneMappingGammaCorrectionPass
-	});
-
-	// Create a scene
-	Gecko::Scene* scene = sceneManager->CreateScene("Main Scene");
+		});
 
 	// Add an environment map
 	scene->SetEnvironmentMapHandle(resourceManager->CreateEnvironmentMap("Assets/scythian_tombs_2_4k.hdr"));
@@ -111,10 +103,12 @@ int main()
 	lightNode->Transform.Rotation.x = -90.f;
 
 	Gecko::f32 lastTime = Gecko::Platform::GetTime();
+	
 
 	while (Gecko::Platform::IsRunning()) {
 		Gecko::Platform::PumpMessage();
 
+		
 		Gecko::f32 currentTime = Gecko::Platform::GetTime();
 		Gecko::f32 deltaTime = (currentTime - lastTime);
 		lastTime = currentTime;
@@ -131,11 +125,15 @@ int main()
 
 		// Do the imgui things
 		Gecko::DebugUIRenderer::RenderDebugUI(ctx);
-
-		Gecko::SceneRenderInfo sceneRenderInfo = scene->GetSceneRenderInfo();
-		renderer->RenderScene(sceneRenderInfo);
+		
+		renderer->RenderScene(scene->GetSceneRenderInfo());
 	}
-	*/
+
+	ctx.Shutdown();
+
+	Gecko::Logger::Shutdown();
+
+	Gecko::Platform::Shutdown();
 
 	return 0;
 }

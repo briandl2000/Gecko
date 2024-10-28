@@ -37,7 +37,8 @@ namespace Gecko
 			};
 
 			ComputePipelineDesc computePipelineDesc;
-			computePipelineDesc.ComputeShaderPath = "Shaders/DownSample";
+			computePipelineDesc.ComputeShaderPath = "Shaders/DownSample.gsh";
+			computePipelineDesc.ShaderVersion = "5_1";
 			computePipelineDesc.DynamicCallData.BufferLocation = 0;
 			computePipelineDesc.DynamicCallData.Size = sizeof(MipGenerationData);
 			computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
@@ -61,7 +62,8 @@ namespace Gecko
 			};
 
 			ComputePipelineDesc computePipelineDesc;
-			computePipelineDesc.ComputeShaderPath = "Shaders/HDR_to_cube";
+			computePipelineDesc.ComputeShaderPath = "Shaders/HDR_to_cube.gsh";
+			computePipelineDesc.ShaderVersion = "5_1";
 			computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
 			computePipelineDesc.NumTextures = 1;
 			computePipelineDesc.NumUAVs = 1;
@@ -83,7 +85,8 @@ namespace Gecko
 			};
 
 			ComputePipelineDesc computePipelineDesc;
-			computePipelineDesc.ComputeShaderPath = "Shaders/IrradianceMap";
+			computePipelineDesc.ComputeShaderPath = "Shaders/IrradianceMap.gsh";
+			computePipelineDesc.ShaderVersion = "5_1";
 			computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
 			computePipelineDesc.NumTextures = 1;
 			computePipelineDesc.NumUAVs = 1;

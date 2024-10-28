@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 set(GECKO Gecko)
+#add_definitions(-DDEBUG)
 
 project(GECKO VERSION 1.0.0 LANGUAGES C CXX)
 

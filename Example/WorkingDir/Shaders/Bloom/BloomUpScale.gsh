@@ -1,4 +1,4 @@
-#include "ShaderDefines.h"
+#include "../ShaderDefines.h"
 
 Texture2D<float4> OutPutSmallTexture : register(t0);
 RW_Texture2D_Arr<float4> InputTexture : register(u0);

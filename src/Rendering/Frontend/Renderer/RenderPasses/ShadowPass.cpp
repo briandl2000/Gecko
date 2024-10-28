@@ -17,8 +17,9 @@ const void ShadowPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourc
 		};
 
 		GraphicsPipelineDesc pipelineDesc;
-		pipelineDesc.VertexShaderPath = "Shaders/ShadowVertex";
-		pipelineDesc.PixelShaderPath = "Shaders/ShadowPixel";
+		pipelineDesc.VertexShaderPath = "Shaders/Shadow.gsh";
+		pipelineDesc.PixelShaderPath = "Shaders/Shadow.gsh";
+		pipelineDesc.ShaderVersion = "5_1";
 
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
