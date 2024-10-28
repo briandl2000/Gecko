@@ -32,7 +32,8 @@ const void DeferredPBRPass::Init(Platform::AppInfo& appInfo, ResourceManager* re
 		};
 
 		ComputePipelineDesc computePipelineDesc;
-		computePipelineDesc.ComputeShaderPath = "Shaders/PBRShader";
+		computePipelineDesc.ComputeShaderPath = "Shaders/PBRShader.gsh";
+		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.DynamicCallData.BufferLocation = 1;
 		computePipelineDesc.DynamicCallData.Size = sizeof(PBRData);
 		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;

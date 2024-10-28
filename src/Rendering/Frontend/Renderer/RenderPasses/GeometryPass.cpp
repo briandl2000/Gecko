@@ -40,8 +40,9 @@ const void GeometryPass::Init(Platform::AppInfo& appInfo, ResourceManager* resou
 		};
 
 		GraphicsPipelineDesc pipelineDesc;
-		pipelineDesc.VertexShaderPath = "Shaders/GBufferShaderVertex";
-		pipelineDesc.PixelShaderPath = "Shaders/GBufferShaderPixel";
+		pipelineDesc.VertexShaderPath = "Shaders/GBufferShader.gsh";
+		pipelineDesc.PixelShaderPath = "Shaders/GBufferShader.gsh";
+		pipelineDesc.ShaderVersion = "5_1";
 
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
@@ -89,8 +90,9 @@ const void GeometryPass::Init(Platform::AppInfo& appInfo, ResourceManager* resou
 		};
 
 		GraphicsPipelineDesc pipelineDesc;
-		pipelineDesc.VertexShaderPath = "Shaders/CubemapVertex";
-		pipelineDesc.PixelShaderPath = "Shaders/CubemapPixel";
+		pipelineDesc.VertexShaderPath = "Shaders/Cubemap.gsh";
+		pipelineDesc.PixelShaderPath = "Shaders/Cubemap.gsh";
+		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
 		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;

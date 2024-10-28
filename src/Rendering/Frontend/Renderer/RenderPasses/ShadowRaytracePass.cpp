@@ -17,6 +17,8 @@ const void ShadowRaytracePass::Init(Platform::AppInfo& appInfo, ResourceManager*
 		};
 
 		RaytracingPipelineDesc pipelineDesc;
+		pipelineDesc.RaytraceShaderPath = "Shaders/Raytracing.gsh";
+		//pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.NumConstantBuffers = 1;
 		pipelineDesc.NumUAVs = 3;
 

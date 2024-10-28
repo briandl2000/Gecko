@@ -40,8 +40,6 @@ namespace Gecko { namespace Platform
 
 			std::vector<ResizeEventInfo> ResizeEventsInfos;
 
-			std::string WorkingDirPath{""};
-
 			bool keys[1000]{ 0 };
 		};
 
@@ -316,7 +314,7 @@ namespace Gecko { namespace Platform
 	{
 		ASSERT(s_State != nullptr);
 
-		return s_State->WorkingDirPath+filePath;
+		return s_State->Info.WorkingDir+filePath;
 	}
 
 } }

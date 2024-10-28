@@ -1,4 +1,4 @@
-#include "ShaderDefines.h"
+#include "../ShaderDefines.h"
 
 RW_Texture2D_Arr<float4> Bloom : register(u0);
 RW_Texture2D_Arr<float4> InputTexture : register(u1);

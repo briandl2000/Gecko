@@ -890,16 +890,35 @@ namespace Gecko { namespace DX12
 		ComPtr<ID3DBlob> vertexShaderBlob;
 		if (desc.VertexShaderPath != nullptr)
 		{
-			std::string vertexPath = desc.VertexShaderPath;
-			vertexPath += ".cso";
+			std::string vertexPath = Platform::GetLocalPath(desc.VertexShaderPath);
+			std::wstring vertexSource;
+			vertexSource.assign(vertexPath.begin(), vertexPath.end());
+
+			ComPtr<ID3DBlob> errorBlob;
+			UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined( DEBUG ) || defined( _DEBUG )
+			flags |= D3DCOMPILE_DEBUG;
+#endif
+
+			std::string shaderVersion = "vs_";
+			shaderVersion += desc.ShaderVersion;
+			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "VERTEX", "1", NULL, NULL };
+			HRESULT hr = D3DCompileFromFile(vertexSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+				desc.VertexEntryPoint, shaderVersion.c_str(), flags, 0, &vertexShaderBlob, &errorBlob);
+			if (FAILED(hr))
 			{
-				std::wstring vertexSource;
-				vertexSource.assign(vertexPath.begin(), vertexPath.end());
+				// Should probably do some nicer error handling here #FIXME
+				if (errorBlob)
+				{
+					char* c = (char*)errorBlob->GetBufferPointer();
+					errorBlob->Release();
+				}
 
-				D3DReadFileToBlob(vertexSource.c_str(), &vertexShaderBlob);
-
-				VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
+				if (vertexShaderBlob)
+					vertexShaderBlob->Release();
 			}
+
+			VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
 			piplineStateStream2.VS = VS;
 		}
 
@@ -907,15 +926,35 @@ namespace Gecko { namespace DX12
 		ComPtr<ID3DBlob> pixelShaderBlob;
 		if (desc.PixelShaderPath != nullptr)
 		{
-			std::string pixelPath = desc.PixelShaderPath;
-			pixelPath += ".cso";
-			{
-				std::wstring pixelSource;
-				pixelSource.assign(pixelPath.begin(), pixelPath.end());
+			std::string pixelPath = Platform::GetLocalPath(desc.PixelShaderPath);
+			std::wstring pixelSource;
+			pixelSource.assign(pixelPath.begin(), pixelPath.end());
 
-				D3DReadFileToBlob(pixelSource.c_str(), &pixelShaderBlob);
-				PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
+			ComPtr<ID3DBlob> errorBlob;
+			UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined( DEBUG ) || defined( _DEBUG )
+			flags |= D3DCOMPILE_DEBUG;
+#endif
+				
+			std::string shaderVersion = "ps_";
+			shaderVersion += desc.ShaderVersion;
+			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "PIXEL", "1", NULL, NULL };
+			HRESULT hr = D3DCompileFromFile(pixelSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+				desc.PixelEntryPoint, shaderVersion.c_str(), flags, 0, &pixelShaderBlob, &errorBlob);
+			if (FAILED(hr))
+			{
+				// Should probably do some nicer error handling here #FIXME
+				if (errorBlob)
+				{
+					char* c = (char*)errorBlob->GetBufferPointer();
+					errorBlob->Release();
+				}
+
+				if (pixelShaderBlob)
+					pixelShaderBlob->Release();
 			}
+
+			PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
 			piplineStateStream2.PS = PS;
 		}
 
@@ -977,7 +1016,7 @@ namespace Gecko { namespace DX12
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsDesc = piplineStateStream2.GraphicsDescV0();
 
-		m_Device->CreateGraphicsPipelineState(&graphicsDesc, IID_PPV_ARGS(&graphicsPipeline_DX12->PipelineState));
+		HRESULT hr = m_Device->CreateGraphicsPipelineState(&graphicsDesc, IID_PPV_ARGS(&graphicsPipeline_DX12->PipelineState));
 
 		GraphicsPipeline graphicsPipeline;
 		graphicsPipeline.Desc = desc;
@@ -992,8 +1031,6 @@ namespace Gecko { namespace DX12
 		Ref<ComputePipeline_DX12> computePipeline_DX12 = CreateRef<ComputePipeline_DX12>();
 
 		computePipeline_DX12->device = this;
-		std::string computePath = desc.ComputeShaderPath;
-		computePath += ".cso";
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC computeStateDesc;
 		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
@@ -1147,14 +1184,40 @@ namespace Gecko { namespace DX12
 		computeStateDesc.pRootSignature = pRootSignature;
 
 		CD3DX12_PIPELINE_STATE_STREAM_CS CS;
-		ComPtr<ID3DBlob> vertexShaderBlob;
+		ComPtr<ID3DBlob> computeShaderBlob;
 		{
-			std::wstring vertexSource;
-			vertexSource.assign(computePath.begin(), computePath.end());
+			std::string computePath = Platform::GetLocalPath(desc.ComputeShaderPath);
+			std::wstring ComputeSource;
+			ComputeSource.assign(computePath.begin(), computePath.end());
 
-			D3DReadFileToBlob(vertexSource.c_str(), &vertexShaderBlob);
+			ComPtr<ID3DBlob> errorBlob;
+			UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#if defined( DEBUG ) || defined( _DEBUG )
+			flags |= D3DCOMPILE_DEBUG;
+#endif
 
-			CS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
+			std::string shaderVersion = "cs_";
+			shaderVersion += desc.ShaderVersion;
+			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "COMPUTE", "1", NULL, NULL };
+			HRESULT hr = D3DCompileFromFile(ComputeSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
+				desc.EntryPoint, shaderVersion.c_str(), flags, 0, &computeShaderBlob, &errorBlob);
+			if (FAILED(hr))
+			{
+				// Should probably do some nicer error handling here #FIXME
+				if (errorBlob)
+				{
+					char* c = (char*)errorBlob->GetBufferPointer();
+					errorBlob->Release();
+				}
+
+				if (computeShaderBlob)
+					computeShaderBlob->Release();
+
+				// Oh no, could not create shader pipeline
+				return ComputePipeline{};
+			}
+
+			CS = CD3DX12_SHADER_BYTECODE(computeShaderBlob.Get());
 		}
 		computeStateDesc.CS = CS;
 		
@@ -1163,7 +1226,7 @@ namespace Gecko { namespace DX12
 		computeStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 		computeStateDesc.NodeMask = 0;
 
-		m_Device->CreateComputePipelineState(&computeStateDesc, IID_PPV_ARGS(&computePipeline_DX12->PipelineState));
+		HRESULT hr = m_Device->CreateComputePipelineState(&computeStateDesc, IID_PPV_ARGS(&computePipeline_DX12->PipelineState));
 
 		ComputePipeline computePipeline;
 		computePipeline.Desc = desc;
@@ -1373,10 +1436,13 @@ namespace Gecko { namespace DX12
 			// Load the library shader
 			CD3DX12_DXIL_LIBRARY_SUBOBJECT* lib = raytracingPipeline.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 
-			std::wstring libSource = L"Shaders/Raytracing.cso";
+			// Does not consider non-compiled shader file #FIXME
+			std::string rayTracePath = desc.RaytraceShaderPath;
+			std::wstring rayTraceSource;
+			rayTraceSource.assign(rayTracePath.begin(), rayTracePath.end());
 
 			ComPtr<ID3DBlob> libShaderBlob;
-			D3DReadFileToBlob(libSource.c_str(), &libShaderBlob);
+			D3DReadFileToBlob(rayTraceSource.c_str(), &libShaderBlob);
 
 			D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE(libShaderBlob.Get());
 			lib->SetDXILLibrary(&libdxil);
@@ -2159,6 +2225,11 @@ namespace Gecko { namespace DX12
 		DIRECTX12_ASSERT(copyCommandBuffer->CommandList->Close());
 		ID3D12CommandList* const commandLists[]{ copyCommandBuffer->CommandList.Get() };
 		m_CopyCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
+		HRESULT deviceRemoved = this->GetDevice()->GetDeviceRemovedReason();
+		if (deviceRemoved != S_OK)
+		{
+			int x = 1;
+		}
 
 		u64 fenceValueForSignal = ++copyCommandBuffer->FenceValue;
 		m_CopyCommandQueue->Signal(copyCommandBuffer->Fence.Get(), fenceValueForSignal);
