@@ -1,14 +1,14 @@
 #include "Rendering/Frontend/Renderer/Renderer.h"
 
-#include "Logging/Logger.h"
-#include "Logging/Asserts.h"
+#include "Core/Logger.h"
+#include "Core/Asserts.h"
 #include "Rendering/Backend/Device.h"
 #include "Rendering/Backend/CommandList.h"
 #include "Rendering/Frontend/Scene/Scene.h"
 
 #include "stb_image.h"
 #include <imgui.h>
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
 
 #include "glm/matrix.hpp"
 #include <random>

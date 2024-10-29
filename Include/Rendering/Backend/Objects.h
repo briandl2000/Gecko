@@ -1,7 +1,7 @@
 #pragma once
 #include "Defines.h"
 
-#include "Logging/Asserts.h"
+#include "Core/Asserts.h"
 
 #include <vector>
 

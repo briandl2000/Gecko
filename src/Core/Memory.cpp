@@ -1,6 +1,6 @@
-#include "Memory/Memory.h"
+#include "Core/Memory.h"
 
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
 
 #if defined(WIN32)
 #pragma warning( push )

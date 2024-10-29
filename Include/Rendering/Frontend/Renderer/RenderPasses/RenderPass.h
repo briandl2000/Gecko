@@ -11,7 +11,7 @@
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
 #include "Rendering/Frontend/Scene/SceneRenderInfo.h"
 
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
 
 namespace Gecko
 {

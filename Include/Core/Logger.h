@@ -30,6 +30,8 @@ namespace Gecko { namespace Logger
     bool Init();
     void Shutdown();
     void LogOutput(eLogLevel level, std::string message, ...);
+
+    void ConsoleWrite(char* msg, Logger::eLogLevel level);
 } }
 
 #ifndef LOG_FATAL

@@ -1,9 +1,6 @@
 #pragma once
 #include "Defines.h"
 
-#include "Logging/Logger.h"
-
-#include <string>
 
 namespace Gecko { namespace Platform 
 {
@@ -37,7 +34,6 @@ namespace Gecko { namespace Platform
 	glm::vec3 GetPositionInput();
 	glm::vec3 GetRotationInput();
 
-	void ConsoleWrite(char* msg, Logger::eLogLevel level);
 	// TODO: memory tracking
 	void* CustomAllocate(size_t size);
 	void* CustomRealloc(void* mem, size_t size);

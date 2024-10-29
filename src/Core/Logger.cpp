@@ -1,7 +1,7 @@
-#include "Logging/Logger.h"
+#include "Core/Logger.h"
 
-#include "Logging/Asserts.h"
-#include "Platform/Platform.h"
+#include "Core/Asserts.h"
+#include "Core/Platform.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -35,7 +35,7 @@ namespace Gecko { namespace Logger
         vsnprintf(buffer, 32000, message.c_str(), arg_ptr);
         va_end(arg_ptr);
 
-        Platform::ConsoleWrite(buffer, level);
+        ConsoleWrite(buffer, level);
     }
 #ifdef WIN32
 #pragma warning(pop)

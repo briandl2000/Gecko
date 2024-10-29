@@ -1,6 +1,6 @@
 #include "Rendering/Frontend/Scene/SceneObjects/SceneCamera.h"
 
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
 
 namespace Gecko {
 

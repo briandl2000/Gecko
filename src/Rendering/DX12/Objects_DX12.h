@@ -4,7 +4,7 @@
 #include "Rendering/DX12/CommonHeaders_DX12.h"
 #include "Resources_DX12.h"
 
-#include "Logging/Logger.h"
+#include "Core/Logger.h"
 #include "Rendering/Backend/Objects.h"
 
 namespace Gecko { namespace DX12 {

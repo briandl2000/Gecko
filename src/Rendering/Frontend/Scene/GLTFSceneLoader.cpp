@@ -3,7 +3,8 @@
 #include "Rendering/Frontend/Scene/Scene.h"
 #include "Rendering/Frontend/ApplicationContext.h"
 
-#include "Logging/Asserts.h"
+#include "Core/Asserts.h"
+#include "Core/Logger.h"
 
 #include <glm/gtx/matrix_decompose.hpp>
 #include <tiny_gltf.h>

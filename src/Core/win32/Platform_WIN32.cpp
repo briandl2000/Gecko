@@ -1,7 +1,8 @@
 #ifdef WIN32
-#include "Platform/Platform.h"
-#include "Event/Event.h"
-#include "Logging/Asserts.h"
+#include "Core/Platform.h"
+#include "Core/Logger.h"
+#include "Core/Event.h"
+#include "Core/Asserts.h"
 
 // Windows Includes
 #ifndef UNICODE
@@ -293,18 +294,6 @@ namespace Gecko { namespace Platform
 
 	// Platform specific functions
 
-	void ConsoleWrite(char* msg, Logger::eLogLevel level)
-	{
-		HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-		static u8 levels[6] = { 64, 4, 6, 2, 11, 8 };
-		SetConsoleTextAttribute(consoleHandle, levels[level]);
-		OutputDebugStringA(msg);
-		u64 length = strlen(msg);
-		LPDWORD numberWritten = 0;
-		WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length, numberWritten, 0);
-	}
-
 	void* CustomAllocate(size_t size) {
 		return malloc(size);
 	}
@@ -322,6 +311,23 @@ namespace Gecko { namespace Platform
 		ASSERT(s_State != nullptr);
 
 		return s_State->Info.WorkingDir+filePath;
+	}
+
+} 
+
+namespace Logger
+{
+
+	void ConsoleWrite(char* msg, Logger::eLogLevel level)
+	{
+		HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+		static u8 levels[6] = { 64, 4, 6, 2, 11, 8 };
+		SetConsoleTextAttribute(consoleHandle, levels[level]);
+		OutputDebugStringA(msg);
+		u64 length = strlen(msg);
+		LPDWORD numberWritten = 0;
+		WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length, numberWritten, 0);
 	}
 
 } }

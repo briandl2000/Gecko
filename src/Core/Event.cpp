@@ -1,6 +1,6 @@
-#include "Event/Event.h"
+#include "Core/Event.h"
 
-#include "Logging/Logger.h"
+#include "Core/Logger.h"
 
 #include <string>
 #include <vector>

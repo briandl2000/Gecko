@@ -1,7 +1,7 @@
 #ifdef WIN32
 
 #include "Rendering/DX12/Device_DX12.h"
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
 #include "CommandList_DX12.h"
 
 #include "Objects_DX12.h"

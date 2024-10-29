@@ -6,7 +6,7 @@
 #include "Rendering/DX12/Device_DX12.h"
 #endif
 
-#include "Logging/Asserts.h"
+#include "Core/Asserts.h"
 
 namespace Gecko {
 

@@ -1,7 +1,7 @@
 #if WIN32
 #include "CommandList_DX12.h"
 
-#include "Logging/Logger.h"
+#include "Core/Logger.h"
 #include "Rendering/DX12/Device_DX12.h"
 
 #include "Objects_DX12.h"

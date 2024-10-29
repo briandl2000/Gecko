@@ -3,8 +3,8 @@
 
 #include "Defines.h"
 
-#include "Logging/Asserts.h"
-#include "Logging/Logger.h"
+#include "Core/Asserts.h"
+#include "Core/Logger.h"
 
 
 #include "Rendering/DX12/d3dx12.h"

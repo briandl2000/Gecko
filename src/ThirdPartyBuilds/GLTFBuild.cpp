@@ -1,4 +1,4 @@
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
 
 #if defined(WIN32)
 #pragma warning( push )

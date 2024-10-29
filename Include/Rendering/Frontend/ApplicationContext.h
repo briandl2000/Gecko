@@ -5,7 +5,8 @@
 #include "Rendering/Frontend/Renderer/Renderer.h"
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
 #include "Rendering/Frontend/Scene/SceneManager.h"
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
+#include "Core/Logger.h"
 
 
 namespace Gecko

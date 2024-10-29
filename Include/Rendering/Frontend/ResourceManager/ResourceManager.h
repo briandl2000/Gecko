@@ -3,8 +3,8 @@
 #include "Defines.h"
 #include "Rendering/Frontend/ResourceManager/ResourceObjects.h"
 #include "Rendering/Backend/Device.h"
-#include "Platform/Platform.h"
-#include "Event/Event.h"
+#include "Core/Platform.h"
+#include "Core/Event.h"
 
 #include <unordered_map>
 

@@ -2,7 +2,8 @@
 
 #include "Rendering/Frontend/Scene/SceneRenderInfo.h"
 
-#include "Platform/Platform.h"
+#include "Core/Platform.h"
+#include "Core/Logger.h"
 
 namespace Gecko  {
 
