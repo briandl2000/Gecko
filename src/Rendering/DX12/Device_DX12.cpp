@@ -905,18 +905,8 @@ namespace Gecko { namespace DX12
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "VERTEX", "1", NULL, NULL };
 			HRESULT hr = D3DCompileFromFile(vertexSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 				desc.VertexEntryPoint, shaderVersion.c_str(), flags, 0, &vertexShaderBlob, &errorBlob);
-			if (FAILED(hr))
-			{
-				// Should probably do some nicer error handling here #FIXME
-				if (errorBlob)
-				{
-					char* c = (char*)errorBlob->GetBufferPointer();
-					errorBlob->Release();
-				}
-
-				if (vertexShaderBlob)
-					vertexShaderBlob->Release();
-			}
+			// Should probably do some nicer error handling here #FIXME
+			ASSERT(hr == S_OK);
 
 			VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
 			piplineStateStream2.VS = VS;
@@ -941,18 +931,8 @@ namespace Gecko { namespace DX12
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "PIXEL", "1", NULL, NULL };
 			HRESULT hr = D3DCompileFromFile(pixelSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 				desc.PixelEntryPoint, shaderVersion.c_str(), flags, 0, &pixelShaderBlob, &errorBlob);
-			if (FAILED(hr))
-			{
-				// Should probably do some nicer error handling here #FIXME
-				if (errorBlob)
-				{
-					char* c = (char*)errorBlob->GetBufferPointer();
-					errorBlob->Release();
-				}
-
-				if (pixelShaderBlob)
-					pixelShaderBlob->Release();
-			}
+			// Should probably do some nicer error handling here #FIXME
+			ASSERT(hr == S_OK);
 
 			PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
 			piplineStateStream2.PS = PS;
@@ -1017,6 +997,8 @@ namespace Gecko { namespace DX12
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsDesc = piplineStateStream2.GraphicsDescV0();
 
 		HRESULT hr = m_Device->CreateGraphicsPipelineState(&graphicsDesc, IID_PPV_ARGS(&graphicsPipeline_DX12->PipelineState));
+
+		ASSERT(hr == S_OK);
 
 		GraphicsPipeline graphicsPipeline;
 		graphicsPipeline.Desc = desc;
@@ -1201,21 +1183,8 @@ namespace Gecko { namespace DX12
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "COMPUTE", "1", NULL, NULL };
 			HRESULT hr = D3DCompileFromFile(ComputeSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 				desc.EntryPoint, shaderVersion.c_str(), flags, 0, &computeShaderBlob, &errorBlob);
-			if (FAILED(hr))
-			{
-				// Should probably do some nicer error handling here #FIXME
-				if (errorBlob)
-				{
-					char* c = (char*)errorBlob->GetBufferPointer();
-					errorBlob->Release();
-				}
-
-				if (computeShaderBlob)
-					computeShaderBlob->Release();
-
-				// Oh no, could not create shader pipeline
-				return ComputePipeline{};
-			}
+			// Should probably do some nicer error handling here #FIXME
+			ASSERT(hr == S_OK);
 
 			CS = CD3DX12_SHADER_BYTECODE(computeShaderBlob.Get());
 		}
@@ -1227,6 +1196,8 @@ namespace Gecko { namespace DX12
 		computeStateDesc.NodeMask = 0;
 
 		HRESULT hr = m_Device->CreateComputePipelineState(&computeStateDesc, IID_PPV_ARGS(&computePipeline_DX12->PipelineState));
+		// Should probably do some nicer error handling here #FIXME
+		ASSERT(hr == S_OK);
 
 		ComputePipeline computePipeline;
 		computePipeline.Desc = desc;
@@ -2225,11 +2196,6 @@ namespace Gecko { namespace DX12
 		DIRECTX12_ASSERT(copyCommandBuffer->CommandList->Close());
 		ID3D12CommandList* const commandLists[]{ copyCommandBuffer->CommandList.Get() };
 		m_CopyCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
-		HRESULT deviceRemoved = this->GetDevice()->GetDeviceRemovedReason();
-		if (deviceRemoved != S_OK)
-		{
-			int x = 1;
-		}
 
 		u64 fenceValueForSignal = ++copyCommandBuffer->FenceValue;
 		m_CopyCommandQueue->Signal(copyCommandBuffer->Fence.Get(), fenceValueForSignal);
