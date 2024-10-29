@@ -17,8 +17,6 @@ namespace Gecko
 
 	void ResourceManager::Init(Device* device)
 	{
-		Platform::AddResizeEvent(ResourceManager::OnResize, this);
-
 		m_Device = device;
 		m_CurrentMeshIndex = 0;
 		m_CurrentTextureIndex = 0;
@@ -206,7 +204,6 @@ namespace Gecko
 
 		}
 
-
 		SceneDataBuffer.resize(m_Device->GetNumBackBuffers());
 		SceneData.resize(m_Device->GetNumBackBuffers());
 		for(u32 i = 0; i < m_Device->GetNumBackBuffers(); i++)
@@ -234,10 +231,14 @@ namespace Gecko
 			SceneData[i]->LightColor = glm::vec3(1.f);
 			SceneData[i]->Exposure = 2.f;
 		}
+
+		AddEventListener(Event::RESIZED, &ResourceManager::ResizeEvent);
 	}
 
 	void ResourceManager::Shutdown()
 	{
+		RemoveEventListener(Event::RESIZED, &ResourceManager::ResizeEvent);
+
 		m_CurrentMeshIndex = 0;
 		m_CurrentTextureIndex = 0;
 		m_CurrentMaterialIndex = 0;
@@ -575,20 +576,20 @@ namespace Gecko
 		return m_RaytracePipelines[raytracingPipelineHandle];
 	}
 
-	void ResourceManager::OnResize(u32 width, u32 height, void* listener)
+	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)
 	{
-		ResourceManager* resourceManager = reinterpret_cast<ResourceManager*>(listener);
-		
-		for (auto [key, val] : resourceManager->m_RenderTargets)
+		for (auto [key, val] : m_RenderTargets)
 		{
 			if (val.KeepWindowAspectRatio)
 			{
 				RenderTargetDesc renderTargetDesc = val.RenderTarget.Desc;
-				renderTargetDesc.Width = static_cast<u32>(width * val.WidthScale);
-				renderTargetDesc.Height = static_cast<u32>(height * val.WidthScale);
-				val.RenderTarget = resourceManager->m_Device->CreateRenderTarget(renderTargetDesc);
+				renderTargetDesc.Width = static_cast<u32>(eventData.Data.u32[0] * val.WidthScale);
+				renderTargetDesc.Height = static_cast<u32>(eventData.Data.u32[1] * val.WidthScale);
+				val.RenderTarget = m_Device->CreateRenderTarget(renderTargetDesc);
 			}
 		}
+
+		return false;
 	}
 
 	void ResourceManager::MipMapTexture(Texture texture)

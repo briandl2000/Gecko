@@ -1,5 +1,6 @@
 #ifdef WIN32
 #include "Platform/Platform.h"
+#include "Event/Event.h"
 #include "Logging/Asserts.h"
 
 // Windows Includes
@@ -184,6 +185,12 @@ namespace Gecko { namespace Platform
 				{
 					resizeEventInfo.ResizeEvent(width, height, resizeEventInfo.Data);
 				}
+				Event::EventData data;
+				data.Sender = nullptr;
+				data.Code = static_cast<u32>(Event::RESIZED);
+				data.Data.u32[0] = width;
+				data.Data.u32[1] = height;
+				Event::FireEvent(static_cast<u32>(Event::RESIZED), data);
 			} break;
 			case WM_KEYDOWN:
 			case WM_SYSKEYDOWN:

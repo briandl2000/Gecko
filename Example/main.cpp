@@ -30,11 +30,10 @@ int main()
 	info.Name = "Gecko App";
 	info.WorkingDir = WORKING_DIR_PATH;
 
+	Gecko::Event::Init();
 	Gecko::Platform::Init(info);
-
-
-
 	Gecko::Logger::Init();
+
 
 	// Create the context
 	Gecko::ApplicationContext ctx;
@@ -132,8 +131,8 @@ int main()
 	ctx.Shutdown();
 
 	Gecko::Logger::Shutdown();
-
 	Gecko::Platform::Shutdown();
+	Gecko::Event::Shutdown();
 
 	return 0;
 }

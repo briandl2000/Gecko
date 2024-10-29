@@ -4,14 +4,16 @@
 #include "Rendering/Frontend/ResourceManager/ResourceObjects.h"
 #include "Rendering/Backend/Device.h"
 #include "Platform/Platform.h"
+#include "Event/Event.h"
 
 #include <unordered_map>
 
 namespace Gecko
 {
 
-class ResourceManager
+class ResourceManager : protected Event::EventListener<ResourceManager>
 {
+	//GECKO_ADD_EVENT_LISTENERS(ResourceManager)
 public:
 
 	ResourceManager() = default;
@@ -44,13 +46,13 @@ public:
 	MaterialHandle GetMissingMaterialHandle() { return m_MissingMaterialHandle; }
 	MaterialHandle GetCubeMeshHandle() { return m_CubeMeshHandle; }
 
-	static void OnResize(u32 width, u32 height, void* listener);
-
 	u32 GetCurrentBackBufferIndex() { return m_Device->GetCurrentBackBufferIndex(); }
 
 	// TEMP
 	std::vector<ConstantBuffer> SceneDataBuffer;
 	std::vector<SceneDataStruct*> SceneData;
+
+	bool ResizeEvent(const Event::EventData& eventData);
 
 private:
 	void MipMapTexture(Texture texture);
