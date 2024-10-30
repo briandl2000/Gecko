@@ -5,26 +5,26 @@
 namespace Gecko { namespace Event 
 {
 
-	enum SystemEventCode : u32
+	enum SystemEvent : u32
 	{
-		NONE = 0x00,
-		WINDOW_CLOSED = 0x01,
-		KEY_PRESSED = 0x02,
-		KEY_RELEASED = 0x03,
-		BUTTON_PRESSED = 0x04,
-		BUTTON_RELEASED = 0x05,
-		MOUSE_MOVED = 0x06,
-		MOUSE_WHEEL = 0x07,
-		RESIZED = 0x08,
+		CODE_NONE = 0x00,
+		CODE_WINDOW_CLOSED = 0x01,
+		CODE_KEY_PRESSED = 0x02,
+		CODE_KEY_RELEASED = 0x03,
+		CODE_BUTTON_PRESSED = 0x04,
+		CODE_BUTTON_RELEASED = 0x05,
+		CODE_MOUSE_MOVED = 0x06,
+		CODE_MOUSE_WHEEL = 0x07,
+		CODE_RESIZED = 0x08,
 
-		IMGUI_EVENT = 0x09,
+		CODE_IMGUI_EVENT = 0x09,
 
 		MAX_EVENT_CODE = 0xFF
 	};
 
 	struct EventData
 	{
-		u32 Code{ SystemEventCode::NONE };
+		u32 Code{ SystemEvent::CODE_NONE };
 		void* Sender;
 		union
 		{

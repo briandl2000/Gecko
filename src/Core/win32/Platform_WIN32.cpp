@@ -2,6 +2,7 @@
 #include "Core/Platform.h"
 #include "Core/Logger.h"
 #include "Core/Event.h"
+#include "Core/Input.h"
 #include "Core/Asserts.h"
 
 // Windows Includes
@@ -169,11 +170,16 @@ namespace Gecko { namespace Platform
 			if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
 				return true;
 
+			Event::EventData data {};
+			data.Sender = nullptr;
+
 			switch (uMsg)
 			{
 			case WM_DESTROY:
 			{
+				Event::FireEvent(Event::SystemEvent::CODE_WINDOW_CLOSED, data);
 				s_State->IsClosed = true;
+				return 0;
 			} break;
 			case WM_SIZE:
 			{
@@ -182,16 +188,10 @@ namespace Gecko { namespace Platform
 				u32 width = r.right - r.left;
 				u32 height = r.bottom - r.top;
 
-				for (ResizeEventInfo& resizeEventInfo : s_State->ResizeEventsInfos)
-				{
-					resizeEventInfo.ResizeEvent(width, height, resizeEventInfo.Data);
-				}
-				Event::EventData data;
-				data.Sender = nullptr;
-				data.Code = static_cast<u32>(Event::RESIZED);
-				data.Data.u32[0] = width;
-				data.Data.u32[1] = height;
-				Event::FireEvent(static_cast<u32>(Event::RESIZED), data);
+				data.Data.u16[0] = (u16)width;
+				data.Data.u16[1] = (u16)height;
+				Event::FireEvent(Event::SystemEvent::CODE_RESIZED, data);
+
 			} break;
 			case WM_KEYDOWN:
 			case WM_SYSKEYDOWN:
@@ -199,13 +199,80 @@ namespace Gecko { namespace Platform
 			case WM_SYSKEYUP:
 			{
 				bool pressed = (uMsg == WM_KEYDOWN || uMsg == WM_SYSKEYDOWN);
-				u32 key = (u32)wParam;
-				s_State->keys[key] = pressed;
+				Input::Key key = static_cast<Input::Key>(wParam);
+
+				bool is_extended = (HIWORD(lParam) & KF_EXTENDED) == KF_EXTENDED;
+
+				if (wParam == VK_MENU) {
+					key = is_extended ? Input::Key::RALT : Input::Key::LALT;
+				}
+				else if (wParam == VK_SHIFT) {
+					u32 left_shift = MapVirtualKey(VK_LSHIFT, MAPVK_VK_TO_VSC);
+					u32 scancode = ((lParam & (0xFF << 16)) >> 16);
+					key = scancode == left_shift ? Input::Key::LSHIFT : Input::Key::RSHIFT;
+				}
+				else if (wParam == VK_CONTROL) {
+					key = is_extended ? Input::Key::RCONTROL : Input::Key::LCONTROL;
+				}
+
+				data.Data.u32[0] = static_cast<u32>(key);
+
+				Event::FireEvent(pressed ? Event::SystemEvent::CODE_KEY_PRESSED : Event::SystemEvent::CODE_KEY_RELEASED, data);
 
 				return 0;
 			} break;
-			}
+			case WM_MOUSEMOVE:
+			{
+				// Mouse move
+				i32 x = GET_X_LPARAM(lParam);
+				i32 y = GET_Y_LPARAM(lParam);
+				data.Data.i32[0] = x;
+				data.Data.i32[1] = y;
 
+				// Pass over to the input subsystem.
+				Event::FireEvent(Event::SystemEvent::CODE_MOUSE_MOVED, data);
+			} break;
+			case WM_MOUSEWHEEL:
+			{
+				i32 z_delta = GET_WHEEL_DELTA_WPARAM(wParam);
+				if (z_delta != 0) {
+					// Flatten the input to an OS-independent (-1, 1)
+					z_delta = (z_delta < 0) ? -1 : 1;
+					data.Data.i32[0] = z_delta;
+					Event::FireEvent(Event::SystemEvent::CODE_MOUSE_MOVED, data);
+				}
+			} break;
+			case WM_LBUTTONDOWN:
+			case WM_MBUTTONDOWN:
+			case WM_RBUTTONDOWN:
+			case WM_LBUTTONUP:
+			case WM_MBUTTONUP:
+			case WM_RBUTTONUP:
+			{
+				bool pressed = uMsg == WM_LBUTTONDOWN || uMsg == WM_RBUTTONDOWN || uMsg == WM_MBUTTONDOWN;
+				Input::MouseButton mouse_button = Input::MouseButton::MAX_BUTTONS;
+				switch (uMsg) {
+				case WM_LBUTTONDOWN:
+				case WM_LBUTTONUP:
+					mouse_button = Input::MouseButton::LEFT;
+					break;
+				case WM_MBUTTONDOWN:
+				case WM_MBUTTONUP:
+					mouse_button = Input::MouseButton::MIDDLE;
+					break;
+				case WM_RBUTTONDOWN:
+				case WM_RBUTTONUP:
+					mouse_button = Input::MouseButton::RIGHT;
+					break;
+				}
+
+				// Pass over to the input subsystem.
+				if (mouse_button != Input::MouseButton::MAX_BUTTONS)
+				{
+					Event::FireEvent(pressed ? Event::SystemEvent::CODE_BUTTON_PRESSED : Event::SystemEvent::CODE_BUTTON_RELEASED, data);
+				}
+			} break;
+			}
 			return DefWindowProc(hwnd, uMsg, wParam, lParam);
 		}
     }
@@ -239,60 +306,6 @@ namespace Gecko { namespace Platform
 
 		return static_cast<float>(elapsedTime);
 	}
-
-	glm::vec3 GetPositionInput()
-	{
-		glm::vec3 dir(0.f);
-		if (s_State->keys[87])
-		{
-			dir.z -= 1.f;
-		}
-		if (s_State->keys[83])
-		{
-			dir.z += 1.f;
-		}
-		if (s_State->keys[65])
-		{
-			dir.x -= 1.f;
-		}
-		if (s_State->keys[68])
-		{
-			dir.x += 1.f;
-		}
-		if (s_State->keys[32])
-		{
-			dir.y += 1.f;
-		}
-		if (s_State->keys[16])
-		{
-			dir.y -= 1.f;
-		}
-
-		return dir;
-	}
-	glm::vec3 GetRotationInput()
-	{
-		glm::vec3 rot(0.f);
-		if (s_State->keys[38])
-		{
-			rot.x += 1.f;
-		}
-		if (s_State->keys[40])
-		{
-			rot.x -= 1.f;
-		}
-		if (s_State->keys[37])
-		{
-			rot.y += 1.f;
-		}
-		if (s_State->keys[39])
-		{
-			rot.y -= 1.f;
-		}
-		return rot;
-	}
-
-	// Platform specific functions
 
 	void* CustomAllocate(size_t size) {
 		return malloc(size);

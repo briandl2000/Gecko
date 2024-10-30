@@ -30,9 +30,6 @@ namespace Gecko { namespace Platform
 	float GetScreenAspectRatio();
 	float GetTime();
 	void AddResizeEvent(ResizeEvent resizeEvent, void* listener);
-	// TODO: change input system
-	glm::vec3 GetPositionInput();
-	glm::vec3 GetRotationInput();
 
 	// TODO: memory tracking
 	void* CustomAllocate(size_t size);

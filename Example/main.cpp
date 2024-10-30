@@ -13,6 +13,8 @@
 #include "Rendering/Frontend/Renderer/RenderPasses/ToneMappingGammaCorrectionPass.h"
 #include "UI/DebugUIRenderer.h"
 
+#include "Core/Input.h"
+
 #include "CustomPass.h"
 
 int main()
@@ -32,6 +34,7 @@ int main()
 
 	Gecko::Event::Init();
 	Gecko::Platform::Init(info);
+	Gecko::Input::Init();
 	Gecko::Logger::Init();
 
 
@@ -107,7 +110,6 @@ int main()
 	while (Gecko::Platform::IsRunning()) {
 		Gecko::Platform::PumpMessage();
 
-		
 		Gecko::f32 currentTime = Gecko::Platform::GetTime();
 		Gecko::f32 deltaTime = (currentTime - lastTime);
 		lastTime = currentTime;
@@ -116,9 +118,26 @@ int main()
 		helmetRootNode->Transform.Rotation.x += 1.6f * deltaTime * 50.f;
 		helmetRootNode->Transform.Rotation.z += 1.0f * deltaTime * 50.f;
 	
-		cameraNode->Transform.Rotation += Gecko::Platform::GetRotationInput() * deltaTime * 40.f;
+		glm::vec3 rot{ 0. };
+		
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::UP))		rot.x += 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::DOWN))	rot.x -= 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::LEFT))	rot.y += 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::RIGHT))	rot.y -= 1.f;
 
-		glm::vec3 movement = glm::mat3(cameraNode->Transform.GetMat4()) * Gecko::Platform::GetPositionInput();
+		cameraNode->Transform.Rotation += rot * deltaTime * 40.f;
+		
+		glm::vec3 pos{ 0. };
+
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::W))		pos.z -= 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::S))		pos.z += 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::A))		pos.x -= 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::D))		pos.x += 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::LSHIFT)) pos.y -= 1.f;
+		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::SPACE))	pos.y += 1.f;
+		if (glm::length2(pos) > 0.) pos = glm::normalize(pos);
+
+		glm::vec3 movement = glm::mat3(cameraNode->Transform.GetMat4()) * pos;
 		
 		cameraNode->Transform.Position += movement * deltaTime;
 
@@ -126,11 +145,15 @@ int main()
 		Gecko::DebugUIRenderer::RenderDebugUI(ctx);
 		
 		renderer->RenderScene(scene->GetSceneRenderInfo());
+
+
+		Gecko::Input::Update();
 	}
 
 	ctx.Shutdown();
 
 	Gecko::Logger::Shutdown();
+	Gecko::Input::Shutdown();
 	Gecko::Platform::Shutdown();
 	Gecko::Event::Shutdown();
 

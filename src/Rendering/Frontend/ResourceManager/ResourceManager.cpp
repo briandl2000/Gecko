@@ -232,12 +232,12 @@ namespace Gecko
 			SceneData[i]->Exposure = 2.f;
 		}
 
-		AddEventListener(Event::RESIZED, &ResourceManager::ResizeEvent);
+		AddEventListener(Event::SystemEvent::CODE_RESIZED, &ResourceManager::ResizeEvent);
 	}
 
 	void ResourceManager::Shutdown()
 	{
-		RemoveEventListener(Event::RESIZED, &ResourceManager::ResizeEvent);
+		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &ResourceManager::ResizeEvent);
 
 		m_CurrentMeshIndex = 0;
 		m_CurrentTextureIndex = 0;
