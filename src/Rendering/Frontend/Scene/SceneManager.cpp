@@ -7,7 +7,7 @@ namespace Gecko {
 
 	void SceneManager::Init()
 	{
-		Platform::AddResizeEvent(SceneManager::OnResize, this);
+		//Platform::AddResizeEvent(SceneManager::OnResize, this);
 	}
 
 	void SceneManager::Shutdown()
@@ -40,16 +40,6 @@ namespace Gecko {
 		}
 
 		return m_Scenes[sceneIndex].get();
-	}
-
-	void SceneManager::OnResize(u32 width, u32 height, void* listener)
-	{
-		SceneManager* sceneManager = reinterpret_cast<SceneManager*>(listener);
-		
-		for (u32 i = 0; i < sceneManager->m_Scenes.size(); i++)
-		{
-			sceneManager->m_Scenes[i]->OnResize(width, height);
-		}
 	}
 
 }

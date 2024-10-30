@@ -578,13 +578,18 @@ namespace Gecko
 
 	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)
 	{
+		u32 width = eventData.Data.u32[0];
+		u32 height = eventData.Data.u32[0];
+		width = width == 0 ? 1 : width;
+		height = height == 0 ? 1 : height;
+
 		for (auto [key, val] : m_RenderTargets)
 		{
 			if (val.KeepWindowAspectRatio)
 			{
 				RenderTargetDesc renderTargetDesc = val.RenderTarget.Desc;
-				renderTargetDesc.Width = static_cast<u32>(eventData.Data.u32[0] * val.WidthScale);
-				renderTargetDesc.Height = static_cast<u32>(eventData.Data.u32[1] * val.WidthScale);
+				renderTargetDesc.Width = static_cast<u32>(width * val.WidthScale);
+				renderTargetDesc.Height = static_cast<u32>(height * val.WidthScale);
 				val.RenderTarget = m_Device->CreateRenderTarget(renderTargetDesc);
 			}
 		}

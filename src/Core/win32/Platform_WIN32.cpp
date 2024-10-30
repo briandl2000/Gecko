@@ -26,13 +26,6 @@ namespace Gecko { namespace Platform
 
 		constexpr wchar_t CLASS_NAME[] = L"Gecko_Window_Class";
 
-		struct ResizeEventInfo
-		{
-			ResizeEventInfo() = default;
-			ResizeEvent ResizeEvent{ nullptr };
-			void* Data{ nullptr };
-		};
-
 		struct PlatformState
 		{
 			HWND Window{ nullptr };
@@ -40,10 +33,6 @@ namespace Gecko { namespace Platform
 
 			AppInfo Info;
 			bool IsClosed = false;
-
-			std::vector<ResizeEventInfo> ResizeEventsInfos;
-
-			bool keys[1000]{ 0 };
 		};
 
 		static Scope<PlatformState> s_State{ nullptr };
@@ -156,13 +145,6 @@ namespace Gecko { namespace Platform
 		return !s_State->IsClosed;
 	}
 
-	void AddResizeEvent(ResizeEvent resizeEvent, void* listener)
-	{
-		ASSERT_MSG(s_State != nullptr, "Platform state not initialized, did you not initialize platform?");
-
-		s_State->ResizeEventsInfos.push_back({ resizeEvent, listener });
-	}
-
     namespace
     {
 		LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -188,8 +170,8 @@ namespace Gecko { namespace Platform
 				u32 width = r.right - r.left;
 				u32 height = r.bottom - r.top;
 
-				data.Data.u16[0] = (u16)width;
-				data.Data.u16[1] = (u16)height;
+				data.Data.u32[0] = (u16)width;
+				data.Data.u32[1] = (u16)height;
 				Event::FireEvent(Event::SystemEvent::CODE_RESIZED, data);
 
 			} break;

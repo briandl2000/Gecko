@@ -4,9 +4,6 @@
 
 namespace Gecko { namespace Platform 
 {
-
-	typedef void (*ResizeEvent)(u32 width, u32 height, void* listener);
-
 	struct AppInfo
 	{
 		u32 Width = 1920;
@@ -29,7 +26,6 @@ namespace Gecko { namespace Platform
 	bool IsRunning();
 	float GetScreenAspectRatio();
 	float GetTime();
-	void AddResizeEvent(ResizeEvent resizeEvent, void* listener);
 
 	// TODO: memory tracking
 	void* CustomAllocate(size_t size);

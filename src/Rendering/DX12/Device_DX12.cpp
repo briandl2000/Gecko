@@ -21,17 +21,14 @@ const wchar_t* c_missShaderName = L"MyMissShader";
 
 namespace Gecko { namespace DX12
 {
-	void OnResize(u32 width, u32 height, void* Device)
-	{
-		Device_DX12* device = reinterpret_cast<Device_DX12*>(Device);
-		device->Resize(width, height);
-	}
 
 	template<typename T>
 	void CreateCommandBuffers(ComPtr<ID3D12Device8> device, ComPtr<ID3D12CommandQueue>& commandQueue, T& commandBuffers, D3D12_COMMAND_LIST_TYPE type);
 
 	Device_DX12::Device_DX12()
 	{
+		AddEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
+
 		CreateDevice();
 
 		const Platform::AppInfo& info = Platform::GetAppInfo();
@@ -107,8 +104,6 @@ namespace Gecko { namespace DX12
 
 		}
 
-		Gecko::Platform::AddResizeEvent(&OnResize, this);
-
 		// ImGui stuff
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext(); 
@@ -148,10 +143,13 @@ namespace Gecko { namespace DX12
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
+
 	};
 	
 	Device_DX12::~Device_DX12()
 	{
+		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
+
 	}
 
 	Ref<CommandList> Device_DX12::CreateGraphicsCommandList()
@@ -2318,9 +2316,11 @@ namespace Gecko { namespace DX12
 
 	}
 
-	void Device_DX12::Resize(u32 width, u32 height)
+	bool Device_DX12::Resize(const Event::EventData& data)
 	{
 		Flush();
+		u32 width = data.Data.u32[0];
+		u32 height = data.Data.u32[1];
 		LOG_INFO("Resizeing to: %u, %u", width, height);
 
 		if (width == 0) width = 1;
@@ -2340,10 +2340,10 @@ namespace Gecko { namespace DX12
 		for (u32 i = 0; i < m_NumBackBuffers; i++)
 		{
 
-			Ref<RenderTarget_DX12> data = CreateRef<RenderTarget_DX12>();
-			data->RenderTargetResources[0] = CreateRef<Resource>();
+			Ref<RenderTarget_DX12> renderTarget_DX12 = CreateRef<RenderTarget_DX12>();
+			renderTarget_DX12->RenderTargetResources[0] = CreateRef<Resource>();
 
-			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&data->RenderTargetResources[0]->Resource)));
+			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget_DX12->RenderTargetResources[0]->Resource)));
 
 			RenderTargetDesc renderTargetDesc;
 			renderTargetDesc.RenderTargetFormats[0] = m_BackBufferFormat;
@@ -2357,11 +2357,13 @@ namespace Gecko { namespace DX12
 			renderTargetDesc.RenderTargetClearValues[0].Values[3] = 1.0f;
 			renderTargetDesc.DepthTargetClearValue.Depth = 1.0f;
 
-			m_BackBuffers[i] = CreateRenderTarget(renderTargetDesc, data);
+			m_BackBuffers[i] = CreateRenderTarget(renderTargetDesc, renderTarget_DX12);
 
 		}
 
 		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
+
+		return false;
 	}
 
 	inline void AllocateUAVBuffer(ID3D12Device* pDevice, UINT64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON, const wchar_t* resourceName = nullptr)

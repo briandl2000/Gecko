@@ -5,6 +5,7 @@
 #include "Rendering/Frontend/Scene/SceneObjects/SceneCamera.h"
 #include "Rendering/Frontend/Scene/SceneObjects/SceneLight.h"
 #include "Rendering/Frontend/Scene/SceneObjects/SceneRenderObject.h"
+#include "Core/Event.h"
 
 namespace Gecko {
 
@@ -73,7 +74,7 @@ namespace Gecko {
 		std::string m_Name{ "Node" };
 	};
 
-	class Scene
+	class Scene : Event::EventListener<Scene>
 	{
 	public:
 		friend class SceneNode;
@@ -100,9 +101,9 @@ namespace Gecko {
 
 		const std::string& GetName() { return m_Name; };
 
-	private:
-		void OnResize(u32 width, u32 height);
+		bool Scene::OnResize(const Event::EventData& data);
 
+	private:
 		const void PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const;
 	
 	private:
