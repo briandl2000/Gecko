@@ -33,9 +33,9 @@ public:
 	{
 		Ref<T> renderPass = CreateRef<T>();
 		renderPass->Init(m_Info, m_ResourceManager, dependencies);
-		RenderPassHandle id = name;
-		m_RenderPasses.emplace(std::make_pair(id, renderPass));
-		return id;
+		RenderPassHandle handle = name;
+		m_RenderPasses.emplace(std::make_pair(handle, renderPass));
+		return handle;
 	}
 
 	const Ref<RenderPassInterface>& GetRenderPassByHandle(RenderPassHandle id) const
