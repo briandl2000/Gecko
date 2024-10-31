@@ -51,27 +51,28 @@ int main()
 
 
 	// Create the render passess
-	//Gecko::RenderPassHandle customPass = renderer->CreateRenderPass<CustomPass>("Custom");
 	Gecko::RenderPassHandle shadowPass = renderer->CreateRenderPass<Gecko::ShadowPass>("Shadow");
 	Gecko::RenderPassHandle geometryPass = renderer->CreateRenderPass<Gecko::GeometryPass>("Geo");
 
-	Gecko::DeferredPBRPass::InputData PBRInputData;
-	PBRInputData.GeoPass = geometryPass;
-	PBRInputData.ShadowPass = shadowPass;
-	Gecko::RenderPassHandle deferredPBRPass = renderer->CreateRenderPass<Gecko::DeferredPBRPass>("PBR", PBRInputData);
+	Gecko::DeferredPBRPass::ConfigData PBRConfigData;
+	PBRConfigData.GeoPass = geometryPass;
+	PBRConfigData.ShadowPass = shadowPass;
+	Gecko::RenderPassHandle deferredPBRPass = renderer->CreateRenderPass<Gecko::DeferredPBRPass>("PBR", PBRConfigData);
 
-	Gecko::FXAAPass::InputData FXAAInputData(deferredPBRPass);
-	Gecko::RenderPassHandle FXAAPass = renderer->CreateRenderPass<Gecko::FXAAPass>("FXAA", FXAAInputData);
+	Gecko::FXAAPass::ConfigData FXAAConfigData(deferredPBRPass);
+	Gecko::RenderPassHandle FXAAPass = renderer->CreateRenderPass<Gecko::FXAAPass>("FXAA", FXAAConfigData);
 
-	Gecko::BloomPass::InputData BloomInputData(FXAAPass);
-	Gecko::RenderPassHandle bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>("Bloom", BloomInputData);
+	Gecko::BloomPass::ConfigData BloomConfigData(FXAAPass);
+	Gecko::RenderPassHandle bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>("Bloom", BloomConfigData);
 
-	Gecko::ToneMappingGammaCorrectionPass::InputData ToneMappingGammaCorrectionInputData;
-	ToneMappingGammaCorrectionInputData.PrevPass = deferredPBRPass;
+	Gecko::ToneMappingGammaCorrectionPass::ConfigData ToneMappingGammaCorrectionConfigData;
+	ToneMappingGammaCorrectionConfigData.PrevPass = bloomPass;
 	Gecko::RenderPassHandle toneMappingGammaCorrectionPass = 
 		renderer->CreateRenderPass<Gecko::ToneMappingGammaCorrectionPass>("ToneMappingGammaCorrection",
-			ToneMappingGammaCorrectionInputData);
+			ToneMappingGammaCorrectionConfigData);
 
+	//Gecko::RenderPassHandle customPass = renderer->CreateRenderPass<CustomPass>("Custom");
+	
 	// Configure renderpasses
 	renderer->ConfigureRenderPasses({
 		shadowPass,
@@ -80,6 +81,7 @@ int main()
 		FXAAPass,
 		bloomPass,
 		toneMappingGammaCorrectionPass
+		//customPass,
 		});
 
 	// Add an environment map

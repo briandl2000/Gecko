@@ -10,7 +10,7 @@
 namespace Gecko
 {
 
-const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
+const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies)
 {
 	// BloomDownScale Compute Pipeline
 	{
@@ -121,14 +121,14 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 	m_BloomData.Height = appInfo.Height;
 	m_BloomData.Threshold = .9f;
 
-	m_Input = dependencies;
+	m_ConfigData = dependencies;
 }
 
 const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
 	const Renderer* renderer, Ref<CommandList> commandList)
 {
 
-	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.PrevPass)->GetOutputHandle());
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.PrevPass)->GetOutputHandle());
 	Texture downSampleTexture = resourceManager->GetTexture(m_DownScaleTextureHandle);
 	Texture upSampleTexture = resourceManager->GetTexture(m_UpScaleTextureHandle);
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);

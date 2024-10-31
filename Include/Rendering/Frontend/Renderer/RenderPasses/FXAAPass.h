@@ -21,14 +21,16 @@ struct FXAAData
 class FXAAPass : public RenderPass<FXAAPass>
 {
 public:
-	struct InputData : public BaseInputData
+	struct ConfigData : public BaseConfigData
 	{
-		RenderPassHandle PrevPass;
+		ConfigData() :
+			PrevPass(RenderPassHandle())
+		{}
+		ConfigData(RenderPassHandle handle) :
+			PrevPass(handle)
+		{}
 
-		InputData() : PrevPass(RenderPassHandle())
-		{}
-		InputData(RenderPassHandle handle) : PrevPass(handle)
-		{}
+		RenderPassHandle PrevPass;
 	};
 
 	FXAAPass() = default;
@@ -39,7 +41,7 @@ public:
 
 protected:
 	friend class RenderPass<FXAAPass>;
-	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 private:
 
@@ -47,7 +49,7 @@ private:
 
 	ComputePipelineHandle FXAAPipelineHandle;
 
-	InputData m_Input;
+	ConfigData m_ConfigData;
 
 };
 

@@ -29,7 +29,8 @@ public:
 	void Shutdown();
 
 	template<typename T>
-	RenderPassHandle CreateRenderPass(std::string name, const BaseInputData& dependencies = BaseInputData())
+	RenderPassHandle CreateRenderPass(std::string name,
+		const RenderPassInterface::ConfigDataInterface& dependencies = RenderPassInterface::ConfigDataInterface())
 	{
 		Ref<T> renderPass = CreateRef<T>();
 		renderPass->Init(m_Info, m_ResourceManager, dependencies);

@@ -17,14 +17,16 @@ struct BloomData
 class BloomPass : public RenderPass<BloomPass>
 {
 public:
-	struct InputData : public BaseInputData
+	struct ConfigData : public BaseConfigData
 	{
+		ConfigData() :
+			PrevPass(RenderPassHandle())
+		{}
+		ConfigData(RenderPassHandle handle) :
+			PrevPass(handle)
+		{}
+		
 		RenderPassHandle PrevPass;
-
-		InputData() : PrevPass(RenderPassHandle())
-		{}
-		InputData(RenderPassHandle handle) : PrevPass(handle)
-		{}
 	};
 
 	BloomPass() = default;
@@ -35,7 +37,7 @@ public:
 
 protected:
 	friend class RenderPass<BloomPass>;
-	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 private:
 	
@@ -49,7 +51,7 @@ private:
 	ComputePipelineHandle m_ThresholdPipelineHandle;
 	ComputePipelineHandle m_CompositePipelineHandle;
 
-	InputData m_Input;
+	ConfigData m_ConfigData;
 
 };
 

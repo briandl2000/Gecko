@@ -7,7 +7,7 @@
 namespace Gecko
 {
 
-const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
+const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies)
 {
 	// GBuffer Graphics Pipeline
 	{

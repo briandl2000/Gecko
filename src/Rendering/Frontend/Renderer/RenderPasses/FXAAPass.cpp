@@ -8,7 +8,7 @@
 namespace Gecko
 {
 
-const void FXAAPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
+const void FXAAPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies)
 {
 	// FXAA Compute Pipeline
 	{
@@ -56,7 +56,7 @@ const void FXAAPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* 
 	m_FXAAData.fxaaReduceMul = 1.f / 128.f;
 	m_FXAAData.fxaaReduceMin = 1. / 8.f;
 
-	m_Input = dependencies;
+	m_ConfigData = dependencies;
 
 }
 
@@ -64,7 +64,7 @@ const void FXAAPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMana
 	const Renderer* renderer, Ref<CommandList> commandList)
 {
 
-	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.PrevPass)->GetOutputHandle());
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.PrevPass)->GetOutputHandle());
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 	
 	ComputePipeline FXAAPipeline = resourceManager->GetComputePipeline(FXAAPipelineHandle);

@@ -27,11 +27,11 @@ using RenderPassHandle = std::string;
 class RenderPassInterface
 {
 public:
-	struct InputDataInterface
+	struct ConfigDataInterface
 	{};
 
 	virtual const void Init(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
-		const InputDataInterface& dependencies = InputDataInterface()) = 0;
+		const ConfigDataInterface& dependencies = ConfigDataInterface()) = 0;
 	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
 		const Renderer* renderer, Ref<CommandList> commandList) = 0;
 
@@ -40,7 +40,7 @@ public:
 };
 
 // Shortened to make inheriting from this type easier
-using BaseInputData = RenderPassInterface::InputDataInterface;
+using BaseConfigData = RenderPassInterface::ConfigDataInterface;
 
 template <typename T>
 class RenderPass : public RenderPassInterface
@@ -50,9 +50,9 @@ public:
 	virtual ~RenderPass() {}
 
 	virtual const void Init(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
-		const InputDataInterface& dependencies) override final
+		const BaseConfigData& dependencies) override final
 	{
-		const T::InputData& data = static_cast<const T::InputData&>(dependencies);
+		const T::ConfigData& data = static_cast<const T::ConfigData&>(dependencies);
 		static_cast<T*>(this)->SubInit(appInfo, resourceManager, data);
 	}
 

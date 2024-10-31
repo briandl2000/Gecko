@@ -9,7 +9,7 @@
 namespace Gecko
 {
 
-const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
+const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies)
 {
 
 	// PBR Compute Pipeline
@@ -74,15 +74,15 @@ const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceMa
 	
 	stbi_image_free(image);
 	
-	m_Input = dependencies;
+	m_ConfigData = dependencies;
 }
 
 const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
 	const Renderer* renderer, Ref<CommandList> commandList)
 {
 
-	RenderTarget GBuffer = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.GeoPass)->GetOutputHandle());
-	RenderTarget ShadowMap = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.ShadowPass)->GetOutputHandle());
+	RenderTarget GBuffer = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.GeoPass)->GetOutputHandle());
+	RenderTarget ShadowMap = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.ShadowPass)->GetOutputHandle());
 	RenderTarget PBROutput = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	Texture BRDFLUTTexture = resourceManager->GetTexture(BRDFLUTTextureHandle);

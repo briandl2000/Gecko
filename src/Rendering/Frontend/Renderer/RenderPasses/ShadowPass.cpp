@@ -7,7 +7,7 @@
 namespace Gecko
 {
 
-const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
+const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies)
 {
 	// Shadow map Graphics Pipeline
 	{

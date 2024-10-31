@@ -18,16 +18,17 @@ struct PBRData
 class DeferredPBRPass : public RenderPass<DeferredPBRPass>
 {
 public:
-	struct Gecko::DeferredPBRPass::InputData : public BaseInputData
+	struct ConfigData : public BaseConfigData
 	{
-		InputData() :
+		ConfigData() :
 			GeoPass(RenderPassHandle()),
 			ShadowPass(RenderPassHandle())
 		{}
-		InputData(RenderPassHandle geo, RenderPassHandle shadow) :
+		ConfigData(RenderPassHandle geo, RenderPassHandle shadow) :
 			GeoPass(geo),
 			ShadowPass(shadow)
 		{}
+
 		RenderPassHandle GeoPass;
 		RenderPassHandle ShadowPass;
 	};
@@ -40,7 +41,7 @@ public:
 
 protected:
 	friend class RenderPass<DeferredPBRPass>;
-	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 private:
 
@@ -48,7 +49,7 @@ private:
 
 	ComputePipelineHandle PBRPipelineHandle;
 
-	InputData m_Input;
+	ConfigData m_ConfigData;
 };
 
 }

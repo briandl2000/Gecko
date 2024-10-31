@@ -11,7 +11,7 @@ namespace Gecko
 {
 
 const void ToneMappingGammaCorrectionPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
-	const InputData& dependencies)
+	const ConfigData& dependencies)
 {
 	// TonemapAndGammaCorrect Compute Pipeline
 	{
@@ -40,13 +40,13 @@ const void ToneMappingGammaCorrectionPass::SubInit(const Platform::AppInfo& appI
 
 	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "ToneMappingGammaCorrection", true);
 
-	m_Input = dependencies;
+	m_ConfigData = dependencies;
 }
 
 const void ToneMappingGammaCorrectionPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
 	const Renderer* renderer, Ref<CommandList> commandList)
 {
-	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.PrevPass)->GetOutputHandle());
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.PrevPass)->GetOutputHandle());
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	ComputePipeline TonemapAndGammaCorrectPipeline = resourceManager->GetComputePipeline(TonemapAndGammaCorrectPipelineHandle);

@@ -10,14 +10,16 @@ namespace Gecko
 	class ShadowRaytracePass : public RenderPass<ShadowRaytracePass>
 	{
 	public:
-		struct InputData : public BaseInputData
+		struct ConfigData : public BaseConfigData
 		{
+			ConfigData() :
+				GeoPass(RenderPassHandle())
+			{}
+			ConfigData(RenderPassHandle handle) :
+				GeoPass(handle)
+			{}
+			
 			RenderPassHandle GeoPass;
-
-			InputData() : GeoPass(RenderPassHandle())
-			{}
-			InputData(RenderPassHandle handle) : GeoPass(handle)
-			{}
 		};
 
 		ShadowRaytracePass() = default;
@@ -29,12 +31,12 @@ namespace Gecko
 
 	protected:
 		friend class RenderPass<ShadowRaytracePass>;
-		virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
+		virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 	private:
 		RaytracingPipelineHandle m_ShadowRaytracePipelineHandle;
 
-		InputData m_Input;
+		ConfigData m_ConfigData;
 	};
 
 }

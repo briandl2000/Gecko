@@ -10,7 +10,7 @@ namespace Gecko
 class ShadowPass : public RenderPass<ShadowPass>
 {
 public:
-	struct InputData : public BaseInputData
+	struct ConfigData : public BaseConfigData
 	{};
 
 	ShadowPass() = default;
@@ -22,7 +22,7 @@ public:
 
 protected:
 	friend class RenderPass<ShadowPass>;
-	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 private:
 	GraphicsPipelineHandle ShadowPipelineHandle;

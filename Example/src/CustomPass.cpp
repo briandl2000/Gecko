@@ -5,7 +5,7 @@
 #include "Rendering/Frontend/Renderer/Renderer.h"
 
 const void CustomPass::SubInit(const Gecko::Platform::AppInfo& appInfo, Gecko::ResourceManager* resourceManager,
-	const InputData& dependencies)
+	const ConfigData& dependencies)
 {
 	// Simple colour output Compute Pipeline
 	{

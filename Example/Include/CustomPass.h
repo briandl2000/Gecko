@@ -5,7 +5,7 @@
 class CustomPass : public Gecko::RenderPass<CustomPass>
 {
 public:
-	struct InputData : public Gecko::BaseInputData
+	struct ConfigData : public Gecko::BaseConfigData
 	{
 
 	};
@@ -16,7 +16,7 @@ public:
 protected:
 	friend class Gecko::RenderPass<CustomPass>;
 	virtual const void SubInit(const Gecko::Platform::AppInfo& appInfo, Gecko::ResourceManager* resourceManager, 
-		const InputData& dependencies);
+		const ConfigData& dependencies);
 
 private:
 	Gecko::RenderTargetHandle m_OutputHandle;
