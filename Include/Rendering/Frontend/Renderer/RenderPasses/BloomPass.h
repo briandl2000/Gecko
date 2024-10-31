@@ -14,22 +14,35 @@ struct BloomData
 	f32 Threshold;
 };
 
-class BloomPass : public RenderPass
+class BloomPass : public RenderPass<BloomPass>
 {
 public:
+	struct ConfigData : public BaseConfigData
+	{
+		ConfigData() :
+			PrevPass(RenderPassHandle())
+		{}
+		ConfigData(RenderPassHandle handle) :
+			PrevPass(handle)
+		{}
+		
+		RenderPassHandle PrevPass;
+	};
+
 	BloomPass() = default;
 	virtual ~BloomPass() {}
 
-	virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) override;
-	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList) override;
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+		const Renderer* renderer, Ref<CommandList> commandList) override;
 
 protected:
+	friend class RenderPass<BloomPass>;
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 private:
 	
 	BloomData m_BloomData;
 
-	RenderTargetHandle m_OutputTargetHandle;
 	TextureHandle m_DownScaleTextureHandle;
 	TextureHandle m_UpScaleTextureHandle;
 
@@ -37,6 +50,8 @@ private:
 	ComputePipelineHandle m_UpScalePipelineHandle;
 	ComputePipelineHandle m_ThresholdPipelineHandle;
 	ComputePipelineHandle m_CompositePipelineHandle;
+
+	ConfigData m_ConfigData;
 
 };
 

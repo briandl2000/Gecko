@@ -2,8 +2,10 @@
 
 #include "Defines.h"
 #include "Rendering/Backend/CommandList.h"
+#include "Rendering/Frontend/Renderer/Renderer.h"
 
-const void CustomPass::Init(Gecko::Platform::AppInfo& appInfo, Gecko::ResourceManager* resourceManager)
+const void CustomPass::SubInit(const Gecko::Platform::AppInfo& appInfo, Gecko::ResourceManager* resourceManager,
+	const ConfigData& dependencies)
 {
 	// Simple colour output Compute Pipeline
 	{
@@ -33,7 +35,7 @@ const void CustomPass::Init(Gecko::Platform::AppInfo& appInfo, Gecko::ResourceMa
 }
 
 const void CustomPass::Render(const Gecko::SceneRenderInfo& sceneRenderInfo, Gecko::ResourceManager* resourceManager,
-	Gecko::Ref<Gecko::CommandList> commandList)
+	const Gecko::Renderer* renderer, Gecko::Ref<Gecko::CommandList> commandList)
 {
 	Gecko::RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 

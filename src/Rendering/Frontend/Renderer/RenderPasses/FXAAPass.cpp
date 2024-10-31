@@ -3,11 +3,12 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
+#include "Rendering/Frontend/Renderer/Renderer.h"
 
 namespace Gecko
 {
 
-const void FXAAPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
+const void FXAAPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies)
 {
 	// FXAA Compute Pipeline
 	{
@@ -55,12 +56,15 @@ const void FXAAPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceM
 	m_FXAAData.fxaaReduceMul = 1.f / 128.f;
 	m_FXAAData.fxaaReduceMin = 1. / 8.f;
 
+	m_ConfigData = dependencies;
+
 }
 
-const void FXAAPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void FXAAPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+	const Renderer* renderer, Ref<CommandList> commandList)
 {
 
-	RenderTarget inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("PBROutput"));
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.PrevPass)->GetOutputHandle());
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 	
 	ComputePipeline FXAAPipeline = resourceManager->GetComputePipeline(FXAAPipelineHandle);

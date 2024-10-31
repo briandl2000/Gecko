@@ -14,24 +14,42 @@ struct PBRData
 	u32 height;
 };
 
-class DeferredPBRPass : public RenderPass
+//struct DeferredPBRPass::InputData;
+class DeferredPBRPass : public RenderPass<DeferredPBRPass>
 {
 public:
+	struct ConfigData : public BaseConfigData
+	{
+		ConfigData() :
+			GeoPass(RenderPassHandle()),
+			ShadowPass(RenderPassHandle())
+		{}
+		ConfigData(RenderPassHandle geo, RenderPassHandle shadow) :
+			GeoPass(geo),
+			ShadowPass(shadow)
+		{}
+
+		RenderPassHandle GeoPass;
+		RenderPassHandle ShadowPass;
+	};
+
 	DeferredPBRPass() = default;
 	virtual ~DeferredPBRPass() {}
 
-	virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) override;
-	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList) override;
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+		const Renderer* renderer, Ref<CommandList> commandList) override;
 
 protected:
+	friend class RenderPass<DeferredPBRPass>;
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 private:
 
 	TextureHandle BRDFLUTTextureHandle;
-	RenderTargetHandle PBROutputHandle;
 
 	ComputePipelineHandle PBRPipelineHandle;
 
+	ConfigData m_ConfigData;
 };
 
 }
