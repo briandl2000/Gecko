@@ -55,11 +55,13 @@ namespace Gecko { namespace Input
 		static Scope<InputState> s_State;
 	}
 
-	void Init()
+	bool Init()
 	{
 		s_State = CreateScope<InputState>();
 		s_State->Init();
-	}
+	    
+        return true;
+    }
 
 	void Shutdown()
 	{

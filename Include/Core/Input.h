@@ -144,7 +144,7 @@ namespace Gecko { namespace Input
 		GRAVE = 0xC0,
 	};
 
-	void Init();
+	bool Init();
 	void Shutdown();
 	void Update();
 

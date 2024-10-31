@@ -10,10 +10,11 @@
 #include "Rendering/Backend/Device.h"
 #include "Rendering/DX12/Resources_DX12.h"
 
+#include "Core/Event.h"
+
 namespace Gecko {
 	namespace DX12
 	{
-
 
 		class GpuUploadBuffer
 		{
@@ -145,8 +146,9 @@ namespace Gecko {
 		constexpr D3D_FEATURE_LEVEL c_MinimumFeatureLevel{ D3D_FEATURE_LEVEL_11_0 };
 
 		struct RenderTarget_DX12;
+		
 
-		class Device_DX12 : public Device
+		class Device_DX12 : protected Event::EventListener<Device_DX12>, public Device
 		{
 		public:
 
@@ -207,7 +209,7 @@ namespace Gecko {
 			void ExecuteComputeCommandBuffer(Ref<CommandBuffer> copyCommandBuffer);
 			void ExecuteCopyCommandBuffer(Ref<CommandBuffer> copyCommandBuffer);
 
-			void Resize(u32 width, u32 height);
+			bool Resize(const Event::EventData& data);
 
 			/*void SetupRaytracing();
 			ComPtr<ID3D12Resource> GenerateAccelerationStructure(VertexBuffer, IndexBuffer);

@@ -120,7 +120,7 @@ namespace Gecko { namespace Event
 			{
 				if ((*it)->m_Code == code && (*it)->m_Listener == reinterpret_cast<T*>(this) && (*it)->m_Callback == callback)
 				{
-					LOG_WARN("Event callback already exist in this event");
+					LOG_WARN("Event callback already exist in this EventListener");
 					return;
 				}
 			}
@@ -139,7 +139,7 @@ namespace Gecko { namespace Event
 					return;
 				}
 			}
-			LOG_WARN("Event doesn't exist on this event!");
+			LOG_WARN("Event doesn't exist on this EventListener!");
 		}
 
 	private:

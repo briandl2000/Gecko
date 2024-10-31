@@ -161,6 +161,8 @@ namespace Gecko  {
 
 	void Scene::Init(const std::string& name)
 	{
+		AddEventListener(Event::SystemEvent::CODE_RESIZED, &Scene::OnResize);
+
 		m_Name = name;
 		m_RootNode = CreateScope<SceneNode>();
 		m_RootNode->SetName("Root Node");
@@ -250,8 +252,10 @@ namespace Gecko  {
 		m_EnvironmentMapHandle = handle;
 	}
 
-	void Scene::OnResize(u32 width, u32 height)
+	bool Scene::OnResize(const Event::EventData& data)
 	{
+		u32 width = data.Data.u32[0];
+		u32 height = data.Data.u32[1];
 		f32 aspectRatio = static_cast<f32>(width) / static_cast<f32>(height);
 		for (u32 i = 0; i < m_Cameras.size(); i++)
 		{
@@ -260,6 +264,7 @@ namespace Gecko  {
 				m_Cameras[i]->SetAspectRatio(aspectRatio);
 			}
 		}
+		return false;
 	}
 
 	const void Scene::PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const
