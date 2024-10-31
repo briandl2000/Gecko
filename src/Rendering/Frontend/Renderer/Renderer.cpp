@@ -153,14 +153,15 @@ void Renderer::RenderScene(const SceneRenderInfo& sceneRenderInfo)
 	Gecko::Ref<Gecko::CommandList> commandList = device->CreateGraphicsCommandList();
 
 	// Render the render passes
-	for (const Ref<RenderPass>& renderPass : m_RenderPassStack)
+	for (RenderPassHandle renderPassHandle : m_RenderPassStack)
 	{
-		renderPass->Render(sceneRenderInfo, m_ResourceManager, commandList);
+		const auto renderPass = GetRenderPassByHandle(renderPassHandle);
+		renderPass->Render(sceneRenderInfo, m_ResourceManager, this, commandList);
 	}
 
-	// Render to the back buffer
+	// Render the output from the final render pass to the back buffer
 	// TODO: move this to the present function
-	RenderTarget inputTarget = m_ResourceManager->GetRenderTarget(m_ResourceManager->GetRenderTargetHandle("ToneMappingGammaCorrection"));
+	RenderTarget inputTarget = m_ResourceManager->GetRenderTarget(GetRenderPassByHandle(m_RenderPassStack.back())->GetOutputHandle());
 	RenderTarget renderTarget = device->GetCurrentBackBuffer();
 	
 	GraphicsPipeline FullScreenTexturePipeline = m_ResourceManager->GetGraphicsPipeline(FullScreenTexturePipelineHandle);

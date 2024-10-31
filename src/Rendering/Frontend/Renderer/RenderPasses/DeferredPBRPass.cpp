@@ -3,12 +3,13 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
+#include "Rendering/Frontend/Renderer/Renderer.h"
 #include <stb_image.h>
 
 namespace Gecko
 {
 
-const void DeferredPBRPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
+const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
 {
 
 	// PBR Compute Pipeline
@@ -57,7 +58,7 @@ const void DeferredPBRPass::Init(Platform::AppInfo& appInfo, ResourceManager* re
 		PBROutputDesc.RenderTargetClearValues[i].Values[3] = 0.f;
 	}
 	PBROutputDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT; // output
-	PBROutputHandle = resourceManager->CreateRenderTarget(PBROutputDesc, "PBROutput", true);
+	m_OutputHandle = resourceManager->CreateRenderTarget(PBROutputDesc, "PBROutput", true);
 
 	int width, height, n;
 	unsigned char* image = stbi_load(Platform::GetLocalPath("Assets/BRDF_LUT.png").c_str(), &width, &height, &n, 4);
@@ -73,14 +74,16 @@ const void DeferredPBRPass::Init(Platform::AppInfo& appInfo, ResourceManager* re
 	
 	stbi_image_free(image);
 	
+	m_Input = dependencies;
 }
 
-const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+	const Renderer* renderer, Ref<CommandList> commandList)
 {
 
-	RenderTarget GBuffer = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("GBuffer"));
-	RenderTarget ShadowMap = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("ShadowMap"));
-	RenderTarget PBROutput = resourceManager->GetRenderTarget(PBROutputHandle);
+	RenderTarget GBuffer = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.GeoPass)->GetOutputHandle());
+	RenderTarget ShadowMap = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.ShadowPass)->GetOutputHandle());
+	RenderTarget PBROutput = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	Texture BRDFLUTTexture = resourceManager->GetTexture(BRDFLUTTextureHandle);
 

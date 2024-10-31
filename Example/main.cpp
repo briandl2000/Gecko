@@ -4,6 +4,7 @@
 
 #include "Rendering/Frontend/Scene/GLTFSceneLoader.h"
 
+#include "Rendering/Frontend/Renderer/RenderPasses/RenderPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/ShadowPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/ShadowRaytracePass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/GeometryPass.h"
@@ -48,20 +49,29 @@ int main()
 
 	Gecko::Scene* scene = sceneManager->CreateScene("Main Scene");
 
-	Gecko::Ref<CustomPass> customPass = renderer->CreateRenderPass<CustomPass>();
-	// Configure renderpasses
-	renderer->ConfigureRenderPasses({
-		customPass
-		});
 
-	
 	// Create the render passess
-	Gecko::Ref<Gecko::ShadowPass> shadowPass = renderer->CreateRenderPass<Gecko::ShadowPass>();
-	Gecko::Ref<Gecko::GeometryPass> geometryPass = renderer->CreateRenderPass<Gecko::GeometryPass>();
-	Gecko::Ref<Gecko::DeferredPBRPass> deferredPBRPass = renderer->CreateRenderPass<Gecko::DeferredPBRPass>();
-	Gecko::Ref<Gecko::FXAAPass> FXAAPass = renderer->CreateRenderPass<Gecko::FXAAPass>();
-	Gecko::Ref<Gecko::BloomPass> bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>();
-	Gecko::Ref<Gecko::ToneMappingGammaCorrectionPass> toneMappingGammaCorrectionPass = renderer->CreateRenderPass<Gecko::ToneMappingGammaCorrectionPass>();
+	//Gecko::RenderPassHandle customPass = renderer->CreateRenderPass<CustomPass>("Custom");
+	Gecko::RenderPassHandle shadowPass = renderer->CreateRenderPass<Gecko::ShadowPass>("Shadow");
+	Gecko::RenderPassHandle geometryPass = renderer->CreateRenderPass<Gecko::GeometryPass>("Geo");
+
+	Gecko::DeferredPBRPass::InputData PBRInputData;
+	PBRInputData.GeoPass = geometryPass;
+	PBRInputData.ShadowPass = shadowPass;
+	Gecko::RenderPassHandle deferredPBRPass = renderer->CreateRenderPass<Gecko::DeferredPBRPass>("PBR", PBRInputData);
+
+	Gecko::FXAAPass::InputData FXAAInputData(deferredPBRPass);
+	Gecko::RenderPassHandle FXAAPass = renderer->CreateRenderPass<Gecko::FXAAPass>("FXAA", FXAAInputData);
+
+	Gecko::BloomPass::InputData BloomInputData(FXAAPass);
+	Gecko::RenderPassHandle bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>("Bloom", BloomInputData);
+
+	Gecko::ToneMappingGammaCorrectionPass::InputData ToneMappingGammaCorrectionInputData;
+	ToneMappingGammaCorrectionInputData.PrevPass = deferredPBRPass;
+	Gecko::RenderPassHandle toneMappingGammaCorrectionPass = 
+		renderer->CreateRenderPass<Gecko::ToneMappingGammaCorrectionPass>("ToneMappingGammaCorrection",
+			ToneMappingGammaCorrectionInputData);
+
 	// Configure renderpasses
 	renderer->ConfigureRenderPasses({
 		shadowPass,

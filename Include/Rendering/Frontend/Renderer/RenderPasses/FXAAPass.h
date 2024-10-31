@@ -18,24 +18,36 @@ struct FXAAData
 	u32 height;
 };
 
-class FXAAPass : public RenderPass
+class FXAAPass : public RenderPass<FXAAPass>
 {
 public:
+	struct InputData : public BaseInputData
+	{
+		RenderPassHandle PrevPass;
+
+		InputData() : PrevPass(RenderPassHandle())
+		{}
+		InputData(RenderPassHandle handle) : PrevPass(handle)
+		{}
+	};
+
 	FXAAPass() = default;
 	virtual ~FXAAPass() {}
 
-	virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) override;
-	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList) override;
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+		const Renderer* renderer, Ref<CommandList> commandList) override;
 
 protected:
+	friend class RenderPass<FXAAPass>;
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
 
 private:
 
 	FXAAData m_FXAAData;
-	
-	RenderTargetHandle m_OutputHandle;
 
 	ComputePipelineHandle FXAAPipelineHandle;
+
+	InputData m_Input;
 
 };
 

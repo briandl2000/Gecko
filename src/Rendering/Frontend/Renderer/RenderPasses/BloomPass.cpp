@@ -3,13 +3,14 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
+#include "Rendering/Frontend/Renderer/Renderer.h"
 
 #include <algorithm>
 
 namespace Gecko
 {
 
-const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
+const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
 {
 	// BloomDownScale Compute Pipeline
 	{
@@ -114,21 +115,23 @@ const void BloomPass::Init(Platform::AppInfo& appInfo, ResourceManager* resource
 	}
 	renderTargetDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT;
 
-	m_OutputTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput", true);
+	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput", true);
 
 	m_BloomData.Width = appInfo.Width;
 	m_BloomData.Height = appInfo.Height;
 	m_BloomData.Threshold = .9f;
 
+	m_Input = dependencies;
 }
 
-const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+	const Renderer* renderer, Ref<CommandList> commandList)
 {
 
-	RenderTarget inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("FXAAOutput"));
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.PrevPass)->GetOutputHandle());
 	Texture downSampleTexture = resourceManager->GetTexture(m_DownScaleTextureHandle);
 	Texture upSampleTexture = resourceManager->GetTexture(m_UpScaleTextureHandle);
-	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputTargetHandle);
+	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	ComputePipeline BloomDownScale = resourceManager->GetComputePipeline(m_DownScalePipelineHandle);
 	ComputePipeline BloomUpScale = resourceManager->GetComputePipeline(m_UpScalePipelineHandle);

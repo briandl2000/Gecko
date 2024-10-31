@@ -7,22 +7,34 @@
 namespace Gecko
 {
 
-	class ShadowRaytracePass : public RenderPass
+	class ShadowRaytracePass : public RenderPass<ShadowRaytracePass>
 	{
 	public:
+		struct InputData : public BaseInputData
+		{
+			RenderPassHandle GeoPass;
+
+			InputData() : GeoPass(RenderPassHandle())
+			{}
+			InputData(RenderPassHandle handle) : GeoPass(handle)
+			{}
+		};
+
 		ShadowRaytracePass() = default;
 		virtual ~ShadowRaytracePass() {}
 
-		virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) override;
-		virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList) override;
+		virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+			const Renderer* renderer, Ref<CommandList> commandList) override;
 
 
 	protected:
+		friend class RenderPass<ShadowRaytracePass>;
+		virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
 
 	private:
-		RenderTargetHandle m_OutputHandle;
-
 		RaytracingPipelineHandle m_ShadowRaytracePipelineHandle;
+
+		InputData m_Input;
 	};
 
 }

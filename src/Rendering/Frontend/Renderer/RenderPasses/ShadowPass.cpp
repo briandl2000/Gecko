@@ -7,7 +7,7 @@
 namespace Gecko
 {
 
-const void ShadowPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
+const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
 {
 	// Shadow map Graphics Pipeline
 	{
@@ -42,7 +42,7 @@ const void ShadowPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourc
 	
 	Gecko::RenderTargetDesc ShadowMapTargetDesc;
 	ShadowMapTargetDesc.AllowDepthStencilTexture = true;
-	ShadowMapTargetDesc.RenderTargetFormats[0] = Gecko::Format::R8G8B8A8_UNORM; // Matallic Roughness Occlusion
+	ShadowMapTargetDesc.RenderTargetFormats[0] = Gecko::Format::R8G8B8A8_UNORM; // Metallic Roughness Occlusion
 	ShadowMapTargetDesc.NumRenderTargets = 1;
 	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[0] = 0.f;
 	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[1] = 0.f;
@@ -56,7 +56,8 @@ const void ShadowPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourc
 
 }
 
-const void ShadowPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void ShadowPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+	const Renderer* renderer, Ref<CommandList> commandList)
 {
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 	GraphicsPipeline ShadowPipeline = resourceManager->GetGraphicsPipeline(ShadowPipelineHandle);

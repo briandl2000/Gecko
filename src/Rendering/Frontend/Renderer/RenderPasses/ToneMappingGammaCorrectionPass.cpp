@@ -3,13 +3,15 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
+#include "Rendering/Frontend/Renderer/Renderer.h"
 
 #include <algorithm>
 
 namespace Gecko
 {
 
-const void ToneMappingGammaCorrectionPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
+const void ToneMappingGammaCorrectionPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
+	const InputData& dependencies)
 {
 	// TonemapAndGammaCorrect Compute Pipeline
 	{
@@ -37,11 +39,14 @@ const void ToneMappingGammaCorrectionPass::Init(Platform::AppInfo& appInfo, Reso
 	renderTargetDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT; // output
 
 	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "ToneMappingGammaCorrection", true);
+
+	m_Input = dependencies;
 }
 
-const void ToneMappingGammaCorrectionPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void ToneMappingGammaCorrectionPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+	const Renderer* renderer, Ref<CommandList> commandList)
 {
-	RenderTarget inputTarget = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("BloomOutput"));
+	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.PrevPass)->GetOutputHandle());
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	ComputePipeline TonemapAndGammaCorrectPipeline = resourceManager->GetComputePipeline(TonemapAndGammaCorrectPipelineHandle);

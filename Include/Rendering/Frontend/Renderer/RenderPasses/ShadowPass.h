@@ -7,22 +7,24 @@
 namespace Gecko
 {
 
-class ShadowPass : public RenderPass
+class ShadowPass : public RenderPass<ShadowPass>
 {
 public:
+	struct InputData : public BaseInputData
+	{};
+
 	ShadowPass() = default;
 	virtual ~ShadowPass() {}
 
-	virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) override;
-	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList) override;
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+		const Renderer* renderer, Ref<CommandList> commandList) override;
 
 
 protected:
+	friend class RenderPass<ShadowPass>;
+	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies);
 
 private:
-
-	RenderTargetHandle m_OutputHandle;
-
 	GraphicsPipelineHandle ShadowPipelineHandle;
 
 };

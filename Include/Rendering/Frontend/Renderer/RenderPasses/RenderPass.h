@@ -5,6 +5,9 @@
 #pragma warning(disable : 4100)
 #endif
 
+#include <vector>
+#include <string>
+
 #include "Defines.h"
 
 #include "Rendering/Backend/Objects.h"
@@ -17,18 +20,52 @@ namespace Gecko
 {
 
 class ResourceManager;
+class Renderer;
 class CommandList;
+using RenderPassHandle = std::string;
 
-class RenderPass
+class RenderPassInterface
+{
+public:
+	struct InputDataInterface
+	{};
+
+	virtual const void Init(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
+		const InputDataInterface& dependencies = InputDataInterface()) = 0;
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+		const Renderer* renderer, Ref<CommandList> commandList) = 0;
+
+	virtual RenderTargetHandle GetOutputHandle() const = 0;
+
+};
+
+// Shortened to make inheriting from this type easier
+using BaseInputData = RenderPassInterface::InputDataInterface;
+
+template <typename T>
+class RenderPass : public RenderPassInterface
 {
 public:
 	RenderPass() = default;
 	virtual ~RenderPass() {}
 
-	virtual const void Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager) = 0;
-	virtual const void Render(const SceneRenderInfo& sceneRenderInfo,ResourceManager* resourceManager, Ref<CommandList> commandList) = 0;
+	virtual const void Init(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
+		const InputDataInterface& dependencies) final
+	{
+		const T::InputData& data = static_cast<const T::InputData&>(dependencies);
+		static_cast<T*>(this)->SubInit(appInfo, resourceManager, data);
+	}
+
+	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+		const Renderer* renderer, Ref<CommandList> commandList) = 0;
+
+	virtual RenderTargetHandle GetOutputHandle() const final
+	{
+		return m_OutputHandle;
+	}
 
 protected:
+	RenderTargetHandle m_OutputHandle;
 
 private:
 	

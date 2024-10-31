@@ -7,7 +7,7 @@
 namespace Gecko
 {
 
-const void GeometryPass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
+const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
 {
 	// GBuffer Graphics Pipeline
 	{
@@ -134,11 +134,10 @@ const void GeometryPass::Init(Platform::AppInfo& appInfo, ResourceManager* resou
 	gbufferTargetDesc.RenderTargetFormats[4] = Gecko::Format::R32G32B32A32_FLOAT; // Matallic Roughness Occlusion
 
 	m_OutputHandle = resourceManager->CreateRenderTarget(gbufferTargetDesc, "GBuffer", true);
-
-
 }
 
-const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+	const Renderer* renderer, Ref<CommandList> commandList)
 {
 	RenderTarget OutputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 

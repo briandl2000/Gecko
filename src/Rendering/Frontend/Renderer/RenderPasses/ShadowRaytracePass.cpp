@@ -3,11 +3,12 @@
 #include "Rendering/Backend/CommandList.h"
 
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
+#include "Rendering/Frontend/Renderer/Renderer.h"
 
 namespace Gecko
 {
 
-const void ShadowRaytracePass::Init(Platform::AppInfo& appInfo, ResourceManager* resourceManager)
+const void ShadowRaytracePass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const InputData& dependencies)
 {
 	// Shadow map Graphics Pipeline
 	{
@@ -39,13 +40,14 @@ const void ShadowRaytracePass::Init(Platform::AppInfo& appInfo, ResourceManager*
 	ShadowMapTargetDesc.Height = appInfo.Height;
 	m_OutputHandle = resourceManager->CreateRenderTarget(ShadowMapTargetDesc, "RaytracingShadowMap", true);
 
-
+	m_Input = dependencies;
 }
 
-const void ShadowRaytracePass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager, Ref<CommandList> commandList)
+const void ShadowRaytracePass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
+	const Renderer* renderer, Ref<CommandList> commandList)
 {
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
-	RenderTarget GBuffer = resourceManager->GetRenderTarget(resourceManager->GetRenderTargetHandle("GBuffer"));
+	RenderTarget GBuffer = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_Input.GeoPass)->GetOutputHandle());
 
 
 	RaytracingPipeline ShadowPipeline = resourceManager->GetRaytracingPipeline(m_ShadowRaytracePipelineHandle);

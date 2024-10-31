@@ -1,4 +1,6 @@
 #pragma once
+#include <unordered_map>
+
 #include "Defines.h"
 
 #include "Rendering/Backend/Objects.h"
@@ -14,6 +16,9 @@ namespace Gecko {
 
 struct SceneDescriptor;
 
+// Used in template function in this header, so has to be outside of class scope
+static unsigned int s_NumRenderPasses = 0;
+
 class Renderer
 {
 public:
@@ -24,15 +29,21 @@ public:
 	void Shutdown();
 
 	template<typename T>
-	Ref<T> CreateRenderPass()
+	RenderPassHandle CreateRenderPass(std::string name, const BaseInputData& dependencies = BaseInputData())
 	{
 		Ref<T> renderPass = CreateRef<T>();
-		renderPass->Init(m_Info, m_ResourceManager);
-		m_RenderPasses.push_back(renderPass);
-		return renderPass;
+		renderPass->Init(m_Info, m_ResourceManager, dependencies);
+		RenderPassHandle id = name;
+		m_RenderPasses.emplace(std::make_pair(id, renderPass));
+		return id;
 	}
 
-	void ConfigureRenderPasses(std::vector<Ref<RenderPass>> renderPassStack)
+	const Ref<RenderPassInterface>& GetRenderPassByHandle(RenderPassHandle id) const
+	{
+		return m_RenderPasses.at(id);
+	}
+
+	void ConfigureRenderPasses(const std::vector<RenderPassHandle>& renderPassStack)
 	{
 		m_RenderPassStack = renderPassStack;
 	}
@@ -41,12 +52,13 @@ public:
 	void Present();
 
 private:
+
 	Device* device;
 
 	ResourceManager* m_ResourceManager;
 
-	std::vector<Ref<RenderPass>> m_RenderPasses;
-	std::vector<Ref<RenderPass>> m_RenderPassStack;
+	std::unordered_map<RenderPassHandle, Ref<RenderPassInterface>> m_RenderPasses;
+	std::vector<RenderPassHandle> m_RenderPassStack;
 
 	GraphicsPipelineHandle FullScreenTexturePipelineHandle;
 
