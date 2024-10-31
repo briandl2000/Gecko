@@ -50,16 +50,16 @@ public:
 	virtual ~RenderPass() {}
 
 	virtual const void Init(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
-		const InputDataInterface& dependencies) final
+		const InputDataInterface& dependencies) override final
 	{
 		const T::InputData& data = static_cast<const T::InputData&>(dependencies);
 		static_cast<T*>(this)->SubInit(appInfo, resourceManager, data);
 	}
 
 	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
-		const Renderer* renderer, Ref<CommandList> commandList) = 0;
+		const Renderer* renderer, Ref<CommandList> commandList) override = 0;
 
-	virtual RenderTargetHandle GetOutputHandle() const final
+	virtual RenderTargetHandle GetOutputHandle() const override final
 	{
 		return m_OutputHandle;
 	}
