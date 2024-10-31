@@ -359,8 +359,6 @@ namespace Gecko
 		m_RenderTargets[handle].WidthScale = 1.f;
 
 		m_CurrentRenderTargetIndex++;
-
-		m_RenderTargateHandles[name] = handle;
 		return handle;
 	}
 
@@ -500,11 +498,6 @@ namespace Gecko
 
 		m_CurrentRaytracePipelineIndex++;
 		return handle;
-	}
-
-	RenderTargetHandle ResourceManager::GetRenderTargetHandle(std::string name)
-	{
-		return m_RenderTargateHandles[name];
 	}
 
 	Mesh& ResourceManager::GetMesh(const MeshHandle& meshHandle)

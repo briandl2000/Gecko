@@ -31,8 +31,6 @@ public:
 	ComputePipelineHandle CreateComputePipeline(ComputePipelineDesc computePipelineDesc);
 	RaytracingPipelineHandle CreateRaytracePipeline(RaytracingPipelineDesc raytracePipelineDesc);
 
-	RenderTargetHandle GetRenderTargetHandle(std::string name);
-
 	Mesh& GetMesh(const MeshHandle& meshHandle);
 	Texture& GetTexture(const TextureHandle& textureHandle);
 	Material& GetMaterial(const MaterialHandle& materialHandle);
@@ -87,8 +85,6 @@ private:
 	std::unordered_map<GraphicsPipelineHandle, GraphicsPipeline> m_GraphicsPipelines;
 	std::unordered_map<ComputePipelineHandle, ComputePipeline> m_ComputePipelines;
 	std::unordered_map<RaytracingPipelineHandle, RaytracingPipeline> m_RaytracePipelines;
-
-	std::unordered_map<std::string, RenderTargetHandle> m_RenderTargateHandles;
 
 };
 
