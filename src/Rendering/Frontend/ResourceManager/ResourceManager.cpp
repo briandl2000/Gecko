@@ -572,7 +572,7 @@ namespace Gecko
 	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)
 	{
 		u32 width = eventData.Data.u32[0];
-		u32 height = eventData.Data.u32[0];
+		u32 height = eventData.Data.u32[1];
 		width = width == 0 ? 1 : width;
 		height = height == 0 ? 1 : height;
 
