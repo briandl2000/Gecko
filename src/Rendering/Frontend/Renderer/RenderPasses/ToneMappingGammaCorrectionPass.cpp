@@ -52,8 +52,8 @@ const void ToneMappingGammaCorrectionPass::Render(const SceneRenderInfo& sceneRe
 	ComputePipeline TonemapAndGammaCorrectPipeline = resourceManager->GetComputePipeline(TonemapAndGammaCorrectPipelineHandle);
 
 	commandList->BindComputePipeline(TonemapAndGammaCorrectPipeline);
-	commandList->BindAsRWTexture(0, inputTarget, Gecko::RenderTargetType::Target0);
-	commandList->BindAsRWTexture(1, outputTarget, Gecko::RenderTargetType::Target0);
+	commandList->BindAsRWTexture(0, inputTarget.RenderTextures[0]);
+	commandList->BindAsRWTexture(1, outputTarget.RenderTextures[0]);
 	u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
 	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 	commandList->Dispatch(

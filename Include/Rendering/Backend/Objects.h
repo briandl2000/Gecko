@@ -119,69 +119,6 @@ namespace Gecko {
 
 	// TODO: add a resource structure.
 
-	// Render target
-
-	// TODO: make it so that the render target uses textures instead of thier own data.
-	struct ClearValue
-	{
-		ClearValue(ClearValueType type = ClearValueType::RenderTarget)
-		{
-			switch (type)
-			{
-			case ClearValueType::RenderTarget:
-				Values[0] = 0.f;
-				Values[1] = 0.f;
-				Values[2] = 0.f;
-				Values[3] = 1.f;
-				break;
-			case ClearValueType::DepthStencil:
-				Depth = 1.f;
-				break;
-			}
-		}
-
-		ClearValue(f32 r, f32 g, f32 b, f32 a)
-		{
-			Values[0] = r;
-			Values[1] = g;
-			Values[2] = b;
-			Values[3] = a;
-		}
-
-		union
-		{
-			f32 Values[4] {0.};
-			f32 Depth;
-		};
-	};
-
-	struct RenderTargetDesc
-	{
-		RenderTargetDesc()
-		{
-			for (u32 i = 0; i < 8; i++)
-			{
-				RenderTargetFormats[i] = Format::None;
-			}
-		}
-
-		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget};
-		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
-		Format RenderTargetFormats[8]{ Format::None };
-		Format DepthStencilFormat{ Format::None };
-		u32 NumRenderTargets{ 0 };
-		u32 Width{ 0 };
-		u32 Height{ 0 };
-		bool AllowRenderTargetTexture{ false };
-		bool AllowDepthStencilTexture{ false };
-	};
-
-	struct RenderTarget
-	{
-		RenderTargetDesc Desc;
-		Ref<void> Data;
-	};
-
 	// Vertex buffer
 
 	struct VertexAttribute
@@ -278,6 +215,71 @@ namespace Gecko {
 	struct Texture
 	{
 		TextureDesc Desc;
+		Ref<void> Data{nullptr};
+	};
+	// Render target
+
+	// TODO: make it so that the render target uses textures instead of thier own data.
+	struct ClearValue
+	{
+		ClearValue(ClearValueType type = ClearValueType::RenderTarget)
+		{
+			switch (type)
+			{
+			case ClearValueType::RenderTarget:
+				Values[0] = 0.f;
+				Values[1] = 0.f;
+				Values[2] = 0.f;
+				Values[3] = 1.f;
+				break;
+			case ClearValueType::DepthStencil:
+				Depth = 1.f;
+				break;
+			}
+		}
+
+		ClearValue(f32 r, f32 g, f32 b, f32 a)
+		{
+			Values[0] = r;
+			Values[1] = g;
+			Values[2] = b;
+			Values[3] = a;
+		}
+
+		union
+		{
+			f32 Values[4]{ 0. };
+			f32 Depth;
+		};
+	};
+	struct RenderTargetDesc
+	{
+		RenderTargetDesc()
+		{
+			for (u32 i = 0; i < 8; i++)
+			{
+				RenderTargetFormats[i] = Format::None;
+			}
+		}
+
+		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
+		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
+		Format RenderTargetFormats[8]{ Format::None };
+		Format DepthStencilFormat{ Format::None };
+		u32 NumRenderTargets{ 0 };
+		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
+		u32 Width{ 0 };
+		u32 Height{ 0 };
+		bool AllowRenderTargetTexture{ false };
+		bool AllowDepthStencilTexture{ false };
+	};
+
+
+	struct RenderTarget
+	{
+		RenderTargetDesc Desc;
+		Texture RenderTextures[8];
+		Texture DepthTexture;
 		Ref<void> Data;
 	};
 

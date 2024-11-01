@@ -88,18 +88,6 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		m_CompositePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}
 
-	TextureDesc textureDesc;
-
-	textureDesc.Width = appInfo.Width;
-	textureDesc.Height = appInfo.Height;
-	textureDesc.Type = TextureType::Tex2D;
-	textureDesc.Format = Format::R32G32B32A32_FLOAT;
-	textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
-	textureDesc.NumArraySlices = 1;
-
-	m_DownScaleTextureHandle = resourceManager->CreateTexture(textureDesc);
-	m_UpScaleTextureHandle = resourceManager->CreateTexture(textureDesc);
-
 	RenderTargetDesc renderTargetDesc;
 
 	renderTargetDesc.AllowRenderTargetTexture = true;
@@ -117,6 +105,10 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 
 	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput", true);
 
+	renderTargetDesc.NumMips[0] = CalculateNumberOfMips(renderTargetDesc.Width, renderTargetDesc.Height);;
+	m_DownScaleRenderTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "m_DownScaleRenderTargetHandle", true);
+	m_UpScaleRenderTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "m_UpScaleRenderTargetHandle", true);
+
 	m_BloomData.Width = appInfo.Width;
 	m_BloomData.Height = appInfo.Height;
 	m_BloomData.Threshold = .9f;
@@ -129,8 +121,8 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 {
 
 	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.PrevPass)->GetOutputHandle());
-	Texture downSampleTexture = resourceManager->GetTexture(m_DownScaleTextureHandle);
-	Texture upSampleTexture = resourceManager->GetTexture(m_UpScaleTextureHandle);
+	RenderTarget downSampleTexture = resourceManager->GetRenderTarget(m_DownScaleRenderTargetHandle);
+	RenderTarget upSampleTexture = resourceManager->GetRenderTarget(m_UpScaleRenderTargetHandle);
 	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	ComputePipeline BloomDownScale = resourceManager->GetComputePipeline(m_DownScalePipelineHandle);
@@ -138,81 +130,82 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	ComputePipeline BloomThreshold = resourceManager->GetComputePipeline(m_ThresholdPipelineHandle);
 	ComputePipeline BloomComposite = resourceManager->GetComputePipeline(m_CompositePipelineHandle);
 
-	commandList->CopyFromRenderTarget(
-		inputTarget, Gecko::RenderTargetType::Target0,
-		downSampleTexture
+	commandList->CopyTextureToTexture(
+		inputTarget.RenderTextures[0],
+		downSampleTexture.RenderTextures[0]
 	);
 
 	u32 mipLevel = 0;
 	BloomData tempBloomData = m_BloomData;
 	tempBloomData.Width = downSampleTexture.Desc.Width >> 1;
 	tempBloomData.Height = downSampleTexture.Desc.Height >> 1;
-
+	
 	commandList->BindComputePipeline(BloomThreshold);
 	commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
-
-	commandList->BindAsRWTexture(0, downSampleTexture, mipLevel);
-
+	
+	commandList->BindAsRWTexture(0, downSampleTexture.RenderTextures[0], mipLevel);
+	
 	commandList->Dispatch(
 		std::max(1u, downSampleTexture.Desc.Width / 8 + 1),
 		std::max(1u, downSampleTexture.Desc.Height / 8 + 1),
 		1
 	);
-
+	
 	commandList->BindComputePipeline(BloomDownScale);
-
-	std::vector<u32> widths(downSampleTexture.Desc.NumMips);
-	std::vector<u32> heights(downSampleTexture.Desc.NumMips);
+	
+	std::vector<u32> widths(downSampleTexture.RenderTextures[0].Desc.NumMips);
+	std::vector<u32> heights(downSampleTexture.RenderTextures[0].Desc.NumMips);
 	widths[mipLevel] = downSampleTexture.Desc.Width;
 	heights[mipLevel] = downSampleTexture.Desc.Height;
-	while (mipLevel < downSampleTexture.Desc.NumMips - 1)
+	while (mipLevel < downSampleTexture.RenderTextures[0].Desc.NumMips - 1)
 	{
 		commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
-
-		commandList->BindTexture(0, downSampleTexture, mipLevel);
-
-		commandList->BindAsRWTexture(0, downSampleTexture, mipLevel + 1);
-
+	
+		commandList->BindTexture(0, downSampleTexture.RenderTextures[0], mipLevel);
+	
+		commandList->BindAsRWTexture(0, downSampleTexture.RenderTextures[0], mipLevel + 1);
+	
 		commandList->Dispatch(
 			std::max(1u, tempBloomData.Width / 8 + 1),
 			std::max(1u, tempBloomData.Height / 8 + 1),
 			1
 		);
-
+	
 		mipLevel += 1;
 		widths[mipLevel] = tempBloomData.Width;
 		heights[mipLevel] = tempBloomData.Height;
 		tempBloomData.Width = tempBloomData.Width >> 1;
 		tempBloomData.Height = tempBloomData.Height >> 1;
-
+	
 	}
-	commandList->BindComputePipeline(BloomUpScale);
 
+	commandList->BindComputePipeline(BloomUpScale);
+	
 	while (mipLevel >= 1)
 	{
 		tempBloomData.Width = widths[mipLevel - 1];
 		tempBloomData.Height = heights[mipLevel - 1];
 		commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
-
-		commandList->BindTexture(0, upSampleTexture, mipLevel);
-
-		commandList->BindAsRWTexture(0, downSampleTexture, mipLevel - 1);
-		commandList->BindAsRWTexture(1, upSampleTexture, mipLevel - 1);
-
+	
+		commandList->BindTexture(0, upSampleTexture.RenderTextures[0], mipLevel);
+	
+		commandList->BindAsRWTexture(0, downSampleTexture.RenderTextures[0], mipLevel - 1);
+		commandList->BindAsRWTexture(1, upSampleTexture.RenderTextures[0], mipLevel - 1);
+	
 		commandList->Dispatch(
 			std::max(1u, tempBloomData.Width / 8 + 1),
 			std::max(1u, tempBloomData.Height / 8 + 1),
 			1
 		);
-
+	
 		mipLevel -= 1;
 	}
-
+	
 	commandList->BindComputePipeline(BloomComposite);
-	commandList->BindAsRWTexture(0, upSampleTexture, 0);
-	commandList->BindAsRWTexture(1, inputTarget, Gecko::RenderTargetType::Target0);
-	commandList->BindAsRWTexture(2, outputTarget, Gecko::RenderTargetType::Target0);
-
+	commandList->BindAsRWTexture(0, upSampleTexture.RenderTextures[0], 0);
+	commandList->BindAsRWTexture(1, inputTarget.RenderTextures[0]);
+	commandList->BindAsRWTexture(2, outputTarget.RenderTextures[0]);
+	
 	commandList->Dispatch(
 		std::max(1u, outputTarget.Desc.Width / 8 + 1),
 		std::max(1u, outputTarget.Desc.Height / 8 + 1),

@@ -576,7 +576,7 @@ namespace Gecko
 		width = width == 0 ? 1 : width;
 		height = height == 0 ? 1 : height;
 
-		for (auto [key, val] : m_RenderTargets)
+		for (auto& [key, val] : m_RenderTargets)
 		{
 			if (val.KeepWindowAspectRatio)
 			{

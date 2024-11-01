@@ -161,8 +161,12 @@ namespace Gecko { namespace DX12 {
 
 	struct Resource
 	{
-		ComPtr<ID3D12Resource> Resource;
-		D3D12_RESOURCE_STATES CurrentState;
+		Resource()
+		{
+			ResourceDX12 = nullptr;
+		}
+		ComPtr<ID3D12Resource> ResourceDX12;
+		D3D12_RESOURCE_STATES CurrentState{ D3D12_RESOURCE_STATE_COMMON };
 
 		std::vector<D3D12_RESOURCE_STATES> subResourceStates;
 	};
@@ -198,25 +202,21 @@ namespace Gecko { namespace DX12 {
 	struct RenderTarget_DX12
 	{
 		RenderTarget_DX12()
-		{
-			for (u32 i = 0; i < 8; i++)
-			{
-				RenderTargetResources[i] = nullptr;
-			}
-		}
-		Ref<Resource> RenderTargetResources[8];
-		DescriptorHandle rtvs[8];
-		
-		Ref<Resource> DepthBufferResource = nullptr;
-		DescriptorHandle dsv;
-
+		{ }
 		D3D12_RECT rect;
 		D3D12_VIEWPORT ViewPort;
-		Device_DX12* device = nullptr;
+		Device_DX12* device{ nullptr };
+		
+		DescriptorHandle RenderTargetViews[8];
+		DescriptorHandle DepthStencilView;
+		
 
-		DescriptorHandle renderTargetSrvs[8];
-		DescriptorHandle renderTargetUavs[8];
-		DescriptorHandle depthStencilSrv;
+		//Ref<Resource> RenderTargetResources[8];
+		//Ref<Resource> DepthBufferResource = nullptr;
+
+		//DescriptorHandle renderTargetSrvs[8];
+		//DescriptorHandle renderTargetUavs[8];
+		//DescriptorHandle depthStencilSrv;
 
 		~RenderTarget_DX12();
 	};

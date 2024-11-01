@@ -99,12 +99,12 @@ const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, Resou
 		u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
 		commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 		commandList->SetDynamicCallData(sizeof(PBRData), &pbrData);
-		commandList->BindAsRWTexture(0, PBROutput, Gecko::RenderTargetType::Target0);
-		commandList->BindAsRWTexture(1, GBuffer, Gecko::RenderTargetType::Target0);
-		commandList->BindAsRWTexture(2, GBuffer, Gecko::RenderTargetType::Target1);
-		commandList->BindAsRWTexture(3, GBuffer, Gecko::RenderTargetType::Target2);
-		commandList->BindAsRWTexture(4, GBuffer, Gecko::RenderTargetType::Target3);
-		commandList->BindAsRWTexture(5, GBuffer, Gecko::RenderTargetType::Target4);
+		commandList->BindAsRWTexture(0, PBROutput.RenderTextures[0]);
+		commandList->BindAsRWTexture(1, GBuffer.RenderTextures[0]);
+		commandList->BindAsRWTexture(2, GBuffer.RenderTextures[1]);
+		commandList->BindAsRWTexture(3, GBuffer.RenderTextures[2]);
+		commandList->BindAsRWTexture(4, GBuffer.RenderTextures[3]);
+		commandList->BindAsRWTexture(5, GBuffer.RenderTextures[4]);
 
 		commandList->BindTexture(0, BRDFLUTTexture);
 		EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneRenderInfo.EnvironmentMap);
@@ -112,7 +112,7 @@ const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, Resou
 		Texture irradianceTexture = resourceManager->GetTexture(environmentMap.IrradianceTextureHandle);
 		commandList->BindTexture(1, environmentTexture);
 		commandList->BindTexture(2, irradianceTexture);
-		commandList->BindTexture(3, ShadowMap, RenderTargetType::TargetDepth);
+		commandList->BindTexture(3, ShadowMap.DepthTexture);
 		
 		commandList->Dispatch(pbrData.width / 8 + 1, pbrData.height / 8 + 1, 1);
 	}

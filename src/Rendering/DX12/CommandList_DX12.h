@@ -29,20 +29,22 @@ namespace Gecko { namespace DX12 {
 
 		virtual void ClearRenderTarget(RenderTarget renderTarget) override;
 
-		virtual void CopyToRenderTarget(RenderTarget src, RenderTargetType srcType, RenderTarget dst, RenderTargetType dstType) override;
-		virtual void CopyFromRenderTarget(RenderTarget src, RenderTargetType srcType, Texture dst) override;
-		virtual void CopyFromTexture(Texture src, RenderTarget dst, RenderTargetType dstType) override;
+		//virtual void CopyToRenderTarget(RenderTarget src, RenderTargetType srcType, RenderTarget dst, RenderTargetType dstType) override;
+		//virtual void CopyFromRenderTarget(RenderTarget src, RenderTargetType srcType, Texture dst) override;
+		//virtual void CopyFromTexture(Texture src, RenderTarget dst, RenderTargetType dstType) override;
+
+		virtual void CopyTextureToTexture(Texture src, Texture dst) override;
 
 		virtual void BindRenderTarget(RenderTarget renderTarget) override;
 		virtual void BindVertexBuffer(VertexBuffer vertexBuffer) override;
 		virtual void BindIndexBuffer(IndexBuffer indexBuffer) override;
 		virtual void BindTexture(u32 slot, Texture texture) override;
 		virtual void BindTexture(u32 slot, Texture texture, u32 mipLevel) override;
-		virtual void BindTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type) override;
+		//virtual void BindTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type) override;
 		virtual void BindConstantBuffer(u32 slot, ConstantBuffer buffer) override;
 		virtual void BindAsRWTexture(u32 slot, Texture texture) override;
 		virtual void BindAsRWTexture(u32 slot, Texture texture, u32 mipLevel) override;
-		virtual void BindAsRWTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type) override;
+		//virtual void BindAsRWTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type) override;
 	
 		virtual void BindGraphicsPipeline(GraphicsPipeline Pipeline) override;
 		virtual void BindComputePipeline(ComputePipeline Pipeline) override;

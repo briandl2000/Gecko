@@ -80,29 +80,7 @@ namespace Gecko { namespace DX12
 		
 		m_BackBuffers.resize(m_NumBackBuffers);
 		// Createing the render targets
-		for (u32 i = 0; i < m_NumBackBuffers; i++)
-		{
-
-			Ref<RenderTarget_DX12> data = CreateRef<RenderTarget_DX12>();
-			data->RenderTargetResources[0] = CreateRef<Resource>();
-
-			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&data->RenderTargetResources[0]->Resource)));
-
-			RenderTargetDesc renderTargetDesc;
-			renderTargetDesc.RenderTargetFormats[0] = m_BackBufferFormat;
-			renderTargetDesc.NumRenderTargets = 1;
-			renderTargetDesc.DepthStencilFormat = Format::R32_FLOAT;
-			renderTargetDesc.Width = info.Width;
-			renderTargetDesc.Height = info.Height;
-			renderTargetDesc.RenderTargetClearValues[0].Values[0] = 0.5f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[1] = 0.0f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[2] = 0.5f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[3] = 1.0f;
-			renderTargetDesc.DepthTargetClearValue.Depth = 1.0f;
-			
-			m_BackBuffers[i] = CreateRenderTarget(renderTargetDesc, data);
-
-		}
+		CreateBackBuffer(info.Width, info.Height);
 
 		// ImGui stuff
 		IMGUI_CHECKVERSION();
@@ -227,17 +205,11 @@ namespace Gecko { namespace DX12
 	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc)
 	{
 		Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
-
-		return CreateRenderTarget(desc, renderTargetDX12);
-	}
-
-	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc, Ref<RenderTarget_DX12>& renderTargetDX12)
-	{
+		RenderTarget renderTarget;
 
 		DescriptorHandle renderTargetSrvs[8];
 		DescriptorHandle depthStencilSrv;
 
-		
 		for (u32 i = 0; i < desc.NumRenderTargets; i++)
 		{
 			ASSERT_MSG(desc.RenderTargetFormats[i] != Format::None, "None is not a valid format for a render target, did you forget to set it?");
@@ -251,129 +223,55 @@ namespace Gecko { namespace DX12
 			clearValue.Color[2] = desc.RenderTargetClearValues[i].Values[2];
 			clearValue.Color[3] = desc.RenderTargetClearValues[i].Values[3];
 
-			D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				format,
-				(u64)desc.Width,
-				(u32)desc.Height,
-				1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS
-			);
-			CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+			TextureDesc textureDesc;
+			textureDesc.Width = desc.Width;
+			textureDesc.Height = desc.Height;
+			textureDesc.Depth = 1;
+			textureDesc.Format = desc.RenderTargetFormats[i];
+			textureDesc.NumMips = desc.NumMips[i];
+			textureDesc.Type = TextureType::Tex2D;
+			
+			renderTarget.RenderTextures[i] = CreateTexture(textureDesc, FormatToD3D12Format(desc.RenderTargetFormats[i]), D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &clearValue);
 
-			if(renderTargetDX12->RenderTargetResources[i] == nullptr)
-			{ 
-				renderTargetDX12->RenderTargetResources[i] = CreateRef<Resource>();
+			Texture_DX12* textureDX12 = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
 
-				m_Device->CreateCommittedResource(
-					&heapProperties,
-					D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
-					&resourceDesc,
-					D3D12_RESOURCE_STATE_COMMON,
-					&clearValue,
-					IID_PPV_ARGS(&renderTargetDX12->RenderTargetResources[i]->Resource)
-				);
-				NAME_DIRECTX12_OBJECT(renderTargetDX12->RenderTargetResources[i]->Resource, "RenderTarget");
-			}
-
-			renderTargetDX12->RenderTargetResources[i]->CurrentState = D3D12_RESOURCE_STATE_COMMON;
-
-			renderTargetDX12->rtvs[i] = GetRtvHeap().Allocate();
+			renderTargetDX12->RenderTargetViews[i] = GetRtvHeap().Allocate();
 
 			D3D12_RENDER_TARGET_VIEW_DESC renderTargetDesc{};
 			renderTargetDesc.Format = format;
 			renderTargetDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			m_Device->CreateRenderTargetView(renderTargetDX12->RenderTargetResources[i]->Resource.Get(), &renderTargetDesc, renderTargetDX12->rtvs[i].CPU);
-
-			if (desc.AllowRenderTargetTexture)
-			{
-				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				srvDesc.Format = format;
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				srvDesc.Texture2D.MipLevels = 1;
-
-				renderTargetDX12->renderTargetSrvs[i] = m_SrvDescHeap.Allocate();
-				m_Device->CreateShaderResourceView(
-					renderTargetDX12->RenderTargetResources[i]->Resource.Get(),
-					&srvDesc,
-					renderTargetDX12->renderTargetSrvs[i].CPU
-				);
-
-				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-				uavDesc.Format = format;
-				uavDesc.Texture2D.MipSlice = 0;
-				uavDesc.Texture2D.PlaneSlice = 0;
-				uavDesc.Texture2DArray.FirstArraySlice = 0;
-				uavDesc.Texture2DArray.ArraySize = 1;
-				
-				renderTargetDX12->renderTargetUavs[i] = m_SrvDescHeap.Allocate();
-				m_Device->CreateUnorderedAccessView(
-					renderTargetDX12->RenderTargetResources[i]->Resource.Get(),
-					nullptr,
-					&uavDesc,
-					renderTargetDX12->renderTargetUavs[i].CPU
-				);
-			}
+			m_Device->CreateRenderTargetView(textureDX12->TextureResource->ResourceDX12.Get(), &renderTargetDesc, renderTargetDX12->RenderTargetViews[i].CPU);
+			//NAME_DIRECTX12_OBJECT(resource->ResourceDX12, "RenderTarget");
 		}
 
 		if(desc.DepthStencilFormat != Format::None)
-		{
-			DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT;
-
-			D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				format,
-				(u64)desc.Width,
-				(u32)desc.Height,
-				1, 0, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
-			);
-
-
-			CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-			
+		{	
 			D3D12_CLEAR_VALUE clearValue;
 			clearValue.Format = DXGI_FORMAT_D32_FLOAT;
 			clearValue.DepthStencil.Depth = desc.DepthTargetClearValue.Depth;
 			clearValue.DepthStencil.Stencil = 0;
 
-			renderTargetDX12->DepthBufferResource = CreateRef<Resource>();
+			TextureDesc textureDesc;
+			textureDesc.Width = desc.Width;
+			textureDesc.Height = desc.Height;
+			textureDesc.Depth = 1;
+			textureDesc.Format = desc.DepthStencilFormat;
+			textureDesc.NumMips = 1;
+			textureDesc.Type = TextureType::Tex2D;
 
-			renderTargetDX12->DepthBufferResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
+			renderTarget.DepthTexture = CreateTexture(textureDesc, DXGI_FORMAT_D32_FLOAT, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &clearValue);
+		
+			Texture_DX12* textureDX12 = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
 
-			m_Device->CreateCommittedResource(
-				&heapProperties,
-				D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES,
-				&resourceDesc,
-				renderTargetDX12->DepthBufferResource->CurrentState,
-				&clearValue,
-				IID_PPV_ARGS(&renderTargetDX12->DepthBufferResource->Resource)
-			);
-			NAME_DIRECTX12_OBJECT(renderTargetDX12->DepthBufferResource->Resource, "DepthBuffer");
+			renderTargetDX12->DepthStencilView = GetDsvHeap().Allocate();
 
-			renderTargetDX12->dsv = GetDsvHeap().Allocate();
-			
 			D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc;
 			depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
 			depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 			depthStencilDesc.Texture2D.MipSlice = 0;
 			depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
-			m_Device->CreateDepthStencilView(renderTargetDX12->DepthBufferResource->Resource.Get(), &depthStencilDesc, renderTargetDX12->dsv.CPU);
-
-
-			if (desc.AllowDepthStencilTexture)
-			{
-				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				srvDesc.Format = FormatToD3D12Format(desc.DepthStencilFormat);
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-				srvDesc.Texture2D.MipLevels = 1;
-
-				renderTargetDX12->depthStencilSrv = m_SrvDescHeap.Allocate();
-				m_Device->CreateShaderResourceView(
-					renderTargetDX12->DepthBufferResource->Resource.Get(),
-					&srvDesc,
-					renderTargetDX12->depthStencilSrv.CPU
-				);
-			}
+			m_Device->CreateDepthStencilView(textureDX12->TextureResource->ResourceDX12.Get(), &depthStencilDesc, renderTargetDX12->DepthStencilView.CPU);
+			//NAME_DIRECTX12_OBJECT(resource->ResourceDX12, "DepthBuffer");
 		}
 
 
@@ -391,7 +289,6 @@ namespace Gecko { namespace DX12
 		
 		renderTargetDX12->device = this;
 
-		RenderTarget renderTarget;
 		renderTarget.Desc = desc;
 		renderTarget.Data = renderTargetDX12;
 
@@ -416,7 +313,7 @@ namespace Gecko { namespace DX12
 			&buffer,
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
-			IID_PPV_ARGS(&vertexBuffer_DX12->VertexBufferResource->Resource)
+			IID_PPV_ARGS(&vertexBuffer_DX12->VertexBufferResource->ResourceDX12)
 		);
 
 		D3D12_SUBRESOURCE_DATA subresourceData = {};
@@ -424,10 +321,10 @@ namespace Gecko { namespace DX12
 		subresourceData.RowPitch = bufferSize;
 		subresourceData.SlicePitch = subresourceData.RowPitch;
 
-		CopyToResource(vertexBuffer_DX12->VertexBufferResource->Resource, subresourceData);
+		CopyToResource(vertexBuffer_DX12->VertexBufferResource->ResourceDX12, subresourceData);
 
 		// Create the vertex buffer view.
-		vertexBuffer_DX12->VertexBufferView.BufferLocation = vertexBuffer_DX12->VertexBufferResource->Resource->GetGPUVirtualAddress();
+		vertexBuffer_DX12->VertexBufferView.BufferLocation = vertexBuffer_DX12->VertexBufferResource->ResourceDX12->GetGPUVirtualAddress();
 		vertexBuffer_DX12->VertexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
 		vertexBuffer_DX12->VertexBufferView.StrideInBytes = desc.Layout.Stride;
 
@@ -456,19 +353,19 @@ namespace Gecko { namespace DX12
 			&buffer,
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
-			IID_PPV_ARGS(&indexBuffer_DX12->IndexBufferResource->Resource)
+			IID_PPV_ARGS(&indexBuffer_DX12->IndexBufferResource->ResourceDX12)
 		);
 
-		NAME_DIRECTX12_OBJECT(indexBuffer_DX12->IndexBufferResource->Resource, "IndexBuffer");
+		NAME_DIRECTX12_OBJECT(indexBuffer_DX12->IndexBufferResource->ResourceDX12, "IndexBuffer");
 
 		D3D12_SUBRESOURCE_DATA subresourceData = {};
 		subresourceData.pData = desc.IndexData;
 		subresourceData.RowPitch = bufferSize;
 		subresourceData.SlicePitch = subresourceData.RowPitch;
 
-		CopyToResource(indexBuffer_DX12->IndexBufferResource->Resource, subresourceData);
+		CopyToResource(indexBuffer_DX12->IndexBufferResource->ResourceDX12, subresourceData);
 
-		indexBuffer_DX12->IndexBufferView.BufferLocation = indexBuffer_DX12->IndexBufferResource->Resource->GetGPUVirtualAddress();
+		indexBuffer_DX12->IndexBufferView.BufferLocation = indexBuffer_DX12->IndexBufferResource->ResourceDX12->GetGPUVirtualAddress();
 		indexBuffer_DX12->IndexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
 		indexBuffer_DX12->IndexBufferView.Format = FormatToD3D12Format(desc.IndexFormat);
 
@@ -478,8 +375,12 @@ namespace Gecko { namespace DX12
 
 		return indexBuffer;
 	}
-
+	
 	Texture Device_DX12::CreateTexture(const TextureDesc& desc)
+	{
+		return CreateTexture(desc, FormatToD3D12Format(desc.Format));
+	}
+	Texture Device_DX12::CreateTexture(const TextureDesc& desc, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_HEAP_FLAGS heapFlags , D3D12_CLEAR_VALUE* clearValue)
 	{
 
 		Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
@@ -490,7 +391,7 @@ namespace Gecko { namespace DX12
 		{
 		case TextureType::Tex1D:
 			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex1D(
-				FormatToD3D12Format(desc.Format),
+				format,
 				desc.Width,
 				1,
 				static_cast<u16>(desc.NumMips)
@@ -498,7 +399,7 @@ namespace Gecko { namespace DX12
 			break;
 		case TextureType::Tex2D:
 			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				FormatToD3D12Format(desc.Format),
+				format,
 				desc.Width,
 				desc.Height,
 				1,
@@ -507,7 +408,7 @@ namespace Gecko { namespace DX12
 			break;
 		case TextureType::Tex3D:
 			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex3D(
-				FormatToD3D12Format(desc.Format),
+				format,
 				desc.Width,
 				desc.Height,
 				static_cast<u16>(desc.Depth),
@@ -516,7 +417,7 @@ namespace Gecko { namespace DX12
 			break;
 		case TextureType::TexCube:
 			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				FormatToD3D12Format(desc.Format),
+				format,
 				desc.Width,
 				desc.Height,
 				6,
@@ -525,7 +426,7 @@ namespace Gecko { namespace DX12
 			break;
 		case TextureType::Tex1DArray:
 			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex1D(
-				FormatToD3D12Format(desc.Format),
+				format,
 				desc.Width,
 				static_cast<u16>(desc.NumArraySlices),
 				static_cast<u16>(desc.NumMips)
@@ -533,7 +434,7 @@ namespace Gecko { namespace DX12
 			break;
 		case TextureType::Tex2DArray:
 			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				FormatToD3D12Format(desc.Format),
+				format,
 				desc.Width,
 				desc.Height,
 				static_cast<u16>(desc.NumArraySlices),
@@ -544,20 +445,25 @@ namespace Gecko { namespace DX12
 
 		CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 
-		textureResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+		textureResourceDesc.Flags |= flags;
+		if (!(textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL))
+		{
+			textureResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+		}
 		texture_DX12->TextureResource = CreateRef<Resource>();
 
 		texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
 
 		DIRECTX12_ASSERT(m_Device->CreateCommittedResource(
 			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
+			heapFlags,
 			&textureResourceDesc,
 			texture_DX12->TextureResource->CurrentState,
-			nullptr,
-			IID_PPV_ARGS(&texture_DX12->TextureResource->Resource)
+			clearValue,
+			IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)
 		));
-
+		
+		// SRV
 		{
 			texture_DX12->srv = m_SrvDescHeap.Allocate();
 
@@ -590,12 +496,14 @@ namespace Gecko { namespace DX12
 			}
 
 			m_Device->CreateShaderResourceView(
-				texture_DX12->TextureResource->Resource.Get(),
+				texture_DX12->TextureResource->ResourceDX12.Get(),
 				&srvDesc,
 				texture_DX12->srv.CPU
 			);
 		}
 
+		// UAV
+		if(textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
 		{
 			texture_DX12->uav = m_SrvDescHeap.Allocate();
 
@@ -645,7 +553,7 @@ namespace Gecko { namespace DX12
 			{
 
 				m_Device->CreateUnorderedAccessView(
-					texture_DX12->TextureResource->Resource.Get(),
+					texture_DX12->TextureResource->ResourceDX12.Get(),
 					nullptr,
 					&uavDesc,
 					texture_DX12->uav.CPU
@@ -653,7 +561,7 @@ namespace Gecko { namespace DX12
 			}
 		}
 
-
+		// Mips
 		{
 			texture_DX12->mipSrvs.resize(desc.NumMips);
 			texture_DX12->mipUavs.resize(desc.NumMips);
@@ -671,32 +579,35 @@ namespace Gecko { namespace DX12
 				srvDesc.Texture2DArray.FirstArraySlice = 0;
 				srvDesc.Texture2DArray.PlaneSlice = 0;
 				m_Device->CreateShaderResourceView(
-					texture_DX12->TextureResource->Resource.Get(), 
-					&srvDesc, 
+					texture_DX12->TextureResource->ResourceDX12.Get(),
+					&srvDesc,
 					texture_DX12->mipSrvs[i].CPU
 				);
+				if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
+				{
+					texture_DX12->mipUavs[i] = m_SrvDescHeap.Allocate();
+					D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+					uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+					uavDesc.Format = FormatToD3D12Format(desc.Format);
+					uavDesc.Format = uavDesc.Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ? DXGI_FORMAT_R8G8B8A8_UNORM : uavDesc.Format;
+					uavDesc.Texture2DArray.MipSlice = i;
+					uavDesc.Texture2DArray.FirstArraySlice = 0;
+					uavDesc.Texture2DArray.ArraySize = desc.Type == TextureType::TexCube ? 6 : 1;
+					uavDesc.Texture2DArray.PlaneSlice = 0;
+					m_Device->CreateUnorderedAccessView(
+						texture_DX12->TextureResource->ResourceDX12.Get(),
+						nullptr,
+						&uavDesc,
+						texture_DX12->mipUavs[i].CPU
+					);
+				}
 
-				texture_DX12->mipUavs[i] = m_SrvDescHeap.Allocate();
-				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-				uavDesc.Format = FormatToD3D12Format(desc.Format);
-				uavDesc.Format = uavDesc.Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ? DXGI_FORMAT_R8G8B8A8_UNORM : uavDesc.Format;
-				uavDesc.Texture2DArray.MipSlice = i;
-				uavDesc.Texture2DArray.FirstArraySlice = 0;
-				uavDesc.Texture2DArray.ArraySize = desc.Type == TextureType::TexCube ? 6 : 1;
-				uavDesc.Texture2DArray.PlaneSlice = 0;
-				m_Device->CreateUnorderedAccessView(
-					texture_DX12->TextureResource->Resource.Get(),
-					nullptr, 
-					&uavDesc, 
-					texture_DX12->mipUavs[i].CPU
-				);
 				texture_DX12->TextureResource->subResourceStates[i] = texture_DX12->TextureResource->CurrentState;
 			}
 
 		}
 
-		NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->Resource, "texture");
+		NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->ResourceDX12, "texture");
 
 		texture_DX12->device = this;
 
@@ -1218,18 +1129,18 @@ namespace Gecko { namespace DX12
 			&resourceDesc,
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
-			IID_PPV_ARGS(&constantBuffer_DX12->ConstantBufferResource->Resource)
+			IID_PPV_ARGS(&constantBuffer_DX12->ConstantBufferResource->ResourceDX12)
 		);
 
 		constantBuffer_DX12->cbv = m_SrvDescHeap.Allocate();
 
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-		cbvDesc.BufferLocation = constantBuffer_DX12->ConstantBufferResource->Resource->GetGPUVirtualAddress();
+		cbvDesc.BufferLocation = constantBuffer_DX12->ConstantBufferResource->ResourceDX12->GetGPUVirtualAddress();
 		cbvDesc.SizeInBytes = static_cast<u32>(constantBuffer_DX12->MemorySize);
 		m_Device->CreateConstantBufferView(&cbvDesc, constantBuffer_DX12->cbv.CPU);
 
 		CD3DX12_RANGE readRange(0, 0);
-		constantBuffer_DX12->ConstantBufferResource->Resource->Map(0, &readRange, &constantBuffer_DX12->GPUAddress);
+		constantBuffer_DX12->ConstantBufferResource->ResourceDX12->Map(0, &readRange, &constantBuffer_DX12->GPUAddress);
 
 		constantBuffer_DX12->device = this;
 
@@ -1535,7 +1446,7 @@ namespace Gecko { namespace DX12
 				
 		D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 		geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		geometryDesc.Triangles.IndexBuffer = indexBuffer_DX12->IndexBufferResource->Resource->GetGPUVirtualAddress();
+		geometryDesc.Triangles.IndexBuffer = indexBuffer_DX12->IndexBufferResource->ResourceDX12->GetGPUVirtualAddress();
 		geometryDesc.Triangles.IndexCount = desc.IndexBuffer.Desc.NumIndices;
 		geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 		
@@ -1543,7 +1454,7 @@ namespace Gecko { namespace DX12
 		
 		geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 		geometryDesc.Triangles.VertexCount = desc.VertexBuffer.Desc.NumVertices;
-		geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer_DX12->VertexBufferResource->Resource->GetGPUVirtualAddress();
+		geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer_DX12->VertexBufferResource->ResourceDX12->GetGPUVirtualAddress();
 		geometryDesc.Triangles.VertexBuffer.StrideInBytes = desc.VertexBuffer.Desc.Layout.Stride;
 				
 		// Mark the geometry as opaque. 
@@ -1771,7 +1682,7 @@ namespace Gecko { namespace DX12
 			Ref<CommandBuffer> commandList = GetFreeGraphicsCommandBuffer();
 
 			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				texture_DX12->TextureResource->Resource.Get(),
+				texture_DX12->TextureResource->ResourceDX12.Get(),
 				texture_DX12->TextureResource->CurrentState,
 				D3D12_RESOURCE_STATE_COMMON,
 				subResource
@@ -1784,7 +1695,7 @@ namespace Gecko { namespace DX12
 		}
 
 		CopyToResource(
-			texture_DX12->TextureResource->Resource,
+			texture_DX12->TextureResource->ResourceDX12,
 			subresourceData,
 			subResource
 		);
@@ -1795,7 +1706,7 @@ namespace Gecko { namespace DX12
 			Ref<CommandBuffer> commandList = GetFreeGraphicsCommandBuffer();
 
 			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				texture_DX12->TextureResource->Resource.Get(),
+				texture_DX12->TextureResource->ResourceDX12.Get(),
 				D3D12_RESOURCE_STATE_COMMON,
 				texture_DX12->TextureResource->CurrentState,
 				subResource
@@ -1908,47 +1819,6 @@ namespace Gecko { namespace DX12
 
 	};
 
-	void Device_DX12::DrawRenderTargetInImGui(RenderTarget renderTarget, u32 width, u32 height, RenderTargetType type)
-	{
-		RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)renderTarget.Data.get();
-		ImVec2 size = {
-			static_cast<float>(width),
-			static_cast<float>(height)
-		};
-		if (width == 0 || height == 0)
-		{
-			size = {
-				static_cast<float>(renderTarget.Desc.Width),
-				static_cast<float>(renderTarget.Desc.Height)
-			};
-		}
-
-		if (type == RenderTargetType::TargetDepth)
-		{
-			ImGui::Image(static_cast<ImU64>(renderTarget_DX12->depthStencilSrv.GPU.ptr), size);
-			return;
-		}
-
-		u32 index = 0;
-
-		switch (type)
-		{
-		case RenderTargetType::Target0: index = 0; break;
-		case RenderTargetType::Target1: index = 1; break;
-		case RenderTargetType::Target2: index = 2; break;
-		case RenderTargetType::Target3: index = 3; break;
-		case RenderTargetType::Target4: index = 4; break;
-		case RenderTargetType::Target5: index = 5; break;
-		case RenderTargetType::Target6: index = 6; break;
-		case RenderTargetType::Target7: index = 7; break;
-		case RenderTargetType::Target8: index = 8; break;
-		default: break;
-		}
-
-		ImGui::Image(static_cast<ImU64>(renderTarget_DX12->renderTargetSrvs[index].GPU.ptr), size);
-
-	}
-
 	void Device_DX12::SetDeferredReleasesFlag()
 	{
 		//m_CommandFrames[m_CurrentBackBufferIndex].DeferredReleasesFlag = 1;
@@ -2013,9 +1883,97 @@ namespace Gecko { namespace DX12
 		}
 #endif
 
-		DIRECTX12_ASSERT_MSG(IsDirectXRaytracingSupported(adapter.Get()),
-			"ERROR: DirectX Raytracing is not supported by your OS, GPU and/or driver.");
+		//DIRECTX12_ASSERT_MSG(IsDirectXRaytracingSupported(adapter.Get()),
+		//	"ERROR: DirectX Raytracing is not supported by your OS, GPU and/or driver.");
 
+	}
+
+	void Device_DX12::CreateBackBuffer(u32 width, u32 height)
+	{
+		m_BackBuffers.clear();
+		ProcessDeferredReleases();
+
+		DXGI_SWAP_CHAIN_DESC1 desc{};
+		m_SwapChain->GetDesc1(&desc);
+		m_SwapChain->ResizeBuffers(m_NumBackBuffers, width, height, desc.Format, desc.Flags);
+
+		m_BackBuffers.resize(m_NumBackBuffers);
+
+		for (u32 i = 0; i < m_NumBackBuffers; i++)
+		{
+			Ref<Resource> backBufferResource = CreateRef<Resource>();
+			
+			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&backBufferResource->ResourceDX12)));
+
+			RenderTargetDesc renderTargetDesc;
+			renderTargetDesc.RenderTargetFormats[0] = m_BackBufferFormat;
+			renderTargetDesc.NumRenderTargets = 1;
+			renderTargetDesc.DepthStencilFormat = Format::R32_FLOAT;
+			renderTargetDesc.Width = width;
+			renderTargetDesc.Height = height;
+			renderTargetDesc.RenderTargetClearValues[0].Values[0] = 0.5f;
+			renderTargetDesc.RenderTargetClearValues[0].Values[1] = 0.0f;
+			renderTargetDesc.RenderTargetClearValues[0].Values[2] = 0.5f;
+			renderTargetDesc.RenderTargetClearValues[0].Values[3] = 1.0f;
+			renderTargetDesc.DepthTargetClearValue.Depth = 1.0f;
+
+			Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
+
+			DXGI_FORMAT format = FormatToD3D12Format(renderTargetDesc.RenderTargetFormats[0]);
+
+			D3D12_CLEAR_VALUE clearValue;
+			clearValue.Format = format;
+			clearValue.Color[0] = renderTargetDesc.RenderTargetClearValues[0].Values[0];
+			clearValue.Color[1] = renderTargetDesc.RenderTargetClearValues[0].Values[1];
+			clearValue.Color[2] = renderTargetDesc.RenderTargetClearValues[0].Values[2];
+			clearValue.Color[3] = renderTargetDesc.RenderTargetClearValues[0].Values[3];
+
+			TextureDesc textureDesc;
+			textureDesc.Width = renderTargetDesc.Width;
+			textureDesc.Height = renderTargetDesc.Height;
+			textureDesc.Depth = 1;
+			textureDesc.Format = renderTargetDesc.RenderTargetFormats[0];
+			textureDesc.NumMips = 1;
+			textureDesc.Type = TextureType::Tex2D;
+
+			Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
+
+			texture_DX12->TextureResource = backBufferResource;
+			texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
+			texture_DX12->device = this;
+
+			Texture texture;
+			texture.Desc = textureDesc;
+			texture.Data = texture_DX12;
+
+			renderTargetDX12->RenderTargetViews[0] = GetRtvHeap().Allocate();
+
+			D3D12_RENDER_TARGET_VIEW_DESC renderTargetViewDesc{};
+			renderTargetViewDesc.Format = format;
+			renderTargetViewDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			m_Device->CreateRenderTargetView(texture_DX12->TextureResource->ResourceDX12.Get(), &renderTargetViewDesc, renderTargetDX12->RenderTargetViews[0].CPU);
+			//NAME_DIRECTX12_OBJECT(resource->ResourceDX12, "RenderTarget");
+
+			renderTargetDX12->rect.left = 0;
+			renderTargetDX12->rect.top = 0;
+			renderTargetDX12->rect.right = (i32)width;
+			renderTargetDX12->rect.bottom = (i32)height;
+
+			renderTargetDX12->ViewPort.TopLeftX = 0.f;
+			renderTargetDX12->ViewPort.TopLeftY = 0.f;
+			renderTargetDX12->ViewPort.Width = (float)width;
+			renderTargetDX12->ViewPort.Height = (float)height;
+			renderTargetDX12->ViewPort.MinDepth = 0.f;
+			renderTargetDX12->ViewPort.MaxDepth = 1.f;
+
+			renderTargetDX12->device = this;
+
+			m_BackBuffers[i].Desc = renderTargetDesc;
+			m_BackBuffers[i].Data = renderTargetDX12;
+			m_BackBuffers[i].RenderTextures[0] = texture;
+		}
+
+		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	}
 
 	ComPtr<IDXGIAdapter4> Device_DX12::GetAdapter(ComPtr<IDXGIFactory6> factory)
@@ -2325,44 +2283,7 @@ namespace Gecko { namespace DX12
 
 		if (width == 0) width = 1;
 		if (height == 0) height = 1;
-
-		m_BackBuffers.clear();
-		ProcessDeferredReleases();
-		Flush();
-
-		DXGI_SWAP_CHAIN_DESC1 desc{};
-		m_SwapChain->GetDesc1(&desc);
-		m_SwapChain->ResizeBuffers(m_NumBackBuffers, width, height, desc.Format, desc.Flags);
-
-
-		m_BackBuffers.resize(m_NumBackBuffers);
-
-		for (u32 i = 0; i < m_NumBackBuffers; i++)
-		{
-
-			Ref<RenderTarget_DX12> renderTarget_DX12 = CreateRef<RenderTarget_DX12>();
-			renderTarget_DX12->RenderTargetResources[0] = CreateRef<Resource>();
-
-			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&renderTarget_DX12->RenderTargetResources[0]->Resource)));
-
-			RenderTargetDesc renderTargetDesc;
-			renderTargetDesc.RenderTargetFormats[0] = m_BackBufferFormat;
-			renderTargetDesc.NumRenderTargets = 1;
-			renderTargetDesc.DepthStencilFormat = Format::R32_FLOAT;
-			renderTargetDesc.Width = width;
-			renderTargetDesc.Height = height;
-			renderTargetDesc.RenderTargetClearValues[0].Values[0] = 0.5f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[1] = 0.0f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[2] = 0.5f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[3] = 1.0f;
-			renderTargetDesc.DepthTargetClearValue.Depth = 1.0f;
-
-			m_BackBuffers[i] = CreateRenderTarget(renderTargetDesc, renderTarget_DX12);
-
-		}
-
-		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
-
+		CreateBackBuffer(width, height);
 		return false;
 	}
 
@@ -2417,13 +2338,13 @@ namespace Gecko { namespace DX12
 	//		
 	//	D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
 	//	geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-	//	geometryDesc.Triangles.IndexBuffer = indexBuffer_DX12->IndexBufferResource->Resource->GetGPUVirtualAddress();
+	//	geometryDesc.Triangles.IndexBuffer = indexBuffer_DX12->IndexBufferResource->ResourceDX12->GetGPUVirtualAddress();
 	//	geometryDesc.Triangles.IndexCount = indexBuffer->Desc.NumIndices;
 	//	geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
 	//	geometryDesc.Triangles.Transform3x4 = 0;
 	//	geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
 	//	geometryDesc.Triangles.VertexCount = vertexBuffer->Desc.NumVertices;
-	//	geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer_DX12->VertexBufferResource->Resource->GetGPUVirtualAddress();
+	//	geometryDesc.Triangles.VertexBuffer.StartAddress = vertexBuffer_DX12->VertexBufferResource->ResourceDX12->GetGPUVirtualAddress();
 	//	geometryDesc.Triangles.VertexBuffer.StrideInBytes = vertexBuffer->Desc.Layout.Stride;
 	//		
 	//	// Mark the geometry as opaque. 
