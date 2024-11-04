@@ -105,7 +105,7 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 
 	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput", true);
 
-	renderTargetDesc.NumMips[0] = CalculateNumberOfMips(renderTargetDesc.Width, renderTargetDesc.Height);;
+	renderTargetDesc.NumMips[0] = 8;
 	m_DownScaleRenderTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "m_DownScaleRenderTargetHandle", true);
 	m_UpScaleRenderTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "m_UpScaleRenderTargetHandle", true);
 

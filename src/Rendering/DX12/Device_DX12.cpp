@@ -13,6 +13,8 @@
 #include <backends/imgui_impl_dx12.h>
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
+#undef min
+#undef max
 
 const wchar_t* c_hitGroupName = L"MyHitGroup";
 const wchar_t* c_raygenShaderName = L"MyRaygenShader";
@@ -206,12 +208,9 @@ namespace Gecko { namespace DX12
 	{
 		Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
 		RenderTarget renderTarget;
-
-		DescriptorHandle renderTargetSrvs[8];
-		DescriptorHandle depthStencilSrv;
-
 		for (u32 i = 0; i < desc.NumRenderTargets; i++)
 		{
+		
 			ASSERT_MSG(desc.RenderTargetFormats[i] != Format::None, "None is not a valid format for a render target, did you forget to set it?");
 
 			DXGI_FORMAT format = FormatToD3D12Format(desc.RenderTargetFormats[i]);
@@ -223,12 +222,13 @@ namespace Gecko { namespace DX12
 			clearValue.Color[2] = desc.RenderTargetClearValues[i].Values[2];
 			clearValue.Color[3] = desc.RenderTargetClearValues[i].Values[3];
 
+			u32 numTextureMips = std::min(desc.NumMips[i], CalculateNumberOfMips(desc.Width, desc.Height));
 			TextureDesc textureDesc;
 			textureDesc.Width = desc.Width;
 			textureDesc.Height = desc.Height;
 			textureDesc.Depth = 1;
 			textureDesc.Format = desc.RenderTargetFormats[i];
-			textureDesc.NumMips = desc.NumMips[i];
+			textureDesc.NumMips = numTextureMips;
 			textureDesc.Type = TextureType::Tex2D;
 			
 			renderTarget.RenderTextures[i] = CreateTexture(textureDesc, FormatToD3D12Format(desc.RenderTargetFormats[i]), D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &clearValue);
@@ -251,12 +251,13 @@ namespace Gecko { namespace DX12
 			clearValue.DepthStencil.Depth = desc.DepthTargetClearValue.Depth;
 			clearValue.DepthStencil.Stencil = 0;
 
+			u32 numTextureMips = std::min(desc.DepthMips, CalculateNumberOfMips(desc.Width, desc.Height));
 			TextureDesc textureDesc;
 			textureDesc.Width = desc.Width;
 			textureDesc.Height = desc.Height;
 			textureDesc.Depth = 1;
 			textureDesc.Format = desc.DepthStencilFormat;
-			textureDesc.NumMips = 1;
+			textureDesc.NumMips = numTextureMips;
 			textureDesc.Type = TextureType::Tex2D;
 
 			renderTarget.DepthTexture = CreateTexture(textureDesc, DXGI_FORMAT_D32_FLOAT, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &clearValue);

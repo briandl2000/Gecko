@@ -179,13 +179,12 @@ void main(uint3 DTid : S_INPUT_DISPATCH_ID)
 
 	
 		ShadowProjection /= ShadowProjection.w;
-		ShadowProjection.xy = ShadowProjection.xy * 0.5 + 0.5;
+		ShadowProjection.xy = ShadowProjection.xy *0.5 + 0.5;
 		ShadowProjection.y = 1.-ShadowProjection.y;
 		if (ShadowProjection.x > 0. && ShadowProjection.x < 1. &&
 			ShadowProjection.y > 0. && ShadowProjection.y < 1. &&
 			ShadowProjection.z > 0. && ShadowProjection.z < 1.)
 			{
-			ShadowProjection.z = ShadowProjection.z*.5+.5;
 			directLighting *= pcf(ShadowProjection.xy, ShadowProjection.z, 4.*1e-4);
 		}
 	}

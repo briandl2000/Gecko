@@ -268,6 +268,7 @@ namespace Gecko {
 		Format DepthStencilFormat{ Format::None };
 		u32 NumRenderTargets{ 0 };
 		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
+		u32 DepthMips{ 1 };
 		u32 Width{ 0 };
 		u32 Height{ 0 };
 		bool AllowRenderTargetTexture{ false };
