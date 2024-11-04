@@ -18,16 +18,10 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 
 		GraphicsPipelineDesc pipelineDesc;
 		pipelineDesc.VertexShaderPath = "Shaders/Shadow.gsh";
-		pipelineDesc.PixelShaderPath = "Shaders/Shadow.gsh";
 		pipelineDesc.ShaderVersion = "5_1";
-
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
-
 		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;
-
-		pipelineDesc.RenderTargetFormats[0] = Format::R8G8B8A8_UNORM;
 		pipelineDesc.DepthStencilFormat = Format::R32_FLOAT;
-
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;
 		pipelineDesc.CullMode = CullMode::Back;
 
@@ -42,12 +36,6 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 	
 	Gecko::RenderTargetDesc ShadowMapTargetDesc;
 	ShadowMapTargetDesc.AllowDepthStencilTexture = true;
-	ShadowMapTargetDesc.RenderTargetFormats[0] = Gecko::Format::R8G8B8A8_UNORM; // Metallic Roughness Occlusion
-	ShadowMapTargetDesc.NumRenderTargets = 1;
-	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[0] = 0.f;
-	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[1] = 0.f;
-	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[2] = 0.f;
-	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[3] = 0.f;
 	ShadowMapTargetDesc.DepthStencilFormat = Gecko::Format::R32_FLOAT;
 	ShadowMapTargetDesc.DepthTargetClearValue.Depth = 1.0f;
 	ShadowMapTargetDesc.Width = 4096;

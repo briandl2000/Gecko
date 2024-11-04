@@ -43,8 +43,8 @@ private:
 	
 	BloomData m_BloomData;
 
-	TextureHandle m_DownScaleTextureHandle;
-	TextureHandle m_UpScaleTextureHandle;
+	RenderTargetHandle m_DownScaleRenderTargetHandle;
+	RenderTargetHandle m_UpScaleRenderTargetHandle;
 
 	ComputePipelineHandle m_DownScalePipelineHandle;
 	ComputePipelineHandle m_UpScalePipelineHandle;

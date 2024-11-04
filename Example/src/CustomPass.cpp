@@ -42,7 +42,7 @@ const void CustomPass::Render(const Gecko::SceneRenderInfo& sceneRenderInfo, Gec
 	Gecko::ComputePipeline CustomPipeline = resourceManager->GetComputePipeline(CustomPipelineHandle);
 
 	commandList->BindComputePipeline(CustomPipeline);
-	commandList->BindAsRWTexture(0, outputTarget, Gecko::RenderTargetType::Target0);
+	commandList->BindAsRWTexture(0, outputTarget.RenderTextures[0]);
 	commandList->Dispatch(
 		std::max(1u, outputTarget.Desc.Width / 8 + 1),
 		std::max(1u, outputTarget.Desc.Height / 8 + 1),

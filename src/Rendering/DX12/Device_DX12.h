@@ -180,7 +180,6 @@ namespace Gecko {
 			virtual void UploadTextureData(Texture texture, void* Data, u32 mip = 0, u32 slice = 0) override;
 
 			virtual void ImGuiRender(Ref<CommandList> commandList) override;
-			virtual void DrawRenderTargetInImGui(RenderTarget renderTarget, u32 width = 0, u32 height = 0, RenderTargetType type = RenderTargetType::Target0) override;
 			virtual void DrawTextureInImGui(Texture texture, u32 width = 0, u32 height = 0) override;
 
 			virtual bool Destroy() override;
@@ -218,12 +217,12 @@ namespace Gecko {
 			void ShutdownRaytracing();*/
 
 		private:
-
-			RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc, Ref<RenderTarget_DX12>& renderTargetDX12);
+			Texture CreateTexture(const TextureDesc& desc, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_FLAGS heapFlags = D3D12_HEAP_FLAG_NONE, D3D12_CLEAR_VALUE* clearValue = nullptr);
 
 			void CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource = 0);
 
 			void CreateDevice();
+			void CreateBackBuffer(u32 width, u32 height);
 
 			void ProcessDeferredReleases();
 
