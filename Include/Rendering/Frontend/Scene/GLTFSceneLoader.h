@@ -11,7 +11,7 @@ namespace Gecko
 	class GLTFSceneLoader
 	{
 	public:
-		[[nodiscard]] static Scene* LoadScene(const std::string& pathString, ApplicationContext& ctx);
+		[[nodiscard]] static u32 LoadScene(const std::string& pathString, ApplicationContext& ctx);
 	};
 
 }

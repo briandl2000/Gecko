@@ -46,10 +46,15 @@ namespace Gecko {
 
 		[[nodiscard]] SceneNode* AddNode(const std::string& name);
 	
-		void AppendSceneRenderObject(SceneRenderObject* sceneRenderObject);
-		void AppendLight(SceneLight* light);
-		void AttachCamera(SceneCamera* camera);
-		void AppendScene(Scene* scene);
+		// Transfers ownership of sceneRenderObject to this node, sets passed Scope to nullptr
+		void AppendSceneRenderObject(Scope<SceneRenderObject>& sceneRenderObject);
+		// Transfers ownership of light to this node, sets passed Scope to nullptr
+		void AppendLight(Scope<SceneLight>& light);
+		// Transfers ownership of camera to this node, sets passed Scope to nullptr
+		void AttachCamera(Scope<SceneCamera>& camera);
+
+		// Copy data from scene into a new child node
+		void AppendSceneData(const Scene* scene);
 		
 		u32 GetChildrenCount();
 		SceneNode* GetChild(u32 nodeIndex);
@@ -57,19 +62,24 @@ namespace Gecko {
 		const void SetName(const std::string& name);
 		const std::string& GetName();
 
+		// Adjust aspect ratios of cameras
+		bool SceneNode::OnResize(const Event::EventData& data);
+
 	public:
 		NodeTransform Transform;
 
 	private:
+		// Recursively copy the data from this node onto target
+		void RecursiveCopy(SceneNode* target);
+
 		const void PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const;
 
 	private:
 		std::vector<Scope<SceneNode>> m_Children;
 
-		std::vector<Scene*> m_Scenes;
-		std::vector<SceneRenderObject*> m_SceneRenderObjects;
-		std::vector<SceneLight*> m_Lights;
-		SceneCamera* m_Camera{ nullptr };
+		std::vector<Scope<SceneRenderObject>> m_SceneRenderObjects;
+		std::vector<Scope<SceneLight>> m_Lights;
+		Scope<SceneCamera> m_Camera{ nullptr };
 
 		std::string m_Name{ "Node" };
 	};
@@ -87,11 +97,17 @@ namespace Gecko {
 	
 		SceneNode* GetRootNode();
 
+		// Allocates requested object on the heap and returns pointer to it
 		[[nodiscard]] SceneRenderObject* CreateSceneRenderObject();
+		// Allocates requested object on the heap and returns pointer to it
 		[[nodiscard]] SceneCamera* CreateCamera();
+		// Allocates requested object on the heap and returns pointer to it
 		[[nodiscard]] SceneLight* CreateLight(LightType lightType);
+		// Allocates requested object on the heap and returns pointer to it
 		[[nodiscard]] SceneDirectionalLight* CreateDirectionalLight();
+		// Allocates requested object on the heap and returns pointer to it
 		[[nodiscard]] ScenePointLight* CreatePointLight();
+		// Allocates requested object on the heap and returns pointer to it
 		[[nodiscard]] SceneSpotLight* CreateSpotLight();
 		
 		[[nodiscard]] const SceneRenderInfo GetSceneRenderInfo() const;
@@ -101,17 +117,17 @@ namespace Gecko {
 
 		const std::string& GetName() { return m_Name; };
 
+		// Adjust aspect ratios of cameras
 		bool Scene::OnResize(const Event::EventData& data);
 
 	private:
 		const void PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const;
+
+		// Copies the data in this scene to a SceneNode, so it can be appended to another scene
+		[[nodiscard]] Scope<SceneNode> CopySceneToNode() const;
 	
 	private:
 		Scope<SceneNode> m_RootNode;
-
-		std::vector<Scope<SceneRenderObject>> m_SceneRenderObject;
-		std::vector<Scope<SceneLight>> m_Lights;
-		std::vector<Scope<SceneCamera>> m_Cameras;
 
 		EnvironmentMapHandle m_EnvironmentMapHandle{ 0 };
 

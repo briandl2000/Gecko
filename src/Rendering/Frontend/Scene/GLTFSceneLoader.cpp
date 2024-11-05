@@ -319,7 +319,8 @@ namespace Gecko
 				SceneRenderObject* sceneRenderObject = scene->CreateSceneRenderObject();
 				sceneRenderObject->SetMeshHandle(primitiveObject.GetMeshHandle());
 				sceneRenderObject->SetMaterialHandle(primitiveObject.GetMaterialHandle());
-				sceneNode->AppendSceneRenderObject(sceneRenderObject);
+				Scope<SceneRenderObject> objPtr = CreateScopeFromRaw<SceneRenderObject>(sceneRenderObject);
+				sceneNode->AppendSceneRenderObject(objPtr);
 			}
 		}
 
@@ -480,7 +481,7 @@ namespace Gecko
 		return sceneRenderObjects;
 	}
 
-	Scene* GLTFSceneLoader::LoadScene(const std::string& pathString, ApplicationContext& ctx)
+	u32 GLTFSceneLoader::LoadScene(const std::string& pathString, ApplicationContext& ctx)
 	{
 
 		const std::filesystem::path path = Gecko::Platform::GetLocalPath(pathString);
@@ -501,22 +502,22 @@ namespace Gecko
 			ret = loader.LoadBinaryFromFile(&model, &err, &warn, path.string());
 		}
 
-		Scene* scene = ctx.GetSceneManager()->CreateScene(path.filename().string());
+		u32 sceneIdx = ctx.GetSceneManager()->CreateScene(path.filename().string());
 
 		if (!warn.empty()) 
 		{
 			LOG_WARN(warn.c_str());
-			return scene;
+			return sceneIdx;
 		}
 		if (!err.empty()) 
 		{
 			LOG_ERROR(err.c_str());
-			return scene;
+			return sceneIdx;
 		}
 		if (!ret) 
 		{
 			LOG_WARN("Failed to parse glTF");
-			return scene;
+			return sceneIdx;
 		}
 
 		std::vector<TextureHandle> textureHandles = LoadTextures(ctx.GetResourceManager(), model);
@@ -524,6 +525,7 @@ namespace Gecko
 		std::vector<std::vector<SceneRenderObject>> sceneRenderObjects = LoadMeshes(ctx.GetResourceManager(), model, materialHandles);
 
 		// Loading nodes
+		Scene* scene = ctx.GetSceneManager()->GetScene(sceneIdx);
 		SceneNode* rootNode = scene->GetRootNode();
 
 		for (const tinygltf::Scene& gltfScene : model.scenes)
@@ -536,7 +538,7 @@ namespace Gecko
 			}
 		}
 		
-		return scene;
+		return sceneIdx;
 	}
 
 }

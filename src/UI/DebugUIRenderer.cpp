@@ -123,21 +123,6 @@ namespace Gecko {
 		}
 
 		ImGui::Text("%s", scene->GetName().c_str());
-		
-		if (ImGui::CollapsingHeader("Meshes"))
-		{
-			ImGui::Text("Here goes the Meshes of this scene");
-		}
-
-		if (ImGui::CollapsingHeader("Lights"))
-		{
-			ImGui::Text("Here goes the Lights of this scene");
-		}
-
-		if (ImGui::CollapsingHeader("Cameras"))
-		{
-			ImGui::Text("Here goes the Cameras of this scene");
-		}
 
 		if (ImGui::CollapsingHeader("Nodes"))
 		{
