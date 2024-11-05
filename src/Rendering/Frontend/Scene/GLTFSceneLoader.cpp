@@ -254,7 +254,7 @@ namespace Gecko
 		indexDesc.IndexData = indices.data();
 
 		// TODO: check if a BLAS needs to be created.
-		return resourceManager->CreateMesh(vertexDesc, indexDesc, false);
+		return resourceManager->CreateMesh(vertexDesc, indexDesc);
 	}
 
 	void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneNode, u32 gltfNodeIndex, const std::vector<std::vector<SceneRenderObject>>& sceneRenderObjects)

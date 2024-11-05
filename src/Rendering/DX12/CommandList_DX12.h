@@ -48,17 +48,13 @@ namespace Gecko { namespace DX12 {
 	
 		virtual void BindGraphicsPipeline(GraphicsPipeline Pipeline) override;
 		virtual void BindComputePipeline(ComputePipeline Pipeline) override;
-		virtual void BindRaytracingPipeline(RaytracingPipeline Pipeline) override;
 
 		virtual void SetDynamicCallData(u32 size, void* data) override;
-
-		virtual void BindTLAS(TLAS tlas) override;
 
 		virtual void Draw(u32 numIndices) override;
 		virtual void DrawAuto(u32 Vertices) override;
 
 		virtual void Dispatch(u32 xThreads, u32 yThreads, u32 zThreads) override;
-		virtual void DispatchRays(u32 width, u32 height, u32 depth) override;
 
 		void TransitionSubResource(
 			Ref<Resource> resource,
@@ -77,8 +73,6 @@ namespace Gecko { namespace DX12 {
 
 		GraphicsPipeline m_GraphicsPipeline;
 		ComputePipeline m_ComputePipeline;
-		RaytracingPipeline m_RaytracingPipeline;
-		
 
 		Ref<CommandBuffer> CommandBuffer;
 

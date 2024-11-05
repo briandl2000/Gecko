@@ -20,8 +20,6 @@ namespace Gecko
 	{
 		VertexBuffer VertexBuffer;
 		IndexBuffer IndexBuffer;
-		bool HasBLAS{ false };
-		BLAS BLAS;
 	};
 
 	enum class MaterialTextureFlags : u32

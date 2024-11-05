@@ -219,7 +219,6 @@ namespace Gecko {
 	};
 	// Render target
 
-	// TODO: make it so that the render target uses textures instead of thier own data.
 	struct ClearValue
 	{
 		ClearValue(ClearValueType type = ClearValueType::RenderTarget)
@@ -393,60 +392,6 @@ namespace Gecko {
 	struct ComputePipeline
 	{
 		ComputePipelineDesc Desc;
-		Ref<void> Data;
-	};
-
-	// TODO: make the Raytracing structures
-
-	// Raytracing structures
-
-	struct RaytracingPipelineDesc
-	{
-		RaytracingPipelineDesc() = default;
-
-		const char* RaytraceShaderPath{ nullptr };
-
-		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData;
-		u32 NumTextures{ 0 };
-		u32 NumUAVs{ 0 };
-
-		std::vector<SamplerDesc> SamplerDescs;
-	};
-
-	struct RaytracingPipeline
-	{
-		RaytracingPipelineDesc Desc;
-		Ref<void> Data;
-	};
-
-	struct BLASDesc
-	{
-		VertexBuffer VertexBuffer;
-		IndexBuffer IndexBuffer;
-	};
-
-	struct BLAS
-	{
-		BLASDesc Desc;
-		Ref<void> Data;
-	};
-
-	// TLAS
-
-	struct BLASInstanceData
-	{
-		BLAS BLAS;
-		glm::mat4 Transform;
-	};
-
-	struct TLASRefitDesc
-	{
-		std::vector<BLASInstanceData> BLASInstances;
-	};
-	
-	struct TLAS
-	{
 		Ref<void> Data;
 	};
 
