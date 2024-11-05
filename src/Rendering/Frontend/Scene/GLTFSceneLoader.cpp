@@ -320,7 +320,7 @@ namespace Gecko
 				sceneRenderObject->SetMeshHandle(primitiveObject.GetMeshHandle());
 				sceneRenderObject->SetMaterialHandle(primitiveObject.GetMaterialHandle());
 				Scope<SceneRenderObject> objPtr = CreateScopeFromRaw<SceneRenderObject>(sceneRenderObject);
-				sceneNode->AppendSceneRenderObject(objPtr);
+				sceneNode->AppendSceneRenderObject(&objPtr);
 			}
 		}
 

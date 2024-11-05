@@ -90,13 +90,13 @@ int main()
 	// Load the Sponza gltf scene
 	Gecko::SceneNode* sponzaNode = mainScene->GetRootNode()->AddNode("Sponza node");
 	Gecko::SceneHandle sponzaScene = Gecko::GLTFSceneLoader::LoadScene("Assets/sponza/glb/Sponza.glb", ctx);
-	sponzaNode->AppendSceneData(sceneManager->GetScene(sponzaScene));
+	sponzaNode->AppendSceneData(*sceneManager->GetScene(sponzaScene));
 	sponzaNode->Transform.Rotation.y = 90.f;
 
 	// Load Helmet gltf Scene
 	Gecko::SceneNode* helmetRootNode = mainScene->GetRootNode()->AddNode("Helmet node");
 	Gecko::SceneHandle helmetScene = Gecko::GLTFSceneLoader::LoadScene("Assets/gltfHelmet/glTF-Binary/DamagedHelmet.glb", ctx);
-	helmetRootNode->AppendSceneData(sceneManager->GetScene(helmetScene));
+	helmetRootNode->AppendSceneData(*sceneManager->GetScene(helmetScene));
 	helmetRootNode->Transform.Position.y = 3.f;
 
 	// Create a camera in the scene
@@ -104,17 +104,18 @@ int main()
 	Gecko::Scope<Gecko::SceneCamera> camera = Gecko::CreateScopeFromRaw<Gecko::SceneCamera>(mainScene->CreateCamera());
 	camera->SetIsMain(true);
 	camera->SetAutoAspectRatio(true);
-	cameraNode->AttachCamera(camera);
+	cameraNode->AttachCamera(&camera);
 	cameraNode->Transform.Position.z = 4.f;
 	cameraNode->Transform.Position.y = 2.f;
 
 	// Create directional light
-	Gecko::SceneDirectionalLight* directionalLight = static_cast<Gecko::SceneDirectionalLight*>(mainScene->CreateLight(Gecko::LightType::Directional));
+	Gecko::SceneDirectionalLight* directionalLight = 
+		static_cast<Gecko::SceneDirectionalLight*>(mainScene->CreateLight(Gecko::LightType::Directional));
 	Gecko::Scope<Gecko::SceneLight> sDirectionalLight = Gecko::CreateScopeFromRaw<Gecko::SceneDirectionalLight>(directionalLight);
 	Gecko::SceneNode* lightNode = mainScene->GetRootNode()->AddNode("Light node");
 	directionalLight->SetColor({ 1., 1., 1. });
 	directionalLight->SetIntenstiy(1.f);
-	lightNode->AppendLight(sDirectionalLight);
+	lightNode->AppendLight(&sDirectionalLight);
 	lightNode->Transform.Rotation.x = -90.f;
 
 	Gecko::f32 lastTime = Gecko::Platform::GetTime();

@@ -17,49 +17,49 @@ namespace Gecko  {
 		return node;
 	}
 
-	void SceneNode::AppendSceneRenderObject(Scope<SceneRenderObject>& sceneRenderObject)
+	void SceneNode::AppendSceneRenderObject(Scope<SceneRenderObject>* sceneRenderObject)
 	{
-		m_SceneRenderObjects.push_back(std::move(sceneRenderObject));
+		m_SceneRenderObjects.push_back(std::move(*sceneRenderObject));
 	}
 
-	void SceneNode::AppendLight(Scope<SceneLight>& light)
+	void SceneNode::AppendLight(Scope<SceneLight>* light)
 	{
-		m_Lights.push_back(std::move(light));
+		m_Lights.push_back(std::move(*light));
 	}
 
-	void SceneNode::AttachCamera(Scope<SceneCamera>& camera)
+	void SceneNode::AttachCamera(Scope<SceneCamera>* camera)
 	{
-		m_Camera = std::move(camera);
+		m_Camera = std::move(*camera);
 	}
 
-	void SceneNode::AppendSceneData(const Scene* scene)
+	void SceneNode::AppendSceneData(const Scene& scene)
 	{
-		m_Children.push_back(scene->CopySceneToNode());
+		m_Children.push_back(scene.CopySceneToNode());
 	}
 
-	void SceneNode::RecursiveCopy(SceneNode* target)
+	void SceneNode::RecursiveCopy(SceneNode* target) const
 	{
 		target->Transform = Transform;
 
-		for (const Scope<SceneRenderObject>& o : m_SceneRenderObjects)
+		for (const Scope<SceneRenderObject>& obj : m_SceneRenderObjects)
 		{ // Construct new objects with new Scopes pointing to them, then pass those to the target node
-			SceneRenderObject* obj = new SceneRenderObject(*o.get());
-			Scope<SceneRenderObject> sObj = CreateScopeFromRaw<SceneRenderObject>(obj);
+			SceneRenderObject* pObj = new SceneRenderObject(*obj.get());
+			Scope<SceneRenderObject> sObj = CreateScopeFromRaw<SceneRenderObject>(pObj);
 			target->m_SceneRenderObjects.push_back(std::move(sObj));
 		}
 
-		for (const Scope<SceneLight>& l : m_Lights)
+		for (const Scope<SceneLight>& light : m_Lights)
 		{ // Construct new lights with new Scopes pointing to them, then pass those to the target node
-			SceneLight* li = new SceneLight(*l.get());
-			Scope<SceneLight> sLi = CreateScopeFromRaw<SceneLight>(li);
-			target->m_Lights.push_back(std::move(sLi));
+			SceneLight* pLight = new SceneLight(*light.get());
+			Scope<SceneLight> sLight = CreateScopeFromRaw<SceneLight>(pLight);
+			target->m_Lights.push_back(std::move(sLight));
 		}
 
 		if (m_Camera)
 		{ // Construct a new camera with a new Scope pointing to it, then pass that to the target node
-			SceneCamera* cam = new SceneCamera(*m_Camera.get());
-			Scope<SceneCamera> sCam = CreateScopeFromRaw<SceneCamera>(cam);
-			target->AttachCamera(sCam);
+			SceneCamera* pCam = new SceneCamera(*m_Camera.get());
+			Scope<SceneCamera> sCam = CreateScopeFromRaw<SceneCamera>(pCam);
+			target->AttachCamera(&sCam);
 		}
 
 		for (const Scope<SceneNode>& c : m_Children)
@@ -69,12 +69,12 @@ namespace Gecko  {
 		}
 	}
 
-	u32 SceneNode::GetChildrenCount()
+	u32 SceneNode::GetChildrenCount() const
 	{
 		return static_cast<u32>(m_Children.size());
 	}
 
-	SceneNode* SceneNode::GetChild(u32 childNodeIndex)
+	SceneNode* SceneNode::GetChild(u32 childNodeIndex) const
 	{
 		if (childNodeIndex >= GetChildrenCount())
 		{
@@ -89,12 +89,12 @@ namespace Gecko  {
 		m_Name = name;
 	}
 
-	const std::string& SceneNode::GetName()
+	const std::string& SceneNode::GetName() const
 	{
 		return m_Name;
 	}
 
-	const void SceneNode::PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const
+	const void SceneNode::PopulateSceneRenderInfo(SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const
 	{
 	
 		// Calculate the transform of this node
@@ -104,7 +104,7 @@ namespace Gecko  {
 		// Add the meshes
 		for (const Scope<SceneRenderObject>& sceneRenderObject : m_SceneRenderObjects)
 		{
-			sceneRenderInfo.RenderObjects.push_back({
+			sceneRenderInfo->RenderObjects.push_back({
 				sceneRenderObject->GetMeshHandle(),
 				sceneRenderObject->GetMaterialHandle(),
 				worldMatrix}
@@ -112,7 +112,7 @@ namespace Gecko  {
 		}
 
 		// Add the camera
-		if (m_Camera != nullptr && !sceneRenderInfo.HasCamera)
+		if (m_Camera != nullptr && !sceneRenderInfo->HasCamera)
 		{
 			glm::vec3 right = glm::normalize(glm::mat3(worldMatrix) * glm::vec3(1.f, 0.f, 0.f));
 			glm::vec3 up = glm::normalize(glm::mat3(worldMatrix) * glm::vec3(0.f, 1.f, 0.f));
@@ -126,9 +126,9 @@ namespace Gecko  {
 				glm::vec4(forward, 0.f),
 				glm::vec4(position, 1.f)
 			);
-			sceneRenderInfo.Camera.View = view;
-			sceneRenderInfo.Camera.Projection = m_Camera->GetCachedProjection();
-			sceneRenderInfo.HasCamera = true;
+			sceneRenderInfo->Camera.View = view;
+			sceneRenderInfo->Camera.Projection = m_Camera->GetCachedProjection();
+			sceneRenderInfo->HasCamera = true;
 		}
 
 		// Add the lights
@@ -139,7 +139,7 @@ namespace Gecko  {
 			case LightType::Directional:
 				{
 					const SceneDirectionalLight& directionalLight = static_cast<const SceneDirectionalLight&>(*sceneLight);
-					sceneRenderInfo.DirectionalLights.push_back({
+					sceneRenderInfo->DirectionalLights.push_back({
 						directionalLight.GetColor(),
 						directionalLight.GetIntenstiy(),
 						worldMatrix
@@ -149,7 +149,7 @@ namespace Gecko  {
 			case LightType::Point:
 				{
 					const ScenePointLight& pointLight = static_cast<const ScenePointLight&>(*sceneLight);
-					sceneRenderInfo.PointLights.push_back({
+					sceneRenderInfo->PointLights.push_back({
 						pointLight.GetColor(),
 						pointLight.GetIntenstiy(),
 						worldMatrix,
@@ -160,7 +160,7 @@ namespace Gecko  {
 			case LightType::Spot:
 				{
 					const SceneSpotLight& spotLight = static_cast<const SceneSpotLight&>(*sceneLight);
-					sceneRenderInfo.SpotLights.push_back({
+					sceneRenderInfo->SpotLights.push_back({
 						spotLight.GetColor(),
 						spotLight.GetIntenstiy(),
 						worldMatrix,
@@ -194,7 +194,7 @@ namespace Gecko  {
 		m_RootNode->SetName("Root Node");
 	}
 
-	SceneNode* Scene::GetRootNode()
+	SceneNode* Scene::GetRootNode() const
 	{
 		return m_RootNode.get();
 	}
@@ -207,12 +207,12 @@ namespace Gecko  {
 		return newNode;
 	}
 
-	SceneRenderObject* Scene::CreateSceneRenderObject()
+	SceneRenderObject* Scene::CreateSceneRenderObject() const
 	{
 		return new SceneRenderObject();
 	}
 	
-	SceneLight* Scene::CreateLight(LightType lightType)
+	SceneLight* Scene::CreateLight(LightType lightType) const
 	{
 		switch (lightType)
 		{
@@ -228,22 +228,22 @@ namespace Gecko  {
 		}
 	}
 
-	SceneDirectionalLight* Scene::CreateDirectionalLight()
+	SceneDirectionalLight* Scene::CreateDirectionalLight() const
 	{
 		return static_cast<SceneDirectionalLight*>(CreateLight(LightType::Directional));
 	}
 	
-	ScenePointLight* Scene::CreatePointLight()
+	ScenePointLight* Scene::CreatePointLight() const
 	{
 		return static_cast<ScenePointLight*>(CreateLight(LightType::Point));
 	}
 
-	SceneSpotLight* Scene::CreateSpotLight()
+	SceneSpotLight* Scene::CreateSpotLight() const
 	{
 		return static_cast<SceneSpotLight*>(CreateLight(LightType::Spot));
 	}
 
-	SceneCamera* Scene::CreateCamera()
+	SceneCamera* Scene::CreateCamera() const
 	{
 		return new SceneCamera();
 	}
@@ -254,7 +254,7 @@ namespace Gecko  {
 
 		glm::mat4 transform(1.f);
 
-		PopulateSceneRenderInfo(sceneRenderInfo, transform);
+		PopulateSceneRenderInfo(&sceneRenderInfo, transform);
 
 		return sceneRenderInfo;
 	}
@@ -262,6 +262,11 @@ namespace Gecko  {
 	EnvironmentMapHandle Scene::GetEnvironmentMapHandle() const
 	{
 		return m_EnvironmentMapHandle;
+	}
+
+	const std::string& Scene::GetName() const
+	{
+		return m_Name;
 	}
 
 	void Scene::SetEnvironmentMapHandle(EnvironmentMapHandle handle)
@@ -298,9 +303,9 @@ namespace Gecko  {
 		return resized;
 	}
 
-	const void Scene::PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const
+	const void Scene::PopulateSceneRenderInfo(SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const
 	{
-		sceneRenderInfo.EnvironmentMap = m_EnvironmentMapHandle;
+		sceneRenderInfo->EnvironmentMap = m_EnvironmentMapHandle;
 
 		m_RootNode->PopulateSceneRenderInfo(sceneRenderInfo, transform);
 	}
