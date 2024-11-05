@@ -26,7 +26,7 @@ namespace Gecko { namespace DX12
 	// Device Interface Methods
 
 #pragma region Device Interface Methods
-
+	
 	void Device_DX12::Init()
 	{
 
@@ -127,22 +127,23 @@ namespace Gecko { namespace DX12
 
 	void Device_DX12::Shutdown()
 	{
+		//ShutdownRaytracing();
+
 		Flush();
 
 		ImGui_ImplDX12_Shutdown();
 		ImGui_ImplWin32_Shutdown();
 		ImGui::DestroyContext();
 
+		CloseHandle(m_FenceEvent);
+		m_NumBackBuffers = 0;
+
 		m_BackBuffers.clear();
 
-		m_SwapChain = nullptr;
-		
 		m_RtvDescHeap.Destroy();
 		m_DsvDescHeap.Destroy();
 		m_SrvDescHeap.Destroy();
 		m_UavDescHeap.Destroy();
-
-		CloseHandle(m_FenceEvent);
 
 		for (u32 i = 0; i < m_GraphicsCommandBuffers.size(); i++)
 		{
@@ -174,36 +175,43 @@ namespace Gecko { namespace DX12
 			debugDevice->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
 		}
 #endif
-		m_NumBackBuffers = 0;
 
 		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
+
 	}
 
 	Ref<CommandList> Device_DX12::CreateGraphicsCommandList()
 	{
 		Ref<CommandBuffer> graphicsCommandBuffer = GetFreeGraphicsCommandBuffer();
-		Ref<CommandList_DX12> commandList_DX12 = CreateRef<CommandList_DX12>();
-		commandList_DX12->CommandBuffer = graphicsCommandBuffer;
+		Ref<CommandList_DX12> commandList = CreateRef<CommandList_DX12>();
+		commandList->CommandBuffer = graphicsCommandBuffer;
 		
-		ID3D12DescriptorHeap* descriptorHeaps[] = { m_SrvDescHeap.Heap() };
-		commandList_DX12->CommandBuffer->CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+		ID3D12DescriptorHeap* descriptorHeaps[] = { m_SrvDescHeap.Heap()};
+		commandList->CommandBuffer->CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-		return commandList_DX12;
+		return commandList;
 	}
 
 	void Device_DX12::ExecuteGraphicsCommandList(Ref<CommandList> commandList)
 	{
-		CommandList_DX12& commandList_DX12 = *static_cast<CommandList_DX12*>(commandList.get());
+		CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
 		
-		ExecuteGraphicsCommandBuffer(commandList_DX12.CommandBuffer);
-		commandList_DX12.CommandBuffer = nullptr;
+
+		DIRECTX12_ASSERT(commandListDx12.CommandBuffer->CommandList->Close());
+		ID3D12CommandList* const commandLists[]{ commandListDx12.CommandBuffer->CommandList.Get()};
+		m_GraphicsCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
+
+		u64 fenceValueForSignal = ++commandListDx12.CommandBuffer->FenceValue;
+		m_GraphicsCommandQueue->Signal(commandListDx12.CommandBuffer->Fence.Get(), fenceValueForSignal);
+		commandListDx12.CommandBuffer = nullptr;
+
 	}
 	
 	void Device_DX12::ExecuteGraphicsCommandListAndFlip(Ref<CommandList> commandList)
 	{
 
-		CommandList_DX12& commandList_DX12 = *static_cast<CommandList_DX12*>(commandList.get());
-		commandList_DX12.TransitionRenderTarget(GetCurrentBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COMMON);
+		CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
+		commandListDx12.TransitionRenderTarget(GetCurrentBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COMMON);
 
 		ExecuteGraphicsCommandList(commandList);
 
@@ -228,23 +236,25 @@ namespace Gecko { namespace DX12
 	
 	void Device_DX12::ExecuteComputeCommandList(Ref<CommandList> commandList)
 	{
-		CommandList_DX12& commandList_DX12 = *static_cast<CommandList_DX12*>(commandList.get());
+		CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
 
-		ExecuteComputeCommandBuffer(commandList_DX12.CommandBuffer);
-		commandList_DX12.CommandBuffer = nullptr;
+		DIRECTX12_ASSERT(commandListDx12.CommandBuffer->CommandList->Close());
+		ID3D12CommandList* const commandLists[]{ commandListDx12.CommandBuffer->CommandList.Get() };
+		m_ComputeCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
+
+		u64 fenceValueForSignal = ++commandListDx12.CommandBuffer->FenceValue;
+		m_ComputeCommandQueue->Signal(commandListDx12.CommandBuffer->Fence.Get(), fenceValueForSignal);
+		commandListDx12.CommandBuffer = nullptr;
 	}
 
-	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc, std::string name)
+	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc)
 	{
-		Ref<RenderTarget_DX12> renderTarget_DX12 = CreateRef<RenderTarget_DX12>();
+		Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
 		RenderTarget renderTarget;
 		for (u32 i = 0; i < desc.NumRenderTargets; i++)
 		{
-			std::string newname = name + std::to_string(i);
-			ASSERT_MSG(
-				desc.RenderTargetFormats[i] != Format::None, 
-				"None is not a valid format for a render target, did you forget to set it?"
-			);
+		
+			ASSERT_MSG(desc.RenderTargetFormats[i] != Format::None, "None is not a valid format for a render target, did you forget to set it?");
 
 			DXGI_FORMAT format = FormatToD3D12Format(desc.RenderTargetFormats[i]);
 
@@ -255,11 +265,9 @@ namespace Gecko { namespace DX12
 			clearValue.Color[2] = desc.RenderTargetClearValues[i].Values[2];
 			clearValue.Color[3] = desc.RenderTargetClearValues[i].Values[3];
 
-			// Take the minimum between the desired number of mips and the maximum allowed mips
-			// DX12 does not like it if you use more mips than is possible
 			u32 numTextureMips = std::min(desc.NumMips[i], CalculateNumberOfMips(desc.Width, desc.Height));
-
 			TextureDesc textureDesc;
+			textureDesc.Name = desc.Name;
 			textureDesc.Width = desc.Width;
 			textureDesc.Height = desc.Height;
 			textureDesc.Depth = 1;
@@ -267,30 +275,20 @@ namespace Gecko { namespace DX12
 			textureDesc.NumMips = numTextureMips;
 			textureDesc.Type = TextureType::Tex2D;
 			
-			renderTarget.RenderTextures[i] = CreateTexture(
-				textureDesc, 
-				FormatToD3D12Format(desc.RenderTargetFormats[i]), 
-				D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, 
-				D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, 
-				&clearValue
-			);
-			
-			Texture_DX12* texture_DX12 = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
+			renderTarget.RenderTextures[i] = CreateTexture(textureDesc, FormatToD3D12Format(desc.RenderTargetFormats[i]), D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET | D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &clearValue);
 
-			renderTarget_DX12->RenderTargetViews[i] = GetRtvHeap().Allocate();
+			Texture_DX12* textureDX12 = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
+
+			renderTargetDX12->RenderTargetViews[i] = GetRtvHeap().Allocate();
+
 			D3D12_RENDER_TARGET_VIEW_DESC renderTargetDesc{};
 			renderTargetDesc.Format = format;
 			renderTargetDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			m_Device->CreateRenderTargetView(
-				texture_DX12->TextureResource->ResourceDX12.Get(), 
-				&renderTargetDesc, 
-				renderTarget_DX12->RenderTargetViews[i].CPU
-			);
+			m_Device->CreateRenderTargetView(textureDX12->TextureResource->ResourceDX12.Get(), &renderTargetDesc, renderTargetDX12->RenderTargetViews[i].CPU);
 		}
 
 		if(desc.DepthStencilFormat != Format::None)
 		{	
-			// TODO: depth stencil format should be changed maybe?
 			D3D12_CLEAR_VALUE clearValue;
 			clearValue.Format = DXGI_FORMAT_D32_FLOAT;
 			clearValue.DepthStencil.Depth = desc.DepthTargetClearValue.Depth;
@@ -306,48 +304,38 @@ namespace Gecko { namespace DX12
 			textureDesc.NumMips = numTextureMips;
 			textureDesc.Type = TextureType::Tex2D;
 
-			renderTarget.DepthTexture = CreateTexture(
-				textureDesc, 
-				DXGI_FORMAT_D32_FLOAT, 
-				D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, 
-				D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, 
-				&clearValue
-			);
+			renderTarget.DepthTexture = CreateTexture(textureDesc, DXGI_FORMAT_D32_FLOAT, D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL, D3D12_HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES, &clearValue);
 		
-			Texture_DX12* texture_DX12 = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
+			Texture_DX12* textureDX12 = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
 
-			renderTarget_DX12->DepthStencilView = GetDsvHeap().Allocate();
+			renderTargetDX12->DepthStencilView = GetDsvHeap().Allocate();
 
 			D3D12_DEPTH_STENCIL_VIEW_DESC depthStencilDesc;
 			depthStencilDesc.Format = DXGI_FORMAT_D32_FLOAT;
 			depthStencilDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 			depthStencilDesc.Texture2D.MipSlice = 0;
 			depthStencilDesc.Flags = D3D12_DSV_FLAG_NONE;
-			m_Device->CreateDepthStencilView(
-				texture_DX12->TextureResource->ResourceDX12.Get(),
-				&depthStencilDesc, 
-				renderTarget_DX12->DepthStencilView.CPU
-			);
+			m_Device->CreateDepthStencilView(textureDX12->TextureResource->ResourceDX12.Get(), &depthStencilDesc, renderTargetDX12->DepthStencilView.CPU);
+			//NAME_DIRECTX12_OBJECT(resource->ResourceDX12, "DepthBuffer");
 		}
 
-		// TODO: think of how to render to specific parts of a render target
 
-		renderTarget_DX12->rect.left = 0;
-		renderTarget_DX12->rect.top = 0;
-		renderTarget_DX12->rect.right = (i32)desc.Width;
-		renderTarget_DX12->rect.bottom = (i32)desc.Height;
+		renderTargetDX12->rect.left = 0;
+		renderTargetDX12->rect.top = 0;
+		renderTargetDX12->rect.right = (i32)desc.Width;
+		renderTargetDX12->rect.bottom = (i32)desc.Height;
 
-		renderTarget_DX12->ViewPort.TopLeftX = 0.f;
-		renderTarget_DX12->ViewPort.TopLeftY = 0.f;
-		renderTarget_DX12->ViewPort.Width = (float)desc.Width;
-		renderTarget_DX12->ViewPort.Height = (float)desc.Height;
-		renderTarget_DX12->ViewPort.MinDepth = 0.f;
-		renderTarget_DX12->ViewPort.MaxDepth = 1.f;
+		renderTargetDX12->ViewPort.TopLeftX = 0.f;
+		renderTargetDX12->ViewPort.TopLeftY = 0.f;
+		renderTargetDX12->ViewPort.Width = (float)desc.Width;
+		renderTargetDX12->ViewPort.Height = (float)desc.Height;
+		renderTargetDX12->ViewPort.MinDepth = 0.f;
+		renderTargetDX12->ViewPort.MaxDepth = 1.f;
 		
-		renderTarget_DX12->device = this;
+		renderTargetDX12->device = this;
 
 		renderTarget.Desc = desc;
-		renderTarget.Data = renderTarget_DX12;
+		renderTarget.Data = renderTargetDX12;
 
 		return renderTarget;
 	}
@@ -372,7 +360,6 @@ namespace Gecko { namespace DX12
 			nullptr,
 			IID_PPV_ARGS(&vertexBuffer_DX12->VertexBufferResource->ResourceDX12)
 		);
-		NAME_DIRECTX12_OBJECT(vertexBuffer_DX12->VertexBufferResource->ResourceDX12, desc.Name);
 
 		D3D12_SUBRESOURCE_DATA subresourceData = {};
 		subresourceData.pData = desc.VertexData;
@@ -382,10 +369,9 @@ namespace Gecko { namespace DX12
 		CopyToResource(vertexBuffer_DX12->VertexBufferResource->ResourceDX12, subresourceData);
 
 		// Create the vertex buffer view.
-		D3D12_VERTEX_BUFFER_VIEW& VertexBufferView = vertexBuffer_DX12->VertexBufferView;
-		VertexBufferView.BufferLocation = vertexBuffer_DX12->VertexBufferResource->ResourceDX12->GetGPUVirtualAddress();
-		VertexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
-		VertexBufferView.StrideInBytes = desc.Layout.Stride;
+		vertexBuffer_DX12->VertexBufferView.BufferLocation = vertexBuffer_DX12->VertexBufferResource->ResourceDX12->GetGPUVirtualAddress();
+		vertexBuffer_DX12->VertexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
+		vertexBuffer_DX12->VertexBufferView.StrideInBytes = desc.Layout.Stride;
 
 		VertexBuffer vertexBuffer;
 		vertexBuffer.Desc = desc;
@@ -414,7 +400,8 @@ namespace Gecko { namespace DX12
 			nullptr,
 			IID_PPV_ARGS(&indexBuffer_DX12->IndexBufferResource->ResourceDX12)
 		);
-		NAME_DIRECTX12_OBJECT(indexBuffer_DX12->IndexBufferResource->ResourceDX12, desc.Name);
+
+		NAME_DIRECTX12_OBJECT(indexBuffer_DX12->IndexBufferResource->ResourceDX12, "IndexBuffer");
 
 		D3D12_SUBRESOURCE_DATA subresourceData = {};
 		subresourceData.pData = desc.IndexData;
@@ -423,11 +410,9 @@ namespace Gecko { namespace DX12
 
 		CopyToResource(indexBuffer_DX12->IndexBufferResource->ResourceDX12, subresourceData);
 
-		// Create the index buffer view
-		D3D12_INDEX_BUFFER_VIEW& IndexBufferView = indexBuffer_DX12->IndexBufferView;
-		IndexBufferView.BufferLocation = indexBuffer_DX12->IndexBufferResource->ResourceDX12->GetGPUVirtualAddress();
-		IndexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
-		IndexBufferView.Format = FormatToD3D12Format(desc.IndexFormat);
+		indexBuffer_DX12->IndexBufferView.BufferLocation = indexBuffer_DX12->IndexBufferResource->ResourceDX12->GetGPUVirtualAddress();
+		indexBuffer_DX12->IndexBufferView.SizeInBytes = static_cast<u32>(bufferSize);
+		indexBuffer_DX12->IndexBufferView.Format = FormatToD3D12Format(desc.IndexFormat);
 
 		IndexBuffer indexBuffer;
 		indexBuffer.Desc = desc;
@@ -438,23 +423,18 @@ namespace Gecko { namespace DX12
 	
 	GraphicsPipeline Device_DX12::CreateGraphicsPipeline(const GraphicsPipelineDesc& desc)
 	{
+
 		Ref<GraphicsPipeline_DX12> graphicsPipeline_DX12 = CreateRef<GraphicsPipeline_DX12>();
 
 		graphicsPipeline_DX12->device = this;
 
+
 		CD3DX12_PIPELINE_STATE_STREAM2 piplineStateStream2;
-		
-		// Creating the root signature
 		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
 		{
 			D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
 			featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-			HRESULT hr = m_Device->CheckFeatureSupport(
-				D3D12_FEATURE_ROOT_SIGNATURE, 
-				&featureData, 
-				static_cast<u32>(sizeof(featureData))
-			);
-			if (FAILED(hr))
+			if (m_Device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, static_cast<u32>(sizeof(featureData))))
 			{
 				featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
 			}
@@ -741,6 +721,7 @@ namespace Gecko { namespace DX12
 
 	ComputePipeline Device_DX12::CreateComputePipeline(const ComputePipelineDesc& desc)
 	{
+
 		Ref<ComputePipeline_DX12> computePipeline_DX12 = CreateRef<ComputePipeline_DX12>();
 
 		computePipeline_DX12->device = this;
@@ -1090,31 +1071,64 @@ namespace Gecko { namespace DX12
 		//m_CommandFrames[m_CurrentBackBufferIndex].DeferredReleasesFlag = 1;
 	}
 
-	void Device_DX12::Flush() const
+	void Device_DX12::Flush()
 	{
 		for (u32 i = 0; i < m_GraphicsCommandBuffers.size(); i++)
 		{
 			Ref<CommandBuffer> commandBuffer{ m_GraphicsCommandBuffers[i] };
+			commandBuffer->Wait(m_FenceEvent);
+
 			u64 fenceValueForSignal = ++commandBuffer->FenceValue;
 			m_GraphicsCommandQueue->Signal(commandBuffer->Fence.Get(), fenceValueForSignal);
-			commandBuffer->Wait(m_FenceEvent);
+			if (commandBuffer->Fence->GetCompletedValue() < commandBuffer->FenceValue)
+			{
+				commandBuffer->Fence->SetEventOnCompletion(fenceValueForSignal, m_FenceEvent);
+				WaitForSingleObject(m_FenceEvent, INFINITE);
+			}
 		}
 
 		for (u32 i = 0; i < m_ComputeCommandBuffers.size(); i++)
 		{
 			Ref<CommandBuffer> commandBuffer{ m_ComputeCommandBuffers[i] };
+			commandBuffer->Wait(m_FenceEvent);
+
 			u64 fenceValueForSignal = ++commandBuffer->FenceValue;
 			m_GraphicsCommandQueue->Signal(commandBuffer->Fence.Get(), fenceValueForSignal);
-			commandBuffer->Wait(m_FenceEvent);
+			if (commandBuffer->Fence->GetCompletedValue() < commandBuffer->FenceValue)
+			{
+				commandBuffer->Fence->SetEventOnCompletion(fenceValueForSignal, m_FenceEvent);
+				WaitForSingleObject(m_FenceEvent, INFINITE);
+			}
 		}
 
 		for (u32 i = 0; i < m_CopyCommandBuffers.size(); i++)
 		{
 			Ref<CommandBuffer> commandBuffer{ m_CopyCommandBuffers[i] };
+			commandBuffer->Wait(m_FenceEvent);
+
 			u64 fenceValueForSignal = ++commandBuffer->FenceValue;
 			m_GraphicsCommandQueue->Signal(commandBuffer->Fence.Get(), fenceValueForSignal);
-			commandBuffer->Wait(m_FenceEvent);
+			if (commandBuffer->Fence->GetCompletedValue() < commandBuffer->FenceValue)
+			{
+				commandBuffer->Fence->SetEventOnCompletion(fenceValueForSignal, m_FenceEvent);
+				WaitForSingleObject(m_FenceEvent, INFINITE);
+			}
 		}
+
+		//for (u32 i = 0; i < m_GraphicsCommandBuffers.size(); i++)
+		//{
+		//	m_GraphicsCommandBuffers[i]->Wait(m_FenceEvent);
+		//}
+
+		//for (u32 i = 0; i < m_ComputeCommandBuffers.size(); i++)
+		//{
+		//	m_ComputeCommandBuffers[i]->Wait(m_FenceEvent);
+		//}
+
+		//for (u32 i = 0; i < m_CopyCommandBuffers.size(); i++)
+		//{
+		//	m_CopyCommandBuffers[i]->Wait(m_FenceEvent);
+		//}
 	}
 
 	Ref<CommandBuffer> Device_DX12::GetFreeGraphicsCommandBuffer()
@@ -1126,9 +1140,7 @@ namespace Gecko { namespace DX12
 		}
 
 		DIRECTX12_ASSERT(m_GraphicsCommandBuffers[index]->CommandAllocator->Reset());
-		DIRECTX12_ASSERT(
-			m_GraphicsCommandBuffers[index]->CommandList->Reset(m_GraphicsCommandBuffers[index]->CommandAllocator.Get(), nullptr)
-		);
+		DIRECTX12_ASSERT(m_GraphicsCommandBuffers[index]->CommandList->Reset(m_GraphicsCommandBuffers[index]->CommandAllocator.Get(), nullptr));
 
 		return m_GraphicsCommandBuffers[index];
 	}
@@ -1136,36 +1148,38 @@ namespace Gecko { namespace DX12
 	Ref<CommandBuffer> Device_DX12::GetFreeComputeCommandBuffer()
 	{
 		u32 index = 0;
-		while (m_ComputeCommandBuffers[index]->IsBusy())
+		while (true)
 		{
-			index = (index + 1) % m_ComputeCommandBuffers.size();
+			if (!m_ComputeCommandBuffers[index]->IsBusy())
+			{
+				DIRECTX12_ASSERT(m_ComputeCommandBuffers[index]->CommandAllocator->Reset());
+				DIRECTX12_ASSERT(m_ComputeCommandBuffers[index]->CommandList->Reset(m_ComputeCommandBuffers[index]->CommandAllocator.Get(), nullptr));
+
+				return m_ComputeCommandBuffers[index];
+			}
+			index++;
+			index = index % m_ComputeCommandBuffers.size();
 		}
-
-		DIRECTX12_ASSERT(m_ComputeCommandBuffers[index]->CommandAllocator->Reset());
-		DIRECTX12_ASSERT(
-			m_ComputeCommandBuffers[index]->CommandList->Reset(m_ComputeCommandBuffers[index]->CommandAllocator.Get(), nullptr)
-		);
-
-		return m_ComputeCommandBuffers[index];
 	}
 
 	Ref<CommandBuffer> Device_DX12::GetFreeCopyCommandBuffer()
 	{
 		u32 index = 0;
-		while (m_CopyCommandBuffers[index]->IsBusy())
+		while (true)
 		{
-			index = (index + 1) % m_CopyCommandBuffers.size();
+			if (!m_CopyCommandBuffers[index]->IsBusy())
+			{
+				DIRECTX12_ASSERT(m_CopyCommandBuffers[index]->CommandAllocator->Reset());
+				DIRECTX12_ASSERT(m_CopyCommandBuffers[index]->CommandList->Reset(m_CopyCommandBuffers[index]->CommandAllocator.Get(), nullptr));
+
+				return m_CopyCommandBuffers[index];
+			}
+			index++;
+			index = index % m_CopyCommandBuffers.size();
 		}
-
-		DIRECTX12_ASSERT(m_CopyCommandBuffers[index]->CommandAllocator->Reset());
-		DIRECTX12_ASSERT(
-			m_CopyCommandBuffers[index]->CommandList->Reset(m_CopyCommandBuffers[index]->CommandAllocator.Get(), nullptr)
-		);
-
-		return m_CopyCommandBuffers[index];
 	}
 
-	void Device_DX12::ExecuteGraphicsCommandBuffer(const Ref<CommandBuffer>& graphicsCommandBuffer)
+	void Device_DX12::ExecuteGraphicsCommandBuffer(Ref<CommandBuffer> graphicsCommandBuffer)
 	{
 		DIRECTX12_ASSERT(graphicsCommandBuffer->CommandList->Close());
 		ID3D12CommandList* const commandLists[]{ graphicsCommandBuffer->CommandList.Get() };
@@ -1175,7 +1189,7 @@ namespace Gecko { namespace DX12
 		m_GraphicsCommandQueue->Signal(graphicsCommandBuffer->Fence.Get(), fenceValueForSignal);
 	}
 
-	void Device_DX12::ExecuteComputeCommandBuffer(const Ref<CommandBuffer>& computeCommandBuffer)
+	void Device_DX12::ExecuteComputeCommandBuffer(Ref<CommandBuffer> computeCommandBuffer)
 	{
 		DIRECTX12_ASSERT(computeCommandBuffer->CommandList->Close());
 		ID3D12CommandList* const commandLists[]{ computeCommandBuffer->CommandList.Get() };
@@ -1185,7 +1199,7 @@ namespace Gecko { namespace DX12
 		m_ComputeCommandQueue->Signal(computeCommandBuffer->Fence.Get(), fenceValueForSignal);
 	}
 
-	void Device_DX12::ExecuteCopyCommandBuffer(const Ref<CommandBuffer>& copyCommandBuffer)
+	void Device_DX12::ExecuteCopyCommandBuffer(Ref<CommandBuffer> copyCommandBuffer)
 	{
 		DIRECTX12_ASSERT(copyCommandBuffer->CommandList->Close());
 		ID3D12CommandList* const commandLists[]{ copyCommandBuffer->CommandList.Get() };
@@ -1385,7 +1399,7 @@ namespace Gecko { namespace DX12
 
 	}
 
-	Texture Device_DX12::CreateTexture(const TextureDesc& desc, DXGI_FORMAT format,
+	Texture Device_DX12::CreateTexture( const TextureDesc& desc, DXGI_FORMAT format, 
 		D3D12_RESOURCE_FLAGS flags, D3D12_HEAP_FLAGS heapFlags, const D3D12_CLEAR_VALUE* clearValue)
 	{
 		Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
@@ -1618,15 +1632,13 @@ namespace Gecko { namespace DX12
 		return texture;
 	}
 
-	void Device_DX12::CopyToResource(const ComPtr<ID3D12Resource>& resource, 
-		const D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResourceIndex)
+	void Device_DX12::CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource)
 	{
-
-		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
-		u64 requiredSize = GetRequiredIntermediateSize(resource.Get(), 0, 1);
-		CD3DX12_RESOURCE_DESC buffer = CD3DX12_RESOURCE_DESC::Buffer(requiredSize);
-
 		ComPtr<ID3D12Resource> intermediateResource;
+
+		UINT64 requiredSize = GetRequiredIntermediateSize(resource.Get(), 0, 1);
+		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+		CD3DX12_RESOURCE_DESC buffer = CD3DX12_RESOURCE_DESC::Buffer(requiredSize);
 		m_Device->CreateCommittedResource(
 			&heapProps,
 			D3D12_HEAP_FLAG_NONE,
@@ -1637,12 +1649,13 @@ namespace Gecko { namespace DX12
 		);
 
 		Ref<CommandBuffer> copyCommandList = GetFreeCopyCommandBuffer();
+
 		UpdateSubresources(
 			copyCommandList->CommandList.Get(),
 			resource.Get(),
 			intermediateResource.Get(),
 			0,
-			subResourceIndex,
+			subResource,
 			1,
 			&subResourceData
 		);

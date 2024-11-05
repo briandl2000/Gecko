@@ -42,7 +42,7 @@ namespace Gecko {
 
 		virtual RenderTarget GetCurrentBackBuffer() = 0;
 
-		virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc, std::string name = "RenderTarget") = 0;
+		virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) = 0;
 		virtual VertexBuffer CreateVertexBuffer(const VertexBufferDesc& desc) = 0;
 		virtual IndexBuffer CreateIndexBuffer(const IndexBufferDesc& desc) = 0;
 		virtual GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) = 0;
@@ -52,6 +52,7 @@ namespace Gecko {
 
 		virtual void UploadTextureData(Texture texture, void* Data, u32 mip = 0, u32 slice = 0) = 0;
 
+		// TODO: imgui methods should probably go in the command list
 		virtual void DrawTextureInImGui(Texture texture, u32 width = 0, u32 height = 0) = 0;
 		virtual void ImGuiRender(Ref<CommandList> commandList) = 0;
 

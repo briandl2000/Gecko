@@ -5,8 +5,6 @@
 
 #include <vector>
 
-#include <array>
-
 namespace Gecko {
 	
 	enum class ShaderType
@@ -175,7 +173,6 @@ namespace Gecko {
 
 	struct VertexBufferDesc // The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer. This pointer needs to stay valid until the CreateVertexBuffer function is called.
 	{
-		char* Name = "VertexBuffer";
 		VertexLayout Layout;
 		void* VertexData{ nullptr };
 		u32 NumVertices{ 0 };
@@ -191,7 +188,6 @@ namespace Gecko {
 
 	struct IndexBufferDesc // The Index buffer desc takes in format of the indices, the number of indices and the index data pointer. This pointer needs to stay valid until the CreateIndexBuffer function is called.
 	{
-		char* Name = "IndexBuffer";
 		Format IndexFormat;
 		u32 NumIndices{ 0 };
 		void* IndexData{ nullptr };
@@ -207,7 +203,7 @@ namespace Gecko {
 
 	struct TextureDesc
 	{
-		char* Name = "Texture";
+		char* Name{ "Texture" };
 		Format Format{ Format::None };
 		u32 Width{ 1 };
 		u32 Height{ 1 };
@@ -266,19 +262,20 @@ namespace Gecko {
 			}
 		}
 
+		char* Name{ "Render Target" };
 		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
 		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
 		Format RenderTargetFormats[8]{ Format::None };
 		Format DepthStencilFormat{ Format::None };
 		u32 NumRenderTargets{ 0 };
-		std::array<u32, 8> NumMips;
+		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
 		u32 DepthMips{ 1 };
 		u32 Width{ 0 };
 		u32 Height{ 0 };
 		bool AllowRenderTargetTexture{ false };
 		bool AllowDepthStencilTexture{ false };
 	};
-	
+
 
 	struct RenderTarget
 	{

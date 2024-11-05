@@ -37,7 +37,7 @@ namespace Gecko { namespace DX12
 			virtual Ref<CommandList> CreateComputeCommandList() override;
 			virtual void ExecuteComputeCommandList(Ref<CommandList> commandList) override;
 
-			virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc, std::string name) override;
+			virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) override;
 			virtual VertexBuffer CreateVertexBuffer(const VertexBufferDesc& desc) override;
 			virtual IndexBuffer CreateIndexBuffer(const IndexBufferDesc& desc) override;
 			virtual GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) override;
@@ -59,15 +59,15 @@ namespace Gecko { namespace DX12
 
 			void SetDeferredReleasesFlag();
 			
-			void Flush() const;
+			void Flush();
 
 			Ref<CommandBuffer> GetFreeGraphicsCommandBuffer();
 			Ref<CommandBuffer> GetFreeComputeCommandBuffer();
 			Ref<CommandBuffer> GetFreeCopyCommandBuffer();
 
-			void ExecuteGraphicsCommandBuffer(const Ref<CommandBuffer>& graphicsCommandBuffer);
-			void ExecuteComputeCommandBuffer(const Ref<CommandBuffer>& computeCommandBuffer);
-			void ExecuteCopyCommandBuffer(const Ref<CommandBuffer>& copyCommandBuffer);
+			void ExecuteGraphicsCommandBuffer(Ref<CommandBuffer> graphicsCommandBuffer);
+			void ExecuteComputeCommandBuffer(Ref<CommandBuffer> computeCommandBuffer);
+			void ExecuteCopyCommandBuffer(Ref<CommandBuffer> copyCommandBuffer);
 
 			bool Resize(const Event::EventData& data);
 
@@ -86,16 +86,17 @@ namespace Gecko { namespace DX12
 
 			D3D_FEATURE_LEVEL GetMaxFeatureLevel(const ComPtr<IDXGIAdapter1>& adapter);
 			ComPtr<IDXGIAdapter4> GetAdapter(const ComPtr<IDXGIFactory6>& factory);
-
 			template<typename T>
-			void CreateCommandBuffers(const ComPtr<ID3D12Device8>& device, ComPtr<ID3D12CommandQueue>* commandQueue, 
-				T* commandBuffers, D3D12_COMMAND_LIST_TYPE type);
+			void CreateCommandBuffers(const ComPtr<ID3D12Device8>& device, ComPtr<ID3D12CommandQueue>* commandQueue, T* commandBuffers, D3D12_COMMAND_LIST_TYPE type);
 
-			Texture CreateTexture(const TextureDesc& desc, DXGI_FORMAT format, 
-				D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_FLAGS heapFlags = D3D12_HEAP_FLAG_NONE, 
+			Texture CreateTexture(
+				const TextureDesc& desc, 
+				DXGI_FORMAT format, 
+				D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE, 
+				D3D12_HEAP_FLAGS heapFlags = D3D12_HEAP_FLAG_NONE, 
 				const D3D12_CLEAR_VALUE* clearValue = nullptr);
 			
-			void CopyToResource(const ComPtr<ID3D12Resource>& resource, const D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResourceIndex = 0);
+			void CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource = 0);
 			void RecreateBackBuffers(u32 width, u32 height);
 			void ProcessDeferredReleases();
 
