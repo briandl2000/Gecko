@@ -52,6 +52,7 @@ namespace Gecko {
 
 		virtual void UploadTextureData(Texture texture, void* Data, u32 mip = 0, u32 slice = 0) = 0;
 
+		// TODO: imgui methods should probably go in the command list
 		virtual void DrawTextureInImGui(Texture texture, u32 width = 0, u32 height = 0) = 0;
 		virtual void ImGuiRender(Ref<CommandList> commandList) = 0;
 

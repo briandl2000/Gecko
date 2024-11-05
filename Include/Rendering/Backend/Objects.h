@@ -203,6 +203,7 @@ namespace Gecko {
 
 	struct TextureDesc
 	{
+		char* Name{ "Texture" };
 		Format Format{ Format::None };
 		u32 Width{ 1 };
 		u32 Height{ 1 };
@@ -261,6 +262,7 @@ namespace Gecko {
 			}
 		}
 
+		char* Name{ "Render Target" };
 		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
 		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
 		Format RenderTargetFormats[8]{ Format::None };

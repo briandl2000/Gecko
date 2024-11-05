@@ -13,36 +13,38 @@
 #include <backends/imgui_impl_dx12.h>
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
+#if defined(min)
 #undef min
+#endif
+#if defined(max)
 #undef max
-
-const wchar_t* c_hitGroupName = L"MyHitGroup";
-const wchar_t* c_raygenShaderName = L"MyRaygenShader";
-const wchar_t* c_closestHitShaderName = L"MyClosestHitShader";
-const wchar_t* c_missShaderName = L"MyMissShader";
+#endif
 
 namespace Gecko { namespace DX12
 {
 
-	template<typename T>
-	void CreateCommandBuffers(ComPtr<ID3D12Device8> device, ComPtr<ID3D12CommandQueue>& commandQueue, T& commandBuffers, D3D12_COMMAND_LIST_TYPE type);
+	// Device Interface Methods
 
-	Device_DX12::Device_DX12()
+#pragma region Device Interface Methods
+	
+	void Device_DX12::Init()
 	{
+
+		// Add the resize event
 		AddEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
 
-		CreateDevice();
-
 		const Platform::AppInfo& info = Platform::GetAppInfo();
-		HWND window = reinterpret_cast<HWND>(Platform::GetWindowData());
-		
 		m_NumBackBuffers = info.NumBackBuffers;
 
-		// Create the command queue, allocator and list for the Graphics
-		CreateCommandBuffers(m_Device, m_GraphicsCommandQueue, m_GraphicsCommandBuffers, D3D12_COMMAND_LIST_TYPE_DIRECT);
-		CreateCommandBuffers(m_Device, m_ComputeCommandQueue, m_ComputeCommandBuffers, D3D12_COMMAND_LIST_TYPE_COMPUTE);
-		CreateCommandBuffers(m_Device, m_CopyCommandQueue, m_CopyCommandBuffers, D3D12_COMMAND_LIST_TYPE_COPY);
+		// Create the device
+		CreateDevice();
 
+		// Create the command queue, allocator and list for the Graphics
+		CreateCommandBuffers(m_Device, &m_GraphicsCommandQueue, &m_GraphicsCommandBuffers, D3D12_COMMAND_LIST_TYPE_DIRECT);
+		CreateCommandBuffers(m_Device, &m_ComputeCommandQueue, &m_ComputeCommandBuffers, D3D12_COMMAND_LIST_TYPE_COMPUTE);
+		CreateCommandBuffers(m_Device, &m_CopyCommandQueue, &m_CopyCommandBuffers, D3D12_COMMAND_LIST_TYPE_COPY);
+
+		// Create a fence
 		m_FenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
 		ASSERT(m_FenceEvent);
 
@@ -55,7 +57,7 @@ namespace Gecko { namespace DX12
 			result &= m_UavDescHeap.Initialize(this, 512, false);
 			ASSERT_MSG(result, "Failed to initialize heaps!");
 		}
-	
+
 		// Creating the swap chain
 		DXGI_SWAP_CHAIN_DESC1 swapchainDesc{};
 		m_BackBufferFormat = Format::R8G8B8A8_UNORM;
@@ -73,20 +75,18 @@ namespace Gecko { namespace DX12
 		swapchainDesc.Flags = 0;
 
 		ComPtr<IDXGISwapChain1> swapChain;
+		HWND window = reinterpret_cast<HWND>(Platform::GetWindowData());
 		DIRECTX12_ASSERT(m_Factory->CreateSwapChainForHwnd(m_GraphicsCommandQueue.Get(), window, &swapchainDesc, nullptr, nullptr, &swapChain));
 		DIRECTX12_ASSERT(m_Factory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER));
-
 		DIRECTX12_ASSERT(swapChain->QueryInterface(IID_PPV_ARGS(&m_SwapChain)));
 
-		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
-		
-		m_BackBuffers.resize(m_NumBackBuffers);
-		// Createing the render targets
-		CreateBackBuffer(info.Width, info.Height);
+		// Createing the back buffer render targets
+		RecreateBackBuffers(info.Width, info.Height);
 
+		// Setting up ImGui
 		// ImGui stuff
 		IMGUI_CHECKVERSION();
-		ImGui::CreateContext(); 
+		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
@@ -108,27 +108,20 @@ namespace Gecko { namespace DX12
 			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 		}
 
-
 		ImGui_ImplWin32_Init(window);
-		imGuiHandle = m_SrvDescHeap.Allocate();
+		m_ImGuiHandle = m_SrvDescHeap.Allocate();
 		ImGui_ImplDX12_Init(
-			GetDevice().Get(), 
+			m_Device.Get(),
 			info.NumBackBuffers,
 			FormatToD3D12Format(m_BackBufferFormat),
 			m_SrvDescHeap.Heap(),
-			imGuiHandle.CPU,
-			imGuiHandle.GPU
+			m_ImGuiHandle.CPU,
+			m_ImGuiHandle.GPU
 		);
 
 		ImGui_ImplDX12_NewFrame();
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
-
-	};
-	
-	Device_DX12::~Device_DX12()
-	{
-		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
 
 	}
 
@@ -182,6 +175,9 @@ namespace Gecko { namespace DX12
 			debugDevice->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
 		}
 #endif
+
+		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
+
 	}
 
 	Ref<CommandList> Device_DX12::CreateGraphicsCommandList()
@@ -251,11 +247,6 @@ namespace Gecko { namespace DX12
 		commandListDx12.CommandBuffer = nullptr;
 	}
 
-	RenderTarget Device_DX12::GetCurrentBackBuffer()
-	{
-		return m_BackBuffers[m_CurrentBackBufferIndex];
-	}
-
 	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc)
 	{
 		Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
@@ -276,6 +267,7 @@ namespace Gecko { namespace DX12
 
 			u32 numTextureMips = std::min(desc.NumMips[i], CalculateNumberOfMips(desc.Width, desc.Height));
 			TextureDesc textureDesc;
+			textureDesc.Name = desc.Name;
 			textureDesc.Width = desc.Width;
 			textureDesc.Height = desc.Height;
 			textureDesc.Depth = 1;
@@ -293,7 +285,6 @@ namespace Gecko { namespace DX12
 			renderTargetDesc.Format = format;
 			renderTargetDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 			m_Device->CreateRenderTargetView(textureDX12->TextureResource->ResourceDX12.Get(), &renderTargetDesc, renderTargetDX12->RenderTargetViews[i].CPU);
-			//NAME_DIRECTX12_OBJECT(resource->ResourceDX12, "RenderTarget");
 		}
 
 		if(desc.DepthStencilFormat != Format::None)
@@ -305,6 +296,7 @@ namespace Gecko { namespace DX12
 
 			u32 numTextureMips = std::min(desc.DepthMips, CalculateNumberOfMips(desc.Width, desc.Height));
 			TextureDesc textureDesc;
+			textureDesc.Name = "Depth";
 			textureDesc.Width = desc.Width;
 			textureDesc.Height = desc.Height;
 			textureDesc.Depth = 1;
@@ -429,255 +421,13 @@ namespace Gecko { namespace DX12
 		return indexBuffer;
 	}
 	
-	Texture Device_DX12::CreateTexture(const TextureDesc& desc)
-	{
-		return CreateTexture(desc, FormatToD3D12Format(desc.Format));
-	}
-	Texture Device_DX12::CreateTexture(const TextureDesc& desc, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags, D3D12_HEAP_FLAGS heapFlags , D3D12_CLEAR_VALUE* clearValue)
-	{
-
-		Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
-
-		CD3DX12_RESOURCE_DESC textureResourceDesc;
-
-		switch (desc.Type)
-		{
-		case TextureType::Tex1D:
-			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex1D(
-				format,
-				desc.Width,
-				1,
-				static_cast<u16>(desc.NumMips)
-			);
-			break;
-		case TextureType::Tex2D:
-			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				format,
-				desc.Width,
-				desc.Height,
-				1,
-				static_cast<u16>(desc.NumMips)
-			);
-			break;
-		case TextureType::Tex3D:
-			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex3D(
-				format,
-				desc.Width,
-				desc.Height,
-				static_cast<u16>(desc.Depth),
-				static_cast<u16>(desc.NumMips)
-			);
-			break;
-		case TextureType::TexCube:
-			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				format,
-				desc.Width,
-				desc.Height,
-				6,
-				static_cast<u16>(desc.NumMips)
-			);
-			break;
-		case TextureType::Tex1DArray:
-			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex1D(
-				format,
-				desc.Width,
-				static_cast<u16>(desc.NumArraySlices),
-				static_cast<u16>(desc.NumMips)
-			);
-			break;
-		case TextureType::Tex2DArray:
-			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-				format,
-				desc.Width,
-				desc.Height,
-				static_cast<u16>(desc.NumArraySlices),
-				static_cast<u16>(desc.NumMips)
-			);
-			break;
-		}
-
-		CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-
-		textureResourceDesc.Flags |= flags;
-		if (!(textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL))
-		{
-			textureResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-		}
-		texture_DX12->TextureResource = CreateRef<Resource>();
-
-		texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
-
-		DIRECTX12_ASSERT(m_Device->CreateCommittedResource(
-			&heapProps,
-			heapFlags,
-			&textureResourceDesc,
-			texture_DX12->TextureResource->CurrentState,
-			clearValue,
-			IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)
-		));
-		
-		// SRV
-		{
-			texture_DX12->srv = m_SrvDescHeap.Allocate();
-
-			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-			srvDesc.Format = FormatToD3D12Format(desc.Format);
-			srvDesc.ViewDimension = TextureTypeToD3D12SrvDimension(desc.Type);
-			switch (desc.Type)
-			{
-			case TextureType::Tex1D:
-				srvDesc.Texture1D.MipLevels = desc.NumMips;
-				break;
-			case TextureType::Tex2D:
-				srvDesc.Texture2D.MipLevels = desc.NumMips;
-				break;
-			case TextureType::Tex3D:
-				srvDesc.Texture3D.MipLevels = desc.NumMips;
-				break;
-			case TextureType::TexCube:
-				srvDesc.TextureCube.MipLevels = desc.NumMips;
-				break;
-			case TextureType::Tex1DArray:
-				srvDesc.Texture1DArray.MipLevels = desc.NumMips;
-				srvDesc.Texture1DArray.ArraySize = desc.NumArraySlices;
-				break;
-			case TextureType::Tex2DArray:
-				srvDesc.Texture2DArray.MipLevels = desc.NumMips;
-				srvDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
-				break;
-			}
-
-			m_Device->CreateShaderResourceView(
-				texture_DX12->TextureResource->ResourceDX12.Get(),
-				&srvDesc,
-				texture_DX12->srv.CPU
-			);
-		}
-
-		// UAV
-		if(textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
-		{
-			texture_DX12->uav = m_SrvDescHeap.Allocate();
-
-
-			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-			uavDesc.Format = FormatToD3D12Format(desc.Format);
-			switch (desc.Type)
-			{
-			case TextureType::Tex1D:
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
-				uavDesc.Texture1D.MipSlice = 0;
-				break;
-			case TextureType::Tex2D:
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-				uavDesc.Texture2D.MipSlice = 0;
-				uavDesc.Texture2D.PlaneSlice = 0;
-				break;
-			case TextureType::Tex3D:
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
-				uavDesc.Texture3D.MipSlice = 0;
-				uavDesc.Texture3D.FirstWSlice = 0;
-				uavDesc.Texture3D.WSize = desc.Depth;
-				break;
-			case TextureType::TexCube:
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-				uavDesc.Texture2DArray.MipSlice = 0;
-				uavDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
-				uavDesc.Texture2DArray.MipSlice = 0;
-				uavDesc.Texture2DArray.PlaneSlice = 0;
-				break;
-			case TextureType::Tex1DArray:
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
-				uavDesc.Texture1DArray.MipSlice = 0;
-				uavDesc.Texture1DArray.ArraySize = desc.NumArraySlices;
-				uavDesc.Texture1DArray.MipSlice = 0;
-				break;
-			case TextureType::Tex2DArray:
-				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-				uavDesc.Texture2DArray.MipSlice = 0;
-				uavDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
-				uavDesc.Texture2DArray.MipSlice = 0;
-				uavDesc.Texture2DArray.PlaneSlice = 0;
-				break;
-			}
-
-			if (desc.Format != Format::R8G8B8A8_SRGB)
-			{
-
-				m_Device->CreateUnorderedAccessView(
-					texture_DX12->TextureResource->ResourceDX12.Get(),
-					nullptr,
-					&uavDesc,
-					texture_DX12->uav.CPU
-				);
-			}
-		}
-
-		// Mips
-		{
-			texture_DX12->mipSrvs.resize(desc.NumMips);
-			texture_DX12->mipUavs.resize(desc.NumMips);
-			texture_DX12->TextureResource->subResourceStates.resize(desc.NumMips);
-			for (u32 i = 0; i < desc.NumMips; i++)
-			{
-				texture_DX12->mipSrvs[i] = m_SrvDescHeap.Allocate();
-				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-				srvDesc.Format = FormatToD3D12Format(desc.Format);
-				srvDesc.Texture2DArray.MipLevels = 1;
-				srvDesc.Texture2DArray.MostDetailedMip = i;
-				srvDesc.Texture2DArray.ArraySize = desc.Type == TextureType::TexCube ? 6 : 1;
-				srvDesc.Texture2DArray.FirstArraySlice = 0;
-				srvDesc.Texture2DArray.PlaneSlice = 0;
-				m_Device->CreateShaderResourceView(
-					texture_DX12->TextureResource->ResourceDX12.Get(),
-					&srvDesc,
-					texture_DX12->mipSrvs[i].CPU
-				);
-				if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
-				{
-					texture_DX12->mipUavs[i] = m_SrvDescHeap.Allocate();
-					D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-					uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
-					uavDesc.Format = FormatToD3D12Format(desc.Format);
-					uavDesc.Format = uavDesc.Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ? DXGI_FORMAT_R8G8B8A8_UNORM : uavDesc.Format;
-					uavDesc.Texture2DArray.MipSlice = i;
-					uavDesc.Texture2DArray.FirstArraySlice = 0;
-					uavDesc.Texture2DArray.ArraySize = desc.Type == TextureType::TexCube ? 6 : 1;
-					uavDesc.Texture2DArray.PlaneSlice = 0;
-					m_Device->CreateUnorderedAccessView(
-						texture_DX12->TextureResource->ResourceDX12.Get(),
-						nullptr,
-						&uavDesc,
-						texture_DX12->mipUavs[i].CPU
-					);
-				}
-
-				texture_DX12->TextureResource->subResourceStates[i] = texture_DX12->TextureResource->CurrentState;
-			}
-
-		}
-
-		NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->ResourceDX12, "texture");
-
-		texture_DX12->device = this;
-
-		Texture texture;
-		texture.Desc = desc;
-		texture.Data = texture_DX12;
-
-		return texture;
-	}
-
 	GraphicsPipeline Device_DX12::CreateGraphicsPipeline(const GraphicsPipelineDesc& desc)
 	{
 
 		Ref<GraphicsPipeline_DX12> graphicsPipeline_DX12 = CreateRef<GraphicsPipeline_DX12>();
 
 		graphicsPipeline_DX12->device = this;
-		
+
 
 		CD3DX12_PIPELINE_STATE_STREAM2 piplineStateStream2;
 		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
@@ -744,8 +494,8 @@ namespace Gecko { namespace DX12
 				descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];*/
 
 				rootParameters[descriptorIndex].InitAsDescriptorTable(
-					1, 
-					&descriptorTableRanges[descriptorIndex], 
+					1,
+					&descriptorTableRanges[descriptorIndex],
 					ShaderVisibilityToD3D12ShaderVisibility(textureShaderVisibility)
 				);
 
@@ -761,7 +511,7 @@ namespace Gecko { namespace DX12
 
 				u32 descriptorIndex = DynamicCallDataOffset;
 				rootParameters[descriptorIndex].InitAsConstants(
-					desc.DynamicCallData.Size/4,
+					desc.DynamicCallData.Size / 4,
 					desc.DynamicCallData.BufferLocation,
 					0,
 					ShaderVisibilityToD3D12ShaderVisibility(desc.DynamicCallData.ConstantBufferVisibilities)
@@ -790,10 +540,10 @@ namespace Gecko { namespace DX12
 
 			CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDescription;
 			rootSignatureDescription.Init_1_1(
-				static_cast<u32>(rootParameters.size()), 
-				rootParameters.data(), 
+				static_cast<u32>(rootParameters.size()),
+				rootParameters.data(),
 				static_cast<u32>(desc.SamplerDescs.size()),
-				samplers.data(), 
+				samplers.data(),
 				rootSignatureFlags
 			);
 
@@ -802,22 +552,22 @@ namespace Gecko { namespace DX12
 			ComPtr<ID3DBlob> errorBlob;
 			DIRECTX12_ASSERT(D3DX12SerializeVersionedRootSignature(
 				&rootSignatureDescription,
-				featureData.HighestVersion, 
-				&rootSignatureBlob, 
+				featureData.HighestVersion,
+				&rootSignatureBlob,
 				&errorBlob
 			));
 			// Create the root signature.
 			DIRECTX12_ASSERT(m_Device->CreateRootSignature(
 				0,
 				rootSignatureBlob->GetBufferPointer(),
-				rootSignatureBlob->GetBufferSize(), 
+				rootSignatureBlob->GetBufferSize(),
 				IID_PPV_ARGS(&graphicsPipeline_DX12->RootSignature)
 			));
 
 			pRootSignature = graphicsPipeline_DX12->RootSignature.Get();
 			//pipelineCreation.AddPipelineSubObj(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, &pRootSignature);
 		}
-		
+
 		piplineStateStream2.pRootSignature = pRootSignature;
 
 		CD3DX12_PIPELINE_STATE_STREAM_INPUT_LAYOUT InputLayout;
@@ -837,8 +587,8 @@ namespace Gecko { namespace DX12
 				inputLayoutElements.push_back(elementDesc);
 			}
 
-			InputLayout = { inputLayoutElements.data(), static_cast<u32>(inputLayoutElements.size())};
-			
+			InputLayout = { inputLayoutElements.data(), static_cast<u32>(inputLayoutElements.size()) };
+
 		}
 		piplineStateStream2.InputLayout = InputLayout;
 
@@ -887,7 +637,7 @@ namespace Gecko { namespace DX12
 #if defined( DEBUG ) || defined( _DEBUG )
 			flags |= D3DCOMPILE_DEBUG;
 #endif
-				
+
 			std::string shaderVersion = "ps_";
 			shaderVersion += desc.ShaderVersion;
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "PIXEL", "1", NULL, NULL };
@@ -909,7 +659,7 @@ namespace Gecko { namespace DX12
 			{
 				if (desc.RenderTargetFormats[i] == Format::None)
 					break;
-				
+
 				rtvFormats.RTFormats[i] = FormatToD3D12Format(desc.RenderTargetFormats[i]);
 			}
 			rtvFormats.NumRenderTargets = i;
@@ -922,7 +672,7 @@ namespace Gecko { namespace DX12
 
 		CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormats;
 		CD3DX12_DEPTH_STENCIL_DESC1 DepthStencilState;
-		if(desc.DepthStencilFormat != Format::None)
+		if (desc.DepthStencilFormat != Format::None)
 		{
 			DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT;
 			DSVFormats = dsvFormat;
@@ -942,7 +692,7 @@ namespace Gecko { namespace DX12
 		{
 			Rasterizer = CD3DX12_RASTERIZER_DESC(
 				D3D12_FILL_MODE_SOLID, // GetD3D12FillModeFromPrimitiveType(desc.PrimitiveType),
-				CullModeToDirectX12CullMode(desc.CullMode) ,
+				CullModeToDirectX12CullMode(desc.CullMode),
 				desc.WindingOrder == WindingOrder::CounterClockWise ? true : false,
 				D3D12_DEFAULT_DEPTH_BIAS,
 				D3D12_DEFAULT_DEPTH_BIAS_CLAMP,
@@ -1151,7 +901,7 @@ namespace Gecko { namespace DX12
 			CS = CD3DX12_SHADER_BYTECODE(computeShaderBlob.Get());
 		}
 		computeStateDesc.CS = CS;
-		
+
 		computeStateDesc.CachedPSO.pCachedBlob = nullptr;
 		computeStateDesc.CachedPSO.CachedBlobSizeInBytes = 0;
 		computeStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
@@ -1168,6 +918,11 @@ namespace Gecko { namespace DX12
 		return computePipeline;
 	}
 
+	Texture Device_DX12::CreateTexture(const TextureDesc& desc)
+	{
+		return CreateTexture(desc, FormatToD3D12Format(desc.Format));
+	}
+	
 	ConstantBuffer Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
 	{
 		Ref<ConstantBuffer_DX12> constantBuffer_DX12 = CreateRef<ConstantBuffer_DX12>();
@@ -1259,6 +1014,29 @@ namespace Gecko { namespace DX12
 		}
 	}
 
+	void Device_DX12::DrawTextureInImGui(Texture texture, u32 width, u32 height)
+	{
+		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
+
+		ImVec2 size = {
+			static_cast<float>(width),
+			static_cast<float>(height)
+		};
+		if (width == 0 || height == 0)
+		{
+			size = {
+				static_cast<float>(texture.Desc.Width),
+				static_cast<float>(texture.Desc.Height)
+			};
+		}
+
+		for (u32 i = 0; i < texture.Desc.NumMips; i++)
+		{
+			ImGui::Image(static_cast<ImU64>(texture_DX12->mipSrvs[i].GPU.ptr), size);
+		}
+
+	};
+
 	void Device_DX12::ImGuiRender(Ref<CommandList> commandList)
 	{
 		// Execute Command list
@@ -1282,227 +1060,15 @@ namespace Gecko { namespace DX12
 		ImGui::NewFrame();
 	}
 
-	void Device_DX12::DrawTextureInImGui(Texture texture, u32 width, u32 height)
-	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
+#pragma endregion
 
-		ImVec2 size = {
-			static_cast<float>(width), 
-			static_cast<float>(height)
-		};
-		if (width == 0 || height == 0)
-		{
-			size = { 
-				static_cast<float>(texture.Desc.Width), 
-				static_cast<float>(texture.Desc.Height) 
-			};
-		}
-		
-		for (u32 i = 0; i < texture.Desc.NumMips; i++)
-		{
-			ImGui::Image(static_cast<ImU64>(texture_DX12->mipSrvs[i].GPU.ptr), size);
-		}
+	// Public Methods
 
-	};
+#pragma region Device_DX12 public Methods
 
 	void Device_DX12::SetDeferredReleasesFlag()
 	{
 		//m_CommandFrames[m_CurrentBackBufferIndex].DeferredReleasesFlag = 1;
-	}
-
-	bool IsDirectXRaytracingSupported(IDXGIAdapter1* adapter)
-	{
-		ComPtr<ID3D12Device> testDevice;
-		D3D12_FEATURE_DATA_D3D12_OPTIONS5 featureSupportData = {};
-
-		return SUCCEEDED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&testDevice)))
-			&& SUCCEEDED(testDevice->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &featureSupportData, sizeof(featureSupportData)))
-			&& featureSupportData.RaytracingTier != D3D12_RAYTRACING_TIER_NOT_SUPPORTED;
-	}
-
-	void Device_DX12::CreateDevice()
-	{
-		if (m_Device)
-		{
-			ASSERT_MSG(false, "Device already exists! cannot create it again!");
-		}
-
-		u32 createFactoryFlags = 0;
-
-#ifdef DEBUG
-		{
-			ComPtr<ID3D12Debug3> debugInterface;
-			DIRECTX12_ASSERT(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
-			debugInterface->EnableDebugLayer();
-			debugInterface->SetEnableGPUBasedValidation(true);
-			createFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
-		}
-#endif
-
-		DIRECTX12_ASSERT(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&m_Factory)));
-
-		ComPtr<IDXGIAdapter1> adapter = GetAdapter(m_Factory);
-		if (!adapter)
-		{
-			LOG_ERROR("Could not find Adapter!");
-			return;
-		}
-		DXGI_ADAPTER_DESC1 adapterDesc{};
-		adapter->GetDesc1(&adapterDesc);
-		LOG_DEBUG("Selected Adapter: %ls", adapterDesc.Description);
-
-		D3D_FEATURE_LEVEL maxFeatureLevel{ GetMaxFeatureLevel(adapter.Get()) };
-		ASSERT(maxFeatureLevel >= c_MinimumFeatureLevel);
-		if (maxFeatureLevel < c_MinimumFeatureLevel) return;
-
-		DIRECTX12_ASSERT(D3D12CreateDevice(adapter.Get(), maxFeatureLevel, IID_PPV_ARGS(&m_Device)));
-
-		NAME_DIRECTX12_OBJECT(m_Device, "Main Device");
-
-#ifdef DEBUG
-		{
-			ComPtr<ID3D12InfoQueue> infoQueue;
-			DIRECTX12_ASSERT(m_Device->QueryInterface(IID_PPV_ARGS(&infoQueue)));
-			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
-			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
-			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-		}
-#endif
-
-		//DIRECTX12_ASSERT_MSG(IsDirectXRaytracingSupported(adapter.Get()),
-		//	"ERROR: DirectX Raytracing is not supported by your OS, GPU and/or driver.");
-
-	}
-
-	void Device_DX12::CreateBackBuffer(u32 width, u32 height)
-	{
-		m_BackBuffers.clear();
-		ProcessDeferredReleases();
-
-		DXGI_SWAP_CHAIN_DESC1 desc{};
-		m_SwapChain->GetDesc1(&desc);
-		m_SwapChain->ResizeBuffers(m_NumBackBuffers, width, height, desc.Format, desc.Flags);
-
-		m_BackBuffers.resize(m_NumBackBuffers);
-
-		for (u32 i = 0; i < m_NumBackBuffers; i++)
-		{
-			Ref<Resource> backBufferResource = CreateRef<Resource>();
-			
-			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&backBufferResource->ResourceDX12)));
-
-			RenderTargetDesc renderTargetDesc;
-			renderTargetDesc.RenderTargetFormats[0] = m_BackBufferFormat;
-			renderTargetDesc.NumRenderTargets = 1;
-			renderTargetDesc.DepthStencilFormat = Format::R32_FLOAT;
-			renderTargetDesc.Width = width;
-			renderTargetDesc.Height = height;
-			renderTargetDesc.RenderTargetClearValues[0].Values[0] = 0.5f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[1] = 0.0f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[2] = 0.5f;
-			renderTargetDesc.RenderTargetClearValues[0].Values[3] = 1.0f;
-			renderTargetDesc.DepthTargetClearValue.Depth = 1.0f;
-
-			Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
-
-			DXGI_FORMAT format = FormatToD3D12Format(renderTargetDesc.RenderTargetFormats[0]);
-
-			D3D12_CLEAR_VALUE clearValue;
-			clearValue.Format = format;
-			clearValue.Color[0] = renderTargetDesc.RenderTargetClearValues[0].Values[0];
-			clearValue.Color[1] = renderTargetDesc.RenderTargetClearValues[0].Values[1];
-			clearValue.Color[2] = renderTargetDesc.RenderTargetClearValues[0].Values[2];
-			clearValue.Color[3] = renderTargetDesc.RenderTargetClearValues[0].Values[3];
-
-			TextureDesc textureDesc;
-			textureDesc.Width = renderTargetDesc.Width;
-			textureDesc.Height = renderTargetDesc.Height;
-			textureDesc.Depth = 1;
-			textureDesc.Format = renderTargetDesc.RenderTargetFormats[0];
-			textureDesc.NumMips = 1;
-			textureDesc.Type = TextureType::Tex2D;
-
-			Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
-
-			texture_DX12->TextureResource = backBufferResource;
-			texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
-			texture_DX12->device = this;
-
-			Texture texture;
-			texture.Desc = textureDesc;
-			texture.Data = texture_DX12;
-
-			renderTargetDX12->RenderTargetViews[0] = GetRtvHeap().Allocate();
-
-			D3D12_RENDER_TARGET_VIEW_DESC renderTargetViewDesc{};
-			renderTargetViewDesc.Format = format;
-			renderTargetViewDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			m_Device->CreateRenderTargetView(texture_DX12->TextureResource->ResourceDX12.Get(), &renderTargetViewDesc, renderTargetDX12->RenderTargetViews[0].CPU);
-			//NAME_DIRECTX12_OBJECT(resource->ResourceDX12, "RenderTarget");
-
-			renderTargetDX12->rect.left = 0;
-			renderTargetDX12->rect.top = 0;
-			renderTargetDX12->rect.right = (i32)width;
-			renderTargetDX12->rect.bottom = (i32)height;
-
-			renderTargetDX12->ViewPort.TopLeftX = 0.f;
-			renderTargetDX12->ViewPort.TopLeftY = 0.f;
-			renderTargetDX12->ViewPort.Width = (float)width;
-			renderTargetDX12->ViewPort.Height = (float)height;
-			renderTargetDX12->ViewPort.MinDepth = 0.f;
-			renderTargetDX12->ViewPort.MaxDepth = 1.f;
-
-			renderTargetDX12->device = this;
-
-			m_BackBuffers[i].Desc = renderTargetDesc;
-			m_BackBuffers[i].Data = renderTargetDX12;
-			m_BackBuffers[i].RenderTextures[0] = texture;
-		}
-
-		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
-	}
-
-	ComPtr<IDXGIAdapter4> Device_DX12::GetAdapter(ComPtr<IDXGIFactory6> factory)
-	{
-		HRESULT hr{ S_OK };
-
-		ComPtr<IDXGIAdapter4> adapter{ nullptr };
-
-		LOG_DEBUG("Going trhough adapters: ");
-		for (u32 i = 0; factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND; i++)
-		{
-			DXGI_ADAPTER_DESC1 adapterDesc{};
-			adapter->GetDesc1(&adapterDesc);
-
-			hr = D3D12CreateDevice(adapter.Get(), c_MinimumFeatureLevel, __uuidof(ID3D12Device1), nullptr);
-			if (SUCCEEDED(hr))
-			{
-				return adapter;
-			}
-		}
-
-		ASSERT_MSG(false, "Could not find a suiting adapter!");
-		return nullptr;
-	}
-
-	D3D_FEATURE_LEVEL Device_DX12::GetMaxFeatureLevel(IDXGIAdapter1* adapter)
-	{
-		constexpr D3D_FEATURE_LEVEL c_FeatureLevels[4]
-		{
-			D3D_FEATURE_LEVEL_11_0,
-			D3D_FEATURE_LEVEL_11_1,
-			D3D_FEATURE_LEVEL_12_0,
-			D3D_FEATURE_LEVEL_12_1
-		};
-
-		D3D12_FEATURE_DATA_FEATURE_LEVELS featureLevelInfo{};
-		featureLevelInfo.NumFeatureLevels = _countof(c_FeatureLevels);
-		featureLevelInfo.pFeatureLevelsRequested = c_FeatureLevels;
-
-		ComPtr<ID3D12Device> device;
-		DIRECTX12_ASSERT(D3D12CreateDevice(adapter, c_MinimumFeatureLevel, IID_PPV_ARGS(&device)));
-		DIRECTX12_ASSERT(device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &featureLevelInfo, sizeof(featureLevelInfo)));
-		return featureLevelInfo.MaxSupportedFeatureLevel;
 	}
 
 	void Device_DX12::Flush()
@@ -1570,7 +1136,7 @@ namespace Gecko { namespace DX12
 		u32 index = 0;
 		while (m_GraphicsCommandBuffers[index]->IsBusy())
 		{
-			index = (index+1) % m_GraphicsCommandBuffers.size();
+			index = (index + 1) % m_GraphicsCommandBuffers.size();
 		}
 
 		DIRECTX12_ASSERT(m_GraphicsCommandBuffers[index]->CommandAllocator->Reset());
@@ -1595,7 +1161,7 @@ namespace Gecko { namespace DX12
 			index = index % m_ComputeCommandBuffers.size();
 		}
 	}
-	
+
 	Ref<CommandBuffer> Device_DX12::GetFreeCopyCommandBuffer()
 	{
 		u32 index = 0;
@@ -1643,39 +1209,144 @@ namespace Gecko { namespace DX12
 		m_CopyCommandQueue->Signal(copyCommandBuffer->Fence.Get(), fenceValueForSignal);
 	}
 
-	void __declspec(noinline) Device_DX12::ProcessDeferredReleases()
+	bool Device_DX12::Resize(const Event::EventData& data)
 	{
-		std::lock_guard<std::mutex> lock(m_DeferredReleasesMutex);
+		Flush();
+		u32 width = data.Data.u32[0];
+		u32 height = data.Data.u32[1];
+		LOG_INFO("Resizeing to: %u, %u", width, height);
 
-		m_RtvDescHeap.ProcessDeferredFree();
-		m_DsvDescHeap.ProcessDeferredFree();
-		m_SrvDescHeap.ProcessDeferredFree();
-		m_UavDescHeap.ProcessDeferredFree();
+		if (width == 0) width = 1;
+		if (height == 0) height = 1;
+		RecreateBackBuffers(width, height);
+		return false;
+	}
+
+#pragma endregion
+
+	// Private Methods
+
+#pragma region Device_DX12 Private Methods
+
+	void Device_DX12::CreateDevice()
+	{
+		if (m_Device)
+		{
+			ASSERT_MSG(false, "Device already exists! cannot create it again!");
+		}
+
+		u32 createFactoryFlags = 0;
+
+#ifdef DEBUG
+		{
+			ComPtr<ID3D12Debug3> debugInterface;
+			DIRECTX12_ASSERT(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
+			debugInterface->EnableDebugLayer();
+			debugInterface->SetEnableGPUBasedValidation(true);
+			createFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
+		}
+#endif
+
+		DIRECTX12_ASSERT(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&m_Factory)));
+
+		ComPtr<IDXGIAdapter1> adapter = GetAdapter(m_Factory);
+		if (!adapter)
+		{
+			LOG_ERROR("Could not find Adapter!");
+			return;
+		}
+		DXGI_ADAPTER_DESC1 adapterDesc{};
+		adapter->GetDesc1(&adapterDesc);
+		LOG_DEBUG("Selected Adapter: %ls", adapterDesc.Description);
+
+		D3D_FEATURE_LEVEL maxFeatureLevel{ GetMaxFeatureLevel(adapter) };
+		ASSERT(maxFeatureLevel >= c_MinimumFeatureLevel);
+		if (maxFeatureLevel < c_MinimumFeatureLevel) return;
+
+		DIRECTX12_ASSERT(D3D12CreateDevice(adapter.Get(), maxFeatureLevel, IID_PPV_ARGS(&m_Device)));
+
+		NAME_DIRECTX12_OBJECT(m_Device, "Main Device");
+
+#ifdef DEBUG
+		{
+			ComPtr<ID3D12InfoQueue> infoQueue;
+			DIRECTX12_ASSERT(m_Device->QueryInterface(IID_PPV_ARGS(&infoQueue)));
+			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+		}
+#endif
+	}
+
+	D3D_FEATURE_LEVEL Device_DX12::GetMaxFeatureLevel(const ComPtr<IDXGIAdapter1>& adapter)
+	{
+		constexpr D3D_FEATURE_LEVEL c_FeatureLevels[4]
+		{
+			D3D_FEATURE_LEVEL_11_0,
+			D3D_FEATURE_LEVEL_11_1,
+			D3D_FEATURE_LEVEL_12_0,
+			D3D_FEATURE_LEVEL_12_1
+		};
+
+		D3D12_FEATURE_DATA_FEATURE_LEVELS featureLevelInfo{};
+		featureLevelInfo.NumFeatureLevels = _countof(c_FeatureLevels);
+		featureLevelInfo.pFeatureLevelsRequested = c_FeatureLevels;
+
+		ComPtr<ID3D12Device> device;
+		DIRECTX12_ASSERT(D3D12CreateDevice(adapter.Get(), c_MinimumFeatureLevel, IID_PPV_ARGS(&device)));
+		DIRECTX12_ASSERT(device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &featureLevelInfo, sizeof(featureLevelInfo)));
+		return featureLevelInfo.MaxSupportedFeatureLevel;
+	}
+
+	ComPtr<IDXGIAdapter4> Device_DX12::GetAdapter(const ComPtr<IDXGIFactory6>& factory)
+	{
+		// TODO: Select an adapter based on specific requirements
+		HRESULT hr{ S_OK };
+
+		ComPtr<IDXGIAdapter4> adapter{ nullptr };
+
+		LOG_DEBUG("Going trough adapters: ");
+		for (u32 i = 0; factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND; i++)
+		{
+			DXGI_ADAPTER_DESC1 adapterDesc{};
+			adapter->GetDesc1(&adapterDesc);
+			LOG_DEBUG("\t%ls", adapterDesc.Description);
+
+			hr = D3D12CreateDevice(adapter.Get(), c_MinimumFeatureLevel, __uuidof(ID3D12Device1), nullptr);
+			if (SUCCEEDED(hr))
+			{
+				return adapter;
+			}
+		}
+		
+		ASSERT_MSG(false, "Could not find a suiting adapter!");
+		return nullptr;
 	}
 
 	template<typename T>
-	void CreateCommandBuffers(ComPtr<ID3D12Device8> device, ComPtr<ID3D12CommandQueue>& commandQueue, T& commandBuffers, D3D12_COMMAND_LIST_TYPE type)
+	void Device_DX12::CreateCommandBuffers(const ComPtr<ID3D12Device8>& device, 
+		ComPtr<ID3D12CommandQueue>* commandQueue, T* commandBuffers, D3D12_COMMAND_LIST_TYPE type)
 	{
-		D3D12_COMMAND_QUEUE_DESC queue_desc{};
-		queue_desc.Type = type;
-		queue_desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-		queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		queue_desc.NodeMask = 0;
+		D3D12_COMMAND_QUEUE_DESC queueDesc{};
+		queueDesc.Type = type;
+		queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		queueDesc.NodeMask = 0;
 
-		DIRECTX12_ASSERT(device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&commandQueue)));
+		DIRECTX12_ASSERT(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&(*commandQueue))));
 
 		NAME_DIRECTX12_OBJECT(
-			commandQueue,
+			(*commandQueue),
 			type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics Command Queue" :
 			type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy Command Queue" :
 			type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute Command Queue" :
 			"Unkown Command Queue"
 		);
 
-		for (u32 i = 0; i < commandBuffers.size(); i++)
+		for (u32 i = 0; i < (*commandBuffers).size(); i++)
 		{
-			commandBuffers[i] = CreateRef<CommandBuffer>();
-			Ref<CommandBuffer> commandBuffer = commandBuffers[i];
+			(*commandBuffers)[i] = CreateRef<CommandBuffer>();
+			Ref<CommandBuffer> commandBuffer = (*commandBuffers)[i];
 
 			DIRECTX12_ASSERT(device->CreateCommandAllocator(
 				type,
@@ -1698,13 +1369,14 @@ namespace Gecko { namespace DX12
 			));
 
 			NAME_DIRECTX12_OBJECT_INDEXED(
-				commandBuffer->Fence, i,
+				commandBuffer->Fence, 
+				i,
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics Fence" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy Fence" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute Fence" :
 				"Unkown Fence"
 			);
-				
+
 			DIRECTX12_ASSERT(device->CreateCommandList(
 				0,
 				type,
@@ -1714,19 +1386,253 @@ namespace Gecko { namespace DX12
 			));
 
 			DIRECTX12_ASSERT(commandBuffer->CommandList->Close());
+
 			NAME_DIRECTX12_OBJECT_INDEXED(
-				commandBuffer->CommandList, 
+				commandBuffer->CommandList,
 				i,
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics CommandList" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy CommandList" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute CommandList" :
 				"Unkown CommandList"
 			);
-		}	
+		}
 
 	}
 
-	void Device_DX12::CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData,  u32 subResource)
+	Texture Device_DX12::CreateTexture( const TextureDesc& desc, DXGI_FORMAT format, 
+		D3D12_RESOURCE_FLAGS flags, D3D12_HEAP_FLAGS heapFlags, const D3D12_CLEAR_VALUE* clearValue)
+	{
+		Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
+
+		CD3DX12_RESOURCE_DESC textureResourceDesc;
+
+		switch (desc.Type)
+		{
+		case TextureType::Tex1D:
+			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex1D(
+				format,
+				desc.Width,
+				1,
+				static_cast<u16>(desc.NumMips)
+			);
+			break;
+		case TextureType::Tex2D:
+			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+				format,
+				desc.Width,
+				desc.Height,
+				1,
+				static_cast<u16>(desc.NumMips)
+			);
+			break;
+		case TextureType::Tex3D:
+			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex3D(
+				format,
+				desc.Width,
+				desc.Height,
+				static_cast<u16>(desc.Depth),
+				static_cast<u16>(desc.NumMips)
+			);
+			break;
+		case TextureType::TexCube:
+			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+				format,
+				desc.Width,
+				desc.Height,
+				6,
+				static_cast<u16>(desc.NumMips)
+			);
+			break;
+		case TextureType::Tex1DArray:
+			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex1D(
+				format,
+				desc.Width,
+				static_cast<u16>(desc.NumArraySlices),
+				static_cast<u16>(desc.NumMips)
+			);
+			break;
+		case TextureType::Tex2DArray:
+			textureResourceDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+				format,
+				desc.Width,
+				desc.Height,
+				static_cast<u16>(desc.NumArraySlices),
+				static_cast<u16>(desc.NumMips)
+			);
+			break;
+		}
+
+		CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+		textureResourceDesc.Flags |= flags;
+		if (!(textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL))
+		{
+			textureResourceDesc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+		}
+		texture_DX12->TextureResource = CreateRef<Resource>();
+
+		texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
+
+		DIRECTX12_ASSERT(m_Device->CreateCommittedResource(
+			&heapProps,
+			heapFlags,
+			&textureResourceDesc,
+			texture_DX12->TextureResource->CurrentState,
+			clearValue,
+			IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)
+		));
+
+		// SRV
+		{
+			texture_DX12->srv = m_SrvDescHeap.Allocate();
+
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.Format = FormatToD3D12Format(desc.Format);
+			srvDesc.ViewDimension = TextureTypeToD3D12SrvDimension(desc.Type);
+			switch (desc.Type)
+			{
+			case TextureType::Tex1D:
+				srvDesc.Texture1D.MipLevels = desc.NumMips;
+				break;
+			case TextureType::Tex2D:
+				srvDesc.Texture2D.MipLevels = desc.NumMips;
+				break;
+			case TextureType::Tex3D:
+				srvDesc.Texture3D.MipLevels = desc.NumMips;
+				break;
+			case TextureType::TexCube:
+				srvDesc.TextureCube.MipLevels = desc.NumMips;
+				break;
+			case TextureType::Tex1DArray:
+				srvDesc.Texture1DArray.MipLevels = desc.NumMips;
+				srvDesc.Texture1DArray.ArraySize = desc.NumArraySlices;
+				break;
+			case TextureType::Tex2DArray:
+				srvDesc.Texture2DArray.MipLevels = desc.NumMips;
+				srvDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
+				break;
+			}
+
+			m_Device->CreateShaderResourceView(
+				texture_DX12->TextureResource->ResourceDX12.Get(),
+				&srvDesc,
+				texture_DX12->srv.CPU
+			);
+		}
+
+		// UAV
+		if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && desc.Format != Format::R8G8B8A8_SRGB)
+		{
+			texture_DX12->uav = m_SrvDescHeap.Allocate();
+
+			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+			uavDesc.Format = FormatToD3D12Format(desc.Format);
+			switch (desc.Type)
+			{
+			case TextureType::Tex1D:
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1D;
+				uavDesc.Texture1D.MipSlice = 0;
+				break;
+			case TextureType::Tex2D:
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+				uavDesc.Texture2D.MipSlice = 0;
+				uavDesc.Texture2D.PlaneSlice = 0;
+				break;
+			case TextureType::Tex3D:
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE3D;
+				uavDesc.Texture3D.MipSlice = 0;
+				uavDesc.Texture3D.FirstWSlice = 0;
+				uavDesc.Texture3D.WSize = desc.Depth;
+				break;
+			case TextureType::TexCube:
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+				uavDesc.Texture2DArray.MipSlice = 0;
+				uavDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
+				uavDesc.Texture2DArray.MipSlice = 0;
+				uavDesc.Texture2DArray.PlaneSlice = 0;
+				break;
+			case TextureType::Tex1DArray:
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
+				uavDesc.Texture1DArray.MipSlice = 0;
+				uavDesc.Texture1DArray.ArraySize = desc.NumArraySlices;
+				uavDesc.Texture1DArray.MipSlice = 0;
+				break;
+			case TextureType::Tex2DArray:
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+				uavDesc.Texture2DArray.MipSlice = 0;
+				uavDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
+				uavDesc.Texture2DArray.MipSlice = 0;
+				uavDesc.Texture2DArray.PlaneSlice = 0;
+				break;
+			}
+
+			m_Device->CreateUnorderedAccessView(
+				texture_DX12->TextureResource->ResourceDX12.Get(),
+				nullptr,
+				&uavDesc,
+				texture_DX12->uav.CPU
+			);
+		}
+
+		// Mips
+		{
+			texture_DX12->mipSrvs.resize(desc.NumMips);
+			texture_DX12->mipUavs.resize(desc.NumMips);
+			texture_DX12->TextureResource->subResourceStates.resize(desc.NumMips);
+			for (u32 i = 0; i < desc.NumMips; i++)
+			{
+				texture_DX12->mipSrvs[i] = m_SrvDescHeap.Allocate();
+				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
+				srvDesc.Format = FormatToD3D12Format(desc.Format);
+				srvDesc.Texture2DArray.MipLevels = 1;
+				srvDesc.Texture2DArray.MostDetailedMip = i;
+				srvDesc.Texture2DArray.ArraySize = desc.Type == TextureType::TexCube ? 6 : 1;
+				srvDesc.Texture2DArray.FirstArraySlice = 0;
+				srvDesc.Texture2DArray.PlaneSlice = 0;
+				m_Device->CreateShaderResourceView(
+					texture_DX12->TextureResource->ResourceDX12.Get(),
+					&srvDesc,
+					texture_DX12->mipSrvs[i].CPU
+				);
+				if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
+				{
+					texture_DX12->mipUavs[i] = m_SrvDescHeap.Allocate();
+					D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+					uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
+					uavDesc.Format = FormatToD3D12Format(desc.Format);
+					uavDesc.Format = uavDesc.Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ? DXGI_FORMAT_R8G8B8A8_UNORM : uavDesc.Format;
+					uavDesc.Texture2DArray.MipSlice = i;
+					uavDesc.Texture2DArray.FirstArraySlice = 0;
+					uavDesc.Texture2DArray.ArraySize = desc.Type == TextureType::TexCube ? 6 : 1;
+					uavDesc.Texture2DArray.PlaneSlice = 0;
+					m_Device->CreateUnorderedAccessView(
+						texture_DX12->TextureResource->ResourceDX12.Get(),
+						nullptr,
+						&uavDesc,
+						texture_DX12->mipUavs[i].CPU
+					);
+				}
+
+				texture_DX12->TextureResource->subResourceStates[i] = texture_DX12->TextureResource->CurrentState;
+			}
+
+		}
+
+		NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->ResourceDX12, desc.Name);
+
+		texture_DX12->device = this;
+
+		Texture texture;
+		texture.Desc = desc;
+		texture.Data = texture_DX12;
+
+		return texture;
+	}
+
+	void Device_DX12::CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource)
 	{
 		ComPtr<ID3D12Resource> intermediateResource;
 
@@ -1746,11 +1652,11 @@ namespace Gecko { namespace DX12
 
 		UpdateSubresources(
 			copyCommandList->CommandList.Get(),
-			resource.Get(), 
+			resource.Get(),
 			intermediateResource.Get(),
-			0, 
-			subResource, 
-			1, 
+			0,
+			subResource,
+			1,
 			&subResourceData
 		);
 
@@ -1760,56 +1666,99 @@ namespace Gecko { namespace DX12
 
 	}
 
-	bool Device_DX12::Resize(const Event::EventData& data)
+	void Device_DX12::RecreateBackBuffers(u32 width, u32 height)
 	{
-		Flush();
-		u32 width = data.Data.u32[0];
-		u32 height = data.Data.u32[1];
-		LOG_INFO("Resizeing to: %u, %u", width, height);
+		m_BackBuffers.clear();
+		ProcessDeferredReleases();
 
-		if (width == 0) width = 1;
-		if (height == 0) height = 1;
-		CreateBackBuffer(width, height);
-		return false;
-	}
+		DXGI_SWAP_CHAIN_DESC1 desc{};
+		m_SwapChain->GetDesc1(&desc);
+		m_SwapChain->ResizeBuffers(m_NumBackBuffers, width, height, desc.Format, desc.Flags);
 
-	inline void AllocateUAVBuffer(ID3D12Device* pDevice, UINT64 bufferSize, ID3D12Resource** ppResource, D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_COMMON, const wchar_t* resourceName = nullptr)
-	{
-		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(bufferSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		DIRECTX12_ASSERT(pDevice->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			initialResourceState,
-			nullptr,
-			IID_PPV_ARGS(ppResource)));
-		if (resourceName)
+		m_BackBuffers.resize(m_NumBackBuffers);
+
+		for (u32 i = 0; i < m_NumBackBuffers; i++)
 		{
-			(*ppResource)->SetName(resourceName);
+			Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
+			RenderTargetDesc renderTargetDesc;
+			renderTargetDesc.RenderTargetFormats[0] = m_BackBufferFormat;
+			renderTargetDesc.NumRenderTargets = 1;
+			renderTargetDesc.Width = width;
+			renderTargetDesc.Height = height;
+			renderTargetDesc.RenderTargetClearValues[0].Values[0] = 0.0f;
+			renderTargetDesc.RenderTargetClearValues[0].Values[1] = 0.0f;
+			renderTargetDesc.RenderTargetClearValues[0].Values[2] = 0.0f;
+			renderTargetDesc.RenderTargetClearValues[0].Values[3] = 0.0f;
+
+
+			D3D12_CLEAR_VALUE clearValue;
+			DXGI_FORMAT format = FormatToD3D12Format(renderTargetDesc.RenderTargetFormats[0]);
+			clearValue.Format = format;
+			clearValue.Color[0] = renderTargetDesc.RenderTargetClearValues[0].Values[0];
+			clearValue.Color[1] = renderTargetDesc.RenderTargetClearValues[0].Values[1];
+			clearValue.Color[2] = renderTargetDesc.RenderTargetClearValues[0].Values[2];
+			clearValue.Color[3] = renderTargetDesc.RenderTargetClearValues[0].Values[3];
+
+			TextureDesc textureDesc;
+			textureDesc.Width = renderTargetDesc.Width;
+			textureDesc.Height = renderTargetDesc.Height;
+			textureDesc.Depth = 1;
+			textureDesc.Format = renderTargetDesc.RenderTargetFormats[0];
+			textureDesc.NumMips = 1;
+			textureDesc.Type = TextureType::Tex2D;
+
+			Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
+
+			texture_DX12->TextureResource = CreateRef<Resource>();
+			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)));
+			texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
+			texture_DX12->device = this;
+
+			Texture texture;
+			texture.Desc = textureDesc;
+			texture.Data = texture_DX12;
+
+			renderTargetDX12->RenderTargetViews[0] = GetRtvHeap().Allocate();
+
+			D3D12_RENDER_TARGET_VIEW_DESC renderTargetViewDesc{};
+			renderTargetViewDesc.Format = format;
+			renderTargetViewDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+			m_Device->CreateRenderTargetView(texture_DX12->TextureResource->ResourceDX12.Get(), &renderTargetViewDesc, renderTargetDX12->RenderTargetViews[0].CPU);
+			NAME_DIRECTX12_OBJECT_INDEXED(texture_DX12->TextureResource->ResourceDX12, i, "BackBuffer");
+
+			renderTargetDX12->rect.left = 0;
+			renderTargetDX12->rect.top = 0;
+			renderTargetDX12->rect.right = static_cast<i32>(width);
+			renderTargetDX12->rect.bottom = static_cast<i32>(height);
+
+			renderTargetDX12->ViewPort.TopLeftX = 0.f;
+			renderTargetDX12->ViewPort.TopLeftY = 0.f;
+			renderTargetDX12->ViewPort.Width = static_cast<f32>(width);
+			renderTargetDX12->ViewPort.Height = static_cast<f32>(height);
+			renderTargetDX12->ViewPort.MinDepth = 0.f;
+			renderTargetDX12->ViewPort.MaxDepth = 1.f;
+
+			renderTargetDX12->device = this;
+
+			m_BackBuffers[i].Desc = renderTargetDesc;
+			m_BackBuffers[i].Data = renderTargetDX12;
+			m_BackBuffers[i].RenderTextures[0] = texture;
 		}
+
+		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	}
 
-	inline void AllocateUploadBuffer(ID3D12Device* pDevice, void* pData, UINT64 datasize, ID3D12Resource** ppResource, const wchar_t* resourceName = nullptr)
+	void __declspec(noinline) Device_DX12::ProcessDeferredReleases()
 	{
-		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(datasize);
-		DIRECTX12_ASSERT(pDevice->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(ppResource)));
-		if (resourceName)
-		{
-			(*ppResource)->SetName(resourceName);
-		}
-		void* pMappedData;
-		(*ppResource)->Map(0, nullptr, &pMappedData);
-		memcpy(pMappedData, pData, datasize);
-		(*ppResource)->Unmap(0, nullptr);
+		std::lock_guard<std::mutex> lock(m_DeferredReleasesMutex);
+
+		m_RtvDescHeap.ProcessDeferredFree();
+		m_DsvDescHeap.ProcessDeferredFree();
+		m_SrvDescHeap.ProcessDeferredFree();
+		m_UavDescHeap.ProcessDeferredFree();
 	}
+
+#pragma endregion
 
 } }
 
