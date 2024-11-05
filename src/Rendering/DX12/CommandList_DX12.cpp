@@ -76,62 +76,6 @@ namespace Gecko { namespace DX12 {
 		);
 	}
 
-	void CommandList_DX12::TransitionResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices)
-	{
-		
-		if (resource->CurrentState == transtion)
-		{
-			for (u32 i = 0; i < resource->subResourceStates.size(); i++)
-			{
-				TransitionSubResource(resource, transtion, numMips, numArraySlices, i);
-			}
-			return;
-		}
-
-		for (u32 i = 0; i < resource->subResourceStates.size(); i++)
-		{
-			if(resource->subResourceStates[i] != resource->CurrentState)
-				TransitionSubResource(resource, resource->CurrentState, numMips, numArraySlices, i);
-		}
-
-		CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-			resource->ResourceDX12.Get(),
-			resource->CurrentState,
-			transtion
-		);
-
-		CommandBuffer->CommandList->ResourceBarrier(1, &barrier);
-		resource->CurrentState = transtion;
-		
-		for (u32 i = 0; i < resource->subResourceStates.size(); i++)
-		{
-			resource->subResourceStates[i] = transtion;
-		}
-	}
-
-	void CommandList_DX12::TransitionSubResource(
-		Ref<Resource> resource, 
-		D3D12_RESOURCE_STATES transtion, 
-		u32 numMips,
-		u32 numArraySlices,
-		u32 subResourceIndex)
-	{
-		if (resource->subResourceStates[subResourceIndex] == transtion)
-			return;
-
-		for (u32 i = 0; i < numArraySlices; i++)
-		{
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				resource->ResourceDX12.Get(),
-				resource->subResourceStates[subResourceIndex],
-				transtion,
-				subResourceIndex + i * numMips
-			);
-			CommandBuffer->CommandList->ResourceBarrier(1, &barrier);
-		}
-		resource->subResourceStates[subResourceIndex] = transtion;
-	}
-
 	void CommandList_DX12::BindRenderTarget(RenderTarget renderTarget)
 	{
 		//ASSERT_MSG(CurrentlyGraphicsBoundPipeline != nullptr, "Graphics pipeline needs to be bound for this!");
@@ -443,33 +387,6 @@ namespace Gecko { namespace DX12 {
 		}
 	}
 
-	void CommandList_DX12::TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, D3D12_RESOURCE_STATES newDepthStencilState)
-	{
-		//RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget.Data.get();
-
-		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
-		{
-			ASSERT_MSG(renderTarget.RenderTextures[i].Data != nullptr, "RenderTarget texture is nullptr!");
-			Texture_DX12* texture = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
-			TransitionResource(
-				texture->TextureResource,
-				newRenderTargetState,
-				1,
-				1
-			);
-		}
-		if(renderTarget.DepthTexture.Data)
-		{
-			Texture_DX12* depthTexture = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
-			TransitionResource(
-				depthTexture->TextureResource,
-				newDepthStencilState,
-				1,
-				1
-			);
-		}
-	}
-
 	void CommandList_DX12::Dispatch(u32 xThreads, u32 yThreads, u32 zThreads)
 	{
 		CommandBuffer->CommandList->Dispatch(xThreads, yThreads, zThreads);
@@ -561,6 +478,140 @@ namespace Gecko { namespace DX12 {
 
 	}
 
+	void CommandList_DX12::TransitionSubResource(
+		Ref<Resource> resource,
+		D3D12_RESOURCE_STATES transtion,
+		u32 numMips,
+		u32 numArraySlices,
+		u32 subResourceIndex)
+	{
+		std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+		GetTextureMipTransitionBarriers(&barriers, resource, transtion, numMips, numArraySlices, subResourceIndex);
+		if (barriers.size() == 0) return;
+		CommandBuffer->CommandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+		resource->subResourceStates[subResourceIndex] = transtion;
+	}
+
+	void CommandList_DX12::TransitionResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices)
+	{
+		std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+		GetTextureTransitionBarriers(&barriers, resource, transtion, numMips, numArraySlices);
+		if (barriers.size() == 0) return;
+
+		CommandBuffer->CommandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+
+		resource->CurrentState = transtion;
+
+		for (u32 i = 0; i < resource->subResourceStates.size(); i++)
+		{
+			resource->subResourceStates[i] = transtion;
+		}
+	}
+
+	void CommandList_DX12::TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, D3D12_RESOURCE_STATES newDepthStencilState)
+	{
+		std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+
+		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
+		{
+			ASSERT_MSG(renderTarget.RenderTextures[i].Data != nullptr, "RenderTarget texture is nullptr!");
+			Texture_DX12* texture = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
+			GetTextureTransitionBarriers(
+				&barriers, 
+				texture->TextureResource,
+				newRenderTargetState,
+				renderTarget.RenderTextures[i].Desc.NumMips,
+				renderTarget.RenderTextures[i].Desc.NumArraySlices
+			);
+		}
+		if (renderTarget.DepthTexture.Data)
+		{
+			Texture_DX12* depthTexture = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
+			GetTextureTransitionBarriers(
+				&barriers,
+				depthTexture->TextureResource,
+				newDepthStencilState,
+				renderTarget.DepthTexture.Desc.NumMips,
+				renderTarget.DepthTexture.Desc.NumArraySlices
+			);
+		}
+
+		if (barriers.size() == 0) return;
+
+		CommandBuffer->CommandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+
+		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
+		{
+			Texture_DX12* texture = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
+			texture->TextureResource->CurrentState = newRenderTargetState;
+			for (u32 j = 0; j < static_cast<u32>(texture->TextureResource->subResourceStates.size()); j++)
+			{
+				texture->TextureResource->subResourceStates[j] = newRenderTargetState;
+			}
+		}
+		if (renderTarget.DepthTexture.Data)
+		{
+			Texture_DX12* depthTexture = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
+			depthTexture->TextureResource->CurrentState = newDepthStencilState;
+			for (u32 i = 0; i < static_cast<u32>(depthTexture->TextureResource->subResourceStates.size()); i++)
+			{
+				depthTexture->TextureResource->subResourceStates[i] = newDepthStencilState;
+			}
+		}
+	}
+
+	void CommandList_DX12::GetTextureMipTransitionBarriers(
+		std::vector<CD3DX12_RESOURCE_BARRIER>* barriers,
+		Ref<Resource> resource,
+		D3D12_RESOURCE_STATES transtion,
+		u32 numMips,
+		u32 numArraySlices,
+		u32 subResourceIndex)
+	{
+		if (resource->subResourceStates[subResourceIndex] == transtion)
+			return;
+
+		for (u32 i = 0; i < numArraySlices; i++)
+		{
+			barriers->push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+				resource->ResourceDX12.Get(),
+				resource->subResourceStates[subResourceIndex],
+				transtion,
+				subResourceIndex + i * numMips
+			));
+		}
+	}
+
+	void CommandList_DX12::GetTextureTransitionBarriers(
+		std::vector<CD3DX12_RESOURCE_BARRIER>* barriers,
+		Ref<Resource> resource,
+		D3D12_RESOURCE_STATES transtion,
+		u32 numMips,
+		u32 numArraySlices)
+	{
+		if (resource->CurrentState == transtion)
+		{
+			for (u32 i = 0; i < resource->subResourceStates.size(); i++)
+			{
+				GetTextureMipTransitionBarriers(barriers, resource, transtion, numMips, numArraySlices, i);
+			}
+			return;
+		}
+
+		for (u32 i = 0; i < resource->subResourceStates.size(); i++)
+		{
+			if (resource->subResourceStates[i] != resource->CurrentState)
+			{
+				GetTextureMipTransitionBarriers(barriers, resource, resource->CurrentState, numMips, numArraySlices, i);
+			}
+		}
+
+		barriers->push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+			resource->ResourceDX12.Get(),
+			resource->CurrentState,
+			transtion
+		));
+	}
 
 } }
 
