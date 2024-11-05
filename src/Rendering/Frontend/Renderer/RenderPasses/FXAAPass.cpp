@@ -71,9 +71,12 @@ const void FXAAPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMana
 
 	commandList->BindComputePipeline(FXAAPipeline);
 
+	m_FXAAData.width = inputTarget.Desc.Width;
+	m_FXAAData.height = inputTarget.Desc.Height;
+
 	commandList->SetDynamicCallData(sizeof(FXAAData), &m_FXAAData);
-	commandList->BindTexture(0, inputTarget, Gecko::RenderTargetType::Target0);
-	commandList->BindAsRWTexture(0, outputTarget, RenderTargetType::Target0);
+	commandList->BindTexture(0, inputTarget.RenderTextures[0]);
+	commandList->BindAsRWTexture(0, outputTarget.RenderTextures[0]);
 
 	commandList->Dispatch(m_FXAAData.width / 8 + 1, m_FXAAData.height / 8 + 1, 1);
 }

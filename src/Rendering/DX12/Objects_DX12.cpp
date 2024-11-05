@@ -13,15 +13,12 @@ namespace Gecko { namespace DX12 {
 
 		for (u32 i = 0; i < 8; i++)
 		{
-			if (rtvs[i].IsValid())
+			if (RenderTargetViews[i].IsValid())
 			{
-				device->GetRtvHeap().Free(rtvs[i]);
-				device->GetSrvHeap().Free(renderTargetSrvs[i]);
-				device->GetSrvHeap().Free(renderTargetUavs[i]);
+				device->GetRtvHeap().Free(RenderTargetViews[i]);
 			}
 		}
-		device->GetDsvHeap().Free(dsv);
-		device->GetSrvHeap().Free(depthStencilSrv);
+		device->GetDsvHeap().Free(DepthStencilView);
 	}
 
 	GraphicsPipeline_DX12::~GraphicsPipeline_DX12()

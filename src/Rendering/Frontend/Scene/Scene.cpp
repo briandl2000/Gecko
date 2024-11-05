@@ -288,6 +288,8 @@ namespace Gecko  {
 			{
 				u32 width = data.Data.u32[0];
 				u32 height = data.Data.u32[1];
+				width = width < 1 ? 1 : width;
+				height = height < 1 ? 1 : height;
 				f32 aspectRatio = static_cast<f32>(width) / static_cast<f32>(height);
 				m_Camera->SetAspectRatio(aspectRatio);
 			}

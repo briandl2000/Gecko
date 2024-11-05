@@ -59,9 +59,9 @@ const void ShadowRaytracePass::Render(const SceneRenderInfo& sceneRenderInfo, Re
 	commandList->BindTLAS(*sceneRenderInfo.TLAS);
 	u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
 	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
-	commandList->BindAsRWTexture(0, outputTarget, RenderTargetType::Target0);
-	commandList->BindAsRWTexture(1, GBuffer, RenderTargetType::Target2);
-	commandList->BindAsRWTexture(2, GBuffer, RenderTargetType::Target1);
+	commandList->BindAsRWTexture(0, outputTarget.RenderTextures[0]);
+	commandList->BindAsRWTexture(1, GBuffer.RenderTextures[2]);
+	commandList->BindAsRWTexture(2, GBuffer.RenderTextures[1]);
 
 	commandList->DispatchRays(1920, 1080, 1);
 

@@ -169,7 +169,7 @@ void Renderer::RenderScene(const SceneRenderInfo& sceneRenderInfo)
 	Mesh quadMesh = m_ResourceManager->GetMesh(quadMeshHandle);
 	commandList->BindVertexBuffer(quadMesh.VertexBuffer);
 	commandList->BindIndexBuffer(quadMesh.IndexBuffer);
-	commandList->BindTexture(0, inputTarget, Gecko::RenderTargetType::Target0);
+	commandList->BindTexture(0, inputTarget.RenderTextures[0]);
 	commandList->BindRenderTarget(renderTarget);
 
 	commandList->Draw(3);
