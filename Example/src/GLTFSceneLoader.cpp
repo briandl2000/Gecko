@@ -254,7 +254,7 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 	indexDesc.IndexData = indices.data();
 
 	// TODO: check if a BLAS needs to be created.
-	return resourceManager->CreateMesh(vertexDesc, indexDesc, false);
+	return resourceManager->CreateMesh(vertexDesc, indexDesc);
 }
 
 void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneNode, u32 gltfNodeIndex,

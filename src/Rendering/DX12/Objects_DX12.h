@@ -173,17 +173,17 @@ namespace Gecko { namespace DX12 {
 
 	struct CommandBuffer
 	{
-		ComPtr<ID3D12CommandAllocator> CommandAllocator = nullptr;
-		u64 FenceValue = 0;
-		ComPtr<ID3D12Fence1> Fence = nullptr;
-		u32 DeferredReleasesFlag;
-		ComPtr<ID3D12GraphicsCommandList6> CommandList = nullptr;
+		ComPtr<ID3D12CommandAllocator> CommandAllocator{ nullptr };
+		u64 FenceValue{ 0 };
+		ComPtr<ID3D12Fence1> Fence{ nullptr };
+		u32 DeferredReleasesFlag{ 0 };
+		ComPtr<ID3D12GraphicsCommandList6> CommandList{ nullptr };
 
 		void Wait(HANDLE fenceEvent)
 		{
 			ASSERT(Fence && fenceEvent);
 
-			if (Fence->GetCompletedValue() < FenceValue)
+			if (IsBusy())
 			{
 				DIRECTX12_ASSERT(Fence->SetEventOnCompletion(FenceValue, fenceEvent));
 				WaitForSingleObject(fenceEvent, INFINITE);

@@ -5,6 +5,8 @@
 
 #include <vector>
 
+#include <array>
+
 namespace Gecko {
 	
 	enum class ShaderType
@@ -173,6 +175,7 @@ namespace Gecko {
 
 	struct VertexBufferDesc // The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer. This pointer needs to stay valid until the CreateVertexBuffer function is called.
 	{
+		char* Name = "VertexBuffer";
 		VertexLayout Layout;
 		void* VertexData{ nullptr };
 		u32 NumVertices{ 0 };
@@ -188,6 +191,7 @@ namespace Gecko {
 
 	struct IndexBufferDesc // The Index buffer desc takes in format of the indices, the number of indices and the index data pointer. This pointer needs to stay valid until the CreateIndexBuffer function is called.
 	{
+		char* Name = "IndexBuffer";
 		Format IndexFormat;
 		u32 NumIndices{ 0 };
 		void* IndexData{ nullptr };
@@ -203,6 +207,7 @@ namespace Gecko {
 
 	struct TextureDesc
 	{
+		char* Name = "Texture";
 		Format Format{ Format::None };
 		u32 Width{ 1 };
 		u32 Height{ 1 };
@@ -219,7 +224,6 @@ namespace Gecko {
 	};
 	// Render target
 
-	// TODO: make it so that the render target uses textures instead of thier own data.
 	struct ClearValue
 	{
 		ClearValue(ClearValueType type = ClearValueType::RenderTarget)
@@ -267,14 +271,14 @@ namespace Gecko {
 		Format RenderTargetFormats[8]{ Format::None };
 		Format DepthStencilFormat{ Format::None };
 		u32 NumRenderTargets{ 0 };
-		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
+		std::array<u32, 8> NumMips;
 		u32 DepthMips{ 1 };
 		u32 Width{ 0 };
 		u32 Height{ 0 };
 		bool AllowRenderTargetTexture{ false };
 		bool AllowDepthStencilTexture{ false };
 	};
-
+	
 
 	struct RenderTarget
 	{
@@ -393,60 +397,6 @@ namespace Gecko {
 	struct ComputePipeline
 	{
 		ComputePipelineDesc Desc;
-		Ref<void> Data;
-	};
-
-	// TODO: make the Raytracing structures
-
-	// Raytracing structures
-
-	struct RaytracingPipelineDesc
-	{
-		RaytracingPipelineDesc() = default;
-
-		const char* RaytraceShaderPath{ nullptr };
-
-		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData;
-		u32 NumTextures{ 0 };
-		u32 NumUAVs{ 0 };
-
-		std::vector<SamplerDesc> SamplerDescs;
-	};
-
-	struct RaytracingPipeline
-	{
-		RaytracingPipelineDesc Desc;
-		Ref<void> Data;
-	};
-
-	struct BLASDesc
-	{
-		VertexBuffer VertexBuffer;
-		IndexBuffer IndexBuffer;
-	};
-
-	struct BLAS
-	{
-		BLASDesc Desc;
-		Ref<void> Data;
-	};
-
-	// TLAS
-
-	struct BLASInstanceData
-	{
-		BLAS BLAS;
-		glm::mat4 Transform;
-	};
-
-	struct TLASRefitDesc
-	{
-		std::vector<BLASInstanceData> BLASInstances;
-	};
-	
-	struct TLAS
-	{
 		Ref<void> Data;
 	};
 

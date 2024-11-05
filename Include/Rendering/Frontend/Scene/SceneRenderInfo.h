@@ -56,8 +56,6 @@ namespace Gecko {
 		CameraRenderInfo Camera;
 	
 		EnvironmentMapHandle EnvironmentMap{ 0 };
-	
-		TLAS* TLAS;
 	};
 
 }

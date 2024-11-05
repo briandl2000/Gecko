@@ -89,7 +89,6 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 	}
 
 	RenderTargetDesc renderTargetDesc;
-
 	renderTargetDesc.AllowRenderTargetTexture = true;
 	renderTargetDesc.Width = appInfo.Width;
 	renderTargetDesc.Height = appInfo.Height;

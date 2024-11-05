@@ -262,17 +262,6 @@ namespace Gecko { namespace DX12 {
 		m_ComputePipeline = computePipeline;
 	}
 
-	void CommandList_DX12::BindRaytracingPipeline(RaytracingPipeline raytracingPipeline)
-	{
-		RaytracingPipeline_DX12* raytracingPipeline_DX12 = (RaytracingPipeline_DX12*)raytracingPipeline.Data.get();
-
-		CommandBuffer->CommandList->SetPipelineState1(raytracingPipeline_DX12->StateObject.Get());
-		CommandBuffer->CommandList->SetComputeRootSignature(raytracingPipeline_DX12->RootSignature.Get());
-
-		m_BoundPipelineType = PipelineType::Raytracing;
-		m_RaytracingPipeline = raytracingPipeline;
-	}
-
 	void CommandList_DX12::BindConstantBuffer(u32 slot, ConstantBuffer buffer)
 	{
 		ConstantBuffer_DX12* constantBuffer_DX12 = (ConstantBuffer_DX12*)buffer.Data.get();
@@ -295,16 +284,6 @@ namespace Gecko { namespace DX12 {
 			//TransitionResource(constantBuffer_DX12->ConstantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ);
 			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
 			rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[slot];
-			CommandBuffer->CommandList->SetComputeRootDescriptorTable(
-				rootDescriptorTableSlot,
-				constantBuffer_DX12->cbv.GPU
-			);
-		}
-		else if (m_BoundPipelineType == PipelineType::Raytracing)
-		{
-			//TransitionResource(constantBuffer_DX12->ConstantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ);
-			RaytracingPipeline_DX12* raytracingPipeline_DX12 = (RaytracingPipeline_DX12*)m_RaytracingPipeline.Data.get();
-			rootDescriptorTableSlot = raytracingPipeline_DX12->ConstantBufferIndices[slot];
 			CommandBuffer->CommandList->SetComputeRootDescriptorTable(
 				rootDescriptorTableSlot,
 				constantBuffer_DX12->cbv.GPU
@@ -369,113 +348,9 @@ namespace Gecko { namespace DX12 {
 		CommandBuffer->CommandList->DrawInstanced(numVertices, 1, 0, 0);
 	}
 
-	void CommandList_DX12::BindTLAS(TLAS tlas)
-	{
-		TLAS_DX12* tlas_DX12 = (TLAS_DX12*)tlas.Data.get();
-
-		u32 rootDescriptorTableSlot = 0;
-		if (m_BoundPipelineType == PipelineType::Raytracing)
-		{
-			RaytracingPipeline_DX12* raytracingPipeline_DX12 = (RaytracingPipeline_DX12*)m_RaytracingPipeline.Data.get();
-			rootDescriptorTableSlot = raytracingPipeline_DX12->TLASSlot;
-			CommandBuffer->CommandList->SetComputeRootShaderResourceView(rootDescriptorTableSlot, tlas_DX12->Resource->GetGPUVirtualAddress());
-		}
-		else
-		{
-			ASSERT_MSG(false, "No pipline bound!");
-			return;
-		}
-	}
-
 	void CommandList_DX12::Dispatch(u32 xThreads, u32 yThreads, u32 zThreads)
 	{
 		CommandBuffer->CommandList->Dispatch(xThreads, yThreads, zThreads);
-	}
-
-	void CommandList_DX12::DispatchRays(u32 width, u32 height, u32 depth)
-	{
-
-		//Texture_DX12* texture_DX12 = (Texture_DX12*)target->Data.get();
-
-		//CommandBuffer->CommandList->SetComputeRootSignature(raytracingPipeline_DX12->RootSignature.Get());
-
-		//// Bind the heaps, acceleration structure and dispatch rays.    
-		//CommandBuffer->CommandList->SetComputeRootDescriptorTable(0, texture_DX12->uav.GPU);
-
-
-		//RenderTarget_DX12* renderTarget_DX12 = (RenderTarget_DX12*)input->Data.get();
-
-		//DescriptorHandle* descriptorHandlePositions;
-		//DescriptorHandle* descriptorHandleNormal;
-
-		//switch (inputPosition)
-		//{
-		//case RenderTargetType::Target0: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[0]; break;
-		//case RenderTargetType::Target1: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[1]; break;
-		//case RenderTargetType::Target2: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[2]; break;
-		//case RenderTargetType::Target3: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[3]; break;
-		//case RenderTargetType::Target4: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[4]; break;
-		//case RenderTargetType::Target5: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[5]; break;
-		//case RenderTargetType::Target6: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[6]; break;
-		//case RenderTargetType::Target7: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[7]; break;
-		//case RenderTargetType::Target8: descriptorHandlePositions = &renderTarget_DX12->renderTargetSrvs[8]; break;
-		//case RenderTargetType::TargetDepth: descriptorHandlePositions = &renderTarget_DX12->depthStencilSrv; break;
-		//default:
-		//	ASSERT_MSG(false, "Unkown renderTargetType");
-		//	return;
-		//	break;
-		//}
-		//switch (inputNormal)
-		//{
-		//case RenderTargetType::Target0: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[0]; break;
-		//case RenderTargetType::Target1: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[1]; break;
-		//case RenderTargetType::Target2: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[2]; break;
-		//case RenderTargetType::Target3: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[3]; break;
-		//case RenderTargetType::Target4: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[4]; break;
-		//case RenderTargetType::Target5: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[5]; break;
-		//case RenderTargetType::Target6: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[6]; break;
-		//case RenderTargetType::Target7: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[7]; break;
-		//case RenderTargetType::Target8: descriptorHandleNormal = &renderTarget_DX12->renderTargetSrvs[8]; break;
-		//case RenderTargetType::TargetDepth: descriptorHandleNormal = &renderTarget_DX12->depthStencilSrv; break;
-		//default:
-		//	ASSERT_MSG(false, "Unkown renderTargetType");
-		//	return;
-		//	break;
-		//}
-		//	
-		//TransitionRenderTarget(input, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-
-		//CommandBuffer->CommandList->SetComputeRootDescriptorTable(1, descriptorHandlePositions->GPU);
-		//CommandBuffer->CommandList->SetComputeRootDescriptorTable(4, descriptorHandleNormal->GPU);
-		//	
-		//	
-		//CommandBuffer->CommandList->SetComputeRootShaderResourceView(
-		//	2, m_topLevelAccelerationStructure->GetGPUVirtualAddress()
-		//);
-
-		//ConstantBuffer_DX12* constantBuffer_DX12 = (ConstantBuffer_DX12*)sceneData->Data.get();
-		//CommandBuffer->CommandList->SetComputeRootDescriptorTable(
-		//	3, constantBuffer_DX12->cbv.GPU
-		//);
-
-		RaytracingPipeline_DX12* raytracingPipeline_DX12 = (RaytracingPipeline_DX12*)m_RaytracingPipeline.Data.get();
-
-		D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
-
-		dispatchDesc.HitGroupTable.StartAddress = raytracingPipeline_DX12->HitGroupShaderTable->GetGPUVirtualAddress();
-		dispatchDesc.HitGroupTable.SizeInBytes = raytracingPipeline_DX12->HitGroupShaderTable->GetDesc().Width;
-		dispatchDesc.HitGroupTable.StrideInBytes = dispatchDesc.HitGroupTable.SizeInBytes;
-		dispatchDesc.MissShaderTable.StartAddress = raytracingPipeline_DX12->MissShaderTable->GetGPUVirtualAddress();
-		dispatchDesc.MissShaderTable.SizeInBytes = raytracingPipeline_DX12->MissShaderTable->GetDesc().Width;
-		dispatchDesc.MissShaderTable.StrideInBytes = dispatchDesc.MissShaderTable.SizeInBytes;
-		dispatchDesc.RayGenerationShaderRecord.StartAddress = raytracingPipeline_DX12->RayGenShaderTable->GetGPUVirtualAddress();
-		dispatchDesc.RayGenerationShaderRecord.SizeInBytes = raytracingPipeline_DX12->RayGenShaderTable->GetDesc().Width;
-		dispatchDesc.Width = width;
-		dispatchDesc.Height = height;
-		dispatchDesc.Depth = depth;
-
-		CommandBuffer->CommandList->DispatchRays(&dispatchDesc);
-
 	}
 
 	void CommandList_DX12::TransitionSubResource(

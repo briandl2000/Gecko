@@ -96,7 +96,7 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		indexDesc.NumIndices = 3;
 		indexDesc.IndexData = indices;
 
-		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc, false);
+		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc);
 	}
 }
 
