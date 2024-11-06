@@ -2,7 +2,7 @@
 
 #include "Rendering/Frontend/ApplicationContext.h"
 
-#include "Rendering/Frontend/Scene/GLTFSceneLoader.h"
+#include "GLTFSceneLoader.h"
 
 #include "Rendering/Frontend/Renderer/RenderPasses/RenderPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/ShadowPass.h"
@@ -12,11 +12,12 @@
 #include "Rendering/Frontend/Renderer/RenderPasses/FXAAPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/BloomPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/ToneMappingGammaCorrectionPass.h"
-#include "UI/DebugUIRenderer.h"
+#include "DebugSceneUIRenderer.h"
 
 #include "Core/Input.h"
 
 #include "CustomPass.h"
+#include "NodeBasedScene.h"
 
 int main()
 {
@@ -81,26 +82,26 @@ int main()
 
 	// Main scene initialisation
 	Gecko::SceneManager* sceneManager = ctx.GetSceneManager();
-	Gecko::u32 mainSceneIdx = sceneManager->CreateScene("Main Scene");
-	Gecko::Scene* mainScene = sceneManager->GetScene(mainSceneIdx);
+	Gecko::u32 mainSceneIdx = sceneManager->CreateScene<NodeBasedScene>("Main Scene");
+	NodeBasedScene* mainScene = sceneManager->GetScene<NodeBasedScene>(mainSceneIdx);
 
 	// Add an environment map
 	mainScene->SetEnvironmentMapHandle(resourceManager->CreateEnvironmentMap("Assets/scythian_tombs_2_4k.hdr"));
 
 	// Load the Sponza gltf scene
-	Gecko::SceneNode* sponzaNode = mainScene->GetRootNode()->AddNode("Sponza node");
-	Gecko::SceneHandle sponzaScene = Gecko::GLTFSceneLoader::LoadScene("Assets/sponza/glb/Sponza.glb", ctx);
-	sponzaNode->AppendSceneData(*sceneManager->GetScene(sponzaScene));
+	SceneNode* sponzaNode = mainScene->GetRootNode()->AddNode("Sponza node");
+	Gecko::SceneHandle sponzaScene = GLTFSceneLoader::LoadScene("Assets/sponza/glb/Sponza.glb", ctx);
+	sponzaNode->AppendSceneData(*sceneManager->GetScene<NodeBasedScene>(sponzaScene));
 	sponzaNode->Transform.Rotation.y = 90.f;
 
 	// Load Helmet gltf Scene
-	Gecko::SceneNode* helmetRootNode = mainScene->GetRootNode()->AddNode("Helmet node");
-	Gecko::SceneHandle helmetScene = Gecko::GLTFSceneLoader::LoadScene("Assets/gltfHelmet/glTF-Binary/DamagedHelmet.glb", ctx);
-	helmetRootNode->AppendSceneData(*sceneManager->GetScene(helmetScene));
+	SceneNode* helmetRootNode = mainScene->GetRootNode()->AddNode("Helmet node");
+	Gecko::SceneHandle helmetScene = GLTFSceneLoader::LoadScene("Assets/gltfHelmet/glTF-Binary/DamagedHelmet.glb", ctx);
+	helmetRootNode->AppendSceneData(*sceneManager->GetScene<NodeBasedScene>(helmetScene));
 	helmetRootNode->Transform.Position.y = 3.f;
 
 	// Create a camera in the scene
-	Gecko::SceneNode* cameraNode = mainScene->GetRootNode()->AddNode("Camera node");
+	SceneNode* cameraNode = mainScene->GetRootNode()->AddNode("Camera node");
 	Gecko::Scope<Gecko::SceneCamera> camera = Gecko::CreateScopeFromRaw<Gecko::SceneCamera>(mainScene->CreateCamera());
 	camera->SetIsMain(true);
 	camera->SetAutoAspectRatio(true);
@@ -112,7 +113,7 @@ int main()
 	Gecko::SceneDirectionalLight* directionalLight = 
 		static_cast<Gecko::SceneDirectionalLight*>(mainScene->CreateLight(Gecko::LightType::Directional));
 	Gecko::Scope<Gecko::SceneLight> sDirectionalLight = Gecko::CreateScopeFromRaw<Gecko::SceneDirectionalLight>(directionalLight);
-	Gecko::SceneNode* lightNode = mainScene->GetRootNode()->AddNode("Light node");
+	SceneNode* lightNode = mainScene->GetRootNode()->AddNode("Light node");
 	directionalLight->SetColor({ 1., 1., 1. });
 	directionalLight->SetIntenstiy(1.f);
 	lightNode->AppendLight(&sDirectionalLight);
@@ -156,7 +157,7 @@ int main()
 		cameraNode->Transform.Position += movement * deltaTime;
 
 		// Do the imgui things
-		Gecko::DebugUIRenderer::RenderDebugUI(ctx);
+		DebugSceneUIRenderer::RenderDebugUI(ctx);
 		
 		renderer->RenderScene(mainScene->GetSceneRenderInfo());
 
