@@ -25,7 +25,6 @@ const void ToneMappingGammaCorrectionPass::SubInit(const Platform::AppInfo& appI
 	}
 
 	Gecko::RenderTargetDesc renderTargetDesc;
-	renderTargetDesc.AllowRenderTargetTexture = true;
 	renderTargetDesc.Width = appInfo.Width;
 	renderTargetDesc.Height = appInfo.Height;
 	renderTargetDesc.NumRenderTargets = 1;

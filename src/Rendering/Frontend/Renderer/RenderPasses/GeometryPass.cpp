@@ -48,11 +48,11 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;
 
-		pipelineDesc.RenderTargetFormats[0] = Format::R32G32B32A32_FLOAT; // Albedo
-		pipelineDesc.RenderTargetFormats[1] = Format::R32G32B32A32_FLOAT; // Normal
-		pipelineDesc.RenderTargetFormats[2] = Format::R32G32B32A32_FLOAT; // Position
-		pipelineDesc.RenderTargetFormats[3] = Format::R32G32B32A32_FLOAT; // Emissive
-		pipelineDesc.RenderTargetFormats[4] = Format::R32G32B32A32_FLOAT; // Matallic Roughness Occlusion
+		pipelineDesc.RenderTextureFormats[0] = Format::R32G32B32A32_FLOAT; // Albedo
+		pipelineDesc.RenderTextureFormats[1] = Format::R32G32B32A32_FLOAT; // Normal
+		pipelineDesc.RenderTextureFormats[2] = Format::R32G32B32A32_FLOAT; // Position
+		pipelineDesc.RenderTextureFormats[3] = Format::R32G32B32A32_FLOAT; // Emissive
+		pipelineDesc.RenderTextureFormats[4] = Format::R32G32B32A32_FLOAT; // Matallic Roughness Occlusion
 		pipelineDesc.DepthStencilFormat = Format::R32_FLOAT;
 
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;
@@ -96,11 +96,11 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
 		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;
-		pipelineDesc.RenderTargetFormats[0] = Format::R32G32B32A32_FLOAT; // Albedo
-		pipelineDesc.RenderTargetFormats[1] = Format::R32G32B32A32_FLOAT; // Normal
-		pipelineDesc.RenderTargetFormats[2] = Format::R32G32B32A32_FLOAT; // Position
-		pipelineDesc.RenderTargetFormats[3] = Format::R32G32B32A32_FLOAT; // Emissive
-		pipelineDesc.RenderTargetFormats[4] = Format::R32G32B32A32_FLOAT; // Matallic Roughness Occlusion
+		pipelineDesc.RenderTextureFormats[0] = Format::R32G32B32A32_FLOAT; // Albedo
+		pipelineDesc.RenderTextureFormats[1] = Format::R32G32B32A32_FLOAT; // Normal
+		pipelineDesc.RenderTextureFormats[2] = Format::R32G32B32A32_FLOAT; // Position
+		pipelineDesc.RenderTextureFormats[3] = Format::R32G32B32A32_FLOAT; // Emissive
+		pipelineDesc.RenderTextureFormats[4] = Format::R32G32B32A32_FLOAT; // Matallic Roughness Occlusion
 		pipelineDesc.DepthStencilFormat = Format::R32_FLOAT;
 		pipelineDesc.CullMode = CullMode::Back;
 
@@ -113,8 +113,6 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 	
 
 	RenderTargetDesc gbufferTargetDesc;
-	gbufferTargetDesc.AllowDepthStencilTexture = true;
-	gbufferTargetDesc.AllowRenderTargetTexture = true;
 	gbufferTargetDesc.DepthStencilFormat = Gecko::Format::R32_FLOAT;
 	gbufferTargetDesc.DepthTargetClearValue.Depth = 1.0f;
 	gbufferTargetDesc.Width = appInfo.Width;

@@ -62,7 +62,7 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		pipelineDesc.PixelShaderPath = "Shaders/FullScreenTexture.gsh";
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = fullScreenQuadVertexLayout;
-		pipelineDesc.RenderTargetFormats[0] = Format::R8G8B8A8_UNORM; // Albedo
+		pipelineDesc.RenderTextureFormats[0] = Format::R8G8B8A8_UNORM; // Albedo
 		pipelineDesc.CullMode = CullMode::Back;
 
 		pipelineDesc.TextureShaderVisibilities = textureShaderVisibilities;

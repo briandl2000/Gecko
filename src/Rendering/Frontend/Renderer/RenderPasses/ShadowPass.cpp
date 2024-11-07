@@ -35,7 +35,6 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 
 	
 	Gecko::RenderTargetDesc ShadowMapTargetDesc;
-	ShadowMapTargetDesc.AllowDepthStencilTexture = true;
 	ShadowMapTargetDesc.DepthStencilFormat = Gecko::Format::R32_FLOAT;
 	ShadowMapTargetDesc.DepthTargetClearValue.Depth = 1.0f;
 	ShadowMapTargetDesc.Width = 4096;

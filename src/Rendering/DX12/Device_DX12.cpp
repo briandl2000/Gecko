@@ -855,10 +855,10 @@ namespace Gecko { namespace DX12
 			u32 i = 0;
 			for (; i < 8; i++)
 			{
-				if (desc.RenderTargetFormats[i] == Format::None)
+				if (desc.RenderTextureFormats[i] == Format::None)
 					break;
 				
-				rtvFormats.RTFormats[i] = FormatToD3D12Format(desc.RenderTargetFormats[i]);
+				rtvFormats.RTFormats[i] = FormatToD3D12Format(desc.RenderTextureFormats[i]);
 			}
 			rtvFormats.NumRenderTargets = i;
 			RTVFormats = rtvFormats;

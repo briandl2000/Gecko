@@ -30,7 +30,6 @@ const void ShadowRaytracePass::SubInit(const Platform::AppInfo& appInfo, Resourc
 
 	
 	Gecko::RenderTargetDesc ShadowMapTargetDesc;
-	ShadowMapTargetDesc.AllowRenderTargetTexture = true;
 	ShadowMapTargetDesc.RenderTargetFormats[0] = Gecko::Format::R32_FLOAT;
 	ShadowMapTargetDesc.NumRenderTargets = 1;
 	ShadowMapTargetDesc.RenderTargetClearValues[0].Values[0] = 0.f;

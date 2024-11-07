@@ -46,7 +46,6 @@ const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceMa
 	}
 	
 	Gecko::RenderTargetDesc PBROutputDesc;
-	PBROutputDesc.AllowRenderTargetTexture = true;
 	PBROutputDesc.Width = appInfo.Width;
 	PBROutputDesc.Height = appInfo.Height;
 	PBROutputDesc.NumRenderTargets = 1;

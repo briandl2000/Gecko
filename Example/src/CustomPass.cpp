@@ -18,7 +18,6 @@ const void CustomPass::SubInit(const Gecko::Platform::AppInfo& appInfo, Gecko::R
 	}
 
 	Gecko::RenderTargetDesc renderTargetDesc;
-	renderTargetDesc.AllowRenderTargetTexture = true;
 	renderTargetDesc.Width = appInfo.Width;
 	renderTargetDesc.Height = appInfo.Height;
 	renderTargetDesc.NumRenderTargets = 1;
