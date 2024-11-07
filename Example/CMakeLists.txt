@@ -1,7 +1,7 @@
 set(EXAMPLE_NAME GeckoExample)
 project(EXAMPLE_NAME)
 
-add_executable("${EXAMPLE_NAME}" "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp" "src/CustomPass.cpp")
+add_executable("${EXAMPLE_NAME}" "${CMAKE_CURRENT_SOURCE_DIR}/main.cpp" "src/CustomPass.cpp" "src/NodeBasedScene.cpp" "src/GLTFSceneLoader.cpp" "src/DebugSceneUIRenderer.cpp")
 
 target_compile_definitions("${EXAMPLE_NAME}" PUBLIC WORKING_DIR_PATH="${CMAKE_CURRENT_SOURCE_DIR}/WorkingDir/")
 

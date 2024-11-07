@@ -10,113 +10,51 @@
 namespace Gecko {
 
 	struct SceneRenderInfo;
-	class ResourceManager;
-
-	class NodeTransform
-	{
-	public:
-
-		NodeTransform() = default;
-
-		glm::vec3 Position{ 0.f };
-		glm::vec3 Rotation{ 0.f };
-		glm::vec3 Scale{ 1.f };
-
-		inline glm::mat4 GetMat4() const
-		{
-			glm::mat4 nodeTranslationMatrix = glm::translate(glm::mat4(1.), Position);
-			glm::mat4 nodeRotationMatrix = glm::toMat4(glm::quat(glm::radians(Rotation)));
-			glm::mat4 nodeScaleMatrix = glm::scale(glm::mat4(1.), Scale);
-
-			return nodeTranslationMatrix * nodeRotationMatrix * nodeScaleMatrix;
-		}
-	};
-
-	class Scene;
-
-	// TODO: add names to scenes and scene nodes
-
-	class SceneNode
-	{
-	public:
-		friend class Scene;
-
-		SceneNode() = default;
-		~SceneNode() {};
-
-		[[nodiscard]] SceneNode* AddNode(const std::string& name);
-	
-		void AppendSceneRenderObject(SceneRenderObject* sceneRenderObject);
-		void AppendLight(SceneLight* light);
-		void AttachCamera(SceneCamera* camera);
-		void AppendScene(Scene* scene);
-		
-		u32 GetChildrenCount();
-		SceneNode* GetChild(u32 nodeIndex);
-
-		const void SetName(const std::string& name);
-		const std::string& GetName();
-
-	public:
-		NodeTransform Transform;
-
-	private:
-		const void PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const;
-
-	private:
-		std::vector<Scope<SceneNode>> m_Children;
-
-		std::vector<Scene*> m_Scenes;
-		std::vector<SceneRenderObject*> m_SceneRenderObjects;
-		std::vector<SceneLight*> m_Lights;
-		SceneCamera* m_Camera{ nullptr };
-
-		std::string m_Name{ "Node" };
-	};
 
 	class Scene : Event::EventListener<Scene>
 	{
 	public:
-		friend class SceneNode;
-		friend class SceneManager;
-
 		Scene() = default;
-		~Scene() {};
+		virtual ~Scene() {};
 
-		void Init(const std::string& name);
-	
-		SceneNode* GetRootNode();
+		// Sets the name of this scene and initialises event listening. Should be called right after scene creation
+		virtual void Init(const std::string& name);
 
-		[[nodiscard]] SceneRenderObject* CreateSceneRenderObject();
-		[[nodiscard]] SceneCamera* CreateCamera();
-		[[nodiscard]] SceneLight* CreateLight(LightType lightType);
-		[[nodiscard]] SceneDirectionalLight* CreateDirectionalLight();
-		[[nodiscard]] ScenePointLight* CreatePointLight();
-		[[nodiscard]] SceneSpotLight* CreateSpotLight();
+		// Allocates requested object on the heap and returns pointer to it
+		[[nodiscard]] virtual SceneRenderObject* CreateSceneRenderObject() const;
+		// Allocates requested object on the heap and returns pointer to it
+		[[nodiscard]] virtual SceneCamera* CreateCamera() const;
+		// Allocates requested object on the heap and returns pointer to it
+		[[nodiscard]] virtual SceneLight* CreateLight(LightType lightType) const;
+		// Allocates requested object on the heap and returns pointer to it
+		[[nodiscard]] virtual SceneDirectionalLight* CreateDirectionalLight() const;
+		// Allocates requested object on the heap and returns pointer to it
+		[[nodiscard]] virtual ScenePointLight* CreatePointLight() const;
+		// Allocates requested object on the heap and returns pointer to it
+		[[nodiscard]] virtual SceneSpotLight* CreateSpotLight() const;
 		
-		[[nodiscard]] const SceneRenderInfo GetSceneRenderInfo() const;
+		// Returns a newly created SceneRenderInfo object filled with data from this scene
+		[[nodiscard]] SceneRenderInfo GetSceneRenderInfo() const;
 
 		EnvironmentMapHandle GetEnvironmentMapHandle() const;
 		void SetEnvironmentMapHandle(EnvironmentMapHandle handle);
 
-		const std::string& GetName() { return m_Name; };
+		const std::string& GetName() const;
 
-		bool Scene::OnResize(const Event::EventData& data);
+		// Adjust aspect ratios of cameras
+		virtual bool Scene::OnResize(const Event::EventData& data) = 0;
 
-	private:
-		const void PopulateSceneRenderInfo(SceneRenderInfo& sceneRenderInfo, glm::mat4 transform) const;
+	protected:
+		// Read data from this scene into a SceneRenderInfo object (how scene data is translated into the object should be defined
+		// by derived classes based on their internal structure).
+		// Don't forget to call this parent function if you want the environment map handle to be put in.
+		virtual const void PopulateSceneRenderInfo(SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const = 0;
+	
+	protected:
+		EnvironmentMapHandle m_EnvironmentMapHandle{ 0 };
 	
 	private:
-		Scope<SceneNode> m_RootNode;
-
-		std::vector<Scope<SceneRenderObject>> m_SceneRenderObject;
-		std::vector<Scope<SceneLight>> m_Lights;
-		std::vector<Scope<SceneCamera>> m_Cameras;
-
-		EnvironmentMapHandle m_EnvironmentMapHandle{ 0 };
-
 		std::string m_Name{ "Scene" };
-
 	};
 
 }

@@ -9,7 +9,7 @@ namespace Gecko {
 	class DebugUIRenderer
 	{
 	public:
-		static void RenderDebugUI(ApplicationContext& ctx);
+		static bool RenderDebugUI(ApplicationContext& ctx);
 	};
 
 }

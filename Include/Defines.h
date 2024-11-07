@@ -72,6 +72,12 @@ STATIC_ASSERT(sizeof(f64) == 8, "Expected f64 to be 8 byte.");
 	}
 
 	template<typename T>
+	constexpr Scope<T> CreateScopeFromRaw(T* t)
+	{
+		return std::unique_ptr<T>(t);
+	}
+
+	template<typename T>
 	using Ref = std::shared_ptr<T>;
 
 	template<typename T, typename ... Args>
@@ -81,5 +87,17 @@ STATIC_ASSERT(sizeof(f64) == 8, "Expected f64 to be 8 byte.");
 	}
 
 	template<typename T>
+	constexpr Ref<T> CreateRefFromRaw(T* t)
+	{
+		return std::shared_ptr<T>(t);
+	}
+
+	template<typename T>
 	using WeakRef = std::weak_ptr<T>;
+
+	template<typename T>
+	constexpr WeakRef<T> CreateWeakRef(Ref<T> ref)
+	{
+		return std::weak_ptr<T>(ref);
+	}
 }
