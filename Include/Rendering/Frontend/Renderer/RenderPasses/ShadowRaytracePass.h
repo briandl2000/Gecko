@@ -31,6 +31,7 @@ namespace Gecko
 
 	protected:
 		friend class RenderPass<ShadowRaytracePass>;
+		// Called by RenderPass<ShadowRaytracePass> to initialise this object with config data
 		virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 	private:
