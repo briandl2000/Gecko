@@ -11,29 +11,29 @@ namespace Gecko { namespace DX12 {
 
 	class Device_DX12;
 
-	static DXGI_FORMAT FormatToD3D12Format(Format format)
+	static DXGI_FORMAT FormatToD3D12Format(DataFormat format)
 	{
 		switch (format)
 		{
-		case Format::R8G8B8A8_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-		case Format::R8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM;
+		case DataFormat::R8G8B8A8_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		case DataFormat::R8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM;
 		
-		case Format::R32_FLOAT: return DXGI_FORMAT_R32_FLOAT;
-		case Format::R32G32_FLOAT: return DXGI_FORMAT_R32G32_FLOAT;
-		case Format::R32G32B32_FLOAT: return DXGI_FORMAT_R32G32B32_FLOAT;
-		case Format::R32G32B32A32_FLOAT: return DXGI_FORMAT_R32G32B32A32_FLOAT;
-		case Format::R16G16B16A16_FLOAT: return DXGI_FORMAT_R16G16B16A16_FLOAT;
+		case DataFormat::R32_FLOAT: return DXGI_FORMAT_R32_FLOAT;
+		case DataFormat::R32G32_FLOAT: return DXGI_FORMAT_R32G32_FLOAT;
+		case DataFormat::R32G32B32_FLOAT: return DXGI_FORMAT_R32G32B32_FLOAT;
+		case DataFormat::R32G32B32A32_FLOAT: return DXGI_FORMAT_R32G32B32A32_FLOAT;
+		case DataFormat::R16G16B16A16_FLOAT: return DXGI_FORMAT_R16G16B16A16_FLOAT;
 
 
-		case Format::R8_UINT: return DXGI_FORMAT_R8_UINT;
-		case Format::R16_UINT: return DXGI_FORMAT_R16_UINT;
-		case Format::R32_UINT: return DXGI_FORMAT_R32_UINT;
+		case DataFormat::R8_UINT: return DXGI_FORMAT_R8_UINT;
+		case DataFormat::R16_UINT: return DXGI_FORMAT_R16_UINT;
+		case DataFormat::R32_UINT: return DXGI_FORMAT_R32_UINT;
 
-		case Format::R8_INT: return DXGI_FORMAT_R8_SINT;
-		case Format::R16_INT: return DXGI_FORMAT_R16_SINT;
-		case Format::R32_INT: return DXGI_FORMAT_R32_SINT;
+		case DataFormat::R8_INT: return DXGI_FORMAT_R8_SINT;
+		case DataFormat::R16_INT: return DXGI_FORMAT_R16_SINT;
+		case DataFormat::R32_INT: return DXGI_FORMAT_R32_SINT;
 
-		case Format::None: break;
+		case DataFormat::None: break;
 		}
 
 		ASSERT_MSG(false, "Unkown Format state.");
@@ -161,14 +161,10 @@ namespace Gecko { namespace DX12 {
 
 	struct Resource
 	{
-		Resource()
-		{
-			ResourceDX12 = nullptr;
-		}
-		ComPtr<ID3D12Resource> ResourceDX12;
+		ComPtr<ID3D12Resource> ResourceDX12{ nullptr };
 		D3D12_RESOURCE_STATES CurrentState{ D3D12_RESOURCE_STATE_COMMON };
 
-		std::vector<D3D12_RESOURCE_STATES> subResourceStates;
+		std::vector<D3D12_RESOURCE_STATES> subResourceStates{};
 	};
 
 	struct CommandBuffer
@@ -201,117 +197,117 @@ namespace Gecko { namespace DX12 {
 
 	struct RenderTarget_DX12
 	{
-		RenderTarget_DX12()
-		{ }
-		D3D12_RECT rect;
-		D3D12_VIEWPORT ViewPort;
+		D3D12_RECT rect{};
+		D3D12_VIEWPORT ViewPort{};
 		Device_DX12* device{ nullptr };
 		
-		DescriptorHandle RenderTargetViews[8];
-		DescriptorHandle DepthStencilView;
-		
+		DescriptorHandle RenderTargetViews[8]{
+			DescriptorHandle(), DescriptorHandle(), DescriptorHandle(), DescriptorHandle(),
+			DescriptorHandle(), DescriptorHandle(), DescriptorHandle(), DescriptorHandle()
+		};
+		DescriptorHandle DepthStencilView{};
 
-		//Ref<Resource> RenderTargetResources[8];
-		//Ref<Resource> DepthBufferResource = nullptr;
-
-		//DescriptorHandle renderTargetSrvs[8];
-		//DescriptorHandle renderTargetUavs[8];
-		//DescriptorHandle depthStencilSrv;
-
+		RenderTarget_DX12() {}
 		~RenderTarget_DX12();
 	};
 
 	struct GraphicsPipeline_DX12
 	{
-		ComPtr<ID3D12RootSignature> RootSignature;
-		ComPtr<ID3D12PipelineState> PipelineState;
-		Device_DX12* device = nullptr;
+		ComPtr<ID3D12RootSignature> RootSignature{ nullptr };
+		ComPtr<ID3D12PipelineState> PipelineState{ nullptr };
+		Device_DX12* device{ nullptr };
 
-		std::vector<u32> TextureIndices;
-		std::vector<u32> ConstantBufferIndices;
+		std::vector<u32> TextureIndices{};
+		std::vector<u32> ConstantBufferIndices{};
 
+		GraphicsPipeline_DX12() {}
 		~GraphicsPipeline_DX12();
 	};
 
 	struct ComputePipeline_DX12
 	{
-		ComPtr<ID3D12RootSignature> RootSignature;
-		ComPtr<ID3D12PipelineState> PipelineState;
-		Device_DX12* device = nullptr;
+		ComPtr<ID3D12RootSignature> RootSignature{ nullptr };
+		ComPtr<ID3D12PipelineState> PipelineState{ nullptr };
+		Device_DX12* device{ nullptr };
 
-		std::vector<u32> TextureIndices;
-		std::vector<u32> ConstantBufferIndices;
-		std::vector<u32> UAVIndices;
+		std::vector<u32> TextureIndices{};
+		std::vector<u32> ConstantBufferIndices{};
+		std::vector<u32> UAVIndices{};
 
+		ComputePipeline_DX12() {}
 		~ComputePipeline_DX12();
 	};
 
 	struct VertexBuffer_DX12
 	{
-		Ref<Resource> VertexBufferResource;
-		D3D12_VERTEX_BUFFER_VIEW VertexBufferView;
-		Device_DX12* device = nullptr;
+		Ref<Resource> VertexBufferResource{ nullptr };
+		D3D12_VERTEX_BUFFER_VIEW VertexBufferView{};
+		Device_DX12* device{ nullptr };
 
+		VertexBuffer_DX12() {}
 		~VertexBuffer_DX12();
 	};
 
 	struct IndexBuffer_DX12
 	{
-		Ref<Resource> IndexBufferResource;
-		D3D12_INDEX_BUFFER_VIEW IndexBufferView;
-		Device_DX12* device = nullptr;
+		Ref<Resource> IndexBufferResource{ nullptr };
+		D3D12_INDEX_BUFFER_VIEW IndexBufferView{};
+		Device_DX12* device{ nullptr };
 
+		IndexBuffer_DX12() {}
 		~IndexBuffer_DX12();
 	};
 
 	struct ConstantBuffer_DX12
 	{
-		Ref<Resource> ConstantBufferResource;
-		DescriptorHandle cbv;
-		u64 MemorySize;
-		void* GPUAddress;
-		Device_DX12* device = nullptr;
+		Ref<Resource> ConstantBufferResource{ nullptr };
+		DescriptorHandle cbv{};
+		u64 MemorySize{ 0 };
+		void* GPUAddress{ nullptr };
+		Device_DX12* device{ nullptr };
 
+		ConstantBuffer_DX12() {}
 		~ConstantBuffer_DX12();
 	};
 	
 	struct Texture_DX12
 	{
-		Ref<Resource> TextureResource;
-		DescriptorHandle srv;
-		DescriptorHandle uav;
+		Ref<Resource> TextureResource{ nullptr };
+		DescriptorHandle srv{};
+		DescriptorHandle uav{};
 
-		std::vector<DescriptorHandle> mipSrvs;
-		std::vector<DescriptorHandle> mipUavs;
-		Device_DX12* device = nullptr;
+		std::vector<DescriptorHandle> mipSrvs{};
+		std::vector<DescriptorHandle> mipUavs{};
+		Device_DX12* device{ nullptr };
+
+		Texture_DX12() {}
 		~Texture_DX12();
 	};
 
 	struct RaytracingPipeline_DX12
 	{
-		ComPtr<ID3D12RootSignature> RootSignature;
-		ComPtr<ID3D12StateObject> StateObject;
-		Device_DX12* device = nullptr;
+		ComPtr<ID3D12RootSignature> RootSignature{ nullptr };
+		ComPtr<ID3D12StateObject> StateObject{ nullptr };
+		Device_DX12* device{ nullptr };
 
-		std::vector<u32> TextureIndices;
-		std::vector<u32> ConstantBufferIndices;
-		std::vector<u32> UAVIndices;
+		std::vector<u32> TextureIndices{};
+		std::vector<u32> ConstantBufferIndices{};
+		std::vector<u32> UAVIndices{};
 		u32 TLASSlot{ 0 };
 
-		ComPtr<ID3D12Resource> RayGenShaderTable;
-		ComPtr<ID3D12Resource> MissShaderTable;
-		ComPtr<ID3D12Resource> HitGroupShaderTable;
-
+		ComPtr<ID3D12Resource> RayGenShaderTable{ nullptr };
+		ComPtr<ID3D12Resource> MissShaderTable{ nullptr };
+		ComPtr<ID3D12Resource> HitGroupShaderTable{ nullptr };
 	};
 
 	struct BLAS_DX12
 	{
-		ComPtr<ID3D12Resource> Resource;
+		ComPtr<ID3D12Resource> Resource{ nullptr };
 	};
 
 	struct TLAS_DX12
 	{
-		ComPtr<ID3D12Resource> Resource;
+		ComPtr<ID3D12Resource> Resource{ nullptr };
 	};
 
 } }

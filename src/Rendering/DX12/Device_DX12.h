@@ -137,7 +137,7 @@ namespace Gecko { namespace DX12
 			u32 m_NumBackBuffers{ 0 };
 			u32 m_CurrentBackBufferIndex{ 0 };
 
-			Format m_BackBufferFormat{ Format::None };
+			DataFormat m_BackBufferFormat{ DataFormat::None };
 		};
 
 	}

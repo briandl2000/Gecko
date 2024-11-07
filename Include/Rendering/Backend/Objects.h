@@ -14,7 +14,7 @@ namespace Gecko {
 		Pixel
 	};
 
-	enum class Format
+	enum class DataFormat
 	{
 		None,
 		R8G8B8A8_SRGB,
@@ -58,6 +58,7 @@ namespace Gecko {
 
 	enum class TextureType
 	{
+		None,
 		Tex1D,
 		Tex2D,
 		Tex3D,
@@ -110,7 +111,7 @@ namespace Gecko {
 		Structured
 	};
 
-	u32 FormatSizeInBytes(const Format& format);
+	u32 FormatSizeInBytes(const DataFormat& format);
 
 	u32 GetRenderTargetResourceIndex(const RenderTargetType& renderTargetType);
 
@@ -123,24 +124,44 @@ namespace Gecko {
 
 	struct VertexAttribute
 	{
+		const char* Name{ "VertexAttribute" };
+		DataFormat AttributeFormat{ DataFormat::None };
+		u32 Size{ 0 };
+		u32 Offset{ 0 };
+		
 		VertexAttribute() = default;
-
-		VertexAttribute(Format format, const char* name)
+		VertexAttribute(DataFormat format, const char* name)
 			: Name(name)
-			, Format(format)
+			, AttributeFormat(format)
 			, Size(FormatSizeInBytes(format))
 			, Offset(0)
 		{}
 
-		const char* Name;
-		Format Format;
-		u32 Size;
-		u32 Offset;
+		bool IsValid() const
+		{
+			return AttributeFormat != DataFormat::None && Size > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 
+		// Does not check for name equality
+		bool operator==(const VertexAttribute& other) const
+		{
+			return AttributeFormat == other.AttributeFormat && Size == other.Size && Offset == other.Offset;
+		}
+		bool operator!=(const VertexAttribute& other) const
+		{
+			return !(*this == other);
+		}
 	};
 
 	struct VertexLayout
 	{
+		std::vector<VertexAttribute> Attributes{};
+		u32 Stride{ 0 };
+
 		VertexLayout() = default;
 		VertexLayout(const std::initializer_list<VertexAttribute> attributes)
 			: Attributes(attributes)
@@ -154,8 +175,34 @@ namespace Gecko {
 		};
 		~VertexLayout() {};
 
-		std::vector<VertexAttribute> Attributes;
-		u32 Stride = 0;
+		bool IsValid() const
+		{
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+
+		bool operator==(const VertexLayout& other) const
+		{
+			if (Stride != other.Stride || Attributes.size() != other.Attributes.size())
+			{
+				return false;
+			}
+			for (size_t i = 0; i < Attributes.size(); ++i)
+			{
+				if (Attributes[i] != other.Attributes[i])
+				{
+					return false;
+				}
+			}
+			return true;
+		}
+		bool operator!=(const VertexLayout& other) const
+		{
+			return !(*this == other);
+		}
 
 	private:
 		void CalculateOffsetsAndStride()
@@ -173,55 +220,137 @@ namespace Gecko {
 
 	struct VertexBufferDesc // The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer. This pointer needs to stay valid until the CreateVertexBuffer function is called.
 	{
-		VertexLayout Layout;
+		VertexLayout Layout{ VertexLayout() };
 		void* VertexData{ nullptr };
 		u32 NumVertices{ 0 };
+
+		bool IsValid() const
+		{
+			if (Layout.Stride == 0 || Layout.Attributes.empty())
+				return false;
+
+			if (!VertexData)
+				return false;
+
+			if (!NumVertices)
+				return false;
+
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	struct VertexBuffer
 	{
-		VertexBufferDesc Desc;
-		Ref<void> Data;
+		VertexBufferDesc Desc{};
+		Ref<void> Data{ nullptr };
+
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	// Index buffer
 
 	struct IndexBufferDesc // The Index buffer desc takes in format of the indices, the number of indices and the index data pointer. This pointer needs to stay valid until the CreateIndexBuffer function is called.
 	{
-		Format IndexFormat;
+		DataFormat IndexFormat{ DataFormat::None };
 		u32 NumIndices{ 0 };
 		void* IndexData{ nullptr };
+
+		bool IsValid() const
+		{
+			// IndexBuffer format should always be R16_UINT or R32_UINT
+			if (IndexFormat != DataFormat::R16_UINT && IndexFormat != DataFormat::R32_UINT)
+				return false;
+
+			return NumIndices != 0 && IndexData != nullptr;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	struct IndexBuffer
 	{
-		IndexBufferDesc Desc;
-		Ref<void> Data;
+		IndexBufferDesc Desc{};
+		Ref<void> Data{ nullptr };
+
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	// Texture
 
 	struct TextureDesc
 	{
-		char* Name{ "Texture" };
-		Format Format{ Format::None };
+		DataFormat Format{ DataFormat::None };
 		u32 Width{ 1 };
 		u32 Height{ 1 };
 		u32 Depth{ 1 };
 		u32 NumMips{ 1 };
 		u32 NumArraySlices{ 1 };
-		TextureType Type;
+		TextureType Type{ TextureType::None };
+
+		bool IsValid() const
+		{
+			if (Format == DataFormat::None || Type == TextureType::None)
+				return false;
+
+			if (Type == TextureType::Tex1D || Type == TextureType::Tex1DArray)
+				return Height == 1 && Depth == 1;
+			else if (Type == TextureType::Tex2D || Type == TextureType::Tex2DArray)
+				return Depth == 1;
+
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+
 	};
 
 	struct Texture
 	{
-		TextureDesc Desc;
-		Ref<void> Data{nullptr};
+		TextureDesc Desc{};
+		Ref<void> Data{ nullptr };
+
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
+
 	// Render target
 
 	struct ClearValue
 	{
+		union
+		{
+			f32 Values[4]{ 0. };
+			f32 Depth;
+		};
+
 		ClearValue(ClearValueType type = ClearValueType::RenderTarget)
 		{
 			switch (type)
@@ -246,43 +375,88 @@ namespace Gecko {
 			Values[3] = a;
 		}
 
-		union
+		bool IsValid() const
 		{
-			f32 Values[4]{ 0. };
-			f32 Depth;
-		};
-	};
-	struct RenderTargetDesc
-	{
-		RenderTargetDesc()
+			return true;
+		}
+		operator bool() const
 		{
-			for (u32 i = 0; i < 8; i++)
-			{
-				RenderTargetFormats[i] = Format::None;
-			}
+			return IsValid();
 		}
 
-		char* Name{ "Render Target" };
+		bool operator==(const ClearValue& other) const
+		{
+			for (u32 i = 0; i < 4; ++i)
+			{
+				if (Values[i] != other.Values[i])
+					return false;
+			}
+
+			return true;
+		}
+		bool operator!=(const ClearValue& other) const
+		{
+			return !(*this == other);
+		}
+	};
+
+	struct RenderTargetDesc
+	{
 		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
 		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
-		Format RenderTargetFormats[8]{ Format::None };
-		Format DepthStencilFormat{ Format::None };
+		DataFormat RenderTargetFormats[8]{
+			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None,
+			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None
+		};
+		DataFormat DepthStencilFormat{ DataFormat::None };
 		u32 NumRenderTargets{ 0 };
 		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
 		u32 DepthMips{ 1 };
 		u32 Width{ 0 };
 		u32 Height{ 0 };
-		bool AllowRenderTargetTexture{ false };
-		bool AllowDepthStencilTexture{ false };
+
+		bool IsValid() const
+		{
+			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
+			// Assume that if the first RenderTexture does not have a valid format, none of them do
+			if (RenderTargetFormats[0] == DataFormat::None && DepthStencilFormat == DataFormat::None)
+				return false;
+
+			if (Width == 0 || Height == 0)
+				return false;
+
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 
 	struct RenderTarget
 	{
-		RenderTargetDesc Desc;
-		Texture RenderTextures[8];
-		Texture DepthTexture;
-		Ref<void> Data;
+		RenderTargetDesc Desc{};
+		Texture RenderTextures[8]{
+			Texture(), Texture(), Texture(), Texture(),
+			Texture(), Texture(), Texture(), Texture()
+		};
+		Texture DepthTexture{ Texture() };
+		Ref<void> Data{ nullptr };
+
+		bool IsValid() const
+		{
+			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
+			// Assume that if the first RenderTexture is invalid, all of them are
+			if (!RenderTextures[0].IsValid() && !DepthTexture.IsValid())
+				return false;
+
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	// Constant Buffer
@@ -291,24 +465,62 @@ namespace Gecko {
 	{
 		u64 Size{ 0 };
 		ShaderVisibility Visibility{ ShaderVisibility::All };
+
+		bool IsValid() const
+		{
+			return Size > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	struct ConstantBuffer
 	{
-		ConstantBufferDesc Desc;
-		Ref<void> Data;
-		void* Buffer;
+		ConstantBufferDesc Desc{};
+		Ref<void> Data{ nullptr };
+		void* Buffer{ nullptr };
+
+		bool IsValid() const
+		{
+			// You can decide not to use Buffer if you feel like you don't need the void* data
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	// Graphics pipeline
 
 	struct SamplerDesc
 	{
-		ShaderVisibility Visibility;
+		ShaderVisibility Visibility{ ShaderVisibility::All };
 		SamplerFilter Filter{ SamplerFilter::Linear };
 		SamplerWrapMode WrapU{ SamplerWrapMode::Wrap };
 		SamplerWrapMode WrapV{ SamplerWrapMode::Wrap };
 		SamplerWrapMode WrapW{ SamplerWrapMode::Wrap };
+
+		bool IsValid() const
+		{
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+
+		bool operator==(const SamplerDesc& other) const
+		{
+			return Visibility == other.Visibility && Filter == other.Filter &&
+				WrapU == other.WrapU && WrapV == other.WrapV && WrapW == other.WrapW;
+		}
+		bool operator!=(const SamplerDesc& other) const
+		{
+			return !(*this == other);
+		}
 	};
 
 	struct DynamicCallData
@@ -316,12 +528,19 @@ namespace Gecko {
 		i32 BufferLocation{ -1 };
 		u32 Size{ 0 };
 		ShaderVisibility ConstantBufferVisibilities{ ShaderVisibility::All };
+
+		bool IsValid() const
+		{
+			return BufferLocation > -1 && Size > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	struct GraphicsPipelineDesc
 	{
-		GraphicsPipelineDesc() = default;
-
 		const char* VertexShaderPath{ nullptr };
 		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
 		const char* VertexEntryPoint{ "main" };
@@ -337,64 +556,110 @@ namespace Gecko {
 			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders).
 			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
 			*/
-		const char* ShaderVersion{ "" };
+		const char* ShaderVersion{ nullptr };
 
-		VertexLayout VertexLayout;
+		VertexLayout VertexLayout{};
 
-		Format RenderTargetFormats[8]{ Format::None };
-		Format DepthStencilFormat{ Format::None };
+		DataFormat RenderTextureFormats[8]{ DataFormat::None };
+		DataFormat DepthStencilFormat{ DataFormat::None };
 
 		CullMode CullMode{ CullMode::None };
 		WindingOrder WindingOrder{ WindingOrder::ClockWise };
 		PrimitiveType PrimitiveType{ PrimitiveType::Triangles };
-		
-		std::vector<ShaderVisibility> ConstantBufferVisibilities;
 
-		DynamicCallData DynamicCallData;
+		std::vector<ShaderVisibility> ConstantBufferVisibilities{};
 
-		std::vector<ShaderVisibility> TextureShaderVisibilities;
+		DynamicCallData DynamicCallData{};
 
-		std::vector<SamplerDesc> SamplerDescs;
-		bool DepthBoundsTest = false;
+		std::vector<ShaderVisibility> TextureShaderVisibilities{};
+
+		std::vector<SamplerDesc> SamplerDescs{};
+		bool DepthBoundsTest{ false };
+
+		bool IsValid() const
+		{
+			if (!VertexShaderPath || !PixelShaderPath || !ShaderVersion)
+				return false;
+			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
+			// Assume that if the first RenderTexture does not have a valid format, none of them do
+			if (RenderTextureFormats[0] == DataFormat::None && DepthStencilFormat == DataFormat::None)
+				return false;
+
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	struct GraphicsPipeline
 	{
-		GraphicsPipelineDesc Desc;
-		Ref<void> Data;
+		GraphicsPipelineDesc Desc{};
+		Ref<void> Data{ nullptr };
+
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	// Compute pipeline
 
 	struct ComputePipelineDesc
 	{
-		ComputePipelineDesc() = default;
-
 		// Path from executable to shader object (source or compiled)
 		const char* ComputeShaderPath{ nullptr };
 		/* ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y",
 			where type == cs for compute shaders (type_ prefix gets added automatically in Device_DX12.cpp),
 			X == main version (e.g. 5 for hlsl shader language 5.1),
 			Y == subversion (e.g. 1 for 5.1).
-			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to 
+			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to
 			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders)
 			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
 			*/
-		const char* ShaderVersion{ "" };
+		const char* ShaderVersion{ nullptr };
 		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
 		const char* EntryPoint{ "main" };
-		
+
 		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData;
+		DynamicCallData DynamicCallData{};
 		u32 NumTextures{ 0 };
 		u32 NumUAVs{ 0 };
-		std::vector<SamplerDesc> SamplerDescs;
+		std::vector<SamplerDesc> SamplerDescs{};
+
+		bool IsValid() const
+		{
+			if (!ComputeShaderPath || !ShaderVersion)
+				return false;
+			if (NumUAVs == 0)
+				return false;
+
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	struct ComputePipeline
 	{
-		ComputePipelineDesc Desc;
-		Ref<void> Data;
+		ComputePipelineDesc Desc{};
+		Ref<void> Data{ nullptr };
+
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	// TODO: Make is valid functions for each descriptor structure.

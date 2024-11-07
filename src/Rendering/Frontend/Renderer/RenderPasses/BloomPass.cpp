@@ -89,7 +89,7 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 	}
 
 	RenderTargetDesc renderTargetDesc;
-	renderTargetDesc.AllowRenderTargetTexture = true;
+
 	renderTargetDesc.Width = appInfo.Width;
 	renderTargetDesc.Height = appInfo.Height;
 	renderTargetDesc.NumRenderTargets = 1;
@@ -100,7 +100,7 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		renderTargetDesc.RenderTargetClearValues[i].Values[2] = 0.f;
 		renderTargetDesc.RenderTargetClearValues[i].Values[3] = 0.f;
 	}
-	renderTargetDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT;
+	renderTargetDesc.RenderTargetFormats[0] = DataFormat::R32G32B32A32_FLOAT;
 
 	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput", true);
 

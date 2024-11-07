@@ -41,7 +41,7 @@ namespace Gecko {
 				return nullptr;
 			}
 
-			return static_cast<T*>(m_Scenes[handle].get());
+			return dynamic_cast<T*>(m_Scenes[handle].get());
 		}
 
 	private:

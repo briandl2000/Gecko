@@ -153,7 +153,7 @@ namespace Gecko
 			vertexDesc.NumVertices = 24;
 
 			IndexBufferDesc indexDesc;
-			indexDesc.IndexFormat = Format::R32_UINT;
+			indexDesc.IndexFormat = DataFormat::R32_UINT;
 			indexDesc.NumIndices = 36;
 			indexDesc.IndexData = indices;
 
@@ -166,7 +166,7 @@ namespace Gecko
 			textureDesc.Width = 512;
 			textureDesc.Height = 512;
 			textureDesc.Type = TextureType::Tex2D;
-			textureDesc.Format = Format::R8G8B8A8_SRGB;
+			textureDesc.Format = DataFormat::R8G8B8A8_SRGB;
 			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
 			textureDesc.NumArraySlices = 1;
 
@@ -372,7 +372,7 @@ namespace Gecko
 			textureDesc.Width = 512;
 			textureDesc.Height = 512;
 			textureDesc.Type = TextureType::TexCube;
-			textureDesc.Format = Format::R32G32B32A32_FLOAT;
+			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
 			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
 			textureDesc.NumArraySlices = 6;
 			outEnvironmentMap.EnvironmentTextureHandle = CreateTexture(textureDesc);
@@ -380,9 +380,6 @@ namespace Gecko
 		}
 
 		// Load HDR Texture
-
-
-
 		{
 			int x, y, n;
 			f32* data = stbi_loadf(Platform::GetLocalPath(path).c_str(), &x, &y, &n, 4);
@@ -391,7 +388,7 @@ namespace Gecko
 			textureDesc.Width = x;
 			textureDesc.Height = y;
 			textureDesc.Type = TextureType::Tex2D;
-			textureDesc.Format = Format::R32G32B32A32_FLOAT;
+			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
 			textureDesc.NumMips = 1;
 			textureDesc.NumArraySlices = 1;
 			outEnvironmentMap.HDRTextureHandle = CreateTexture(textureDesc, data);
@@ -429,7 +426,7 @@ namespace Gecko
 			textureDesc.Width = 32;
 			textureDesc.Height = 32;
 			textureDesc.Type = TextureType::TexCube;
-			textureDesc.Format = Format::R32G32B32A32_FLOAT;
+			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
 			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
 			textureDesc.NumArraySlices = 6;
 			outEnvironmentMap.IrradianceTextureHandle = CreateTexture(textureDesc);
@@ -568,7 +565,7 @@ namespace Gecko
 		MipGenerationData mipGenerationData;
 
 		mipGenerationData.Mip = 0;
-		mipGenerationData.Srgb = texture.Desc.Format == Format::R8G8B8A8_SRGB ? 1 : 0;
+		mipGenerationData.Srgb = texture.Desc.Format == DataFormat::R8G8B8A8_SRGB ? 1 : 0;
 		mipGenerationData.Width = texture.Desc.Width;
 		mipGenerationData.Height = texture.Desc.Height;
 

@@ -32,7 +32,7 @@ namespace Gecko { namespace DX12 {
 			);
 		}
 
-		if (renderTarget.Desc.DepthStencilFormat != Format::None)
+		if (renderTarget.Desc.DepthStencilFormat != DataFormat::None)
 		{
 			CommandBuffer->CommandList->ClearDepthStencilView(
 				renderTargetDX12->DepthStencilView.CPU,
@@ -51,8 +51,8 @@ namespace Gecko { namespace DX12 {
 		Texture_DX12* srcTexture_DX12 = (Texture_DX12*)src.Data.get();
 		Texture_DX12* dstTexture_DX12 = (Texture_DX12*)dst.Data.get();
 		
-		Format srcFormat = Format::None;
-		Format dstFormat = Format::None;
+		DataFormat srcFormat = DataFormat::None;
+		DataFormat dstFormat = DataFormat::None;
 
 		Ref<Resource> srcTextureResource = srcTexture_DX12->TextureResource;
 		Ref<Resource> dstTextureResource = dstTexture_DX12->TextureResource;

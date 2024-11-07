@@ -60,7 +60,7 @@ namespace Gecko { namespace DX12
 
 		// Creating the swap chain
 		DXGI_SWAP_CHAIN_DESC1 swapchainDesc{};
-		m_BackBufferFormat = Format::R8G8B8A8_UNORM;
+		m_BackBufferFormat = DataFormat::R8G8B8A8_UNORM;
 		swapchainDesc.Width = info.Width;
 		swapchainDesc.Height = info.Height;
 		swapchainDesc.Format = FormatToD3D12Format(m_BackBufferFormat);
@@ -254,8 +254,8 @@ namespace Gecko { namespace DX12
 		for (u32 i = 0; i < desc.NumRenderTargets; i++)
 		{
 		
-			ASSERT_MSG(desc.RenderTargetFormats[i] != Format::None, "None is not a valid format for a render target, did you forget to set it?");
-
+			ASSERT_MSG(desc.RenderTargetFormats[i] != DataFormat::None, "None is not a valid format for a render target, did you forget to set it?");
+			
 			DXGI_FORMAT format = FormatToD3D12Format(desc.RenderTargetFormats[i]);
 
 			D3D12_CLEAR_VALUE clearValue;
@@ -267,7 +267,6 @@ namespace Gecko { namespace DX12
 
 			u32 numTextureMips = std::min(desc.NumMips[i], CalculateNumberOfMips(desc.Width, desc.Height));
 			TextureDesc textureDesc;
-			textureDesc.Name = desc.Name;
 			textureDesc.Width = desc.Width;
 			textureDesc.Height = desc.Height;
 			textureDesc.Depth = 1;
@@ -287,7 +286,7 @@ namespace Gecko { namespace DX12
 			m_Device->CreateRenderTargetView(textureDX12->TextureResource->ResourceDX12.Get(), &renderTargetDesc, renderTargetDX12->RenderTargetViews[i].CPU);
 		}
 
-		if(desc.DepthStencilFormat != Format::None)
+		if(desc.DepthStencilFormat != DataFormat::None)
 		{	
 			D3D12_CLEAR_VALUE clearValue;
 			clearValue.Format = DXGI_FORMAT_D32_FLOAT;
@@ -296,7 +295,6 @@ namespace Gecko { namespace DX12
 
 			u32 numTextureMips = std::min(desc.DepthMips, CalculateNumberOfMips(desc.Width, desc.Height));
 			TextureDesc textureDesc;
-			textureDesc.Name = "Depth";
 			textureDesc.Width = desc.Width;
 			textureDesc.Height = desc.Height;
 			textureDesc.Depth = 1;
@@ -579,7 +577,7 @@ namespace Gecko { namespace DX12
 
 				elementDesc.SemanticName = vertexAttrib.Name;
 				elementDesc.SemanticIndex = 0;
-				elementDesc.Format = FormatToD3D12Format(vertexAttrib.Format);
+				elementDesc.Format = FormatToD3D12Format(vertexAttrib.AttributeFormat);
 				elementDesc.InputSlot = 0;
 				elementDesc.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 				elementDesc.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA;
@@ -657,10 +655,10 @@ namespace Gecko { namespace DX12
 			u32 i = 0;
 			for (; i < 8; i++)
 			{
-				if (desc.RenderTargetFormats[i] == Format::None)
+				if (desc.RenderTextureFormats[i] == DataFormat::None)
 					break;
 
-				rtvFormats.RTFormats[i] = FormatToD3D12Format(desc.RenderTargetFormats[i]);
+				rtvFormats.RTFormats[i] = FormatToD3D12Format(desc.RenderTextureFormats[i]);
 			}
 			rtvFormats.NumRenderTargets = i;
 			RTVFormats = rtvFormats;
@@ -672,7 +670,7 @@ namespace Gecko { namespace DX12
 
 		CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormats;
 		CD3DX12_DEPTH_STENCIL_DESC1 DepthStencilState;
-		if (desc.DepthStencilFormat != Format::None)
+		if (desc.DepthStencilFormat != DataFormat::None)
 		{
 			DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT;
 			DSVFormats = dsvFormat;
@@ -1522,7 +1520,7 @@ namespace Gecko { namespace DX12
 		}
 
 		// UAV
-		if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && desc.Format != Format::R8G8B8A8_SRGB)
+		if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && desc.Format != DataFormat::R8G8B8A8_SRGB)
 		{
 			texture_DX12->uav = m_SrvDescHeap.Allocate();
 
@@ -1621,7 +1619,7 @@ namespace Gecko { namespace DX12
 
 		}
 
-		NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->ResourceDX12, desc.Name);
+		//NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->ResourceDX12, desc.Name);
 
 		texture_DX12->device = this;
 
