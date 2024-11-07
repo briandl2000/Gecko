@@ -267,7 +267,7 @@ namespace Gecko {
 
 			u32 m_CurrentBackBufferIndex;
 
-			Format m_BackBufferFormat;
+			DataFormat m_BackBufferFormat;
 
 			bool SupportsRaytracing{ false };
 
