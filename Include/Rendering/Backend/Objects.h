@@ -14,7 +14,7 @@ namespace Gecko {
 		Pixel
 	};
 
-	enum class Format
+	enum class DataFormat
 	{
 		None,
 		R8G8B8A8_SRGB,
@@ -111,7 +111,7 @@ namespace Gecko {
 		Structured
 	};
 
-	u32 FormatSizeInBytes(const Format& format);
+	u32 FormatSizeInBytes(const DataFormat& format);
 
 	u32 GetRenderTargetResourceIndex(const RenderTargetType& renderTargetType);
 
@@ -124,18 +124,22 @@ namespace Gecko {
 
 	struct VertexAttribute
 	{
+		const char* Name{ "VertexAttribute" };
+		DataFormat AttributeFormat{ DataFormat::None };
+		u32 Size{ 0 };
+		u32 Offset{ 0 };
+		
 		VertexAttribute() = default;
-
-		VertexAttribute(Format format, const char* name)
+		VertexAttribute(DataFormat format, const char* name)
 			: Name(name)
-			, Format(format)
+			, AttributeFormat(format)
 			, Size(FormatSizeInBytes(format))
 			, Offset(0)
 		{}
 
 		bool IsValid() const
 		{
-			return Format != Format::None && Size > 0;
+			return AttributeFormat != DataFormat::None && Size > 0;
 		}
 		operator bool() const
 		{
@@ -145,21 +149,19 @@ namespace Gecko {
 		// Does not check for name equality
 		bool operator==(const VertexAttribute& other) const
 		{
-			return Format == other.Format && Size == other.Size && Offset == other.Offset;
+			return AttributeFormat == other.AttributeFormat && Size == other.Size && Offset == other.Offset;
 		}
 		bool operator!=(const VertexAttribute& other) const
 		{
 			return !(*this == other);
 		}
-
-		const char* Name{ "VertexAttribute" };
-		Format Format{ Format::None };
-		u32 Size{ 0 };
-		u32 Offset{ 0 };
 	};
 
 	struct VertexLayout
 	{
+		std::vector<VertexAttribute> Attributes{};
+		u32 Stride{ 0 };
+
 		VertexLayout() = default;
 		VertexLayout(const std::initializer_list<VertexAttribute> attributes)
 			: Attributes(attributes)
@@ -202,9 +204,6 @@ namespace Gecko {
 			return !(*this == other);
 		}
 
-		std::vector<VertexAttribute> Attributes{};
-		u32 Stride{ 0 };
-
 	private:
 		void CalculateOffsetsAndStride()
 		{
@@ -221,6 +220,10 @@ namespace Gecko {
 
 	struct VertexBufferDesc // The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer. This pointer needs to stay valid until the CreateVertexBuffer function is called.
 	{
+		VertexLayout Layout{ VertexLayout() };
+		void* VertexData{ nullptr };
+		u32 NumVertices{ 0 };
+
 		bool IsValid() const
 		{
 			if (Layout.Stride == 0 || Layout.Attributes.empty())
@@ -238,14 +241,13 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		VertexLayout Layout{ VertexLayout() };
-		void* VertexData{ nullptr };
-		u32 NumVertices{ 0 };
 	};
 
 	struct VertexBuffer
 	{
+		VertexBufferDesc Desc{};
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -254,31 +256,35 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		VertexBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
 	};
 
 	// Index buffer
 
 	struct IndexBufferDesc // The Index buffer desc takes in format of the indices, the number of indices and the index data pointer. This pointer needs to stay valid until the CreateIndexBuffer function is called.
 	{
+		DataFormat IndexFormat{ DataFormat::None };
+		u32 NumIndices{ 0 };
+		void* IndexData{ nullptr };
+
 		bool IsValid() const
 		{
-			return IndexFormat != Format::None && NumIndices != 0 && IndexData != nullptr;
+			// IndexBuffer format should always be R16_UINT or R32_UINT
+			if (IndexFormat != DataFormat::R16_UINT && IndexFormat != DataFormat::R32_UINT)
+				return false;
+
+			return NumIndices != 0 && IndexData != nullptr;
 		}
 		operator bool() const
 		{
 			return IsValid();
 		}
-
-		Format IndexFormat{ Format::None };
-		u32 NumIndices{ 0 };
-		void* IndexData{ nullptr };
 	};
 
 	struct IndexBuffer
 	{
+		IndexBufferDesc Desc{};
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -287,18 +293,23 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		IndexBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
 	};
 
 	// Texture
 
 	struct TextureDesc
 	{
+		DataFormat Format{ DataFormat::None };
+		u32 Width{ 1 };
+		u32 Height{ 1 };
+		u32 Depth{ 1 };
+		u32 NumMips{ 1 };
+		u32 NumArraySlices{ 1 };
+		TextureType Type{ TextureType::None };
+
 		bool IsValid() const
 		{
-			if (Format == Format::None || Type == TextureType::None)
+			if (Format == DataFormat::None || Type == TextureType::None)
 				return false;
 
 			if (Type == TextureType::Tex1D || Type == TextureType::Tex1DArray)
@@ -313,17 +324,13 @@ namespace Gecko {
 			return IsValid();
 		}
 
-		Format Format{ Format::None };
-		u32 Width{ 1 };
-		u32 Height{ 1 };
-		u32 Depth{ 1 };
-		u32 NumMips{ 1 };
-		u32 NumArraySlices{ 1 };
-		TextureType Type{ TextureType::None };
 	};
 
 	struct Texture
 	{
+		TextureDesc Desc{};
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -332,38 +339,17 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		TextureDesc Desc{};
-		Ref<void> Data{ nullptr };
 	};
 
 	// Render target
 
 	struct ClearValue
 	{
-		bool IsValid() const
+		union
 		{
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-
-		bool operator==(const ClearValue& other) const
-		{
-			for (u32 i = 0; i < 4; ++i)
-			{
-				if (Values[i] != other.Values[i])
-					return false;
-			}
-
-			return true;
-		}
-		bool operator!=(const ClearValue& other) const
-		{
-			return !(*this == other);
-		}
+			f32 Values[4]{ 0. };
+			f32 Depth;
+		};
 
 		ClearValue(ClearValueType type = ClearValueType::RenderTarget)
 		{
@@ -389,20 +375,51 @@ namespace Gecko {
 			Values[3] = a;
 		}
 
-		union
+		bool IsValid() const
 		{
-			f32 Values[4]{ 0. };
-			f32 Depth;
-		};
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+
+		bool operator==(const ClearValue& other) const
+		{
+			for (u32 i = 0; i < 4; ++i)
+			{
+				if (Values[i] != other.Values[i])
+					return false;
+			}
+
+			return true;
+		}
+		bool operator!=(const ClearValue& other) const
+		{
+			return !(*this == other);
+		}
 	};
 
 	struct RenderTargetDesc
 	{
+		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
+		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
+		DataFormat RenderTargetFormats[8]{
+			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None,
+			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None
+		};
+		DataFormat DepthStencilFormat{ DataFormat::None };
+		u32 NumRenderTargets{ 0 };
+		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
+		u32 DepthMips{ 1 };
+		u32 Width{ 0 };
+		u32 Height{ 0 };
+
 		bool IsValid() const
 		{
 			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
 			// Assume that if the first RenderTexture does not have a valid format, none of them do
-			if (RenderTargetFormats[0] == Format::None && DepthStencilFormat == Format::None)
+			if (RenderTargetFormats[0] == DataFormat::None && DepthStencilFormat == DataFormat::None)
 				return false;
 
 			if (Width == 0 || Height == 0)
@@ -414,24 +431,19 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
-		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
-		Format RenderTargetFormats[8]{
-			Format::None, Format::None, Format::None, Format::None,
-			Format::None, Format::None, Format::None, Format::None
-		};
-		Format DepthStencilFormat{ Format::None };
-		u32 NumRenderTargets{ 0 };
-		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
-		u32 DepthMips{ 1 };
-		u32 Width{ 0 };
-		u32 Height{ 0 };
 	};
 
 
 	struct RenderTarget
 	{
+		RenderTargetDesc Desc{};
+		Texture RenderTextures[8]{
+			Texture(), Texture(), Texture(), Texture(),
+			Texture(), Texture(), Texture(), Texture()
+		};
+		Texture DepthTexture{ Texture() };
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
@@ -445,20 +457,15 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		RenderTargetDesc Desc{};
-		Texture RenderTextures[8]{
-			Texture(), Texture(), Texture(), Texture(),
-			Texture(), Texture(), Texture(), Texture()
-		};
-		Texture DepthTexture{ Texture() };
-		Ref<void> Data{ nullptr };
 	};
 
 	// Constant Buffer
 
 	struct ConstantBufferDesc
 	{
+		u64 Size{ 0 };
+		ShaderVisibility Visibility{ ShaderVisibility::All };
+
 		bool IsValid() const
 		{
 			return Size > 0;
@@ -467,13 +474,14 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		u64 Size{ 0 };
-		ShaderVisibility Visibility{ ShaderVisibility::All };
 	};
 
 	struct ConstantBuffer
 	{
+		ConstantBufferDesc Desc{};
+		Ref<void> Data{ nullptr };
+		void* Buffer{ nullptr };
+
 		bool IsValid() const
 		{
 			// You can decide not to use Buffer if you feel like you don't need the void* data
@@ -483,16 +491,18 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		ConstantBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
-		void* Buffer{ nullptr };
 	};
 
 	// Graphics pipeline
 
 	struct SamplerDesc
 	{
+		ShaderVisibility Visibility{ ShaderVisibility::All };
+		SamplerFilter Filter{ SamplerFilter::Linear };
+		SamplerWrapMode WrapU{ SamplerWrapMode::Wrap };
+		SamplerWrapMode WrapV{ SamplerWrapMode::Wrap };
+		SamplerWrapMode WrapW{ SamplerWrapMode::Wrap };
+
 		bool IsValid() const
 		{
 			return true;
@@ -511,16 +521,14 @@ namespace Gecko {
 		{
 			return !(*this == other);
 		}
-
-		ShaderVisibility Visibility{ ShaderVisibility::All };
-		SamplerFilter Filter{ SamplerFilter::Linear };
-		SamplerWrapMode WrapU{ SamplerWrapMode::Wrap };
-		SamplerWrapMode WrapV{ SamplerWrapMode::Wrap };
-		SamplerWrapMode WrapW{ SamplerWrapMode::Wrap };
 	};
 
 	struct DynamicCallData
 	{
+		i32 BufferLocation{ -1 };
+		u32 Size{ 0 };
+		ShaderVisibility ConstantBufferVisibilities{ ShaderVisibility::All };
+
 		bool IsValid() const
 		{
 			return BufferLocation > -1 && Size > 0;
@@ -529,32 +537,10 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		i32 BufferLocation{ -1 };
-		u32 Size{ 0 };
-		ShaderVisibility ConstantBufferVisibilities{ ShaderVisibility::All };
 	};
 
 	struct GraphicsPipelineDesc
 	{
-		GraphicsPipelineDesc() = default;
-
-		bool IsValid() const
-		{
-			if (!VertexShaderPath || !PixelShaderPath || !ShaderVersion)
-				return false;
-			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
-			// Assume that if the first RenderTexture does not have a valid format, none of them do
-			if (RenderTextureFormats[0] == Format::None && DepthStencilFormat == Format::None)
-				return false;
-
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-
 		const char* VertexShaderPath{ nullptr };
 		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
 		const char* VertexEntryPoint{ "main" };
@@ -574,13 +560,13 @@ namespace Gecko {
 
 		VertexLayout VertexLayout{};
 
-		Format RenderTextureFormats[8]{ Format::None };
-		Format DepthStencilFormat{ Format::None };
+		DataFormat RenderTextureFormats[8]{ DataFormat::None };
+		DataFormat DepthStencilFormat{ DataFormat::None };
 
 		CullMode CullMode{ CullMode::None };
 		WindingOrder WindingOrder{ WindingOrder::ClockWise };
 		PrimitiveType PrimitiveType{ PrimitiveType::Triangles };
-		
+
 		std::vector<ShaderVisibility> ConstantBufferVisibilities{};
 
 		DynamicCallData DynamicCallData{};
@@ -589,10 +575,29 @@ namespace Gecko {
 
 		std::vector<SamplerDesc> SamplerDescs{};
 		bool DepthBoundsTest{ false };
+
+		bool IsValid() const
+		{
+			if (!VertexShaderPath || !PixelShaderPath || !ShaderVersion)
+				return false;
+			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
+			// Assume that if the first RenderTexture does not have a valid format, none of them do
+			if (RenderTextureFormats[0] == DataFormat::None && DepthStencilFormat == DataFormat::None)
+				return false;
+
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
 	};
 
 	struct GraphicsPipeline
 	{
+		GraphicsPipelineDesc Desc{};
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -601,16 +606,31 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		GraphicsPipelineDesc Desc{};
-		Ref<void> Data{ nullptr };
 	};
 
 	// Compute pipeline
 
 	struct ComputePipelineDesc
 	{
-		ComputePipelineDesc() = default;
+		// Path from executable to shader object (source or compiled)
+		const char* ComputeShaderPath{ nullptr };
+		/* ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y",
+			where type == cs for compute shaders (type_ prefix gets added automatically in Device_DX12.cpp),
+			X == main version (e.g. 5 for hlsl shader language 5.1),
+			Y == subversion (e.g. 1 for 5.1).
+			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to
+			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders)
+			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
+			*/
+		const char* ShaderVersion{ nullptr };
+		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
+		const char* EntryPoint{ "main" };
+
+		u32 NumConstantBuffers{ 0 };
+		DynamicCallData DynamicCallData{};
+		u32 NumTextures{ 0 };
+		u32 NumUAVs{ 0 };
+		std::vector<SamplerDesc> SamplerDescs{};
 
 		bool IsValid() const
 		{
@@ -625,30 +645,13 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		// Path from executable to shader object (source or compiled)
-		const char* ComputeShaderPath{ nullptr };
-		/* ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y",
-			where type == cs for compute shaders (type_ prefix gets added automatically in Device_DX12.cpp),
-			X == main version (e.g. 5 for hlsl shader language 5.1),
-			Y == subversion (e.g. 1 for 5.1).
-			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to 
-			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders)
-			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
-			*/
-		const char* ShaderVersion{ nullptr };
-		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
-		const char* EntryPoint{ "main" };
-		
-		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData{};
-		u32 NumTextures{ 0 };
-		u32 NumUAVs{ 0 };
-		std::vector<SamplerDesc> SamplerDescs{};
 	};
 
 	struct ComputePipeline
 	{
+		ComputePipelineDesc Desc{};
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -657,9 +660,6 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		ComputePipelineDesc Desc{};
-		Ref<void> Data{ nullptr };
 	};
 
 	// TODO: make the Raytracing structures
@@ -668,7 +668,14 @@ namespace Gecko {
 
 	struct RaytracingPipelineDesc
 	{
-		RaytracingPipelineDesc() = default;
+		const char* RaytraceShaderPath{ nullptr };
+
+		u32 NumConstantBuffers{ 0 };
+		DynamicCallData DynamicCallData{};
+		u32 NumTextures{ 0 };
+		u32 NumUAVs{ 0 };
+
+		std::vector<SamplerDesc> SamplerDescs{};
 
 		bool IsValid() const
 		{
@@ -683,19 +690,13 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		const char* RaytraceShaderPath{ nullptr };
-
-		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData{};
-		u32 NumTextures{ 0 };
-		u32 NumUAVs{ 0 };
-
-		std::vector<SamplerDesc> SamplerDescs{};
 	};
 
 	struct RaytracingPipeline
 	{
+		RaytracingPipelineDesc Desc{};
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -704,13 +705,13 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		RaytracingPipelineDesc Desc{};
-		Ref<void> Data{ nullptr };
 	};
 
 	struct BLASDesc
 	{
+		VertexBuffer VertexBuffer{};
+		IndexBuffer IndexBuffer{};
+
 		bool IsValid() const
 		{
 			return VertexBuffer.IsValid() && IndexBuffer.IsValid();
@@ -719,13 +720,13 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		VertexBuffer VertexBuffer{};
-		IndexBuffer IndexBuffer{};
 	};
 
 	struct BLAS
 	{
+		BLASDesc Desc{};
+		Ref<void> Data{ nullptr };
+
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -734,15 +735,15 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		BLASDesc Desc{};
-		Ref<void> Data{ nullptr };
 	};
 
 	// TLAS
 
 	struct BLASInstanceData
 	{
+		BLAS BLAS{};
+		glm::mat4 Transform{ glm::mat4() };
+
 		bool IsValid() const
 		{
 			return BLAS.IsValid();
@@ -751,13 +752,12 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		BLAS BLAS{};
-		glm::mat4 Transform{ glm::mat4() };
 	};
 
 	struct TLASRefitDesc
 	{
+		std::vector<BLASInstanceData> BLASInstances{};
+		
 		bool IsValid() const
 		{
 			for (BLASInstanceData data : BLASInstances)
@@ -770,12 +770,12 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		std::vector<BLASInstanceData> BLASInstances{};
 	};
 	
 	struct TLAS
 	{
+		Ref<void> Data{ nullptr };
+		
 		bool IsValid() const
 		{
 			return Data != nullptr;
@@ -784,8 +784,6 @@ namespace Gecko {
 		{
 			return IsValid();
 		}
-
-		Ref<void> Data{ nullptr };
 	};
 
 }

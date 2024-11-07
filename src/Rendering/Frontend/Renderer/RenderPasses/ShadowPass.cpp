@@ -21,7 +21,7 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;
-		pipelineDesc.DepthStencilFormat = Format::R32_FLOAT;
+		pipelineDesc.DepthStencilFormat = DataFormat::R32_FLOAT;
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;
 		pipelineDesc.CullMode = CullMode::Back;
 
@@ -35,7 +35,7 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 
 	
 	Gecko::RenderTargetDesc ShadowMapTargetDesc;
-	ShadowMapTargetDesc.DepthStencilFormat = Gecko::Format::R32_FLOAT;
+	ShadowMapTargetDesc.DepthStencilFormat = DataFormat::R32_FLOAT;
 	ShadowMapTargetDesc.DepthTargetClearValue.Depth = 1.0f;
 	ShadowMapTargetDesc.Width = 4096;
 	ShadowMapTargetDesc.Height = 4096;

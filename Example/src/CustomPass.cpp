@@ -28,7 +28,7 @@ const void CustomPass::SubInit(const Gecko::Platform::AppInfo& appInfo, Gecko::R
 		renderTargetDesc.RenderTargetClearValues[i].Values[2] = 0.f;
 		renderTargetDesc.RenderTargetClearValues[i].Values[3] = 0.f;
 	}
-	renderTargetDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT; // output
+	renderTargetDesc.RenderTargetFormats[0] = Gecko::DataFormat::R32G32B32A32_FLOAT; // output
 
 	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "ToneMappingGammaCorrection", true);
 }

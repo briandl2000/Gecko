@@ -249,7 +249,7 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 	vertexDesc.NumVertices = static_cast<u32>(vertices.size());
 
 	IndexBufferDesc indexDesc;
-	indexDesc.IndexFormat = Format::R32_UINT;
+	indexDesc.IndexFormat = DataFormat::R32_UINT;
 	indexDesc.NumIndices = static_cast<u32>(indices.size());
 	indexDesc.IndexData = indices.data();
 
@@ -348,7 +348,7 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 		textureDesc.Width = image.width;
 		textureDesc.Height = image.height;
 		textureDesc.Type = TextureType::Tex2D;
-		textureDesc.Format = Format::None;
+		textureDesc.Format = DataFormat::None;
 		textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
 		textureDesc.NumArraySlices = 1;
 	}
@@ -358,15 +358,15 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 		const tinygltf::Material& gltfMaterial = gltfModel.materials[i];
 
 		if (gltfMaterial.pbrMetallicRoughness.baseColorTexture.index >= 0)
-			textureDescs[gltfMaterial.pbrMetallicRoughness.baseColorTexture.index].Format = Format::R8G8B8A8_SRGB;
+			textureDescs[gltfMaterial.pbrMetallicRoughness.baseColorTexture.index].Format = DataFormat::R8G8B8A8_SRGB;
 		if (gltfMaterial.normalTexture.index >= 0)
-			textureDescs[gltfMaterial.normalTexture.index].Format = Format::R8G8B8A8_UNORM;
+			textureDescs[gltfMaterial.normalTexture.index].Format = DataFormat::R8G8B8A8_UNORM;
 		if (gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0)
-			textureDescs[gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index].Format = Format::R8G8B8A8_UNORM;
+			textureDescs[gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index].Format = DataFormat::R8G8B8A8_UNORM;
 		if (gltfMaterial.emissiveTexture.index >= 0)
-			textureDescs[gltfMaterial.emissiveTexture.index].Format = Format::R8G8B8A8_SRGB;
+			textureDescs[gltfMaterial.emissiveTexture.index].Format = DataFormat::R8G8B8A8_SRGB;
 		if (gltfMaterial.occlusionTexture.index >= 0)
-			textureDescs[gltfMaterial.occlusionTexture.index].Format = Format::R8G8B8A8_UNORM;
+			textureDescs[gltfMaterial.occlusionTexture.index].Format = DataFormat::R8G8B8A8_UNORM;
 	}
 
 	for (u32 i = 0; i < gltfModel.textures.size(); i++)
@@ -374,7 +374,7 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 		const tinygltf::Texture& gltfTexture = gltfModel.textures[i];
 		const tinygltf::Image& image = gltfModel.images[gltfTexture.source];
 
-		if (textureDescs[i].Format == Format::None)
+		if (textureDescs[i].Format == DataFormat::None)
 		{
 			LOG_WARN("Texture %ui exists without being on a material!", i);
 			textureHandles[i] = resourceManager->GetMissingTextureHandle();
