@@ -23,6 +23,7 @@ public:
 
 protected:
 	friend class RenderPass<GeometryPass>;
+	// Called by RenderPass<GeometryPass> to initialise this object with config data
 	virtual const void SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies);
 
 private:

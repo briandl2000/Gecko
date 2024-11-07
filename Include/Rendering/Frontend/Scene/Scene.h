@@ -27,11 +27,11 @@ namespace Gecko {
 		// Allocates requested object on the heap and returns pointer to it
 		[[nodiscard]] virtual SceneLight* CreateLight(LightType lightType) const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] virtual SceneDirectionalLight* CreateDirectionalLight() const;
+		[[nodiscard]] SceneDirectionalLight* CreateDirectionalLight() const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] virtual ScenePointLight* CreatePointLight() const;
+		[[nodiscard]] ScenePointLight* CreatePointLight() const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] virtual SceneSpotLight* CreateSpotLight() const;
+		[[nodiscard]] SceneSpotLight* CreateSpotLight() const;
 		
 		// Returns a newly created SceneRenderInfo object filled with data from this scene
 		[[nodiscard]] SceneRenderInfo GetSceneRenderInfo() const;

@@ -46,7 +46,6 @@ const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceMa
 	}
 	
 	Gecko::RenderTargetDesc PBROutputDesc;
-	PBROutputDesc.AllowRenderTargetTexture = true;
 	PBROutputDesc.Width = appInfo.Width;
 	PBROutputDesc.Height = appInfo.Height;
 	PBROutputDesc.NumRenderTargets = 1;
@@ -57,17 +56,17 @@ const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceMa
 		PBROutputDesc.RenderTargetClearValues[i].Values[2] = 0.f;
 		PBROutputDesc.RenderTargetClearValues[i].Values[3] = 0.f;
 	}
-	PBROutputDesc.RenderTargetFormats[0] = Gecko::Format::R32G32B32A32_FLOAT; // output
+	PBROutputDesc.RenderTargetFormats[0] = DataFormat::R32G32B32A32_FLOAT; // output
 	m_OutputHandle = resourceManager->CreateRenderTarget(PBROutputDesc, "PBROutput", true);
 
 	int width, height, n;
 	unsigned char* image = stbi_load(Platform::GetLocalPath("Assets/BRDF_LUT.png").c_str(), &width, &height, &n, 4);
-	Gecko::TextureDesc textureDesc;
+	TextureDesc textureDesc;
 
 	textureDesc.Width = width;
 	textureDesc.Height = height;
-	textureDesc.Type = Gecko::TextureType::Tex2D;
-	textureDesc.Format = Gecko::Format::R8G8B8A8_UNORM;
+	textureDesc.Type = TextureType::Tex2D;
+	textureDesc.Format = DataFormat::R8G8B8A8_UNORM;
 	textureDesc.NumMips = 1;
 	textureDesc.NumArraySlices = 1;
 	BRDFLUTTextureHandle = resourceManager->CreateTexture(textureDesc, image);
