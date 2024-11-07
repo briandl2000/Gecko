@@ -36,6 +36,7 @@ Make sure visual studio is installed with the latest Windows SDK
 ```git clone https://github.com/briandl2000/Gecko.git --recurse```
 2. Open the Gecko folder that you just cloned.
 3. Right click on the folder and select "Open with Visual Studio"
+
 ![](Images/OpenWithVisualStudio.png)
 
 4. Visual Studio should open up and an out folder should have been created in the Gecko directory.
@@ -44,6 +45,7 @@ Make sure visual studio is installed with the latest Windows SDK
 7. Select "GeckoExample.exe" 
 
 ![](Images/StartUpSelect.png)
+
 8. If everything went correctly you should be able to run the program through Visual Studio.
 
 #### Visual Studio Code
@@ -53,6 +55,7 @@ Make sure visual studio is installed with the latest Windows SDK
 3. Press ```Ctrl+Shift+B``` To start the build task at the top it will ask release or debug
 
 ![](Images/BuildTargetVSC.png)
+
 4. Select the target you want to build.
 5. To run the program go to the Run and Debug tab to the right and select the target you want to run. You can also press F5 and it will run the selected target.
 
