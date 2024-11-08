@@ -25,11 +25,18 @@ namespace Gecko { namespace DX12
 
 	// Device Interface Methods
 
+	static Device_DX12* s_Device{ nullptr };
+
 #pragma region Device Interface Methods
 	
 	void Device_DX12::Init()
 	{
-
+		if(s_Device != nullptr)
+		{
+			ASSERT_MSG(false, "Device already initialized!")
+		}
+		s_Device = this;
+		
 		// Add the resize event
 		AddEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
 
@@ -54,7 +61,6 @@ namespace Gecko { namespace DX12
 			result &= m_RtvDescHeap.Initialize(this, 512, false);
 			result &= m_DsvDescHeap.Initialize(this, 512, false);
 			result &= m_SrvDescHeap.Initialize(this, 4096, true);
-			result &= m_UavDescHeap.Initialize(this, 512, false);
 			ASSERT_MSG(result, "Failed to initialize heaps!");
 		}
 
@@ -127,7 +133,6 @@ namespace Gecko { namespace DX12
 
 	void Device_DX12::Shutdown()
 	{
-		//ShutdownRaytracing();
 
 		Flush();
 
@@ -140,10 +145,11 @@ namespace Gecko { namespace DX12
 
 		m_BackBuffers.clear();
 
+		ProcessDeferredReleases();
+
 		m_RtvDescHeap.Destroy();
 		m_DsvDescHeap.Destroy();
 		m_SrvDescHeap.Destroy();
-		m_UavDescHeap.Destroy();
 
 		for (u32 i = 0; i < m_GraphicsCommandBuffers.size(); i++)
 		{
@@ -178,6 +184,11 @@ namespace Gecko { namespace DX12
 
 		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
 
+		if(s_Device == nullptr)
+		{
+			ASSERT(false);
+		}
+		s_Device = nullptr;
 	}
 
 	Ref<CommandList> Device_DX12::CreateGraphicsCommandList()
@@ -330,8 +341,6 @@ namespace Gecko { namespace DX12
 		renderTargetDX12->ViewPort.MinDepth = 0.f;
 		renderTargetDX12->ViewPort.MaxDepth = 1.f;
 		
-		renderTargetDX12->device = this;
-
 		renderTarget.Desc = desc;
 		renderTarget.Data = renderTargetDX12;
 
@@ -342,8 +351,6 @@ namespace Gecko { namespace DX12
 	{
 		Ref<VertexBuffer_DX12> vertexBuffer_DX12 = CreateRef<VertexBuffer_DX12>();
 		
-		vertexBuffer_DX12->device = this;
-
 		size_t bufferSize = desc.NumVertices * desc.Layout.Stride;
 
 		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_DEFAULT);
@@ -382,8 +389,6 @@ namespace Gecko { namespace DX12
 	IndexBuffer Device_DX12::CreateIndexBuffer(const IndexBufferDesc& desc)
 	{
 		Ref<IndexBuffer_DX12> indexBuffer_DX12 = CreateRef<IndexBuffer_DX12>();
-
-		indexBuffer_DX12->device = this;
 
 		size_t bufferSize = desc.NumIndices * FormatSizeInBytes(desc.IndexFormat);
 
@@ -948,8 +953,6 @@ namespace Gecko { namespace DX12
 		CD3DX12_RANGE readRange(0, 0);
 		constantBuffer_DX12->ConstantBufferResource->ResourceDX12->Map(0, &readRange, &constantBuffer_DX12->GPUAddress);
 
-		constantBuffer_DX12->device = this;
-
 		ConstantBuffer constantBuffer;
 		constantBuffer.Desc = desc;
 		constantBuffer.Data = constantBuffer_DX12;
@@ -1218,6 +1221,54 @@ namespace Gecko { namespace DX12
 		if (height == 0) height = 1;
 		RecreateBackBuffers(width, height);
 		return false;
+	}
+
+	void Device_DX12::FlagResrouceForDeletion(Ref<Resource>& resource)
+	{
+		if(!s_Device)
+		{
+			ASSERT_MSG(false, "Device not initialized!");
+		}
+
+		s_Device->m_ResourcesToBeDeleted.push_back(resource);
+	}
+
+	void Device_DX12::FlagPipelineStateForDeletion(ComPtr<ID3D12PipelineState>& pipelineState)
+	{
+		if(!s_Device)
+		{
+			ASSERT_MSG(false, "Device not initialized!");
+		}
+
+		s_Device->m_PipelineStatesToBeDeleted.push_back(pipelineState);
+	}
+
+	void  Device_DX12::FlagRtvDescriptorHandleForDeletion(DescriptorHandle& handle)
+	{
+		if(!s_Device)
+		{
+			ASSERT_MSG(false, "Device not initialized!");
+		}
+
+		s_Device->m_RtvDescHeapHandlesToBeDeleted.push_back(handle);
+	}
+	void  Device_DX12::FlagDsvDescriptorHandleForDeletion(DescriptorHandle& handle)
+	{
+		if(!s_Device)
+		{
+			ASSERT_MSG(false, "Device not initialized!");
+		}
+
+		s_Device->m_DsvDescHeapHandlesToBeDeleted.push_back(handle);
+	}
+	void  Device_DX12::FlagSrvDescriptorHandleForDeletion(DescriptorHandle& handle)
+	{
+		if(!s_Device)
+		{
+			ASSERT_MSG(false, "Device not initialized!");
+		}
+
+		s_Device->m_SrvDescHeapHandlesToBeDeleted.push_back(handle);
 	}
 
 #pragma endregion
@@ -1621,8 +1672,6 @@ namespace Gecko { namespace DX12
 
 		//NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->ResourceDX12, desc.Name);
 
-		texture_DX12->device = this;
-
 		Texture texture;
 		texture.Desc = desc;
 		texture.Data = texture_DX12;
@@ -1710,7 +1759,6 @@ namespace Gecko { namespace DX12
 			texture_DX12->TextureResource = CreateRef<Resource>();
 			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)));
 			texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
-			texture_DX12->device = this;
 
 			Texture texture;
 			texture.Desc = textureDesc;
@@ -1736,8 +1784,6 @@ namespace Gecko { namespace DX12
 			renderTargetDX12->ViewPort.MinDepth = 0.f;
 			renderTargetDX12->ViewPort.MaxDepth = 1.f;
 
-			renderTargetDX12->device = this;
-
 			m_BackBuffers[i].Desc = renderTargetDesc;
 			m_BackBuffers[i].Data = renderTargetDX12;
 			m_BackBuffers[i].RenderTextures[0] = texture;
@@ -1750,10 +1796,34 @@ namespace Gecko { namespace DX12
 	{
 		std::lock_guard<std::mutex> lock(m_DeferredReleasesMutex);
 
+		for(DescriptorHandle& handle : m_RtvDescHeapHandlesToBeDeleted)
+		{
+			m_RtvDescHeap.Free(handle);
+		}
+		m_RtvDescHeapHandlesToBeDeleted.clear();
+		for(DescriptorHandle& handle : m_DsvDescHeapHandlesToBeDeleted)
+		{
+			m_DsvDescHeap.Free(handle);
+			
+		}
+		m_DsvDescHeapHandlesToBeDeleted.clear();
+		for(DescriptorHandle& handle : m_SrvDescHeapHandlesToBeDeleted)
+		{
+			m_SrvDescHeap.Free(handle);
+		}
+		m_SrvDescHeapHandlesToBeDeleted.clear();
+
+
 		m_RtvDescHeap.ProcessDeferredFree();
 		m_DsvDescHeap.ProcessDeferredFree();
 		m_SrvDescHeap.ProcessDeferredFree();
-		m_UavDescHeap.ProcessDeferredFree();
+
+		if(m_ResourcesToBeDeleted.size() > 0 || m_PipelineStatesToBeDeleted.size() > 0)
+		{
+			Flush();
+			m_ResourcesToBeDeleted.clear();
+			m_PipelineStatesToBeDeleted.clear();
+		}
 	}
 
 #pragma endregion

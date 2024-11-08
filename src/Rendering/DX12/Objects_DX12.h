@@ -10,7 +10,7 @@
 namespace Gecko { namespace DX12 {
 
 	class Device_DX12;
-
+	
 	static DXGI_FORMAT FormatToD3D12Format(DataFormat format)
 	{
 		switch (format)
@@ -199,7 +199,6 @@ namespace Gecko { namespace DX12 {
 	{
 		D3D12_RECT rect{};
 		D3D12_VIEWPORT ViewPort{};
-		Device_DX12* device{ nullptr };
 		
 		DescriptorHandle RenderTargetViews[8]{
 			DescriptorHandle(), DescriptorHandle(), DescriptorHandle(), DescriptorHandle(),
@@ -213,9 +212,9 @@ namespace Gecko { namespace DX12 {
 
 	struct GraphicsPipeline_DX12
 	{
+		Device_DX12* device;
 		ComPtr<ID3D12RootSignature> RootSignature{ nullptr };
 		ComPtr<ID3D12PipelineState> PipelineState{ nullptr };
-		Device_DX12* device{ nullptr };
 
 		std::vector<u32> TextureIndices{};
 		std::vector<u32> ConstantBufferIndices{};
@@ -226,9 +225,9 @@ namespace Gecko { namespace DX12 {
 
 	struct ComputePipeline_DX12
 	{
+		Device_DX12* device;
 		ComPtr<ID3D12RootSignature> RootSignature{ nullptr };
 		ComPtr<ID3D12PipelineState> PipelineState{ nullptr };
-		Device_DX12* device{ nullptr };
 
 		std::vector<u32> TextureIndices{};
 		std::vector<u32> ConstantBufferIndices{};
@@ -242,7 +241,6 @@ namespace Gecko { namespace DX12 {
 	{
 		Ref<Resource> VertexBufferResource{ nullptr };
 		D3D12_VERTEX_BUFFER_VIEW VertexBufferView{};
-		Device_DX12* device{ nullptr };
 
 		VertexBuffer_DX12() {}
 		~VertexBuffer_DX12();
@@ -252,7 +250,6 @@ namespace Gecko { namespace DX12 {
 	{
 		Ref<Resource> IndexBufferResource{ nullptr };
 		D3D12_INDEX_BUFFER_VIEW IndexBufferView{};
-		Device_DX12* device{ nullptr };
 
 		IndexBuffer_DX12() {}
 		~IndexBuffer_DX12();
@@ -264,7 +261,6 @@ namespace Gecko { namespace DX12 {
 		DescriptorHandle cbv{};
 		u64 MemorySize{ 0 };
 		void* GPUAddress{ nullptr };
-		Device_DX12* device{ nullptr };
 
 		ConstantBuffer_DX12() {}
 		~ConstantBuffer_DX12();
@@ -278,36 +274,9 @@ namespace Gecko { namespace DX12 {
 
 		std::vector<DescriptorHandle> mipSrvs{};
 		std::vector<DescriptorHandle> mipUavs{};
-		Device_DX12* device{ nullptr };
 
 		Texture_DX12() {}
 		~Texture_DX12();
-	};
-
-	struct RaytracingPipeline_DX12
-	{
-		ComPtr<ID3D12RootSignature> RootSignature{ nullptr };
-		ComPtr<ID3D12StateObject> StateObject{ nullptr };
-		Device_DX12* device{ nullptr };
-
-		std::vector<u32> TextureIndices{};
-		std::vector<u32> ConstantBufferIndices{};
-		std::vector<u32> UAVIndices{};
-		u32 TLASSlot{ 0 };
-
-		ComPtr<ID3D12Resource> RayGenShaderTable{ nullptr };
-		ComPtr<ID3D12Resource> MissShaderTable{ nullptr };
-		ComPtr<ID3D12Resource> HitGroupShaderTable{ nullptr };
-	};
-
-	struct BLAS_DX12
-	{
-		ComPtr<ID3D12Resource> Resource{ nullptr };
-	};
-
-	struct TLAS_DX12
-	{
-		ComPtr<ID3D12Resource> Resource{ nullptr };
 	};
 
 } }

@@ -7,30 +7,28 @@ namespace Gecko { namespace DX12 {
 
 	RenderTarget_DX12::~RenderTarget_DX12()
 	{
-		ASSERT_MSG(device != nullptr, "device is null, Did you forget to assign it?");
-
-		device->Flush();
-
 		for (u32 i = 0; i < 8; i++)
 		{
 			if (RenderTargetViews[i].IsValid())
 			{
-				device->GetRtvHeap().Free(RenderTargetViews[i]);
+				Device_DX12::FlagRtvDescriptorHandleForDeletion(RenderTargetViews[i]);
 			}
 		}
-		device->GetDsvHeap().Free(DepthStencilView);
+		Device_DX12::FlagDsvDescriptorHandleForDeletion(DepthStencilView);
 	}
 
 	GraphicsPipeline_DX12::~GraphicsPipeline_DX12()
 	{
-		device->Flush();
+		// device->Flush();
+		Device_DX12::FlagPipelineStateForDeletion(PipelineState);
 		RootSignature = nullptr;
 		PipelineState = nullptr;
 	}
 
 	ComputePipeline_DX12::~ComputePipeline_DX12()
 	{
-		device->Flush();
+		// device->Flush();
+		Device_DX12::FlagPipelineStateForDeletion(PipelineState);
 		RootSignature = nullptr;
 		PipelineState = nullptr;
 	}
@@ -38,7 +36,6 @@ namespace Gecko { namespace DX12 {
 
 	CommandBuffer::~CommandBuffer()
 	{
-		
 		CommandAllocator = nullptr;
 		Fence = nullptr;
 		CommandList = nullptr;
@@ -46,33 +43,34 @@ namespace Gecko { namespace DX12 {
 
 	VertexBuffer_DX12::~VertexBuffer_DX12()
 	{
-		device->Flush();
+		Device_DX12::FlagResrouceForDeletion(VertexBufferResource);
 	}
 
 	IndexBuffer_DX12::~IndexBuffer_DX12()
 	{
-		device->Flush();
+		Device_DX12::FlagResrouceForDeletion(IndexBufferResource);
 	}
 
 	ConstantBuffer_DX12::~ConstantBuffer_DX12()
 	{
-		device->Flush();
-		device->GetSrvHeap().Free(cbv);
+		Device_DX12::FlagResrouceForDeletion(ConstantBufferResource);
+		Device_DX12::FlagSrvDescriptorHandleForDeletion(cbv);
 	}
 
 	Texture_DX12::~Texture_DX12()
 	{
-		device->Flush();
-		device->GetSrvHeap().Free(srv);
-		device->GetSrvHeap().Free(uav);
+		//device->Flush();
+		Device_DX12::FlagResrouceForDeletion(TextureResource);
+		Device_DX12::FlagSrvDescriptorHandleForDeletion(srv);
+		Device_DX12::FlagSrvDescriptorHandleForDeletion(uav);
 
 		for (u32 i = 0; i < mipSrvs.size(); i++)
 		{
-			device->GetSrvHeap().Free(mipSrvs[i]);
+			Device_DX12::FlagSrvDescriptorHandleForDeletion(mipSrvs[i]);
 		}
 		for (u32 i = 0; i < mipUavs.size(); i++)
 		{
-			device->GetSrvHeap().Free(mipUavs[i]);
+			Device_DX12::FlagSrvDescriptorHandleForDeletion(mipUavs[i]);
 		}
 	}
 

@@ -54,6 +54,8 @@ namespace Gecko { namespace DX12
 			virtual u32 GetNumBackBuffers() { return m_NumBackBuffers; };
 			virtual u32 GetCurrentBackBufferIndex() { return m_CurrentBackBufferIndex; };
 
+			static void ClearResource(Ref<Resource> resource);
+
 		public:
 			// Public Methods
 
@@ -77,7 +79,12 @@ namespace Gecko { namespace DX12
 			DescriptorHeap& GetRtvHeap() { return m_RtvDescHeap; }
 			DescriptorHeap& GetDsvHeap() { return m_DsvDescHeap; }
 			DescriptorHeap& GetSrvHeap() { return m_SrvDescHeap; }
-			DescriptorHeap& GetUavHeap() { return m_UavDescHeap; }
+
+			static void FlagResrouceForDeletion(Ref<Resource>& resource);
+			static void FlagPipelineStateForDeletion(ComPtr<ID3D12PipelineState>& pipelineState);
+			static void FlagRtvDescriptorHandleForDeletion(DescriptorHandle& handle);
+			static void FlagDsvDescriptorHandleForDeletion(DescriptorHandle& handle);
+			static void FlagSrvDescriptorHandleForDeletion(DescriptorHandle& handle);
 
 		private:
 			// Private Methods
@@ -108,7 +115,12 @@ namespace Gecko { namespace DX12
 			DescriptorHeap m_RtvDescHeap{ D3D12_DESCRIPTOR_HEAP_TYPE_RTV };
 			DescriptorHeap m_DsvDescHeap{ D3D12_DESCRIPTOR_HEAP_TYPE_DSV };
 			DescriptorHeap m_SrvDescHeap{ D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV };
-			DescriptorHeap m_UavDescHeap{ D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV };
+
+			std::vector<Ref<Resource>> m_ResourcesToBeDeleted{ };
+			std::vector<DescriptorHandle> m_RtvDescHeapHandlesToBeDeleted{ };
+			std::vector<DescriptorHandle> m_DsvDescHeapHandlesToBeDeleted{ };
+			std::vector<DescriptorHandle> m_SrvDescHeapHandlesToBeDeleted{ };
+			std::vector<ComPtr<ID3D12PipelineState>> m_PipelineStatesToBeDeleted{ };
 
 			DescriptorHandle m_ImGuiHandle{ };
 
