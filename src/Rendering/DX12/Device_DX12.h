@@ -1,16 +1,14 @@
+#ifdef DIRECTX_12
 #pragma once
-#ifdef WIN32
-
-#include <vector>
-#include <array>
-
 #include "CommonHeaders_DX12.h"
 
 #include "Rendering/DX12/Objects_DX12.h"
 #include "Rendering/Backend/Device.h"
-#include "Rendering/DX12/Resources_DX12.h"
+#include "Rendering/DX12/DescriptorHeap_DX12.h"
 
 #include "Core/Event.h"
+
+#include <array>
 
 namespace Gecko { namespace DX12
 {

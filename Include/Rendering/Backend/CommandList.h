@@ -34,7 +34,7 @@ namespace Gecko {
 		virtual void SetDynamicCallData(u32 size, void* data) = 0;
 
 		virtual void Draw(u32 numIndices) = 0;
-		virtual void DrawAuto(u32 Vertices) = 0;
+		virtual void DrawAuto(u32 numVertices) = 0;
 
 		virtual void Dispatch(u32 xThreads, u32 yThreads, u32 zThreads) = 0;
 

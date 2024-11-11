@@ -1,4 +1,4 @@
-#ifdef WIN32
+#ifdef DIRECTX_12
 //*********************************************************
 //
 // Copyright (c) Microsoft Corporation.

@@ -1,5 +1,5 @@
+#ifdef DIRECTX_12
 #pragma once
-#ifdef WIN32
 
 #include <mutex>
 #include <vector>

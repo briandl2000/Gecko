@@ -1,4 +1,4 @@
-#if WIN32
+#if DIRECTX_12
 #include "CommandList_DX12.h"
 
 #include "Core/Logger.h"
@@ -15,12 +15,19 @@ namespace Gecko { namespace DX12 {
 
 	bool CommandList_DX12::IsValid()
 	{
-		return CommandBuffer->CommandList.Get() != nullptr;
+		if(CommandBuffer == nullptr)
+		{
+			return false;
+		}
+
+		return CommandBuffer->CommandList != nullptr;
 	}
 	
 	void CommandList_DX12::ClearRenderTarget(RenderTarget renderTarget)
 	{
-		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget.Data.get();
+		ASSERT_MSG(renderTarget.IsValid(), "Render target is invalid!");
+		
+		RenderTarget_DX12* renderTargetDX12 = reinterpret_cast<RenderTarget_DX12*>(renderTarget.Data.get());
 		TransitionRenderTarget(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
 		{
@@ -28,7 +35,7 @@ namespace Gecko { namespace DX12 {
 				renderTargetDX12->RenderTargetViews[i].CPU,
 				renderTarget.Desc.RenderTargetClearValues[i].Values,
 				1,
-				&renderTargetDX12->rect
+				&renderTargetDX12->Rect
 			);
 		}
 
@@ -40,25 +47,21 @@ namespace Gecko { namespace DX12 {
 				renderTarget.Desc.DepthTargetClearValue.Depth,
 				0,
 				1,
-				&renderTargetDX12->rect
+				&renderTargetDX12->Rect
 			);
 		}
 	}
 
 	void CommandList_DX12::CopyTextureToTexture(Texture src, Texture dst)
 	{
+		ASSERT_MSG(src.IsValid(), "Source texture is invalid!");
+		ASSERT_MSG(dst.IsValid(), "Destination texture is invalid!");
 
-		Texture_DX12* srcTexture_DX12 = (Texture_DX12*)src.Data.get();
-		Texture_DX12* dstTexture_DX12 = (Texture_DX12*)dst.Data.get();
+		Texture_DX12* srcTexture_DX12 = reinterpret_cast<Texture_DX12*>(src.Data.get());
+		Texture_DX12* dstTexture_DX12 = reinterpret_cast<Texture_DX12*>(dst.Data.get());
 		
-		DataFormat srcFormat = DataFormat::None;
-		DataFormat dstFormat = DataFormat::None;
-
 		Ref<Resource> srcTextureResource = srcTexture_DX12->TextureResource;
 		Ref<Resource> dstTextureResource = dstTexture_DX12->TextureResource;
-
-		srcFormat = src.Desc.Format;
-		dstFormat = dst.Desc.Format;
 
 		TransitionResource(srcTextureResource, D3D12_RESOURCE_STATE_COPY_SOURCE, 1, 1);
 		TransitionResource(dstTextureResource, D3D12_RESOURCE_STATE_COPY_DEST, 1, 1);
@@ -78,14 +81,16 @@ namespace Gecko { namespace DX12 {
 
 	void CommandList_DX12::BindRenderTarget(RenderTarget renderTarget)
 	{
-		//ASSERT_MSG(CurrentlyGraphicsBoundPipeline != nullptr, "Graphics pipeline needs to be bound for this!");
+		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound to bind render target!");
+		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
+		ASSERT_MSG(renderTarget.IsValid(), "Render target is invalid!");
 
-		RenderTarget_DX12* renderTargetDX12 = (RenderTarget_DX12*)renderTarget.Data.get();
+		RenderTarget_DX12* renderTargetDX12 = reinterpret_cast<RenderTarget_DX12*>(renderTarget.Data.get());
 
 		TransitionRenderTarget(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 
 		CommandBuffer->CommandList->RSSetViewports(1, &renderTargetDX12->ViewPort);
-		CommandBuffer->CommandList->RSSetScissorRects(1, &renderTargetDX12->rect);
+		CommandBuffer->CommandList->RSSetScissorRects(1, &renderTargetDX12->Rect);
 
 		D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetCpuHandles[8]{0};
 		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
@@ -103,7 +108,9 @@ namespace Gecko { namespace DX12 {
 	void CommandList_DX12::BindVertexBuffer(VertexBuffer vertexBuffer)
 	{
 		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound for this!");
-		VertexBuffer_DX12* vertexBuffer_DX12 = (VertexBuffer_DX12*)vertexBuffer.Data.get();
+		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
+		ASSERT_MSG(vertexBuffer.IsValid(), "Vertex buffer is invalid!");
+		VertexBuffer_DX12* vertexBuffer_DX12 = reinterpret_cast<VertexBuffer_DX12*>(vertexBuffer.Data.get());
 
 		CommandBuffer->CommandList->IASetVertexBuffers(0, 1, &vertexBuffer_DX12->VertexBufferView);
 	}
@@ -111,136 +118,126 @@ namespace Gecko { namespace DX12 {
 	void CommandList_DX12::BindIndexBuffer(IndexBuffer indexBuffer)
 	{
 		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound for this!");
-		IndexBuffer_DX12* indexBuffer_DX12 = (IndexBuffer_DX12*)indexBuffer.Data.get();
+		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
+		ASSERT_MSG(indexBuffer.IsValid(), "Index buffer is invalid!");
+		IndexBuffer_DX12* indexBuffer_DX12 = reinterpret_cast<IndexBuffer_DX12*>(indexBuffer.Data.get());
 
 		CommandBuffer->CommandList->IASetIndexBuffer(&indexBuffer_DX12->IndexBufferView);
-
 	}
 	
 	void CommandList_DX12::BindTexture(u32 slot, Texture texture)
 	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
-
-		u32 rootDescriptorTableSlot = 0;
+		ASSERT_MSG(texture.IsValid(), "Texture buffer is invalid!");
+		Texture_DX12* texture_DX12 = reinterpret_cast<Texture_DX12*>(texture.Data.get());
+		
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, texture.Desc.NumMips, texture.Desc.NumArraySlices);
-			GraphicsPipeline_DX12* graphicsPipeline_DX12 = (GraphicsPipeline_DX12*)m_GraphicsPipeline.Data.get();
-			rootDescriptorTableSlot = graphicsPipeline_DX12->TextureIndices[slot];
-			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->srv.GPU);
+			ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
+			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
+			ASSERT_MSG(slot < graphicsPipeline_DX12->TextureIndices.size(), "Specified slot is out of bounds!");
+
+			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, 
+				texture.Desc.NumMips, texture.Desc.NumArraySlices);
+			
+			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->TextureIndices[slot];
+			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->ShaderResourceView.GPU);
+			return;
 		}
 		else if(m_BoundPipelineType == PipelineType::Compute)
 		{
-			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, texture.Desc.NumMips, texture.Desc.NumArraySlices);
+			ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is invalid!");
 			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
-			rootDescriptorTableSlot = computePipeline_DX12->TextureIndices[slot];
-			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->srv.GPU);
-		}
-		else
-		{
-			ASSERT_MSG(false, "No pipline bound!");
+			ASSERT_MSG(slot < computePipeline_DX12->TextureIndices.size(), "Specified slot is out of bounds!");
+			
+			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, 
+				texture.Desc.NumMips, texture.Desc.NumArraySlices);
+			
+			u32 rootDescriptorTableSlot = computePipeline_DX12->TextureIndices[slot];
+			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->ShaderResourceView.GPU);
 			return;
 		}
-
+		
+		ASSERT_MSG(false, "No pipline bound!");	
 	}
 
 	void CommandList_DX12::BindTexture(u32 slot, Texture texture, u32 mipLevel)
 	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
+		ASSERT_MSG(texture.IsValid(), "Texture buffer is invalid!");
+		ASSERT_MSG(mipLevel < texture.Desc.NumMips, "Mip level out of bounds of texture mips!");
+		Texture_DX12* texture_DX12 = reinterpret_cast<Texture_DX12*>(texture.Data.get());
 		
-		u32 rootDescriptorTableSlot = 0;
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			TransitionSubResource(
-				texture_DX12->TextureResource, 
-				D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
-				texture.Desc.NumMips,
-				texture.Desc.NumArraySlices, 
-				mipLevel
-			);
-			GraphicsPipeline_DX12* graphicsPipeline_DX12 = (GraphicsPipeline_DX12*)m_GraphicsPipeline.Data.get();
-
-			rootDescriptorTableSlot = graphicsPipeline_DX12->TextureIndices[slot];
-
-			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->mipSrvs[mipLevel].GPU);
+			ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
+			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
+			ASSERT_MSG(slot < graphicsPipeline_DX12->TextureIndices.size(), "Specified slot is out of bounds!");
+			
+			TransitionSubResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+				texture.Desc.NumMips, texture.Desc.NumArraySlices, mipLevel);
+			
+			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->TextureIndices[slot];
+			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot, 
+				texture_DX12->MipShaderResourceViews[mipLevel].GPU);
+			return;
 		}
 		else if (m_BoundPipelineType == PipelineType::Compute)
 		{
-			TransitionSubResource(
-				texture_DX12->TextureResource, 
-				D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, 
-				texture.Desc.NumMips,
-				texture.Desc.NumArraySlices, 
-				mipLevel
-			);
-			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
-			rootDescriptorTableSlot = computePipeline_DX12->TextureIndices[slot];
-			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->mipSrvs[mipLevel].GPU);
-		}
-		else
-		{
-			ASSERT_MSG(false, "No pipline bound!");
+			ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is invalid!");
+			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
+			ASSERT_MSG(slot < computePipeline_DX12->TextureIndices.size(), "Specified slot is out of bounds!");
+			
+			TransitionSubResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, 
+				texture.Desc.NumMips, texture.Desc.NumArraySlices, mipLevel);
+			
+			u32 rootDescriptorTableSlot = computePipeline_DX12->TextureIndices[slot];
+			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, 
+				texture_DX12->MipShaderResourceViews[mipLevel].GPU);
 			return;
 		}
-
+		
+		ASSERT_MSG(false, "No pipline bound!");
 	}
 
 	void CommandList_DX12::BindAsRWTexture(u32 slot, Texture texture)
 	{
-		//ASSERT_MSG(CurrentlyComputeBoundPipeline != nullptr, "A compute shader needs to be bound for this!");
+		ASSERT_MSG(m_BoundPipelineType == PipelineType::Compute, "Compute pipeline must be bound to bind as read write texture!");
+		ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is invalid!");
+		ASSERT_MSG(texture.IsValid(), "Texture is invalid!");
 
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
+		Texture_DX12* texture_DX12 = reinterpret_cast<Texture_DX12*>(texture.Data.get());
+		ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
+		ASSERT_MSG(slot < computePipeline_DX12->UAVIndices.size(), "Specified slot is out of bounds!");
 
-		u32 rootDescriptorTableSlot = 0;
-		if (m_BoundPipelineType == PipelineType::Compute)
-		{
-			TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, texture.Desc.NumMips, texture.Desc.NumArraySlices);
-			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
-			rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
-			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->uav.GPU);
-		}
-		else
-		{
-			ASSERT_MSG(false, "No pipline bound!");
-			return;
-		}
+		TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 
+			texture.Desc.NumMips, texture.Desc.NumArraySlices);
 
-
+		u32	rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
+		CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->UnorderedAccessView.GPU);
 	}
 
 	void CommandList_DX12::BindAsRWTexture(u32 slot, Texture texture, u32 mipLevel)
 	{
-		//ASSERT_MSG(CurrentlyComputeBoundPipeline != nullptr, "A compute shader needs to be bound for this!");
+		ASSERT_MSG(m_BoundPipelineType == PipelineType::Compute, "Compute pipeline must be bound to bind as read write texture!");
+		ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is invalid!");
+		ASSERT_MSG(texture.IsValid(), "Texture is invalid!");
+		ASSERT_MSG(mipLevel < texture.Desc.NumMips, "Specified mip is out of bounds of the texture!");
 
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
-
+		Texture_DX12* texture_DX12 = reinterpret_cast<Texture_DX12*>(texture.Data.get());
+		ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
+		ASSERT_MSG(slot < computePipeline_DX12->UAVIndices.size(), "Specified slot is out of bounds!");
 		
-		u32 rootDescriptorTableSlot = 0;
-		if (m_BoundPipelineType == PipelineType::Compute)
-		{
-			
-			TransitionSubResource(
-				texture_DX12->TextureResource,
-				D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-				texture.Desc.NumMips,
-				texture.Desc.NumArraySlices,
-				mipLevel
-			);
-			
-			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
-			rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
-			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->mipUavs[mipLevel].GPU);
-		}
-		else
-		{
-			ASSERT_MSG(false, "No pipline bound!");
-			return;
-		}
+		TransitionSubResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 
+			texture.Desc.NumMips, texture.Desc.NumArraySlices, mipLevel);
+		
+		u32 rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
+		CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->MipUnorderedAccessViews[mipLevel].GPU);
 	}
 
 	void CommandList_DX12::BindGraphicsPipeline(GraphicsPipeline graphicsPipeline)
 	{
-		GraphicsPipeline_DX12* graphicsPipeline_DX12 = (GraphicsPipeline_DX12*)graphicsPipeline.Data.get();
+		ASSERT_MSG(graphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
+
+		GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(graphicsPipeline.Data.get());
 
 		CommandBuffer->CommandList->SetPipelineState(graphicsPipeline_DX12->PipelineState.Get());
 		CommandBuffer->CommandList->SetGraphicsRootSignature(graphicsPipeline_DX12->RootSignature.Get());
@@ -253,7 +250,9 @@ namespace Gecko { namespace DX12 {
 	
 	void CommandList_DX12::BindComputePipeline(ComputePipeline computePipeline)
 	{
-		ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)computePipeline.Data.get();
+		ASSERT_MSG(computePipeline.IsValid(), "Compute pipeline is invalid!");
+
+		ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(computePipeline.Data.get());
 
 		CommandBuffer->CommandList->SetPipelineState(computePipeline_DX12->PipelineState.Get());
 		CommandBuffer->CommandList->SetComputeRootSignature(computePipeline_DX12->RootSignature.Get());
@@ -264,218 +263,196 @@ namespace Gecko { namespace DX12 {
 
 	void CommandList_DX12::BindConstantBuffer(u32 slot, ConstantBuffer buffer)
 	{
-		ConstantBuffer_DX12* constantBuffer_DX12 = (ConstantBuffer_DX12*)buffer.Data.get();
+		ASSERT_MSG(buffer.IsValid(), "Buffer is invalid!");
+		ConstantBuffer_DX12* constantBuffer_DX12 = reinterpret_cast<ConstantBuffer_DX12*>(buffer.Data.get());
 		
-
-		u32 rootDescriptorTableSlot = 0;
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			//TransitionResource(constantBuffer_DX12->ConstantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ);
-			GraphicsPipeline_DX12* graphicsPipeline_DX12 = (GraphicsPipeline_DX12*)m_GraphicsPipeline.Data.get();
+			ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is Invalid!");
+			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
+			ASSERT_MSG(slot < graphicsPipeline_DX12->ConstantBufferIndices.size(), "Slot is out of bounds of constant buffer indices!");
 
-			rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[slot];
-			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(
-				rootDescriptorTableSlot,
-				constantBuffer_DX12->cbv.GPU
-			);
+			TransitionResource(constantBuffer_DX12->ConstantBufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
+
+			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[slot];
+
+			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot, 
+				constantBuffer_DX12->ConstantBufferView.GPU);
+			return;
 		}
 		else if (m_BoundPipelineType == PipelineType::Compute)
 		{
-			//TransitionResource(constantBuffer_DX12->ConstantBufferResource, D3D12_RESOURCE_STATE_GENERIC_READ);
-			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
-			rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[slot];
-			CommandBuffer->CommandList->SetComputeRootDescriptorTable(
-				rootDescriptorTableSlot,
-				constantBuffer_DX12->cbv.GPU
-			);
-		}
-		else
-		{
-			ASSERT_MSG(false, "No pipline bound!");
+			ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is Invalid!");
+			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
+			ASSERT_MSG(slot < computePipeline_DX12->ConstantBufferIndices.size(), "Slot is out of bounds of constant buffer indices!");
+
+			TransitionResource(constantBuffer_DX12->ConstantBufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
+
+			u32 rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[slot];
+			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot,
+				constantBuffer_DX12->ConstantBufferView.GPU);
 			return;
 		}
 
-		
+		ASSERT_MSG(false, "No pipline bound!");
 	}
 
 	void CommandList_DX12::SetDynamicCallData(u32 size, void* data)
 	{
 		ASSERT_MSG(size % 4 == 0, "The size of dynamic call data must be a multiple of 32 bits or 4 bytes");
-		u32 rootDescriptorTableSlot = 0;
+		ASSERT_MSG(size != 0, "Data can't be 0");
+		ASSERT_MSG(data != nullptr, "Data can't be nullptr");
+
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			GraphicsPipeline_DX12* graphicsPipeline_DX12 = (GraphicsPipeline_DX12*)m_GraphicsPipeline.Data.get();
+			ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is Invalid!");
+			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
 			ASSERT_MSG(size <= m_GraphicsPipeline.Desc.DynamicCallData.Size, "the size is biggert than the DynamicCallData!");
 			ASSERT_MSG(m_GraphicsPipeline.Desc.DynamicCallData.BufferLocation >= 0, "Buffer Location has to be set!");
-			rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[m_GraphicsPipeline.Desc.DynamicCallData.BufferLocation];
-			CommandBuffer->CommandList->SetGraphicsRoot32BitConstants(
-				rootDescriptorTableSlot,
-				size / 4,
-				data,
-				0
-			);
+			ASSERT_MSG(m_GraphicsPipeline.Desc.DynamicCallData.BufferLocation < graphicsPipeline_DX12->ConstantBufferIndices.size(),
+				 "Dynamic call data slot is out of bounds of constant buffer indices!");
+
+			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[m_GraphicsPipeline.Desc.DynamicCallData.BufferLocation];
+			CommandBuffer->CommandList->SetGraphicsRoot32BitConstants(rootDescriptorTableSlot, size / 4, data, 0);
+			return;
 		}
 		else if (m_BoundPipelineType == PipelineType::Compute)
 		{
-			ComputePipeline_DX12* computePipeline_DX12 = (ComputePipeline_DX12*)m_ComputePipeline.Data.get();
-
+			ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is Invalid!");
+			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
 			ASSERT_MSG(size <= m_ComputePipeline.Desc.DynamicCallData.Size, "the size is biggert than the DynamicCallData!");
 			ASSERT_MSG(m_ComputePipeline.Desc.DynamicCallData.BufferLocation >= 0, "Buffer Location has to be set!");
-			rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[m_ComputePipeline.Desc.DynamicCallData.BufferLocation];
-			CommandBuffer->CommandList->SetComputeRoot32BitConstants(
-				rootDescriptorTableSlot,
-				size / 4,
-				data,
-				0
-			);
-		}
-		else
-		{
-			ASSERT_MSG(false, "No pipline bound!");
+			ASSERT_MSG(m_ComputePipeline.Desc.DynamicCallData.BufferLocation < computePipeline_DX12->ConstantBufferIndices.size(),
+				 "Dynamic call data slot is out of bounds of constant buffer indices!");
+
+			u32 rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[m_ComputePipeline.Desc.DynamicCallData.BufferLocation];
+			CommandBuffer->CommandList->SetComputeRoot32BitConstants( rootDescriptorTableSlot, size / 4, data, 0);
 			return;
 		}
-
-		
+		ASSERT_MSG(false, "No pipline bound!");
 	}
 
 	void CommandList_DX12::Draw(u32 numIndices)
 	{
+		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound to draw!");
+		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
 		CommandBuffer->CommandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
+		ASSERT_MSG(numIndices != 0, "Number of indices cannot be 0!");
 	}
 	
 	void CommandList_DX12::DrawAuto(u32 numVertices)
 	{
+		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound to draw!");
+		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
+		ASSERT_MSG(numVertices != 0, "Number of vertices cannot be 0!");
 		CommandBuffer->CommandList->DrawInstanced(numVertices, 1, 0, 0);
 	}
 
 	void CommandList_DX12::Dispatch(u32 xThreads, u32 yThreads, u32 zThreads)
 	{
+		ASSERT_MSG(m_BoundPipelineType == PipelineType::Compute, "Compute pipeline needs to be bound to draw!");
+		ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is invalid!");
+		ASSERT_MSG(xThreads*yThreads*zThreads != 0, "All thread dementions need to be atleast 1!");
 		CommandBuffer->CommandList->Dispatch(xThreads, yThreads, zThreads);
 	}
 
-	void CommandList_DX12::TransitionSubResource(
-		Ref<Resource> resource,
-		D3D12_RESOURCE_STATES transtion,
-		u32 numMips,
-		u32 numArraySlices,
-		u32 subResourceIndex)
+	void CommandList_DX12::TransitionSubResource( Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices, u32 subResourceIndex)
 	{
-		std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+		std::vector<CD3DX12_RESOURCE_BARRIER> barriers{ };
+
 		GetTextureMipTransitionBarriers(&barriers, resource, transtion, numMips, numArraySlices, subResourceIndex);
+		
 		if (barriers.size() == 0) return;
+		
 		CommandBuffer->CommandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
-		resource->subResourceStates[subResourceIndex] = transtion;
+		resource->SubResourceStates[subResourceIndex] = transtion;
 	}
 
 	void CommandList_DX12::TransitionResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices)
 	{
-		std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+		std::vector<CD3DX12_RESOURCE_BARRIER> barriers{ };
+
 		GetTextureTransitionBarriers(&barriers, resource, transtion, numMips, numArraySlices);
+
 		if (barriers.size() == 0) return;
 
 		CommandBuffer->CommandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
-
 		resource->CurrentState = transtion;
-
-		for (u32 i = 0; i < resource->subResourceStates.size(); i++)
+		for (u32 i = 0; i < resource->SubResourceStates.size(); i++)
 		{
-			resource->subResourceStates[i] = transtion;
+			resource->SubResourceStates[i] = transtion;
 		}
 	}
 
-	void CommandList_DX12::TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, D3D12_RESOURCE_STATES newDepthStencilState)
+	void CommandList_DX12::TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, 
+		D3D12_RESOURCE_STATES newDepthStencilState)
 	{
-		std::vector<CD3DX12_RESOURCE_BARRIER> barriers;
+		std::vector<CD3DX12_RESOURCE_BARRIER> barriers{ };
+
+		ASSERT_MSG(renderTarget.IsValid(), "Invalid render target in transition render target!");
 
 		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
 		{
-			ASSERT_MSG(renderTarget.RenderTextures[i].Data != nullptr, "RenderTarget texture is nullptr!");
-			Texture_DX12* texture = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
-			GetTextureTransitionBarriers(
-				&barriers, 
-				texture->TextureResource,
-				newRenderTargetState,
-				renderTarget.RenderTextures[i].Desc.NumMips,
-				renderTarget.RenderTextures[i].Desc.NumArraySlices
-			);
+			Texture_DX12* texture = reinterpret_cast<Texture_DX12*>(renderTarget.RenderTextures[i].Data.get());
+			GetTextureTransitionBarriers(&barriers,  texture->TextureResource, newRenderTargetState, 
+				renderTarget.RenderTextures[i].Desc.NumMips, renderTarget.RenderTextures[i].Desc.NumArraySlices);
+			
+			texture->TextureResource->CurrentState = newRenderTargetState;
+			for (u32 j = 0; j < static_cast<u32>(texture->TextureResource->SubResourceStates.size()); j++)
+			{
+				texture->TextureResource->SubResourceStates[j] = newRenderTargetState;
+			}
 		}
-		if (renderTarget.DepthTexture.Data)
+		if (renderTarget.DepthTexture.IsValid())
 		{
-			Texture_DX12* depthTexture = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
-			GetTextureTransitionBarriers(
-				&barriers,
-				depthTexture->TextureResource,
-				newDepthStencilState,
-				renderTarget.DepthTexture.Desc.NumMips,
-				renderTarget.DepthTexture.Desc.NumArraySlices
-			);
+			Texture_DX12* depthTexture = reinterpret_cast<Texture_DX12*>(renderTarget.DepthTexture.Data.get());
+			GetTextureTransitionBarriers(&barriers, depthTexture->TextureResource, newDepthStencilState,
+				renderTarget.DepthTexture.Desc.NumMips, renderTarget.DepthTexture.Desc.NumArraySlices);
+			
+			depthTexture->TextureResource->CurrentState = newDepthStencilState;
+			for (u32 i = 0; i < static_cast<u32>(depthTexture->TextureResource->SubResourceStates.size()); i++)
+			{
+				depthTexture->TextureResource->SubResourceStates[i] = newDepthStencilState;
+			}
 		}
 
 		if (barriers.size() == 0) return;
 
 		CommandBuffer->CommandList->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
-
-		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
-		{
-			Texture_DX12* texture = (Texture_DX12*)renderTarget.RenderTextures[i].Data.get();
-			texture->TextureResource->CurrentState = newRenderTargetState;
-			for (u32 j = 0; j < static_cast<u32>(texture->TextureResource->subResourceStates.size()); j++)
-			{
-				texture->TextureResource->subResourceStates[j] = newRenderTargetState;
-			}
-		}
-		if (renderTarget.DepthTexture.Data)
-		{
-			Texture_DX12* depthTexture = (Texture_DX12*)renderTarget.DepthTexture.Data.get();
-			depthTexture->TextureResource->CurrentState = newDepthStencilState;
-			for (u32 i = 0; i < static_cast<u32>(depthTexture->TextureResource->subResourceStates.size()); i++)
-			{
-				depthTexture->TextureResource->subResourceStates[i] = newDepthStencilState;
-			}
-		}
 	}
 
-	void CommandList_DX12::GetTextureMipTransitionBarriers(
-		std::vector<CD3DX12_RESOURCE_BARRIER>* barriers,
-		Ref<Resource> resource,
-		D3D12_RESOURCE_STATES transtion,
-		u32 numMips,
-		u32 numArraySlices,
-		u32 subResourceIndex)
+	void CommandList_DX12::GetTextureMipTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource, 
+		D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices, u32 subResourceIndex)
 	{
-		if (resource->subResourceStates[subResourceIndex] == transtion)
+		if (resource->SubResourceStates[subResourceIndex] == transtion)
 			return;
 
 		for (u32 i = 0; i < numArraySlices; i++)
 		{
 			barriers->push_back(CD3DX12_RESOURCE_BARRIER::Transition(
 				resource->ResourceDX12.Get(),
-				resource->subResourceStates[subResourceIndex],
+				resource->SubResourceStates[subResourceIndex],
 				transtion,
 				subResourceIndex + i * numMips
 			));
 		}
 	}
 
-	void CommandList_DX12::GetTextureTransitionBarriers(
-		std::vector<CD3DX12_RESOURCE_BARRIER>* barriers,
-		Ref<Resource> resource,
-		D3D12_RESOURCE_STATES transtion,
-		u32 numMips,
-		u32 numArraySlices)
+	void CommandList_DX12::GetTextureTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource, 
+		D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices)
 	{
 		if (resource->CurrentState == transtion)
 		{
-			for (u32 i = 0; i < resource->subResourceStates.size(); i++)
+			for (u32 i = 0; i < resource->SubResourceStates.size(); i++)
 			{
 				GetTextureMipTransitionBarriers(barriers, resource, transtion, numMips, numArraySlices, i);
 			}
 			return;
 		}
 
-		for (u32 i = 0; i < resource->subResourceStates.size(); i++)
+		for (u32 i = 0; i < resource->SubResourceStates.size(); i++)
 		{
-			if (resource->subResourceStates[i] != resource->CurrentState)
+			if (resource->SubResourceStates[i] != resource->CurrentState)
 			{
 				GetTextureMipTransitionBarriers(barriers, resource, resource->CurrentState, numMips, numArraySlices, i);
 			}

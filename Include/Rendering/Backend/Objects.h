@@ -578,7 +578,7 @@ namespace Gecko {
 
 		bool IsValid() const
 		{
-			if (!VertexShaderPath || !PixelShaderPath || !ShaderVersion)
+			if (!VertexShaderPath || !ShaderVersion)
 				return false;
 			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
 			// Assume that if the first RenderTexture does not have a valid format, none of them do

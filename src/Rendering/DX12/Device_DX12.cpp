@@ -1,4 +1,4 @@
-#ifdef WIN32
+#ifdef DIRECTX_12
 
 #include "Rendering/DX12/Device_DX12.h"
 #include "Core/Platform.h"
@@ -329,10 +329,10 @@ namespace Gecko { namespace DX12
 		}
 
 
-		renderTargetDX12->rect.left = 0;
-		renderTargetDX12->rect.top = 0;
-		renderTargetDX12->rect.right = (i32)desc.Width;
-		renderTargetDX12->rect.bottom = (i32)desc.Height;
+		renderTargetDX12->Rect.left = 0;
+		renderTargetDX12->Rect.top = 0;
+		renderTargetDX12->Rect.right = (i32)desc.Width;
+		renderTargetDX12->Rect.bottom = (i32)desc.Height;
 
 		renderTargetDX12->ViewPort.TopLeftX = 0.f;
 		renderTargetDX12->ViewPort.TopLeftY = 0.f;
@@ -426,11 +426,7 @@ namespace Gecko { namespace DX12
 	
 	GraphicsPipeline Device_DX12::CreateGraphicsPipeline(const GraphicsPipelineDesc& desc)
 	{
-
 		Ref<GraphicsPipeline_DX12> graphicsPipeline_DX12 = CreateRef<GraphicsPipeline_DX12>();
-
-		graphicsPipeline_DX12->device = this;
-
 
 		CD3DX12_PIPELINE_STATE_STREAM2 piplineStateStream2;
 		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
@@ -694,8 +690,8 @@ namespace Gecko { namespace DX12
 		CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
 		{
 			Rasterizer = CD3DX12_RASTERIZER_DESC(
-				D3D12_FILL_MODE_SOLID, // GetD3D12FillModeFromPrimitiveType(desc.PrimitiveType),
-				CullModeToDirectX12CullMode(desc.CullMode),
+				D3D12_FILL_MODE_SOLID, // PrimitiveTypeToD3D12FillMode(desc.PrimitiveType),
+				CullModeToD3D12CullMode(desc.CullMode),
 				desc.WindingOrder == WindingOrder::CounterClockWise ? true : false,
 				D3D12_DEFAULT_DEPTH_BIAS,
 				D3D12_DEFAULT_DEPTH_BIAS_CLAMP,
@@ -724,10 +720,7 @@ namespace Gecko { namespace DX12
 
 	ComputePipeline Device_DX12::CreateComputePipeline(const ComputePipelineDesc& desc)
 	{
-
 		Ref<ComputePipeline_DX12> computePipeline_DX12 = CreateRef<ComputePipeline_DX12>();
-
-		computePipeline_DX12->device = this;
 
 		D3D12_COMPUTE_PIPELINE_STATE_DESC computeStateDesc;
 		CD3DX12_PIPELINE_STATE_STREAM_ROOT_SIGNATURE pRootSignature;
@@ -943,12 +936,12 @@ namespace Gecko { namespace DX12
 			IID_PPV_ARGS(&constantBuffer_DX12->ConstantBufferResource->ResourceDX12)
 		);
 
-		constantBuffer_DX12->cbv = m_SrvDescHeap.Allocate();
+		constantBuffer_DX12->ConstantBufferView = m_SrvDescHeap.Allocate();
 
 		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
 		cbvDesc.BufferLocation = constantBuffer_DX12->ConstantBufferResource->ResourceDX12->GetGPUVirtualAddress();
 		cbvDesc.SizeInBytes = static_cast<u32>(constantBuffer_DX12->MemorySize);
-		m_Device->CreateConstantBufferView(&cbvDesc, constantBuffer_DX12->cbv.CPU);
+		m_Device->CreateConstantBufferView(&cbvDesc, constantBuffer_DX12->ConstantBufferView.CPU);
 
 		CD3DX12_RANGE readRange(0, 0);
 		constantBuffer_DX12->ConstantBufferResource->ResourceDX12->Map(0, &readRange, &constantBuffer_DX12->GPUAddress);
@@ -972,47 +965,11 @@ namespace Gecko { namespace DX12
 
 		u32 subResource = D3D12CalcSubresource(mip, slice, 0, texture.Desc.NumMips, texture.Desc.NumArraySlices);
 
-		if (texture_DX12->TextureResource->CurrentState != D3D12_RESOURCE_STATE_COMMON)
-		{
-
-			Ref<CommandBuffer> commandList = GetFreeGraphicsCommandBuffer();
-
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				texture_DX12->TextureResource->ResourceDX12.Get(),
-				texture_DX12->TextureResource->CurrentState,
-				D3D12_RESOURCE_STATE_COMMON,
-				subResource
-			);
-
-			commandList->CommandList->ResourceBarrier(1, &barrier);
-			
-			ExecuteGraphicsCommandBuffer(commandList);
-			commandList->Wait(m_FenceEvent);
-		}
-
 		CopyToResource(
 			texture_DX12->TextureResource->ResourceDX12,
 			subresourceData,
 			subResource
 		);
-
-		if (texture_DX12->TextureResource->CurrentState != D3D12_RESOURCE_STATE_COMMON)
-		{
-
-			Ref<CommandBuffer> commandList = GetFreeGraphicsCommandBuffer();
-
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-				texture_DX12->TextureResource->ResourceDX12.Get(),
-				D3D12_RESOURCE_STATE_COMMON,
-				texture_DX12->TextureResource->CurrentState,
-				subResource
-			);
-
-			commandList->CommandList->ResourceBarrier(1, &barrier);
-
-			ExecuteGraphicsCommandBuffer(commandList);
-			commandList->Wait(m_FenceEvent);
-		}
 	}
 
 	void Device_DX12::DrawTextureInImGui(Texture texture, u32 width, u32 height)
@@ -1033,7 +990,7 @@ namespace Gecko { namespace DX12
 
 		for (u32 i = 0; i < texture.Desc.NumMips; i++)
 		{
-			ImGui::Image(static_cast<ImU64>(texture_DX12->mipSrvs[i].GPU.ptr), size);
+			ImGui::Image(static_cast<ImU64>(texture_DX12->MipShaderResourceViews[i].GPU.ptr), size);
 		}
 
 	};
@@ -1533,7 +1490,7 @@ namespace Gecko { namespace DX12
 
 		// SRV
 		{
-			texture_DX12->srv = m_SrvDescHeap.Allocate();
+			texture_DX12->ShaderResourceView = m_SrvDescHeap.Allocate();
 
 			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -1566,14 +1523,14 @@ namespace Gecko { namespace DX12
 			m_Device->CreateShaderResourceView(
 				texture_DX12->TextureResource->ResourceDX12.Get(),
 				&srvDesc,
-				texture_DX12->srv.CPU
+				texture_DX12->ShaderResourceView.CPU
 			);
 		}
 
 		// UAV
 		if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && desc.Format != DataFormat::R8G8B8A8_SRGB)
 		{
-			texture_DX12->uav = m_SrvDescHeap.Allocate();
+			texture_DX12->UnorderedAccessView = m_SrvDescHeap.Allocate();
 
 			D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 			uavDesc.Format = FormatToD3D12Format(desc.Format);
@@ -1620,18 +1577,18 @@ namespace Gecko { namespace DX12
 				texture_DX12->TextureResource->ResourceDX12.Get(),
 				nullptr,
 				&uavDesc,
-				texture_DX12->uav.CPU
+				texture_DX12->UnorderedAccessView.CPU
 			);
 		}
 
 		// Mips
 		{
-			texture_DX12->mipSrvs.resize(desc.NumMips);
-			texture_DX12->mipUavs.resize(desc.NumMips);
-			texture_DX12->TextureResource->subResourceStates.resize(desc.NumMips);
+			texture_DX12->MipShaderResourceViews.resize(desc.NumMips);
+			texture_DX12->MipUnorderedAccessViews.resize(desc.NumMips);
+			texture_DX12->TextureResource->SubResourceStates.resize(desc.NumMips);
 			for (u32 i = 0; i < desc.NumMips; i++)
 			{
-				texture_DX12->mipSrvs[i] = m_SrvDescHeap.Allocate();
+				texture_DX12->MipShaderResourceViews[i] = m_SrvDescHeap.Allocate();
 				D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 				srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 				srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
@@ -1644,11 +1601,11 @@ namespace Gecko { namespace DX12
 				m_Device->CreateShaderResourceView(
 					texture_DX12->TextureResource->ResourceDX12.Get(),
 					&srvDesc,
-					texture_DX12->mipSrvs[i].CPU
+					texture_DX12->MipShaderResourceViews[i].CPU
 				);
 				if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)
 				{
-					texture_DX12->mipUavs[i] = m_SrvDescHeap.Allocate();
+					texture_DX12->MipUnorderedAccessViews[i] = m_SrvDescHeap.Allocate();
 					D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 					uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
 					uavDesc.Format = FormatToD3D12Format(desc.Format);
@@ -1661,11 +1618,11 @@ namespace Gecko { namespace DX12
 						texture_DX12->TextureResource->ResourceDX12.Get(),
 						nullptr,
 						&uavDesc,
-						texture_DX12->mipUavs[i].CPU
+						texture_DX12->MipUnorderedAccessViews[i].CPU
 					);
 				}
 
-				texture_DX12->TextureResource->subResourceStates[i] = texture_DX12->TextureResource->CurrentState;
+				texture_DX12->TextureResource->SubResourceStates[i] = texture_DX12->TextureResource->CurrentState;
 			}
 
 		}
@@ -1772,10 +1729,10 @@ namespace Gecko { namespace DX12
 			m_Device->CreateRenderTargetView(texture_DX12->TextureResource->ResourceDX12.Get(), &renderTargetViewDesc, renderTargetDX12->RenderTargetViews[0].CPU);
 			NAME_DIRECTX12_OBJECT_INDEXED(texture_DX12->TextureResource->ResourceDX12, i, "BackBuffer");
 
-			renderTargetDX12->rect.left = 0;
-			renderTargetDX12->rect.top = 0;
-			renderTargetDX12->rect.right = static_cast<i32>(width);
-			renderTargetDX12->rect.bottom = static_cast<i32>(height);
+			renderTargetDX12->Rect.left = 0;
+			renderTargetDX12->Rect.top = 0;
+			renderTargetDX12->Rect.right = static_cast<i32>(width);
+			renderTargetDX12->Rect.bottom = static_cast<i32>(height);
 
 			renderTargetDX12->ViewPort.TopLeftX = 0.f;
 			renderTargetDX12->ViewPort.TopLeftY = 0.f;
