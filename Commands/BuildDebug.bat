@@ -1,7 +1,7 @@
 cd ..
 mkdir build
 cd build
-cmake ..
+cmake .. -DRELEASE=OFF
 cmake --build . --config Debug
 
-ECHO "Finished building Release"
+ECHO "Finished building Debug"
