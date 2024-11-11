@@ -157,7 +157,7 @@ namespace Gecko
 			indexDesc.NumIndices = 36;
 			indexDesc.IndexData = indices;
 
-			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc, true);
+			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc);
 		}
 
 		// Create missing Texture
@@ -257,10 +257,9 @@ namespace Gecko
 		m_RenderTargets.clear();
 		m_GraphicsPipelines.clear();
 		m_ComputePipelines.clear();
-		m_RaytracePipelines.clear();
 	}
 
-	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, bool CreateBLAS)
+	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc)
 	{
 		MeshHandle handle = m_CurrentMeshIndex;
 
@@ -268,11 +267,6 @@ namespace Gecko
 
 		mesh.VertexBuffer = m_Device->CreateVertexBuffer(vertexDesc);
 		mesh.IndexBuffer = m_Device->CreateIndexBuffer(indexDesc);
-		mesh.HasBLAS = CreateBLAS;
-		if (CreateBLAS)
-		{
-			//mesh.BLAS = m_Device->CreateBLAS({ mesh.VertexBuffer, mesh.IndexBuffer });
-		}
 
 		m_Meshes[handle] = mesh;
 
@@ -486,17 +480,6 @@ namespace Gecko
 		return handle;
 	}
 
-	RaytracingPipelineHandle ResourceManager::CreateRaytracePipeline(RaytracingPipelineDesc raytracePipelineDesc)
-	{
-		RaytracingPipelineHandle handle = m_CurrentRaytracePipelineIndex;
-
-		RaytracingPipeline outRaytracingPipeline = m_Device->CreateRaytracingPipeline(raytracePipelineDesc);
-		m_RaytracePipelines[handle] = outRaytracingPipeline;
-
-		m_CurrentRaytracePipelineIndex++;
-		return handle;
-	}
-
 	Mesh& ResourceManager::GetMesh(const MeshHandle& meshHandle)
 	{
 		if (m_Meshes.find(meshHandle) == m_Meshes.end())
@@ -554,16 +537,6 @@ namespace Gecko
 		}
 
 		return m_ComputePipelines[computePipelineHandle];
-	}
-
-	RaytracingPipeline& ResourceManager::GetRaytracingPipeline(const RaytracingPipelineHandle& raytracingPipelineHandle)
-	{
-		if (m_RaytracePipelines.find(raytracingPipelineHandle) == m_RaytracePipelines.end())
-		{
-			ASSERT_MSG(false, "Could not find specified RaytracingPipeline!");
-		}
-
-		return m_RaytracePipelines[raytracingPipelineHandle];
 	}
 
 	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)

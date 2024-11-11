@@ -22,14 +22,13 @@ public:
 	void Init(Device* device);
 	void Shutdown();
 
-	MeshHandle CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, bool CreateBLAS);
+	MeshHandle CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc);
 	TextureHandle CreateTexture(TextureDesc textureDesc, void* imageData = nullptr, bool mipMap = false);
 	MaterialHandle CreateMaterial();
 	RenderTargetHandle CreateRenderTarget(RenderTargetDesc renderTargetDesc, std::string name, bool KeepWindowAspectRatio);
 	EnvironmentMapHandle CreateEnvironmentMap(std::string path);
 	GraphicsPipelineHandle CreateGraphicsPipeline(GraphicsPipelineDesc graphicsPipelineDesc);
 	ComputePipelineHandle CreateComputePipeline(ComputePipelineDesc computePipelineDesc);
-	RaytracingPipelineHandle CreateRaytracePipeline(RaytracingPipelineDesc raytracePipelineDesc);
 
 	Mesh& GetMesh(const MeshHandle& meshHandle);
 	Texture& GetTexture(const TextureHandle& textureHandle);
@@ -38,7 +37,6 @@ public:
 	EnvironmentMap& GetEnvironmentMap(const EnvironmentMapHandle& environmentMapHandle);
 	GraphicsPipeline& GetGraphicsPipeline(const GraphicsPipelineHandle& graphicsPipelineHandle);
 	ComputePipeline& GetComputePipeline(const ComputePipelineHandle& computePipelineHandle);
-	RaytracingPipeline& GetRaytracingPipeline(const RaytracingPipelineHandle& raytracingPipelineHandle);
 
 	TextureHandle GetMissingTextureHandle() { return m_MissingTextureHandle; }
 	MaterialHandle GetMissingMaterialHandle() { return m_MissingMaterialHandle; }
@@ -84,7 +82,6 @@ private:
 
 	std::unordered_map<GraphicsPipelineHandle, GraphicsPipeline> m_GraphicsPipelines;
 	std::unordered_map<ComputePipelineHandle, ComputePipeline> m_ComputePipelines;
-	std::unordered_map<RaytracingPipelineHandle, RaytracingPipeline> m_RaytracePipelines;
 
 };
 

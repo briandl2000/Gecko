@@ -578,7 +578,7 @@ namespace Gecko {
 
 		bool IsValid() const
 		{
-			if (!VertexShaderPath || !PixelShaderPath || !ShaderVersion)
+			if (!VertexShaderPath || !ShaderVersion)
 				return false;
 			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
 			// Assume that if the first RenderTexture does not have a valid format, none of them do
@@ -662,128 +662,6 @@ namespace Gecko {
 		}
 	};
 
-	// TODO: make the Raytracing structures
-
-	// Raytracing structures
-
-	struct RaytracingPipelineDesc
-	{
-		const char* RaytraceShaderPath{ nullptr };
-
-		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData{};
-		u32 NumTextures{ 0 };
-		u32 NumUAVs{ 0 };
-
-		std::vector<SamplerDesc> SamplerDescs{};
-
-		bool IsValid() const
-		{
-			if (!RaytraceShaderPath)
-				return false;
-			if (NumUAVs == 0)
-				return false;
-
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	struct RaytracingPipeline
-	{
-		RaytracingPipelineDesc Desc{};
-		Ref<void> Data{ nullptr };
-
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	struct BLASDesc
-	{
-		VertexBuffer VertexBuffer{};
-		IndexBuffer IndexBuffer{};
-
-		bool IsValid() const
-		{
-			return VertexBuffer.IsValid() && IndexBuffer.IsValid();
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	struct BLAS
-	{
-		BLASDesc Desc{};
-		Ref<void> Data{ nullptr };
-
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	// TLAS
-
-	struct BLASInstanceData
-	{
-		BLAS BLAS{};
-		glm::mat4 Transform{ glm::mat4() };
-
-		bool IsValid() const
-		{
-			return BLAS.IsValid();
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	struct TLASRefitDesc
-	{
-		std::vector<BLASInstanceData> BLASInstances{};
-		
-		bool IsValid() const
-		{
-			for (BLASInstanceData data : BLASInstances)
-				if (!data.IsValid())
-					return false;
-
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-	
-	struct TLAS
-	{
-		Ref<void> Data{ nullptr };
-		
-		bool IsValid() const
-		{
-			return Data != nullptr;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
+	// TODO: Make is valid functions for each descriptor structure.
 
 }

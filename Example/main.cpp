@@ -6,7 +6,6 @@
 
 #include "Rendering/Frontend/Renderer/RenderPasses/RenderPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/ShadowPass.h"
-#include "Rendering/Frontend/Renderer/RenderPasses/ShadowRaytracePass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/GeometryPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/DeferredPBRPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/FXAAPass.h"

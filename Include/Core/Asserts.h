@@ -2,9 +2,9 @@
 #include "Defines.h"
 
 // Disable assertions by commenting out the below line.
-#define AASSERTIONS_ENABLED
+#define ASSERTIONS_ENABLED
 
-#ifdef AASSERTIONS_ENABLED
+#ifdef ASSERTIONS_ENABLED
 #if _MSC_VER
 #include <intrin.h>
 #define debugBreak() __debugbreak()
@@ -33,19 +33,6 @@ namespace Gecko { namespace Logger {
             debugBreak();                                                 \
         }                                                                 \
     }
-
-#ifdef _DEBUG
-#define AASSERT_DEBUG(expr)                                          \
-    {                                                                \
-        if (expr) {                                                  \
-        } else {                                                     \
-            Gecko::Logger::ReportAssertionFailure(#expr, "", __FILE__, __LINE__); \
-            debugBreak();                                            \
-        }                                                            \
-    }
-#else
-#define ASSERT_DEBUG(expr)  // Does nothing at all
-#endif
 
 #else
 #define ASSERT(expr)               // Does nothing at all

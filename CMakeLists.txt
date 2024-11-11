@@ -33,7 +33,7 @@ else()
 endif()
 
 if (WIN32)
-	target_compile_definitions("${GECKO}" PUBLIC DIRECT_X_12)
+	target_compile_definitions("${GECKO}" PUBLIC DIRECTX_12)
 endif (WIN32)
 
 if(MSVC) # If using the VS compiler...
