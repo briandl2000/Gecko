@@ -1,6 +1,7 @@
 #include "GLTFSceneLoader.h"
 
 #include "NodeBasedScene.h"
+#include "FlatHierarchyScene.h"
 #include "Rendering/Frontend/ApplicationContext.h"
 
 #include "Core/Asserts.h"
@@ -306,9 +307,7 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 		}
 	}
 
-	sceneNode->Transform.Position = translation;
-	sceneNode->Transform.Rotation = glm::eulerAngles(rotation);
-	sceneNode->Transform.Scale = scale;
+	sceneNode->GetModifiableTransform() = Transform(translation, glm::eulerAngles(rotation), scale);
 
 	// Load the meshes into the Node
 	if (gltfNode.mesh >= 0)
@@ -317,11 +316,10 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 
 		for (const SceneRenderObject& primitiveObject : primitiveObjects)
 		{
-			SceneRenderObject* sceneRenderObject = scene->CreateSceneRenderObject();
+			Scope<SceneRenderObject> sceneRenderObject = scene->CreateSceneRenderObject();
 			sceneRenderObject->SetMeshHandle(primitiveObject.GetMeshHandle());
 			sceneRenderObject->SetMaterialHandle(primitiveObject.GetMaterialHandle());
-			Scope<SceneRenderObject> objPtr = CreateScopeFromRaw<SceneRenderObject>(sceneRenderObject);
-			sceneNode->AppendSceneRenderObject(&objPtr);
+			sceneNode->AppendSceneRenderObject(&sceneRenderObject);
 		}
 	}
 
@@ -331,6 +329,78 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 		const tinygltf::Node& childGltfNode = gltfModel.nodes[nodeIndex];
 		SceneNode* newNode = sceneNode->AddNode(childGltfNode.name);
 		LoadNodes(gltfModel, scene, newNode, nodeIndex, sceneRenderObjects);
+	}
+}
+
+void LoadNodes(const tinygltf::Model& gltfModel, FlatHierarchyScene* scene, u32 gltfNodeIndex,
+	const std::vector<std::vector<SceneRenderObject>>& sceneRenderObjects)
+{
+	const tinygltf::Node& gltfNode = gltfModel.nodes[gltfNodeIndex];
+
+	// Get the transform for this node
+	glm::vec3 translation = glm::vec3(0.f, 0.f, 0.f);
+	glm::quat rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
+	glm::vec3 scale = glm::vec3(1.f, 1.f, 1.f);
+
+	if (gltfNode.matrix.size() == 16)
+	{
+		glm::mat4 transform(0.f);
+
+		for (u32 x = 0; x < 4; x++)
+		{
+			for (u32 y = 0; y < 4; y++)
+			{
+				transform[x][y] = static_cast<f32>(gltfNode.matrix[x + y * 4]);
+			}
+		}
+
+		glm::vec3 skew;
+		glm::vec4 perspective;
+		glm::decompose(transform, scale, rotation, translation, skew, perspective);
+	}
+	else
+	{
+		if (gltfNode.translation.size() == 3)
+		{
+			translation.x = static_cast<f32>(gltfNode.translation[0]);
+			translation.y = static_cast<f32>(gltfNode.translation[1]);
+			translation.z = static_cast<f32>(gltfNode.translation[2]);
+		}
+		if (gltfNode.rotation.size() == 4)
+		{
+			rotation.x = static_cast<f32>(gltfNode.rotation[0]);
+			rotation.y = static_cast<f32>(gltfNode.rotation[1]);
+			rotation.z = static_cast<f32>(gltfNode.rotation[2]);
+			rotation.w = static_cast<f32>(gltfNode.rotation[3]);
+		}
+		if (gltfNode.scale.size() == 3)
+		{
+			scale.x = static_cast<f32>(gltfNode.scale[0]);
+			scale.y = static_cast<f32>(gltfNode.scale[1]);
+			scale.z = static_cast<f32>(gltfNode.scale[2]);
+		}
+	}
+
+	// Load the meshes of this node into the container scene
+	if (gltfNode.mesh >= 0)
+	{
+		const std::vector<SceneRenderObject>& primitiveObjects = sceneRenderObjects[gltfNode.mesh];
+
+		for (const SceneRenderObject& primitiveObject : primitiveObjects)
+		{
+			Scope<SceneRenderObject> sceneRenderObject = scene->CreateSceneRenderObject();
+			sceneRenderObject->SetMeshHandle(primitiveObject.GetMeshHandle());
+			sceneRenderObject->SetMaterialHandle(primitiveObject.GetMaterialHandle());
+			sceneRenderObject->GetModifiableTransform() = Transform(translation, glm::eulerAngles(rotation), scale);
+			scene->AppendSceneRenderObject(&sceneRenderObject);
+		}
+	}
+
+	// Load the nodes for this node
+	for (u32 nodeIndex : gltfNode.children)
+	{
+		const tinygltf::Node& childGltfNode = gltfModel.nodes[nodeIndex];
+		LoadNodes(gltfModel, scene, nodeIndex, sceneRenderObjects);
 	}
 }
 
@@ -482,12 +552,12 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 	return sceneRenderObjects;
 }
 
-SceneHandle GLTFSceneLoader::LoadScene(const std::string& pathString, ApplicationContext& ctx)
+SceneHandle GLTFSceneLoader::LoadNodeBasedScene(const std::string& pathString, ApplicationContext& ctx)
 {
 
 	const std::filesystem::path path = Platform::GetLocalPath(pathString);
 
-	// Get the gltf Mode
+	// Get the gltf Model
 	tinygltf::Model model;
 	tinygltf::TinyGLTF loader;
 	std::string err;
@@ -539,5 +609,62 @@ SceneHandle GLTFSceneLoader::LoadScene(const std::string& pathString, Applicatio
 		}
 	}
 		
+	return sceneIdx;
+}
+
+Gecko::SceneHandle GLTFSceneLoader::LoadFlatHierarchyScene(const std::string& pathString, Gecko::ApplicationContext& ctx)
+{
+	const std::filesystem::path path = Platform::GetLocalPath(pathString);
+
+	// Get the gltf Model
+	tinygltf::Model model;
+	tinygltf::TinyGLTF loader;
+	std::string err;
+	std::string warn;
+
+	// Load the GLTF Model
+	bool ret;
+	if (path.extension() == ".gltf")
+	{
+		ret = loader.LoadASCIIFromFile(&model, &err, &warn, path.string());
+	}
+	else {
+		ret = loader.LoadBinaryFromFile(&model, &err, &warn, path.string());
+	}
+
+	u32 sceneIdx = ctx.GetSceneManager()->CreateScene<FlatHierarchyScene>(path.filename().string());
+
+	if (!warn.empty())
+	{
+		LOG_WARN(warn.c_str());
+		return sceneIdx;
+	}
+	if (!err.empty())
+	{
+		LOG_ERROR(err.c_str());
+		return sceneIdx;
+	}
+	if (!ret)
+	{
+		LOG_WARN("Failed to parse glTF");
+		return sceneIdx;
+	}
+
+	std::vector<TextureHandle> textureHandles = LoadTextures(ctx.GetResourceManager(), model);
+	std::vector<MaterialHandle> materialHandles = LoadMaterials(ctx.GetResourceManager(), model, textureHandles);
+	std::vector<std::vector<SceneRenderObject>> sceneRenderObjects = LoadMeshes(ctx.GetResourceManager(), model, materialHandles);
+
+	// Loading nodes
+	FlatHierarchyScene* scene = ctx.GetSceneManager()->GetScene<FlatHierarchyScene>(sceneIdx);
+
+	for (const tinygltf::Scene& gltfScene : model.scenes)
+	{
+		for (u32 nodeIndex : gltfScene.nodes)
+		{
+			const tinygltf::Node& gltfNode = model.nodes[nodeIndex];
+			LoadNodes(model, scene, nodeIndex, sceneRenderObjects);
+		}
+	}
+
 	return sceneIdx;
 }
