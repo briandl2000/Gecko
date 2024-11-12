@@ -44,7 +44,7 @@ namespace Gecko { namespace DX12 {
 
 		virtual void BindConstantBuffer(u32 slot, ConstantBuffer buffer) override;
 
-		virtual void SetDynamicCallData(u32 size, void* data) override;
+		virtual void SetLocalData(u32 size, void* data) override;
 
 		virtual void Draw(u32 numIndices) override;
 		virtual void DrawAuto(u32 numVertices) override;

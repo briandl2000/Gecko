@@ -71,7 +71,8 @@ namespace Gecko {
 	{
 		All,
 		Vertex,
-		Pixel
+		Pixel,
+		Compute
 	};
 
 	enum class CullMode
@@ -107,8 +108,10 @@ namespace Gecko {
 
 	enum class BufferType
 	{
-		Constant,
-		Structured
+		None,
+		ConstantBuffer,
+		StructuredBuffer,
+		LocalData
 	};
 
 	u32 FormatSizeInBytes(const DataFormat& format);
@@ -539,6 +542,44 @@ namespace Gecko {
 		}
 	};
 
+	struct PipelineBuffer
+	{
+		static PipelineBuffer ConstantBuffer(ShaderVisibility visibility, u32 bindLocation)
+		{
+			return {BufferType::ConstantBuffer, visibility, bindLocation, 0};
+		}
+		static PipelineBuffer StructuredBuffer(ShaderVisibility visibility, u32 bindLocation)
+		{
+			return {BufferType::ConstantBuffer, visibility, bindLocation, 0};
+		}
+		static PipelineBuffer LocalData(ShaderVisibility visibility, u32 bindLocation, u32 size)
+		{
+			return {BufferType::LocalData, visibility, bindLocation, size};
+		}
+
+		BufferType Type{ BufferType::None };
+		ShaderVisibility Visibility{ ShaderVisibility::All };
+		u32 BindLocation{ 0 };
+		u32 Size{ 0 };
+
+		bool IsValid() const
+		{
+			if(Type == BufferType::None)
+			{
+				return false;
+			}
+			if(Type == BufferType::LocalData && (Size == 0 || Size % 4 != 0))
+			{
+				return false;
+			}
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
 	struct GraphicsPipelineDesc
 	{
 		const char* VertexShaderPath{ nullptr };
@@ -567,9 +608,7 @@ namespace Gecko {
 		WindingOrder WindingOrder{ WindingOrder::ClockWise };
 		PrimitiveType PrimitiveType{ PrimitiveType::Triangles };
 
-		std::vector<ShaderVisibility> ConstantBufferVisibilities{};
-
-		DynamicCallData DynamicCallData{};
+		std::vector<PipelineBuffer> PipelineBuffers{};
 
 		std::vector<ShaderVisibility> TextureShaderVisibilities{};
 
@@ -626,8 +665,7 @@ namespace Gecko {
 		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
 		const char* EntryPoint{ "main" };
 
-		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData{};
+		std::vector<PipelineBuffer> PipelineReadOnlyBuffers{};
 		u32 NumTextures{ 0 };
 		u32 NumUAVs{ 0 };
 		std::vector<SamplerDesc> SamplerDescs{};
@@ -635,8 +673,6 @@ namespace Gecko {
 		bool IsValid() const
 		{
 			if (!ComputeShaderPath || !ShaderVersion)
-				return false;
-			if (NumUAVs == 0)
 				return false;
 
 			return true;

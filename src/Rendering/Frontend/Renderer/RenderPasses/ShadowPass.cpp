@@ -11,26 +11,22 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 {
 	// Shadow map Graphics Pipeline
 	{
-		std::vector<ShaderVisibility> constantBufferVisibilities =
+		std::vector<PipelineBuffer> pipelineBuffers =
 		{
-			ShaderVisibility::Vertex,
+			PipelineBuffer::ConstantBuffer(ShaderVisibility::Vertex, 0),
+			PipelineBuffer::LocalData(ShaderVisibility::Vertex, 1, sizeof(glm::mat4)),
 		};
 
 		GraphicsPipelineDesc pipelineDesc;
 		pipelineDesc.VertexShaderPath = "Shaders/Shadow.gsh";
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
-		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;
+		pipelineDesc.PipelineBuffers = pipelineBuffers;
 		pipelineDesc.DepthStencilFormat = DataFormat::R32_FLOAT;
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;
 		pipelineDesc.CullMode = CullMode::Back;
 
-		pipelineDesc.DynamicCallData.BufferLocation = 1;
-		pipelineDesc.DynamicCallData.Size = sizeof(glm::mat4);
-		pipelineDesc.DynamicCallData.ConstantBufferVisibilities = ShaderVisibility::Vertex;
-
 		ShadowPipelineHandle = resourceManager->CreateGraphicsPipeline(pipelineDesc);
-
 	}
 
 	
@@ -62,7 +58,7 @@ const void ShadowPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMa
 
 		glm::mat4 transformMatrix = meshInstanceDescriptor.Transform;
 
-		commandList->SetDynamicCallData(sizeof(glm::mat4), (void*)(&transformMatrix));
+		commandList->SetLocalData(sizeof(glm::mat4), (void*)(&transformMatrix));
 
 		Mesh& mesh = resourceManager->GetMesh(meshInstanceDescriptor.MeshHandle);
 		commandList->BindVertexBuffer(mesh.VertexBuffer);

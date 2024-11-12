@@ -31,7 +31,7 @@ namespace Gecko {
 
 		virtual void BindConstantBuffer(u32 slot, ConstantBuffer Buffer) = 0;
 
-		virtual void SetDynamicCallData(u32 size, void* data) = 0;
+		virtual void SetLocalData(u32 size, void* data) = 0;
 
 		virtual void Draw(u32 numIndices) = 0;
 		virtual void DrawAuto(u32 numVertices) = 0;

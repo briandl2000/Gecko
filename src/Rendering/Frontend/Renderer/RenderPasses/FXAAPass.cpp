@@ -23,8 +23,7 @@ const void FXAAPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* 
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/FXAA.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.DynamicCallData.BufferLocation = 0;
-		computePipelineDesc.DynamicCallData.Size = sizeof(FXAAData);
+		computePipelineDesc.PipelineReadOnlyBuffers = { PipelineBuffer::LocalData(ShaderVisibility::Compute, 0, sizeof(FXAAData)) };
 		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
 		computePipelineDesc.NumTextures = 1;
 		computePipelineDesc.NumUAVs = 1;
@@ -73,7 +72,7 @@ const void FXAAPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMana
 	m_FXAAData.width = inputTarget.Desc.Width;
 	m_FXAAData.height = inputTarget.Desc.Height;
 
-	commandList->SetDynamicCallData(sizeof(FXAAData), &m_FXAAData);
+	commandList->SetLocalData(sizeof(FXAAData), &m_FXAAData);
 	commandList->BindTexture(0, inputTarget.RenderTextures[0]);
 	commandList->BindAsRWTexture(0, outputTarget.RenderTextures[0]);
 

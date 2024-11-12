@@ -10,35 +10,7 @@ namespace Gecko
 const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* resourceManager, const ConfigData& dependencies)
 {
 	// GBuffer Graphics Pipeline
-	{
-		std::vector<ShaderVisibility> constantBufferVisibilities =
-		{
-			ShaderVisibility::All,
-			ShaderVisibility::Pixel
-		};
-
-		std::vector<ShaderVisibility> textureShaderVisibilities =
-		{
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-		};
-
-		std::vector<SamplerDesc> samplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-			},
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Point,
-			}
-		};
-
+	{	
 		GraphicsPipelineDesc pipelineDesc;
 		pipelineDesc.VertexShaderPath = "Shaders/GBufferShader.gsh";
 		pipelineDesc.PixelShaderPath = "Shaders/GBufferShader.gsh";
@@ -46,7 +18,11 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
-		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;
+		pipelineDesc.PipelineBuffers = {
+			PipelineBuffer::ConstantBuffer(ShaderVisibility::All, 0),
+			PipelineBuffer::ConstantBuffer(ShaderVisibility::Pixel, 1),
+			PipelineBuffer::LocalData(ShaderVisibility::All, 2, sizeof(glm::mat4)),
+		};
 
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
 		pipelineDesc.RenderTextureFormats[1] = DataFormat::R32G32B32A32_FLOAT; // Normal
@@ -57,23 +33,31 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;
 		pipelineDesc.CullMode = CullMode::Back;
+		pipelineDesc.PrimitiveType = PrimitiveType::Lines;
 
-		pipelineDesc.TextureShaderVisibilities = textureShaderVisibilities;
+		pipelineDesc.TextureShaderVisibilities = {
+			ShaderVisibility::Pixel,
+			ShaderVisibility::Pixel,
+			ShaderVisibility::Pixel,
+			ShaderVisibility::Pixel,
+			ShaderVisibility::Pixel,
+			ShaderVisibility::Pixel,
+		};
 
-		pipelineDesc.SamplerDescs = samplerShaderDescs;
-
-		pipelineDesc.DynamicCallData.BufferLocation = 2;
-		pipelineDesc.DynamicCallData.Size = sizeof(glm::mat4);
-		pipelineDesc.DynamicCallData.ConstantBufferVisibilities = ShaderVisibility::Vertex;
+		pipelineDesc.SamplerDescs = {
+			{ShaderVisibility::Pixel, SamplerFilter::Linear},
+			{ShaderVisibility::Pixel, SamplerFilter::Point}
+		};
 
 		GBufferPipelineHandle = resourceManager->CreateGraphicsPipeline(pipelineDesc);
 	}
 
 	// CubeMap Graphics Pipeline
 	{
-		std::vector<ShaderVisibility> constantBufferVisibilities =
+		std::vector<PipelineBuffer> pipelineBuffer =
 		{
-			ShaderVisibility::All
+			
+			PipelineBuffer::ConstantBuffer(ShaderVisibility::All, 0),
 		};
 
 		std::vector<ShaderVisibility> textureShaderVisibilities =
@@ -95,7 +79,7 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
-		pipelineDesc.ConstantBufferVisibilities = constantBufferVisibilities;
+		pipelineDesc.PipelineBuffers = pipelineBuffer;
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
 		pipelineDesc.RenderTextureFormats[1] = DataFormat::R32G32B32A32_FLOAT; // Normal
 		pipelineDesc.RenderTextureFormats[2] = DataFormat::R32G32B32A32_FLOAT; // Position
@@ -167,7 +151,7 @@ const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, Resource
 
 		glm::mat4 transformMatrix = meshInstanceDescriptor.Transform;
 
-		commandList->SetDynamicCallData(sizeof(glm::mat4), (void*)(&transformMatrix));
+		commandList->SetLocalData(sizeof(glm::mat4), (void*)(&transformMatrix));
 
 		Mesh& mesh = resourceManager->GetMesh(meshInstanceDescriptor.MeshHandle);
 		commandList->BindVertexBuffer(mesh.VertexBuffer);
