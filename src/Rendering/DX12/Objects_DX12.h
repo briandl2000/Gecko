@@ -77,6 +77,8 @@ namespace Gecko { namespace DX12 {
 		std::vector<u32> TextureIndices{ };
 		std::vector<u32> ConstantBufferIndices{ };
 
+		u32 LocalDataLocation{ 0 };
+
 		GraphicsPipeline_DX12() {}
 		~GraphicsPipeline_DX12();
 	};
@@ -88,6 +90,8 @@ namespace Gecko { namespace DX12 {
 		std::vector<u32> TextureIndices{};
 		std::vector<u32> ConstantBufferIndices{};
 		std::vector<u32> UAVIndices{};
+
+		u32 LocalDataLocation{ 0 };
 
 		ComputePipeline_DX12() {}
 		~ComputePipeline_DX12();

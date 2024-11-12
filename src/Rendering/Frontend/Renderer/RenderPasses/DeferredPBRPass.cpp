@@ -35,12 +35,13 @@ const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceMa
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/PBRShader.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.DynamicCallData.BufferLocation = 1;
-		computePipelineDesc.DynamicCallData.Size = sizeof(PBRData);
+		computePipelineDesc.PipelineReadOnlyBuffers = { 
+			PipelineBuffer::ConstantBuffer(ShaderVisibility::Compute, 0), 
+			PipelineBuffer::LocalData(ShaderVisibility::Compute, 1, sizeof(PBRData)) 
+		};
 		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
 		computePipelineDesc.NumTextures = 4;
 		computePipelineDesc.NumUAVs = 6;
-		computePipelineDesc.NumConstantBuffers = 1;
 
 		PBRPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}
@@ -97,7 +98,7 @@ const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, Resou
 
 		u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
 		commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
-		commandList->SetDynamicCallData(sizeof(PBRData), &pbrData);
+		commandList->SetLocalData(sizeof(PBRData), &pbrData);
 		commandList->BindAsRWTexture(0, PBROutput.RenderTextures[0]);
 		commandList->BindAsRWTexture(1, GBuffer.RenderTextures[0]);
 		commandList->BindAsRWTexture(2, GBuffer.RenderTextures[1]);

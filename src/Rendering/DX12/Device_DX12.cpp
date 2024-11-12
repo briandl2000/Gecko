@@ -441,16 +441,11 @@ namespace Gecko { namespace DX12
 			std::vector<CD3DX12_ROOT_PARAMETER1> rootParameters;
 			std::vector<D3D12_DESCRIPTOR_RANGE1> descriptorTableRanges;
 
-			u32 numConstantBuffers = static_cast<u32>(desc.ConstantBufferVisibilities.size());
+			u32 numConstantBuffers = static_cast<u32>(desc.PipelineBuffers.size());
 			u32 numTextures = static_cast<u32>(desc.TextureShaderVisibilities.size());
 
 			u32 numRootParams = numConstantBuffers + numTextures;
-			if (desc.DynamicCallData.BufferLocation >= 0)
-			{
-				numRootParams += 1;
-			}
 			u32 TextureOffset = numConstantBuffers;
-			u32 DynamicCallDataOffset = TextureOffset + numTextures;
 			rootParameters.resize(numRootParams);
 			u32 numDescriptorTableRanges = numConstantBuffers + numTextures;
 			descriptorTableRanges.resize(numDescriptorTableRanges);
@@ -459,21 +454,34 @@ namespace Gecko { namespace DX12
 			for (u32 i = 0; i < numConstantBuffers; i++)
 			{
 				u32 descriptorIndex = i;
-				const ShaderVisibility& constantBufferVisibility = desc.ConstantBufferVisibilities[i];
+				const PipelineBuffer& pipelineBuffer = desc.PipelineBuffers[i];
 
-				descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-				descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
-				descriptorTableRanges[descriptorIndex].BaseShaderRegister = i;
-				descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
-				descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+				if(pipelineBuffer.Type == BufferType::LocalData)
+				{
+					rootParameters[descriptorIndex].InitAsConstants(
+						pipelineBuffer.Size / 4,
+						pipelineBuffer.BindLocation,
+						0,
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineBuffer.Visibility)
+					);
+					graphicsPipeline_DX12->LocalDataLocation = i;
+				}
+				else
+				{
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineBuffer.BindLocation;
+					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
+					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
-				descriptorTable.NumDescriptorRanges = 1;
-				descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];
+					D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
+					descriptorTable.NumDescriptorRanges = 1;
+					descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];
 
-				rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
-				rootParameters[descriptorIndex].ShaderVisibility = ShaderVisibilityToD3D12ShaderVisibility(constantBufferVisibility);
+					rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+					rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
+					rootParameters[descriptorIndex].ShaderVisibility = ShaderVisibilityToD3D12ShaderVisibility(pipelineBuffer.Visibility);
+				}
 				graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
 			}
 
@@ -502,20 +510,6 @@ namespace Gecko { namespace DX12
 				rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
 				rootParameters[descriptorIndex].ShaderVisibility = ShaderVisibilityToD3D12ShaderVisibility(textureShaderVisibility);*/
 				graphicsPipeline_DX12->TextureIndices.push_back(descriptorIndex);
-			}
-
-			if (desc.DynamicCallData.BufferLocation >= 0)
-			{
-				ASSERT_MSG(desc.DynamicCallData.Size > 0, "The Size of the dynamic call data must be greater than 0");
-
-				u32 descriptorIndex = DynamicCallDataOffset;
-				rootParameters[descriptorIndex].InitAsConstants(
-					desc.DynamicCallData.Size / 4,
-					desc.DynamicCallData.BufferLocation,
-					0,
-					ShaderVisibilityToD3D12ShaderVisibility(desc.DynamicCallData.ConstantBufferVisibilities)
-				);
-				graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
 			}
 
 			std::vector<CD3DX12_STATIC_SAMPLER_DESC> samplers;
@@ -585,17 +579,15 @@ namespace Gecko { namespace DX12
 				elementDesc.InstanceDataStepRate = 0;
 				inputLayoutElements.push_back(elementDesc);
 			}
-
 			InputLayout = { inputLayoutElements.data(), static_cast<u32>(inputLayoutElements.size()) };
-
 		}
 		piplineStateStream2.InputLayout = InputLayout;
 
-		CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY PrimitiveTopologyType;
+		CD3DX12_PIPELINE_STATE_STREAM_PRIMITIVE_TOPOLOGY primitiveTopologyType;
 		{
-			PrimitiveTopologyType = PrimitiveTypeToD3D12PrimitiveTopologyType(desc.PrimitiveType);
+			primitiveTopologyType = PrimitiveTypeToD3D12PrimitiveTopologyType(desc.PrimitiveType);
 		}
-		piplineStateStream2.PrimitiveTopologyType = PrimitiveTopologyType;
+		piplineStateStream2.PrimitiveTopologyType = primitiveTopologyType;
 
 		CD3DX12_PIPELINE_STATE_STREAM_VS VS;
 		ComPtr<ID3DBlob> vertexShaderBlob;
@@ -616,8 +608,7 @@ namespace Gecko { namespace DX12
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "VERTEX", "1", NULL, NULL };
 			HRESULT hr = D3DCompileFromFile(vertexSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 				desc.VertexEntryPoint, shaderVersion.c_str(), flags, 0, &vertexShaderBlob, &errorBlob);
-			// Should probably do some nicer error handling here #FIXME
-			ASSERT(hr == S_OK);
+			ASSERT_MSG(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 
 			VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
 			piplineStateStream2.VS = VS;
@@ -642,17 +633,14 @@ namespace Gecko { namespace DX12
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "PIXEL", "1", NULL, NULL };
 			HRESULT hr = D3DCompileFromFile(pixelSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 				desc.PixelEntryPoint, shaderVersion.c_str(), flags, 0, &pixelShaderBlob, &errorBlob);
-			// Should probably do some nicer error handling here #FIXME
-			ASSERT(hr == S_OK);
+			ASSERT_MSG(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 
 			PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
 			piplineStateStream2.PS = PS;
 		}
 
-		CD3DX12_PIPELINE_STATE_STREAM_RENDER_TARGET_FORMATS RTVFormats;
 		D3D12_RT_FORMAT_ARRAY rtvFormats = { {DXGI_FORMAT_UNKNOWN}, 1 };
 		{
-
 			u32 i = 0;
 			for (; i < 8; i++)
 			{
@@ -662,30 +650,29 @@ namespace Gecko { namespace DX12
 				rtvFormats.RTFormats[i] = FormatToD3D12Format(desc.RenderTextureFormats[i]);
 			}
 			rtvFormats.NumRenderTargets = i;
-			RTVFormats = rtvFormats;
-		}
-		if (rtvFormats.NumRenderTargets > 0)
-		{
-			piplineStateStream2.RTVFormats = RTVFormats;
+			if (rtvFormats.NumRenderTargets > 0)
+			{
+				piplineStateStream2.RTVFormats = rtvFormats;
+			}
 		}
 
-		CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormats;
 		CD3DX12_DEPTH_STENCIL_DESC1 DepthStencilState;
-		if (desc.DepthStencilFormat != DataFormat::None)
 		{
-			DXGI_FORMAT dsvFormat = DXGI_FORMAT_D32_FLOAT;
-			DSVFormats = dsvFormat;
-			DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(CD3DX12_DEFAULT());
-			DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+			CD3DX12_PIPELINE_STATE_STREAM_DEPTH_STENCIL_FORMAT DSVFormats;
+			if (desc.DepthStencilFormat != DataFormat::None)
+			{
+				DSVFormats = DXGI_FORMAT_D32_FLOAT;
+				DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1(CD3DX12_DEFAULT());
+				DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+			}
+			else {
+				DSVFormats = DXGI_FORMAT_UNKNOWN;
+				DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1();
+				DepthStencilState.DepthEnable = false;
+			}
+			piplineStateStream2.DSVFormat = DSVFormats;
+			piplineStateStream2.DepthStencilState = DepthStencilState;
 		}
-		else {
-			DXGI_FORMAT dsvFormat = DXGI_FORMAT_UNKNOWN;
-			DSVFormats = dsvFormat;
-			DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC1();
-			DepthStencilState.DepthEnable = false;
-		}
-		piplineStateStream2.DSVFormat = DSVFormats;
-		piplineStateStream2.DepthStencilState = DepthStencilState;
 
 		CD3DX12_PIPELINE_STATE_STREAM_RASTERIZER Rasterizer;
 		{
@@ -735,37 +722,47 @@ namespace Gecko { namespace DX12
 			std::vector<CD3DX12_ROOT_PARAMETER1> rootParameters;
 			std::vector<D3D12_DESCRIPTOR_RANGE1> descriptorTableRanges;
 
-			u32 numRootParams = desc.NumConstantBuffers + desc.NumTextures + desc.NumUAVs;
-			if (desc.DynamicCallData.BufferLocation >= 0)
-			{
-				numRootParams += 1;
-			}
-			u32 TextureOffset = desc.NumConstantBuffers;
+			u32 numRootParams = static_cast<u32>(desc.PipelineReadOnlyBuffers.size()) + desc.NumTextures + desc.NumUAVs;
+			u32 TextureOffset = static_cast<u32>(desc.PipelineReadOnlyBuffers.size());
 			u32 UAVOffset = TextureOffset + desc.NumTextures;
-			u32 DynamicCallDataOffset = UAVOffset + desc.NumUAVs;
 			rootParameters.resize(numRootParams);
-			u32 numDescriptorTableRanges = desc.NumConstantBuffers + desc.NumTextures + desc.NumUAVs;
+			u32 numDescriptorTableRanges = numRootParams;
 			descriptorTableRanges.resize(numDescriptorTableRanges);
 
 
-			for (u32 i = 0; i < desc.NumConstantBuffers; i++)
+			for (u32 i = 0; i < desc.PipelineReadOnlyBuffers.size(); i++)
 			{
 				u32 descriptorIndex = i;
+				const PipelineBuffer& pipelineBuffer = desc.PipelineReadOnlyBuffers[i];
 
-				descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
-				descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
-				descriptorTableRanges[descriptorIndex].BaseShaderRegister = i;
-				descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
-				descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+				if(pipelineBuffer.Type == BufferType::LocalData)
+				{
+					rootParameters[descriptorIndex].InitAsConstants(
+						pipelineBuffer.Size / 4,
+						pipelineBuffer.BindLocation,
+						0,
+						D3D12_SHADER_VISIBILITY_ALL
+					);
+					computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
+					computePipeline_DX12->LocalDataLocation = i;
+				}
+				else
+				{
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = i;
+					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
+					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
-				descriptorTable.NumDescriptorRanges = 1;
-				descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];
+					D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
+					descriptorTable.NumDescriptorRanges = 1;
+					descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];
 
-				rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
-				rootParameters[descriptorIndex].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-				computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
+					rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+					rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
+					rootParameters[descriptorIndex].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+					computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
+				}
 			}
 
 			for (u32 i = 0; i < desc.NumTextures; i++)
@@ -787,7 +784,6 @@ namespace Gecko { namespace DX12
 				computePipeline_DX12->TextureIndices.push_back(descriptorIndex);
 			}
 
-
 			for (u32 i = 0; i < desc.NumUAVs; i++)
 			{
 				u32 descriptorIndex = i + UAVOffset;
@@ -807,21 +803,6 @@ namespace Gecko { namespace DX12
 				rootParameters[descriptorIndex].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 				computePipeline_DX12->UAVIndices.push_back(descriptorIndex);
 			}
-
-			if (desc.DynamicCallData.BufferLocation >= 0)
-			{
-				ASSERT_MSG(desc.DynamicCallData.Size > 0, "The Size of the dynamic call data must be greater than 0");
-
-				u32 descriptorIndex = DynamicCallDataOffset;
-				rootParameters[descriptorIndex].InitAsConstants(
-					desc.DynamicCallData.Size / 4,
-					desc.DynamicCallData.BufferLocation,
-					0,
-					D3D12_SHADER_VISIBILITY_ALL
-				);
-				computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
-			}
-
 
 			std::vector<CD3DX12_STATIC_SAMPLER_DESC> samplers;
 			samplers.resize(desc.SamplerDescs.size());

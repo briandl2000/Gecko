@@ -37,8 +37,7 @@ namespace Gecko
 			ComputePipelineDesc computePipelineDesc;
 			computePipelineDesc.ComputeShaderPath = "Shaders/DownSample.gsh";
 			computePipelineDesc.ShaderVersion = "5_1";
-			computePipelineDesc.DynamicCallData.BufferLocation = 0;
-			computePipelineDesc.DynamicCallData.Size = sizeof(MipGenerationData);
+			computePipelineDesc.PipelineReadOnlyBuffers = { PipelineBuffer::LocalData(ShaderVisibility::Compute, 0, sizeof(MipGenerationData)) };
 			computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
 			computePipelineDesc.NumTextures = 1;
 			computePipelineDesc.NumUAVs = 1;
@@ -574,7 +573,7 @@ namespace Gecko
 
 			Ref<CommandList> commandList = m_Device->CreateComputeCommandList();
 			commandList->BindComputePipeline(GetComputePipeline(DownsamplePipelineHandle));
-			commandList->SetDynamicCallData(sizeof(MipGenerationData), &mipGenerationData);
+			commandList->SetLocalData(sizeof(MipGenerationData), &mipGenerationData);
 
 			commandList->BindTexture(0, texture, mipGenerationData.Mip);
 

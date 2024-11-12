@@ -297,7 +297,7 @@ namespace Gecko { namespace DX12 {
 		ASSERT_MSG(false, "No pipline bound!");
 	}
 
-	void CommandList_DX12::SetDynamicCallData(u32 size, void* data)
+	void CommandList_DX12::SetLocalData(u32 size, void* data)
 	{
 		ASSERT_MSG(size % 4 == 0, "The size of dynamic call data must be a multiple of 32 bits or 4 bytes");
 		ASSERT_MSG(size != 0, "Data can't be 0");
@@ -307,12 +307,8 @@ namespace Gecko { namespace DX12 {
 		{
 			ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is Invalid!");
 			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
-			ASSERT_MSG(size <= m_GraphicsPipeline.Desc.DynamicCallData.Size, "the size is biggert than the DynamicCallData!");
-			ASSERT_MSG(m_GraphicsPipeline.Desc.DynamicCallData.BufferLocation >= 0, "Buffer Location has to be set!");
-			ASSERT_MSG(m_GraphicsPipeline.Desc.DynamicCallData.BufferLocation < graphicsPipeline_DX12->ConstantBufferIndices.size(),
-				 "Dynamic call data slot is out of bounds of constant buffer indices!");
-
-			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[m_GraphicsPipeline.Desc.DynamicCallData.BufferLocation];
+			
+			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[graphicsPipeline_DX12->LocalDataLocation];
 			CommandBuffer->CommandList->SetGraphicsRoot32BitConstants(rootDescriptorTableSlot, size / 4, data, 0);
 			return;
 		}
@@ -320,12 +316,8 @@ namespace Gecko { namespace DX12 {
 		{
 			ASSERT_MSG(m_ComputePipeline.IsValid(), "Compute pipeline is Invalid!");
 			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
-			ASSERT_MSG(size <= m_ComputePipeline.Desc.DynamicCallData.Size, "the size is biggert than the DynamicCallData!");
-			ASSERT_MSG(m_ComputePipeline.Desc.DynamicCallData.BufferLocation >= 0, "Buffer Location has to be set!");
-			ASSERT_MSG(m_ComputePipeline.Desc.DynamicCallData.BufferLocation < computePipeline_DX12->ConstantBufferIndices.size(),
-				 "Dynamic call data slot is out of bounds of constant buffer indices!");
 
-			u32 rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[m_ComputePipeline.Desc.DynamicCallData.BufferLocation];
+			u32 rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[computePipeline_DX12->LocalDataLocation];
 			CommandBuffer->CommandList->SetComputeRoot32BitConstants( rootDescriptorTableSlot, size / 4, data, 0);
 			return;
 		}
@@ -336,8 +328,8 @@ namespace Gecko { namespace DX12 {
 	{
 		ASSERT_MSG(m_BoundPipelineType == PipelineType::Graphics, "Graphics pipeline needs to be bound to draw!");
 		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
-		CommandBuffer->CommandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
 		ASSERT_MSG(numIndices != 0, "Number of indices cannot be 0!");
+		CommandBuffer->CommandList->DrawIndexedInstanced(numIndices, 1, 0, 0, 0);
 	}
 	
 	void CommandList_DX12::DrawAuto(u32 numVertices)
