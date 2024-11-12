@@ -1,23 +1,27 @@
 #pragma once
 
 #include "Defines.h"
+#include "Transform.h"
+#include "Camera.h"
 
 #include "glm/common.hpp"
 
 namespace Gecko {
 
-	class SceneCamera
+	class SceneCamera : private Camera
 	{
 	public:
-		SceneCamera();
+		SceneCamera(ProjectionType type);
 
-		inline f32 GetFieldOfView() const { return m_FieldOfView; }
-		inline f32 GetAspectRatio() const { return m_AspectRatio; }
-		inline f32 GetNear() const { return m_Near; }
-		inline f32 GetFar() const { return m_Far; }
+		inline f32 GetFieldOfView() const { return Perspective.FieldOfView; }
+		inline f32 GetAspectRatio() const { return Perspective.AspectRatio; }
+		inline f32 GetNear() const { return Near; }
+		inline f32 GetFar() const { return Far; }
 		inline bool IsAutoAspectRatio() const { return m_AutoAspectRatio; }
 		inline bool IsMainCamera() const { return m_IsMain; }
-		inline const glm::mat4& GetCachedProjection() const { return m_CachedProjectionMatrix; }
+		inline const glm::mat4& GetCachedProjection() const { return CachedProjectionMatrix; }
+		inline const Transform& GetTransform() const { return m_Transform; }
+		inline Transform& GetModifiableTransform() { return m_Transform; }
 
 		void SetFieldOfView(f32 fieldOfView);
 		void SetAspectRatio(f32 aspectRatio);
@@ -25,20 +29,13 @@ namespace Gecko {
 		void SetFar(f32 far);
 		void SetAutoAspectRatio(bool autoAspectRatio);
 		void SetIsMain(bool isMain);
-
-	private:
-		void UpdateProjection();
+		void SetTransform(const Transform& transform);
 
 	private:
 		bool m_AutoAspectRatio{ false };
 		bool m_IsMain{ false };
 
-		f32 m_FieldOfView{ 90.f };
-		f32 m_AspectRatio{ 1.f };
-		f32 m_Near{ 0.1f };
-		f32 m_Far{ 100.f };
-
-		glm::mat4 m_CachedProjectionMatrix{ 1.f };
+		Transform m_Transform{ Transform() };
 	};
 
 }

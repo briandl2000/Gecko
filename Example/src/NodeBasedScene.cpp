@@ -48,8 +48,8 @@ bool SceneNode::OnResize(const Gecko::Event::EventData& data)
 			height = height < 1 ? 1 : height;
 			Gecko::f32 aspectRatio = static_cast<Gecko::f32>(width) / static_cast<Gecko::f32>(height);
 			m_Camera->SetAspectRatio(aspectRatio);
+			resized = true;
 		}
-		resized = true;
 	}
 	for (const Gecko::Scope<SceneNode>& node : m_Children)
 	{
@@ -106,7 +106,7 @@ void SceneNode::AppendSceneData(const NodeBasedScene& scene)
 
 void SceneNode::RecursiveCopy(SceneNode* target) const
 {
-	target->Transform = Transform;
+	target->m_Transform = m_Transform;
 
 	for (const Gecko::Scope<SceneRenderObject>& obj : m_SceneRenderObjects)
 	{ // Construct new objects with new Scopes pointing to them, then pass those to the target node
@@ -136,6 +136,16 @@ void SceneNode::RecursiveCopy(SceneNode* target) const
 	}
 }
 
+const Gecko::Transform& SceneNode::GetTransform() const
+{
+	return m_Transform;
+}
+
+Gecko::Transform& SceneNode::GetModifiableTransform()
+{
+	return m_Transform;
+}
+
 Gecko::u32 SceneNode::GetChildrenCount() const
 {
 	return static_cast<Gecko::u32>(m_Children.size());
@@ -163,9 +173,8 @@ const std::string& SceneNode::GetName() const
 
 const void SceneNode::PopulateSceneRenderInfo(SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const
 {
-
 	// Calculate the transform of this node
-	glm::mat4 transformMatrix = Transform.GetMat4();
+	glm::mat4 transformMatrix = m_Transform.GetMat4();
 	glm::mat4 worldMatrix = transform * transformMatrix;
 
 	// Add the meshes
@@ -174,8 +183,8 @@ const void SceneNode::PopulateSceneRenderInfo(SceneRenderInfo* sceneRenderInfo, 
 		sceneRenderInfo->RenderObjects.push_back({
 			sceneRenderObject->GetMeshHandle(),
 			sceneRenderObject->GetMaterialHandle(),
-			worldMatrix }
-			);
+			worldMatrix
+			});
 	}
 
 	// Add the camera

@@ -4,33 +4,30 @@
 
 namespace Gecko {
 
-	SceneCamera::SceneCamera()
+	SceneCamera::SceneCamera(ProjectionType type)
+		: Camera(type)
 	{
-		UpdateProjection();
+		
 	}
 
 	void SceneCamera::SetFieldOfView(f32 fieldOfView)
 	{
-		m_FieldOfView = fieldOfView;
-		UpdateProjection();
+		Perspective.FieldOfView = fieldOfView;
 	}
 
 	void SceneCamera::SetAspectRatio(f32 aspectRatio)
 	{
-		m_AspectRatio = aspectRatio;
-		UpdateProjection();
+		Perspective.AspectRatio = aspectRatio;
 	}
 
 	void SceneCamera::SetNear(f32 near)
 	{
-		m_Near = near;
-		UpdateProjection();
+		Near = near;
 	}
 
 	void SceneCamera::SetFar(f32 far)
 	{
-		m_Far = far;
-		UpdateProjection();
+		Far = far;
 	}
 
 	void SceneCamera::SetAutoAspectRatio(bool autoAspectRatio)
@@ -47,14 +44,8 @@ namespace Gecko {
 		m_IsMain = isMain; 
 	}
 
-	void SceneCamera::UpdateProjection()
+	void SceneCamera::SetTransform(const Transform& transform)
 	{
-		m_CachedProjectionMatrix = glm::perspective(
-			glm::radians(m_FieldOfView),
-			m_AspectRatio,
-			m_Near,
-			m_Far
-		);;
+		m_Transform = transform;
 	}
-
 }
