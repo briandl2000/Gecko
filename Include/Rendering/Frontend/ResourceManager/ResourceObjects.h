@@ -20,8 +20,6 @@ namespace Gecko
 	{
 		VertexBuffer VertexBuffer;
 		IndexBuffer IndexBuffer;
-		bool HasBLAS{ false };
-		BLAS BLAS;
 	};
 
 	enum class MaterialTextureFlags : u32
@@ -71,10 +69,10 @@ namespace Gecko
 
 		static const VertexLayout GetLayout() {
 			VertexLayout layout({
-				{ Format::R32G32B32_FLOAT, "POSITION"},
-				{ Format::R32G32_FLOAT, "TEXCOORD" },
-				{ Format::R32G32B32_FLOAT, "NORMAL" },
-				{ Format::R32G32B32A32_FLOAT, "TANGENT" }
+				{ DataFormat::R32G32B32_FLOAT, "POSITION"},
+				{ DataFormat::R32G32_FLOAT, "TEXCOORD" },
+				{ DataFormat::R32G32B32_FLOAT, "NORMAL" },
+				{ DataFormat::R32G32B32A32_FLOAT, "TANGENT" }
 			});
 			return layout;
 		}

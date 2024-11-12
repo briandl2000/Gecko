@@ -1,5 +1,5 @@
+#ifdef DIRECTX_12
 #pragma once
-#ifdef WIN32
 
 #include "Rendering/DX12/CommonHeaders_DX12.h"
 
@@ -29,10 +29,6 @@ namespace Gecko { namespace DX12 {
 
 		virtual void ClearRenderTarget(RenderTarget renderTarget) override;
 
-		//virtual void CopyToRenderTarget(RenderTarget src, RenderTargetType srcType, RenderTarget dst, RenderTargetType dstType) override;
-		//virtual void CopyFromRenderTarget(RenderTarget src, RenderTargetType srcType, Texture dst) override;
-		//virtual void CopyFromTexture(Texture src, RenderTarget dst, RenderTargetType dstType) override;
-
 		virtual void CopyTextureToTexture(Texture src, Texture dst) override;
 
 		virtual void BindRenderTarget(RenderTarget renderTarget) override;
@@ -40,64 +36,40 @@ namespace Gecko { namespace DX12 {
 		virtual void BindIndexBuffer(IndexBuffer indexBuffer) override;
 		virtual void BindTexture(u32 slot, Texture texture) override;
 		virtual void BindTexture(u32 slot, Texture texture, u32 mipLevel) override;
-		//virtual void BindTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type) override;
-		virtual void BindConstantBuffer(u32 slot, ConstantBuffer buffer) override;
 		virtual void BindAsRWTexture(u32 slot, Texture texture) override;
 		virtual void BindAsRWTexture(u32 slot, Texture texture, u32 mipLevel) override;
-		//virtual void BindAsRWTexture(u32 slot, RenderTarget renderTarget, RenderTargetType type) override;
 	
 		virtual void BindGraphicsPipeline(GraphicsPipeline Pipeline) override;
 		virtual void BindComputePipeline(ComputePipeline Pipeline) override;
-		virtual void BindRaytracingPipeline(RaytracingPipeline Pipeline) override;
+
+		virtual void BindConstantBuffer(u32 slot, ConstantBuffer buffer) override;
 
 		virtual void SetDynamicCallData(u32 size, void* data) override;
 
-		virtual void BindTLAS(TLAS tlas) override;
-
 		virtual void Draw(u32 numIndices) override;
-		virtual void DrawAuto(u32 Vertices) override;
+		virtual void DrawAuto(u32 numVertices) override;
 
 		virtual void Dispatch(u32 xThreads, u32 yThreads, u32 zThreads) override;
-		virtual void DispatchRays(u32 width, u32 height, u32 depth) override;
 
-		void TransitionSubResource(
-			Ref<Resource> resource,
-			D3D12_RESOURCE_STATES transtion,
-			u32 numMips,
-			u32 numArraySlices,
-			u32 subResourceIndex = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-		void TransitionResource(
-			Ref<Resource> resource,
-			D3D12_RESOURCE_STATES transtion,
-			u32 numMips,
+	public:
+		void TransitionSubResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips, 
+			u32 numArraySlices, u32 subResourceIndex);
+		void TransitionResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips,
 			u32 numArraySlices);
-		void TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, D3D12_RESOURCE_STATES newDepthStencilState);
+		void TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, 
+			D3D12_RESOURCE_STATES newDepthStencilState);
 		
-		PipelineType m_BoundPipelineType;
-
-		GraphicsPipeline m_GraphicsPipeline;
-		ComputePipeline m_ComputePipeline;
-		RaytracingPipeline m_RaytracingPipeline;
-		
-
 		Ref<CommandBuffer> CommandBuffer;
 
 	private:
+		void GetTextureMipTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource, 
+			D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices, u32 subResourceIndex);
+		void GetTextureTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource, 
+			D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices);
 
-		void GetTextureMipTransitionBarriers(
-			std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, 
-			Ref<Resource> resource,
-			D3D12_RESOURCE_STATES transtion,
-			u32 numMips,
-			u32 numArraySlices,
-			u32 subResourceIndex = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES);
-
-		void GetTextureTransitionBarriers(
-			std::vector<CD3DX12_RESOURCE_BARRIER>* barriers,
-			Ref<Resource> resource,
-			D3D12_RESOURCE_STATES transtion,
-			u32 numMips,
-			u32 numArraySlices);
+		PipelineType m_BoundPipelineType;
+		GraphicsPipeline m_GraphicsPipeline;
+		ComputePipeline m_ComputePipeline;
 	};
 
 

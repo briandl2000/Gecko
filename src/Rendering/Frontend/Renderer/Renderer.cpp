@@ -17,7 +17,7 @@
 namespace Gecko {
 
 const VertexLayout fullScreenQuadVertexLayout({
-	{Format::R32G32_FLOAT, "POSITION"},
+	{DataFormat::R32G32_FLOAT, "POSITION"},
 });
 
 
@@ -62,7 +62,7 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		pipelineDesc.PixelShaderPath = "Shaders/FullScreenTexture.gsh";
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = fullScreenQuadVertexLayout;
-		pipelineDesc.RenderTargetFormats[0] = Format::R8G8B8A8_UNORM; // Albedo
+		pipelineDesc.RenderTextureFormats[0] = DataFormat::R8G8B8A8_UNORM; // Albedo
 		pipelineDesc.CullMode = CullMode::Back;
 
 		pipelineDesc.TextureShaderVisibilities = textureShaderVisibilities;
@@ -92,11 +92,11 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		};
 
 		Gecko::IndexBufferDesc indexDesc;
-		indexDesc.IndexFormat = Gecko::Format::R16_UINT;
+		indexDesc.IndexFormat = DataFormat::R16_UINT;
 		indexDesc.NumIndices = 3;
 		indexDesc.IndexData = indices;
 
-		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc, false);
+		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc);
 	}
 }
 

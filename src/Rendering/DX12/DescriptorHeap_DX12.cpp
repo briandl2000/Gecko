@@ -1,6 +1,6 @@
-#ifdef WIN32
+#ifdef DIRECTX_12
 
-#include "Resources_DX12.h"
+#include "Rendering/DX12/DescriptorHeap_DX12.h"
 #include "Rendering/DX12/Device_DX12.h"
 
 namespace Gecko { namespace DX12 {

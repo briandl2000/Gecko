@@ -27,6 +27,7 @@ using RenderPassHandle = std::string;
 class RenderPassInterface
 {
 public:
+	// Override this in derived classes (even if you don't need any config data)
 	struct ConfigDataInterface
 	{};
 
@@ -49,11 +50,16 @@ public:
 	RenderPass() = default;
 	virtual ~RenderPass() {}
 
+	// This function will cause a runtime error if the object it is called on is not a valid derived class of RenderPass,
+	// if no overridden ConfigData struct exists on the derived class, or if no SubInit function exists on the derived class
 	virtual const void Init(const Platform::AppInfo& appInfo, ResourceManager* resourceManager,
 		const BaseConfigData& dependencies) override final
 	{
 		const T::ConfigData& data = static_cast<const T::ConfigData&>(dependencies);
-		static_cast<T*>(this)->SubInit(appInfo, resourceManager, data);
+		if (T* t = dynamic_cast<T*>(this))
+			t->SubInit(appInfo, resourceManager, data);
+		else
+			ASSERT_MSG(false, "Invalid render pass initialisation!");
 	}
 
 	virtual const void Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
@@ -65,6 +71,8 @@ public:
 	}
 
 protected:
+	// Make sure to write a SubInit function!
+
 	RenderTargetHandle m_OutputHandle;
 
 private:

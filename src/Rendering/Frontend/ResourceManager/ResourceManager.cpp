@@ -153,11 +153,11 @@ namespace Gecko
 			vertexDesc.NumVertices = 24;
 
 			IndexBufferDesc indexDesc;
-			indexDesc.IndexFormat = Format::R32_UINT;
+			indexDesc.IndexFormat = DataFormat::R32_UINT;
 			indexDesc.NumIndices = 36;
 			indexDesc.IndexData = indices;
 
-			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc, true);
+			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc);
 		}
 
 		// Create missing Texture
@@ -166,7 +166,7 @@ namespace Gecko
 			textureDesc.Width = 512;
 			textureDesc.Height = 512;
 			textureDesc.Type = TextureType::Tex2D;
-			textureDesc.Format = Format::R8G8B8A8_SRGB;
+			textureDesc.Format = DataFormat::R8G8B8A8_SRGB;
 			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
 			textureDesc.NumArraySlices = 1;
 
@@ -257,10 +257,9 @@ namespace Gecko
 		m_RenderTargets.clear();
 		m_GraphicsPipelines.clear();
 		m_ComputePipelines.clear();
-		m_RaytracePipelines.clear();
 	}
 
-	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, bool CreateBLAS)
+	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc)
 	{
 		MeshHandle handle = m_CurrentMeshIndex;
 
@@ -268,11 +267,6 @@ namespace Gecko
 
 		mesh.VertexBuffer = m_Device->CreateVertexBuffer(vertexDesc);
 		mesh.IndexBuffer = m_Device->CreateIndexBuffer(indexDesc);
-		mesh.HasBLAS = CreateBLAS;
-		if (CreateBLAS)
-		{
-			//mesh.BLAS = m_Device->CreateBLAS({ mesh.VertexBuffer, mesh.IndexBuffer });
-		}
 
 		m_Meshes[handle] = mesh;
 
@@ -378,7 +372,7 @@ namespace Gecko
 			textureDesc.Width = 512;
 			textureDesc.Height = 512;
 			textureDesc.Type = TextureType::TexCube;
-			textureDesc.Format = Format::R32G32B32A32_FLOAT;
+			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
 			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
 			textureDesc.NumArraySlices = 6;
 			outEnvironmentMap.EnvironmentTextureHandle = CreateTexture(textureDesc);
@@ -386,9 +380,6 @@ namespace Gecko
 		}
 
 		// Load HDR Texture
-
-
-
 		{
 			int x, y, n;
 			f32* data = stbi_loadf(Platform::GetLocalPath(path).c_str(), &x, &y, &n, 4);
@@ -397,7 +388,7 @@ namespace Gecko
 			textureDesc.Width = x;
 			textureDesc.Height = y;
 			textureDesc.Type = TextureType::Tex2D;
-			textureDesc.Format = Format::R32G32B32A32_FLOAT;
+			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
 			textureDesc.NumMips = 1;
 			textureDesc.NumArraySlices = 1;
 			outEnvironmentMap.HDRTextureHandle = CreateTexture(textureDesc, data);
@@ -435,7 +426,7 @@ namespace Gecko
 			textureDesc.Width = 32;
 			textureDesc.Height = 32;
 			textureDesc.Type = TextureType::TexCube;
-			textureDesc.Format = Format::R32G32B32A32_FLOAT;
+			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
 			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
 			textureDesc.NumArraySlices = 6;
 			outEnvironmentMap.IrradianceTextureHandle = CreateTexture(textureDesc);
@@ -486,17 +477,6 @@ namespace Gecko
 		m_ComputePipelines[handle] = outComputePipeline;
 
 		m_CurrentComputePipelineIndex++;
-		return handle;
-	}
-
-	RaytracingPipelineHandle ResourceManager::CreateRaytracePipeline(RaytracingPipelineDesc raytracePipelineDesc)
-	{
-		RaytracingPipelineHandle handle = m_CurrentRaytracePipelineIndex;
-
-		RaytracingPipeline outRaytracingPipeline = m_Device->CreateRaytracingPipeline(raytracePipelineDesc);
-		m_RaytracePipelines[handle] = outRaytracingPipeline;
-
-		m_CurrentRaytracePipelineIndex++;
 		return handle;
 	}
 
@@ -559,16 +539,6 @@ namespace Gecko
 		return m_ComputePipelines[computePipelineHandle];
 	}
 
-	RaytracingPipeline& ResourceManager::GetRaytracingPipeline(const RaytracingPipelineHandle& raytracingPipelineHandle)
-	{
-		if (m_RaytracePipelines.find(raytracingPipelineHandle) == m_RaytracePipelines.end())
-		{
-			ASSERT_MSG(false, "Could not find specified RaytracingPipeline!");
-		}
-
-		return m_RaytracePipelines[raytracingPipelineHandle];
-	}
-
 	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)
 	{
 		u32 width = eventData.Data.u32[0];
@@ -595,7 +565,7 @@ namespace Gecko
 		MipGenerationData mipGenerationData;
 
 		mipGenerationData.Mip = 0;
-		mipGenerationData.Srgb = texture.Desc.Format == Format::R8G8B8A8_SRGB ? 1 : 0;
+		mipGenerationData.Srgb = texture.Desc.Format == DataFormat::R8G8B8A8_SRGB ? 1 : 0;
 		mipGenerationData.Width = texture.Desc.Width;
 		mipGenerationData.Height = texture.Desc.Height;
 

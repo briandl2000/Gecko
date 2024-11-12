@@ -3,3 +3,4 @@ bin/
 build/
 /.vs
 Example/WorkingDir/imgui.ini
+.vscode/settings.json
