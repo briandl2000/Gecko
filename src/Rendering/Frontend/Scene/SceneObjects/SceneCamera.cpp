@@ -12,22 +12,22 @@ namespace Gecko {
 
 	void SceneCamera::SetFieldOfView(f32 fieldOfView)
 	{
-		Perspective.FieldOfView = fieldOfView;
+		Camera::SetFieldOfView(fieldOfView);
 	}
 
 	void SceneCamera::SetAspectRatio(f32 aspectRatio)
 	{
-		Perspective.AspectRatio = aspectRatio;
+		Camera::SetAspectRatio(aspectRatio);
 	}
 
 	void SceneCamera::SetNear(f32 near)
 	{
-		Near = near;
+		Camera::SetNear(near);
 	}
 
 	void SceneCamera::SetFar(f32 far)
 	{
-		Far = far;
+		Camera::SetFar(far);
 	}
 
 	void SceneCamera::SetAutoAspectRatio(bool autoAspectRatio)

@@ -23,10 +23,12 @@ namespace Gecko {
 		inline const Transform& GetTransform() const { return m_Transform; }
 		inline Transform& GetModifiableTransform() { return m_Transform; }
 
+		// Camera::Set functions are inherited privately, so we redeclare them publicly here
 		void SetFieldOfView(f32 fieldOfView);
 		void SetAspectRatio(f32 aspectRatio);
 		void SetNear(f32 near);
 		void SetFar(f32 far);
+
 		void SetAutoAspectRatio(bool autoAspectRatio);
 		void SetIsMain(bool isMain);
 		void SetTransform(const Transform& transform);
