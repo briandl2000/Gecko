@@ -14,34 +14,29 @@ const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceMa
 
 	// PBR Compute Pipeline
 	{
-		std::vector<SamplerDesc> computeSamplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			},
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Point,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			}
-		};
-
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/PBRShader.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.PipelineReadOnlyBuffers = { 
-			PipelineBuffer::ConstantBuffer(ShaderVisibility::Compute, 0), 
-			PipelineBuffer::LocalData(ShaderVisibility::Compute, 1, sizeof(PBRData)) 
+		computePipelineDesc.PipelineReadOnlyResources = { 
+			PipelineResource::ConstantBuffer(ShaderVisibility::Compute, 0), 
+			PipelineResource::LocalData(ShaderVisibility::Compute, 1, sizeof(PBRData)),
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1),
+			PipelineResource::Texture(ShaderVisibility::Compute, 2),
+			PipelineResource::Texture(ShaderVisibility::Compute, 3),
 		};
-		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-		computePipelineDesc.NumTextures = 4;
-		computePipelineDesc.NumUAVs = 6;
+		computePipelineDesc.SamplerDescs = {
+			{ShaderVisibility::Compute, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp},
+			{ShaderVisibility::Compute, SamplerFilter::Point, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp}
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1),
+			PipelineResource::Texture(ShaderVisibility::Compute, 2),
+			PipelineResource::Texture(ShaderVisibility::Compute, 3),
+			PipelineResource::Texture(ShaderVisibility::Compute, 4),
+			PipelineResource::Texture(ShaderVisibility::Compute, 5),
+		};
 
 		PBRPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}

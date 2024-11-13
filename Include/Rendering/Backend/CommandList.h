@@ -29,7 +29,7 @@ namespace Gecko {
 		virtual void BindGraphicsPipeline(GraphicsPipeline Pipeline) = 0;
 		virtual void BindComputePipeline(ComputePipeline Pipeline) = 0;
 
-		virtual void BindConstantBuffer(u32 slot, ConstantBuffer Buffer) = 0;
+		virtual void BindConstantBuffer(u32 slot, Buffer Buffer) = 0;
 
 		virtual void SetLocalData(u32 size, void* data) = 0;
 

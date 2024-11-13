@@ -14,50 +14,40 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 {
 	// BloomDownScale Compute Pipeline
 	{
-		std::vector<SamplerDesc> computeSamplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			}
-		};
-
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomDownScale.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.PipelineReadOnlyBuffers = { PipelineBuffer::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)) };
-		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-		computePipelineDesc.NumTextures = 1;
-		computePipelineDesc.NumUAVs = 1;
+		computePipelineDesc.PipelineReadOnlyResources = {
+			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)),
+			PipelineResource::Texture(ShaderVisibility::Compute, 0)
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1)
+		};
+		computePipelineDesc.SamplerDescs = {
+			{ ShaderVisibility::Compute, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp }
+		};
 
 		m_DownScalePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}
 
 	// BloomUpScale Compute Pipeline
 	{
-		std::vector<SamplerDesc> computeSamplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			}
-		};
-
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomUpScale.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.PipelineReadOnlyBuffers = { PipelineBuffer::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)) };
-		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-		computePipelineDesc.NumTextures = 1;
-		computePipelineDesc.NumUAVs = 2;
-
-
+		computePipelineDesc.PipelineReadOnlyResources = {
+			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)),
+			PipelineResource::Texture(ShaderVisibility::Compute, 0)
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1)
+		};
+		computePipelineDesc.SamplerDescs = {
+			{ShaderVisibility::Compute, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp,}
+		};
 		m_UpScalePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 
 	}
@@ -68,8 +58,13 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomThreshold.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.PipelineReadOnlyBuffers = { PipelineBuffer::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)) };
-		computePipelineDesc.NumUAVs = 1;
+		computePipelineDesc.PipelineReadOnlyResources = 
+		{ 
+			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)) 
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+		};
 
 		m_ThresholdPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 
@@ -80,7 +75,11 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomComposite.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.NumUAVs = 3;
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1),
+			PipelineResource::Texture(ShaderVisibility::Compute, 2),
+		};
 
 		m_CompositePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}

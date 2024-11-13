@@ -11,17 +11,14 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 {
 	// Shadow map Graphics Pipeline
 	{
-		std::vector<PipelineBuffer> pipelineBuffers =
-		{
-			PipelineBuffer::ConstantBuffer(ShaderVisibility::Vertex, 0),
-			PipelineBuffer::LocalData(ShaderVisibility::Vertex, 1, sizeof(glm::mat4)),
-		};
-
 		GraphicsPipelineDesc pipelineDesc;
 		pipelineDesc.VertexShaderPath = "Shaders/Shadow.gsh";
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
-		pipelineDesc.PipelineBuffers = pipelineBuffers;
+		pipelineDesc.PipelineResources = {
+			PipelineResource::ConstantBuffer(ShaderVisibility::Vertex, 0),
+			PipelineResource::LocalData(ShaderVisibility::Vertex, 1, sizeof(glm::mat4)),
+		};
 		pipelineDesc.DepthStencilFormat = DataFormat::R32_FLOAT;
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;
 		pipelineDesc.CullMode = CullMode::Back;

@@ -44,9 +44,11 @@ public:
 
 	u32 GetCurrentBackBufferIndex() { return m_Device->GetCurrentBackBufferIndex(); }
 
+	void UploadMaterial(Buffer& buffer, void* data, u32 size, u32 offset = 0);
+
 	// TEMP
-	std::vector<ConstantBuffer> SceneDataBuffer;
-	std::vector<SceneDataStruct*> SceneData;
+	std::vector<Buffer> SceneDataBuffer;
+	std::vector<SceneDataStruct> SceneData;
 
 	bool ResizeEvent(const Event::EventData& eventData);
 

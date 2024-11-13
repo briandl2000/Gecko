@@ -473,48 +473,50 @@ void LoadNodes(const tinygltf::Model& gltfModel, FlatHierarchyScene* scene, u32 
 		const tinygltf::Material& gltfMaterial = gltfModel.materials[i];
 
 		Material& material = resourceManager->GetMaterial(materialHandles[i]);
-		MaterialData* materialData = reinterpret_cast<MaterialData*>(material.MaterialConstantBuffer.Buffer);
+		MaterialData materialData{ };// = reinterpret_cast<MaterialData*>(material.MaterialConstantBuffer._Buffer);
 
 		if (gltfMaterial.pbrMetallicRoughness.baseColorTexture.index >= 0) 
 		{
-			materialData->materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Albedo);
+			materialData.materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Albedo);
 			material.AlbedoTextureHandle = textureHandles[gltfMaterial.pbrMetallicRoughness.baseColorTexture.index];
 		}
-		materialData->baseColorFactor[0] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[0]);
-		materialData->baseColorFactor[1] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[1]);
-		materialData->baseColorFactor[2] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[2]);
-		materialData->baseColorFactor[3] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[3]);
+		materialData.baseColorFactor[0] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[0]);
+		materialData.baseColorFactor[1] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[1]);
+		materialData.baseColorFactor[2] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[2]);
+		materialData.baseColorFactor[3] = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.baseColorFactor[3]);
 
 		if (gltfMaterial.normalTexture.index >= 0) 
 		{
-			materialData->materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Normal);
+			materialData.materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Normal);
 			material.NormalTextureHandle = textureHandles[gltfMaterial.normalTexture.index];
 		}
-		materialData->normalScale = static_cast<f32>(gltfMaterial.normalTexture.scale);
+		materialData.normalScale = static_cast<f32>(gltfMaterial.normalTexture.scale);
 
 		if (gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0)
 		{
-			materialData->materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::MetalicRoughness);
+			materialData.materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::MetalicRoughness);
 			material.MetalicRoughnessTextureHandle = textureHandles[gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index];
 		}
-		materialData->matallicFactor = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.metallicFactor);
-		materialData->roughnessFactor = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.roughnessFactor);
+		materialData.matallicFactor = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.metallicFactor);
+		materialData.roughnessFactor = static_cast<f32>(gltfMaterial.pbrMetallicRoughness.roughnessFactor);
 
 		if (gltfMaterial.emissiveTexture.index >= 0)
 		{
-			materialData->materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Emmisive);
+			materialData.materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Emmisive);
 			material.EmmisiveTextureHandle = textureHandles[gltfMaterial.emissiveTexture.index];
 		}
-		materialData->emissiveFactor[0] = static_cast<f32>(gltfMaterial.emissiveFactor[0]);
-		materialData->emissiveFactor[1] = static_cast<f32>(gltfMaterial.emissiveFactor[1]);
-		materialData->emissiveFactor[2] = static_cast<f32>(gltfMaterial.emissiveFactor[2]);
+		materialData.emissiveFactor[0] = static_cast<f32>(gltfMaterial.emissiveFactor[0]);
+		materialData.emissiveFactor[1] = static_cast<f32>(gltfMaterial.emissiveFactor[1]);
+		materialData.emissiveFactor[2] = static_cast<f32>(gltfMaterial.emissiveFactor[2]);
 
 		if (gltfMaterial.occlusionTexture.index >= 0)
 		{
-			materialData->materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Occlusion);
+			materialData.materialTextureFlags |= static_cast<u32>(MaterialTextureFlags::Occlusion);
 			material.OcclusionTextureHandle = textureHandles[gltfMaterial.occlusionTexture.index];
 		}
-		materialData->occlusionStrength = static_cast<f32>(gltfMaterial.occlusionTexture.strength);
+		materialData.occlusionStrength = static_cast<f32>(gltfMaterial.occlusionTexture.strength);
+
+		resourceManager->UploadMaterial(material.MaterialConstantBuffer, &materialData, sizeof(MaterialData));	
 	}
 
 	return materialHandles;

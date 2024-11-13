@@ -41,6 +41,7 @@ namespace Gecko { namespace DX12 {
 		case ShaderVisibility::All: return D3D12_SHADER_VISIBILITY_ALL;
 		case ShaderVisibility::Vertex: return D3D12_SHADER_VISIBILITY_VERTEX;
 		case ShaderVisibility::Pixel: return D3D12_SHADER_VISIBILITY_PIXEL;
+		case ShaderVisibility::Compute: return D3D12_SHADER_VISIBILITY_ALL;
 		}
 		ASSERT_MSG(false, "Unkown Shader visibilty");
 		return D3D12_SHADER_VISIBILITY_ALL;
