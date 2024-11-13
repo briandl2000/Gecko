@@ -33,7 +33,7 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;
 		pipelineDesc.CullMode = CullMode::Back;
-		pipelineDesc.PrimitiveType = PrimitiveType::Lines;
+		pipelineDesc.PrimitiveType = PrimitiveType::Triangles;
 
 		pipelineDesc.TextureShaderVisibilities = {
 			ShaderVisibility::Pixel,
