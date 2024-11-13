@@ -11,12 +11,13 @@
 #include "Rendering/Frontend/Renderer/RenderPasses/FXAAPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/BloomPass.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/ToneMappingGammaCorrectionPass.h"
-#include "DebugSceneUIRenderer.h"
+#include "Rendering/Frontend/Scene/SceneObjects/Transform.h"
 
 #include "Core/Input.h"
 
 #include "CustomPass.h"
 #include "NodeBasedScene.h"
+#include "DebugSceneUIRenderer.h"
 
 int main()
 {
@@ -89,34 +90,32 @@ int main()
 
 	// Load the Sponza gltf scene
 	SceneNode* sponzaNode = mainScene->GetRootNode()->AddNode("Sponza node");
-	Gecko::SceneHandle sponzaScene = GLTFSceneLoader::LoadScene("Assets/sponza/glb/Sponza.glb", ctx);
+	Gecko::SceneHandle sponzaScene = GLTFSceneLoader::LoadNodeBasedScene("Assets/sponza/glb/Sponza.glb", ctx);
 	sponzaNode->AppendSceneData(*sceneManager->GetScene<NodeBasedScene>(sponzaScene));
-	sponzaNode->Transform.Rotation.y = 90.f;
+	sponzaNode->GetModifiableTransform().Rotation.y = 90.f;
 
 	// Load Helmet gltf Scene
 	SceneNode* helmetRootNode = mainScene->GetRootNode()->AddNode("Helmet node");
-	Gecko::SceneHandle helmetScene = GLTFSceneLoader::LoadScene("Assets/gltfHelmet/glTF-Binary/DamagedHelmet.glb", ctx);
+	Gecko::SceneHandle helmetScene = GLTFSceneLoader::LoadNodeBasedScene("Assets/gltfHelmet/glTF-Binary/DamagedHelmet.glb", ctx);
 	helmetRootNode->AppendSceneData(*sceneManager->GetScene<NodeBasedScene>(helmetScene));
-	helmetRootNode->Transform.Position.y = 3.f;
+	helmetRootNode->GetModifiableTransform().Position.y = 3.f;
 
 	// Create a camera in the scene
 	SceneNode* cameraNode = mainScene->GetRootNode()->AddNode("Camera node");
-	Gecko::Scope<Gecko::SceneCamera> camera = Gecko::CreateScopeFromRaw<Gecko::SceneCamera>(mainScene->CreateCamera());
+	Gecko::Scope<Gecko::SceneCamera> camera = mainScene->CreateCamera(Gecko::ProjectionType::Perspective);
 	camera->SetIsMain(true);
 	camera->SetAutoAspectRatio(true);
 	cameraNode->AttachCamera(&camera);
-	cameraNode->Transform.Position.z = 4.f;
-	cameraNode->Transform.Position.y = 2.f;
+	cameraNode->GetModifiableTransform().Position.z = 4.f;
+	cameraNode->GetModifiableTransform().Position.y = 2.f;
 
 	// Create directional light
-	Gecko::SceneDirectionalLight* directionalLight = 
-		static_cast<Gecko::SceneDirectionalLight*>(mainScene->CreateLight(Gecko::LightType::Directional));
-	Gecko::Scope<Gecko::SceneLight> sDirectionalLight = Gecko::CreateScopeFromRaw<Gecko::SceneDirectionalLight>(directionalLight);
+	Gecko::Scope<Gecko::SceneDirectionalLight> directionalLight = mainScene->CreateDirectionalLight();
 	SceneNode* lightNode = mainScene->GetRootNode()->AddNode("Light node");
 	directionalLight->SetColor({ 1., 1., 1. });
 	directionalLight->SetIntenstiy(1.f);
-	lightNode->AppendLight(&sDirectionalLight);
-	lightNode->Transform.Rotation.x = -90.f;
+	lightNode->AppendLight(&Gecko::CreateScopeFromRaw<Gecko::SceneLight>(directionalLight.release()));
+	lightNode->GetModifiableTransform().Rotation.x = -90.f;
 
 	Gecko::f32 lastTime = Gecko::Platform::GetTime();
 	
@@ -128,9 +127,9 @@ int main()
 		Gecko::f32 deltaTime = (currentTime - lastTime);
 		lastTime = currentTime;
 
-		helmetRootNode->Transform.Rotation.y += .73f * deltaTime * 50.f;
-		helmetRootNode->Transform.Rotation.x += 1.6f * deltaTime * 50.f;
-		helmetRootNode->Transform.Rotation.z += 1.0f * deltaTime * 50.f;
+		helmetRootNode->GetModifiableTransform().Rotation.y += .73f * deltaTime * 50.f;
+		helmetRootNode->GetModifiableTransform().Rotation.x += 1.6f * deltaTime * 50.f;
+		helmetRootNode->GetModifiableTransform().Rotation.z += 1.0f * deltaTime * 50.f;
 	
 		glm::vec3 rot{ 0. };
 		
@@ -139,7 +138,7 @@ int main()
 		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::LEFT))	rot.y += 1.f;
 		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::RIGHT))	rot.y -= 1.f;
 
-		cameraNode->Transform.Rotation += rot * deltaTime * 40.f;
+		cameraNode->GetModifiableTransform().Rotation += rot * deltaTime * 40.f;
 		
 		glm::vec3 pos{ 0. };
 
@@ -151,9 +150,9 @@ int main()
 		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::SPACE))	pos.y += 1.f;
 		if (glm::length2(pos) > 0.) pos = glm::normalize(pos);
 
-		glm::vec3 movement = glm::mat3(cameraNode->Transform.GetMat4()) * pos;
+		glm::vec3 movement = glm::mat3(cameraNode->GetModifiableTransform().GetMat4()) * pos;
 		
-		cameraNode->Transform.Position += movement * deltaTime;
+		cameraNode->GetModifiableTransform().Position += movement * deltaTime;
 
 		// Do the imgui things
 		DebugSceneUIRenderer::RenderDebugUI(ctx);

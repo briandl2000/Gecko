@@ -21,28 +21,29 @@ namespace Gecko {
 		virtual void Init(const std::string& name);
 
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] virtual SceneRenderObject* CreateSceneRenderObject() const;
+		[[nodiscard]] Scope<SceneRenderObject> CreateSceneRenderObject() const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] virtual SceneCamera* CreateCamera() const;
+		[[nodiscard]] Scope<SceneCamera> CreateCamera(ProjectionType type) const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] virtual SceneLight* CreateLight(LightType lightType) const;
+		[[nodiscard]] Scope<SceneLight> CreateLight(LightType lightType) const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] SceneDirectionalLight* CreateDirectionalLight() const;
+		[[nodiscard]] Scope<SceneDirectionalLight> CreateDirectionalLight() const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] ScenePointLight* CreatePointLight() const;
+		[[nodiscard]] Scope<ScenePointLight> CreatePointLight() const;
 		// Allocates requested object on the heap and returns pointer to it
-		[[nodiscard]] SceneSpotLight* CreateSpotLight() const;
+		[[nodiscard]] Scope<SceneSpotLight> CreateSpotLight() const;
 		
 		// Returns a newly created SceneRenderInfo object filled with data from this scene
 		[[nodiscard]] SceneRenderInfo GetSceneRenderInfo() const;
 
+		// Adjust aspect ratios of cameras
+		virtual bool OnResize(const Event::EventData& data) = 0;
+
+	public:
 		EnvironmentMapHandle GetEnvironmentMapHandle() const;
 		void SetEnvironmentMapHandle(EnvironmentMapHandle handle);
 
 		const std::string& GetName() const;
-
-		// Adjust aspect ratios of cameras
-		virtual bool Scene::OnResize(const Event::EventData& data) = 0;
 
 	protected:
 		// Read data from this scene into a SceneRenderInfo object (how scene data is translated into the object should be defined

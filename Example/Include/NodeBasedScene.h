@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Rendering/Frontend/Scene/Scene.h"
+#include "Rendering/Frontend/Scene/SceneObjects/Transform.h"
 
 class SceneNode;
 class NodeBasedScene : public Gecko::Scene
@@ -9,7 +10,7 @@ public:
 	friend class SceneNode;
 
 	NodeBasedScene() = default;
-	virtual ~NodeBasedScene() {};
+	virtual ~NodeBasedScene() {}
 
 	virtual void Init(const std::string& name) override;
 
@@ -17,7 +18,7 @@ public:
 	SceneNode* GetRootNode() const;
 
 	// Adjust aspect ratios of cameras
-	virtual bool NodeBasedScene::OnResize(const Gecko::Event::EventData& data) override;
+	virtual bool OnResize(const Gecko::Event::EventData& data) override;
 
 protected:
 	virtual const void PopulateSceneRenderInfo(Gecko::SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const;
@@ -29,33 +30,13 @@ private:
 	Gecko::Scope<SceneNode> m_RootNode;
 };
 
-class NodeTransform
-{
-public:
-
-	NodeTransform() = default;
-
-	glm::vec3 Position{ 0.f };
-	glm::vec3 Rotation{ 0.f };
-	glm::vec3 Scale{ 1.f };
-
-	inline glm::mat4 GetMat4() const
-	{
-		glm::mat4 nodeTranslationMatrix = glm::translate(glm::mat4(1.), Position);
-		glm::mat4 nodeRotationMatrix = glm::toMat4(glm::quat(glm::radians(Rotation)));
-		glm::mat4 nodeScaleMatrix = glm::scale(glm::mat4(1.), Scale);
-
-		return nodeTranslationMatrix * nodeRotationMatrix * nodeScaleMatrix;
-	}
-};
-
 class SceneNode
 {
 public:
 	friend class NodeBasedScene;
 
 	SceneNode() = default;
-	~SceneNode() {};
+	~SceneNode() {}
 
 	[[nodiscard]] SceneNode* AddNode(const std::string& name);
 
@@ -69,6 +50,9 @@ public:
 	// Copy data from scene into a new child node, leaves passed scene intact
 	void AppendSceneData(const NodeBasedScene& scene);
 
+	const Gecko::Transform& GetTransform() const;
+	Gecko::Transform& GetModifiableTransform();
+
 	Gecko::u32 GetChildrenCount() const;
 	SceneNode* GetChild(Gecko::u32 nodeIndex) const;
 
@@ -76,10 +60,7 @@ public:
 	const std::string& GetName() const;
 
 	// Adjust aspect ratios of cameras
-	bool SceneNode::OnResize(const Gecko::Event::EventData& data);
-
-public:
-	NodeTransform Transform;
+	bool OnResize(const Gecko::Event::EventData& data);
 
 private:
 	// Recursively copy the data from this node onto target
@@ -88,6 +69,8 @@ private:
 	const void PopulateSceneRenderInfo(Gecko::SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const;
 
 private:
+	Gecko::Transform m_Transform;
+	
 	std::vector<Gecko::Scope<SceneNode>> m_Children;
 
 	std::vector<Gecko::Scope<Gecko::SceneRenderObject>> m_SceneRenderObjects;

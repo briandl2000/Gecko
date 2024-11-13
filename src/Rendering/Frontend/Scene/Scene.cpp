@@ -14,45 +14,45 @@ namespace Gecko  {
 		m_Name = name;
 	}
 
-	SceneRenderObject* Scene::CreateSceneRenderObject() const
+	Scope<SceneRenderObject> Scene::CreateSceneRenderObject() const
 	{
-		return new SceneRenderObject();
+		return CreateScopeFromRaw<SceneRenderObject>(new SceneRenderObject());
 	}
 	
-	SceneLight* Scene::CreateLight(LightType lightType) const
+	Scope<SceneLight> Scene::CreateLight(LightType lightType) const
 	{
 		switch (lightType)
 		{
 		case LightType::Directional:
-			return new SceneDirectionalLight();
+			return CreateDirectionalLight();
 		case LightType::Point:
-			return new ScenePointLight();
+			return CreatePointLight();
 		case LightType::Spot:
-			return new SceneSpotLight();
+			return CreateSpotLight();
 		default:
 			ASSERT_MSG(false, "Unkown light type!");
 			return nullptr;
 		}
 	}
 
-	SceneDirectionalLight* Scene::CreateDirectionalLight() const
+	Scope<SceneDirectionalLight> Scene::CreateDirectionalLight() const
 	{
-		return static_cast<SceneDirectionalLight*>(CreateLight(LightType::Directional));
+		return CreateScopeFromRaw<SceneDirectionalLight>(new SceneDirectionalLight());
 	}
 	
-	ScenePointLight* Scene::CreatePointLight() const
+	Scope<ScenePointLight> Scene::CreatePointLight() const
 	{
-		return static_cast<ScenePointLight*>(CreateLight(LightType::Point));
+		return CreateScopeFromRaw<ScenePointLight>(new ScenePointLight());
 	}
 
-	SceneSpotLight* Scene::CreateSpotLight() const
+	Scope<SceneSpotLight> Scene::CreateSpotLight() const
 	{
-		return static_cast<SceneSpotLight*>(CreateLight(LightType::Spot));
+		return CreateScopeFromRaw<SceneSpotLight>(new SceneSpotLight());
 	}
 
-	SceneCamera* Scene::CreateCamera() const
+	Scope<SceneCamera> Scene::CreateCamera(ProjectionType type) const
 	{
-		return new SceneCamera();
+		return CreateScopeFromRaw<SceneCamera>(new SceneCamera(type));
 	}
 
 	SceneRenderInfo Scene::GetSceneRenderInfo() const

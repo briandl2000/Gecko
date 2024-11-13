@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Defines.h"
+#include "Transform.h"
 
 #include "glm/common.hpp"
 
@@ -24,15 +25,20 @@ namespace Gecko {
 
 		inline f32 GetIntenstiy() const { return m_Intensity; }
 		inline const glm::vec3& GetColor() const { return m_Color; }
+		inline const Transform& GetTransform() const { return m_Transform; }
+		inline Transform& GetModifiableTransform() { return m_Transform; }
 
 		inline void SetIntenstiy(f32 intensity) { m_Intensity = intensity; }
 		inline void SetColor(glm::vec3 color) { m_Color = color; }
+		inline void SetTransform(const Transform& transform) { m_Transform = transform; }
 
 	protected:
 		LightType m_LightType{ LightType::None };
 
 		f32 m_Intensity{ 1.f };
 		glm::vec3 m_Color{ 1.f };
+
+		Transform m_Transform{ Transform() };
 	};
 
 	class SceneDirectionalLight : public SceneLight
