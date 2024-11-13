@@ -261,7 +261,7 @@ namespace Gecko { namespace DX12 {
 		m_ComputePipeline = computePipeline;
 	}
 
-	void CommandList_DX12::BindConstantBuffer(u32 slot, ConstantBuffer buffer)
+	void CommandList_DX12::BindConstantBuffer(u32 slot, Buffer buffer)
 	{
 		ASSERT_MSG(buffer.IsValid(), "Buffer is invalid!");
 		ConstantBuffer_DX12* constantBuffer_DX12 = reinterpret_cast<ConstantBuffer_DX12*>(buffer.Data.get());

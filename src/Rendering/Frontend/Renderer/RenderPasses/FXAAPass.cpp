@@ -12,21 +12,20 @@ const void FXAAPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* 
 {
 	// FXAA Compute Pipeline
 	{
-		std::vector<SamplerDesc> computeSamplerShaderDescs =
-		{
-			{
-				ShaderVisibility::All,
-				SamplerFilter::Point,
-			}
-		};
-
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/FXAA.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.PipelineReadOnlyBuffers = { PipelineBuffer::LocalData(ShaderVisibility::Compute, 0, sizeof(FXAAData)) };
-		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-		computePipelineDesc.NumTextures = 1;
-		computePipelineDesc.NumUAVs = 1;
+		computePipelineDesc.PipelineReadOnlyResources = 
+		{ 
+			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(FXAAData)),
+			PipelineResource::Texture(ShaderVisibility::Compute, 0) 
+		};
+		computePipelineDesc.SamplerDescs = {
+			{ ShaderVisibility::Compute, SamplerFilter::Point }
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0)
+		};
 
 
 		FXAAPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);

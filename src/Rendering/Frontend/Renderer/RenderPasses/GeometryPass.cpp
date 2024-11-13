@@ -18,10 +18,15 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
-		pipelineDesc.PipelineBuffers = {
-			PipelineBuffer::ConstantBuffer(ShaderVisibility::All, 0),
-			PipelineBuffer::ConstantBuffer(ShaderVisibility::Pixel, 1),
-			PipelineBuffer::LocalData(ShaderVisibility::All, 2, sizeof(glm::mat4)),
+		pipelineDesc.PipelineResources = {
+			PipelineResource::ConstantBuffer(ShaderVisibility::All, 0),
+			PipelineResource::ConstantBuffer(ShaderVisibility::Pixel, 1),
+			PipelineResource::LocalData(ShaderVisibility::All, 2, sizeof(glm::mat4)),
+			PipelineResource::Texture(ShaderVisibility::Pixel, 0),
+			PipelineResource::Texture(ShaderVisibility::Pixel, 1),
+			PipelineResource::Texture(ShaderVisibility::Pixel, 2),
+			PipelineResource::Texture(ShaderVisibility::Pixel, 3),
+			PipelineResource::Texture(ShaderVisibility::Pixel, 4),
 		};
 
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
@@ -35,15 +40,6 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.CullMode = CullMode::Back;
 		pipelineDesc.PrimitiveType = PrimitiveType::Triangles;
 
-		pipelineDesc.TextureShaderVisibilities = {
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-			ShaderVisibility::Pixel,
-		};
-
 		pipelineDesc.SamplerDescs = {
 			{ShaderVisibility::Pixel, SamplerFilter::Linear},
 			{ShaderVisibility::Pixel, SamplerFilter::Point}
@@ -54,24 +50,6 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 	// CubeMap Graphics Pipeline
 	{
-		std::vector<PipelineBuffer> pipelineBuffer =
-		{
-			
-			PipelineBuffer::ConstantBuffer(ShaderVisibility::All, 0),
-		};
-
-		std::vector<ShaderVisibility> textureShaderVisibilities =
-		{
-			ShaderVisibility::Pixel,
-		};
-
-		std::vector<SamplerDesc> samplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-			},
-		};
 
 		GraphicsPipelineDesc pipelineDesc;
 		pipelineDesc.VertexShaderPath = "Shaders/Cubemap.gsh";
@@ -79,7 +57,11 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
-		pipelineDesc.PipelineBuffers = pipelineBuffer;
+		pipelineDesc.PipelineResources = 
+		{	
+			PipelineResource::ConstantBuffer(ShaderVisibility::All, 0),
+			PipelineResource::Texture(ShaderVisibility::Pixel, 0)
+		};
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
 		pipelineDesc.RenderTextureFormats[1] = DataFormat::R32G32B32A32_FLOAT; // Normal
 		pipelineDesc.RenderTextureFormats[2] = DataFormat::R32G32B32A32_FLOAT; // Position
@@ -88,9 +70,9 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.DepthStencilFormat = DataFormat::R32_FLOAT;
 		pipelineDesc.CullMode = CullMode::Back;
 
-		pipelineDesc.TextureShaderVisibilities = textureShaderVisibilities;
-
-		pipelineDesc.SamplerDescs = samplerShaderDescs;
+		pipelineDesc.SamplerDescs = {
+			{ ShaderVisibility::Pixel, SamplerFilter::Linear,},
+		};
 
 		CubemapPipelineHandle = resourceManager->CreateGraphicsPipeline(pipelineDesc);
 	}

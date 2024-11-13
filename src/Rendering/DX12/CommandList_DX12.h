@@ -42,7 +42,7 @@ namespace Gecko { namespace DX12 {
 		virtual void BindGraphicsPipeline(GraphicsPipeline Pipeline) override;
 		virtual void BindComputePipeline(ComputePipeline Pipeline) override;
 
-		virtual void BindConstantBuffer(u32 slot, ConstantBuffer buffer) override;
+		virtual void BindConstantBuffer(u32 slot, Buffer buffer) override;
 
 		virtual void SetLocalData(u32 size, void* data) override;
 

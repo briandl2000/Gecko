@@ -441,75 +441,72 @@ namespace Gecko { namespace DX12
 			std::vector<CD3DX12_ROOT_PARAMETER1> rootParameters;
 			std::vector<D3D12_DESCRIPTOR_RANGE1> descriptorTableRanges;
 
-			u32 numConstantBuffers = static_cast<u32>(desc.PipelineBuffers.size());
-			u32 numTextures = static_cast<u32>(desc.TextureShaderVisibilities.size());
-
-			u32 numRootParams = numConstantBuffers + numTextures;
-			u32 TextureOffset = numConstantBuffers;
+			u32 numRootParams = static_cast<u32>(desc.PipelineResources.size());
 			rootParameters.resize(numRootParams);
-			u32 numDescriptorTableRanges = numConstantBuffers + numTextures;
+			u32 numDescriptorTableRanges = numRootParams;
 			descriptorTableRanges.resize(numDescriptorTableRanges);
 
 
-			for (u32 i = 0; i < numConstantBuffers; i++)
+			for (u32 i = 0; i < numDescriptorTableRanges; i++)
 			{
 				u32 descriptorIndex = i;
-				const PipelineBuffer& pipelineBuffer = desc.PipelineBuffers[i];
+				const PipelineResource& pipelineResource = desc.PipelineResources[i];
 
-				if(pipelineBuffer.Type == BufferType::LocalData)
+				switch (pipelineResource.Type)
 				{
-					rootParameters[descriptorIndex].InitAsConstants(
-						pipelineBuffer.Size / 4,
-						pipelineBuffer.BindLocation,
-						0,
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineBuffer.Visibility)
-					);
-					graphicsPipeline_DX12->LocalDataLocation = i;
-				}
-				else
+				case ResourceType::None: ASSERT_MSG(false, "None is not a valid resource type"); continue;
+				case ResourceType::Texture:
 				{
-					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
-					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineBuffer.BindLocation;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineResource.BindLocation;
 					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-					D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
-					descriptorTable.NumDescriptorRanges = 1;
-					descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];
-
-					rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-					rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
-					rootParameters[descriptorIndex].ShaderVisibility = ShaderVisibilityToD3D12ShaderVisibility(pipelineBuffer.Visibility);
+					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+					graphicsPipeline_DX12->TextureIndices.push_back(descriptorIndex);
 				}
-				graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
-			}
+				continue;
+				case ResourceType::ConstantBuffer:
+				{
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineResource.BindLocation;
+					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
+					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-			for (u32 i = 0; i < numTextures; i++)
-			{
-				u32 descriptorIndex = i + TextureOffset;
-				const ShaderVisibility& textureShaderVisibility = desc.TextureShaderVisibilities[i];
+					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+					graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
+				}
+				continue;
+				case ResourceType::StructuredBuffer: 
+				{
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineResource.BindLocation;
+					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
+					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-				descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
-				descriptorTableRanges[descriptorIndex].BaseShaderRegister = i;
-				descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
-				descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-				/*D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
-				descriptorTable.NumDescriptorRanges = 1;
-				descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];*/
-
-				rootParameters[descriptorIndex].InitAsDescriptorTable(
-					1,
-					&descriptorTableRanges[descriptorIndex],
-					ShaderVisibilityToD3D12ShaderVisibility(textureShaderVisibility)
-				);
-
-				/*rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
-				rootParameters[descriptorIndex].ShaderVisibility = ShaderVisibilityToD3D12ShaderVisibility(textureShaderVisibility);*/
-				graphicsPipeline_DX12->TextureIndices.push_back(descriptorIndex);
+					rootParameters[descriptorIndex].InitAsDescriptorTable( 1, &descriptorTableRanges[descriptorIndex], 
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+					graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
+				}
+				continue;
+				case ResourceType::LocalData:
+				{
+					rootParameters[descriptorIndex].InitAsConstants(
+						pipelineResource.Size / 4,
+						pipelineResource.BindLocation,
+						0,
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility)
+					);
+					graphicsPipeline_DX12->LocalDataLocation = i;
+					graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
+				}
+				continue;
+				}
 			}
 
 			std::vector<CD3DX12_STATIC_SAMPLER_DESC> samplers;
@@ -722,85 +719,87 @@ namespace Gecko { namespace DX12
 			std::vector<CD3DX12_ROOT_PARAMETER1> rootParameters;
 			std::vector<D3D12_DESCRIPTOR_RANGE1> descriptorTableRanges;
 
-			u32 numRootParams = static_cast<u32>(desc.PipelineReadOnlyBuffers.size()) + desc.NumTextures + desc.NumUAVs;
-			u32 TextureOffset = static_cast<u32>(desc.PipelineReadOnlyBuffers.size());
-			u32 UAVOffset = TextureOffset + desc.NumTextures;
+			u32 numRootParams = static_cast<u32>(desc.PipelineReadOnlyResources.size()) + static_cast<u32>(desc.PipelineReadWriteResources.size());
 			rootParameters.resize(numRootParams);
 			u32 numDescriptorTableRanges = numRootParams;
 			descriptorTableRanges.resize(numDescriptorTableRanges);
 
-
-			for (u32 i = 0; i < desc.PipelineReadOnlyBuffers.size(); i++)
+			for (u32 i = 0; i < desc.PipelineReadOnlyResources.size(); i++)
 			{
 				u32 descriptorIndex = i;
-				const PipelineBuffer& pipelineBuffer = desc.PipelineReadOnlyBuffers[i];
+				const PipelineResource& pipelineResource = desc.PipelineReadOnlyResources[i];
 
-				if(pipelineBuffer.Type == BufferType::LocalData)
+				switch (pipelineResource.Type)
 				{
-					rootParameters[descriptorIndex].InitAsConstants(
-						pipelineBuffer.Size / 4,
-						pipelineBuffer.BindLocation,
-						0,
-						D3D12_SHADER_VISIBILITY_ALL
-					);
-					computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
-					computePipeline_DX12->LocalDataLocation = i;
-				}
-				else
+				case ResourceType::None: ASSERT_MSG(false, "None is not a valid resource type"); continue;
+				case ResourceType::Texture:
 				{
-					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
-					descriptorTableRanges[descriptorIndex].BaseShaderRegister = i;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineResource.BindLocation;
 					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-					D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
-					descriptorTable.NumDescriptorRanges = 1;
-					descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];
+					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+					computePipeline_DX12->TextureIndices.push_back(descriptorIndex);
+				}
+				continue;
+				case ResourceType::ConstantBuffer:
+				{
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineResource.BindLocation;
+					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
+					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-					rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-					rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
-					rootParameters[descriptorIndex].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
 					computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
 				}
+				continue;
+				case ResourceType::StructuredBuffer: 
+				{
+					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+					descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
+					descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineResource.BindLocation;
+					descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
+					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+					rootParameters[descriptorIndex].InitAsDescriptorTable( 1, &descriptorTableRanges[descriptorIndex], 
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+					computePipeline_DX12->TextureIndices.push_back(descriptorIndex);
+				}
+				continue;
+				case ResourceType::LocalData:
+				{
+					rootParameters[descriptorIndex].InitAsConstants(
+						pipelineResource.Size / 4,
+						pipelineResource.BindLocation,
+						0,
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility)
+					);
+					computePipeline_DX12->LocalDataLocation = i;
+					computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
+				}
+				continue;
+				}
 			}
+			u32 uavOffset = static_cast<u32>(desc.PipelineReadOnlyResources.size());
 
-			for (u32 i = 0; i < desc.NumTextures; i++)
+			for (u32 i = 0; i < desc.PipelineReadWriteResources.size(); i++)
 			{
-				u32 descriptorIndex = i + TextureOffset;
-
-				descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-				descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
-				descriptorTableRanges[descriptorIndex].BaseShaderRegister = i;
-				descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
-				descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-				rootParameters[descriptorIndex].InitAsDescriptorTable(
-					1,
-					&descriptorTableRanges[descriptorIndex],
-					D3D12_SHADER_VISIBILITY_ALL
-				);
-
-				computePipeline_DX12->TextureIndices.push_back(descriptorIndex);
-			}
-
-			for (u32 i = 0; i < desc.NumUAVs; i++)
-			{
-				u32 descriptorIndex = i + UAVOffset;
+				u32 descriptorIndex = i + uavOffset;
+				const PipelineResource& pipelineResource = desc.PipelineReadWriteResources[i];
 
 				descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 				descriptorTableRanges[descriptorIndex].NumDescriptors = 1;
-				descriptorTableRanges[descriptorIndex].BaseShaderRegister = i;
+				descriptorTableRanges[descriptorIndex].BaseShaderRegister = pipelineResource.BindLocation;
 				descriptorTableRanges[descriptorIndex].RegisterSpace = 0;
 				descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-				D3D12_ROOT_DESCRIPTOR_TABLE1 descriptorTable;
-				descriptorTable.NumDescriptorRanges = 1;
-				descriptorTable.pDescriptorRanges = &descriptorTableRanges[descriptorIndex];
-
-				rootParameters[descriptorIndex].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-				rootParameters[descriptorIndex].DescriptorTable = descriptorTable;
-				rootParameters[descriptorIndex].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+				rootParameters[descriptorIndex].InitAsDescriptorTable( 1, &descriptorTableRanges[descriptorIndex], 
+						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
 				computePipeline_DX12->UAVIndices.push_back(descriptorIndex);
 			}
 
@@ -873,7 +872,7 @@ namespace Gecko { namespace DX12
 			HRESULT hr = D3DCompileFromFile(ComputeSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
 				desc.EntryPoint, shaderVersion.c_str(), flags, 0, &computeShaderBlob, &errorBlob);
 			// Should probably do some nicer error handling here #FIXME
-			ASSERT(hr == S_OK);
+			ASSERT_MSG(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
 
 			CS = CD3DX12_SHADER_BYTECODE(computeShaderBlob.Get());
 		}
@@ -900,7 +899,7 @@ namespace Gecko { namespace DX12
 		return CreateTexture(desc, FormatToD3D12Format(desc.Format));
 	}
 	
-	ConstantBuffer Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
+	Buffer Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
 	{
 		Ref<ConstantBuffer_DX12> constantBuffer_DX12 = CreateRef<ConstantBuffer_DX12>();
 		constantBuffer_DX12->ConstantBufferResource = CreateRef<Resource>();
@@ -924,23 +923,24 @@ namespace Gecko { namespace DX12
 		cbvDesc.SizeInBytes = static_cast<u32>(constantBuffer_DX12->MemorySize);
 		m_Device->CreateConstantBufferView(&cbvDesc, constantBuffer_DX12->ConstantBufferView.CPU);
 
-		CD3DX12_RANGE readRange(0, 0);
-		constantBuffer_DX12->ConstantBufferResource->ResourceDX12->Map(0, &readRange, &constantBuffer_DX12->GPUAddress);
+		//CD3DX12_RANGE readRange(0, 0);
+		//constantBuffer_DX12->ConstantBufferResource->ResourceDX12->Map(0, &readRange, &constantBuffer_DX12->GPUAddress);
 
-		ConstantBuffer constantBuffer;
+		Buffer constantBuffer;
+		constantBuffer.Type = BufferType::Constant;
 		constantBuffer.Desc = desc;
 		constantBuffer.Data = constantBuffer_DX12;
-		constantBuffer.Buffer = constantBuffer_DX12->GPUAddress;
+		//constantBuffer._Buffer = constantBuffer_DX12->GPUAddress;
 
 		return constantBuffer;
 	}
 
-	void Device_DX12::UploadTextureData(Texture texture, void* Data, u32 mip, u32 slice)
+	void Device_DX12::UploadTextureData(Texture texture, void* data, u32 mip, u32 slice)
 	{
 		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
 
 		D3D12_SUBRESOURCE_DATA subresourceData = {};
-		subresourceData.pData = Data;
+		subresourceData.pData = data;
 		subresourceData.RowPitch = static_cast<LONG_PTR>(texture.Desc.Width * FormatSizeInBytes(texture.Desc.Format));
 		subresourceData.SlicePitch = static_cast<LONG_PTR>(texture.Desc.Width * texture.Desc.Height * FormatSizeInBytes(texture.Desc.Format));
 
@@ -951,6 +951,17 @@ namespace Gecko { namespace DX12
 			subresourceData,
 			subResource
 		);
+	}
+
+	void Device_DX12::UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset)
+	{
+		ConstantBuffer_DX12* constantBuffer_DX12 = reinterpret_cast<ConstantBuffer_DX12*>(buffer.Data.get());
+		CD3DX12_RANGE readRange(0, 0);
+		u8* cpyLocation = nullptr;
+		constantBuffer_DX12->ConstantBufferResource->ResourceDX12->Map(0, &readRange, reinterpret_cast<void**>(&cpyLocation));
+		cpyLocation += offset;
+		memcpy(cpyLocation, data, size);
+		constantBuffer_DX12->ConstantBufferResource->ResourceDX12->Unmap(0, &readRange);
 	}
 
 	void Device_DX12::DrawTextureInImGui(Texture texture, u32 width, u32 height)
@@ -1634,7 +1645,7 @@ namespace Gecko { namespace DX12
 		);
 
 		Ref<CommandBuffer> copyCommandList = GetFreeCopyCommandBuffer();
-
+		
 		UpdateSubresources(
 			copyCommandList->CommandList.Get(),
 			resource.Get(),

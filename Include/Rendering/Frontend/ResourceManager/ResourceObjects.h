@@ -43,7 +43,7 @@ namespace Gecko
 
 	struct Material
 	{
-		ConstantBuffer MaterialConstantBuffer;
+		Buffer MaterialConstantBuffer;
 		TextureHandle AlbedoTextureHandle;
 		TextureHandle NormalTextureHandle;
 		TextureHandle MetalicRoughnessTextureHandle;

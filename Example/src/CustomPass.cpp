@@ -12,7 +12,10 @@ const void CustomPass::SubInit(const Gecko::Platform::AppInfo& appInfo, Gecko::R
 		Gecko::ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Custom.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.NumUAVs = 1;
+		computePipelineDesc.PipelineReadWriteResources =
+		{
+			Gecko::PipelineResource::Texture(Gecko::ShaderVisibility::Compute, 0)
+		};
 
 		CustomPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}

@@ -106,17 +106,27 @@ namespace Gecko {
 		Clamp
 	};
 
-	enum class BufferType
+	enum class ResourceType
 	{
 		None,
+		Texture,
 		ConstantBuffer,
 		StructuredBuffer,
 		LocalData
 	};
 
+	enum class BufferType
+	{
+		None,
+		Vertex,
+		Index,
+		Constant, 
+		Structured
+	};
+
 	u32 FormatSizeInBytes(const DataFormat& format);
 
-	u32 GetRenderTargetResourceIndex(const RenderTargetType& renderTargetType);
+	//u32 GetRenderTargetResourceIndex(const RenderTargetType& renderTargetType);
 
 	// TODO: find a better place for this
 	u32 CalculateNumberOfMips(u32 width, u32 height);
@@ -298,6 +308,40 @@ namespace Gecko {
 		}
 	};
 
+
+	// Constant Buffer
+
+	struct ConstantBufferDesc
+	{
+		u64 Size{ 0 };
+	
+		bool IsValid() const
+		{
+			return Size > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	struct Buffer
+	{
+		BufferType Type{ BufferType::None };
+		ConstantBufferDesc Desc{};
+		Ref<void> Data{ nullptr };
+		
+		bool IsValid() const
+		{
+			// You can decide not to use Buffer if you feel like you don't need the void* data
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
 	// Texture
 
 	struct TextureDesc
@@ -436,7 +480,6 @@ namespace Gecko {
 		}
 	};
 
-
 	struct RenderTarget
 	{
 		RenderTargetDesc Desc{};
@@ -454,40 +497,6 @@ namespace Gecko {
 			if (!RenderTextures[0].IsValid() && !DepthTexture.IsValid())
 				return false;
 
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	// Constant Buffer
-
-	struct ConstantBufferDesc
-	{
-		u64 Size{ 0 };
-		ShaderVisibility Visibility{ ShaderVisibility::All };
-
-		bool IsValid() const
-		{
-			return Size > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	struct ConstantBuffer
-	{
-		ConstantBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
-		void* Buffer{ nullptr };
-
-		bool IsValid() const
-		{
-			// You can decide not to use Buffer if you feel like you don't need the void* data
 			return Desc.IsValid() && Data;
 		}
 		operator bool() const
@@ -542,33 +551,37 @@ namespace Gecko {
 		}
 	};
 
-	struct PipelineBuffer
+	struct PipelineResource
 	{
-		static PipelineBuffer ConstantBuffer(ShaderVisibility visibility, u32 bindLocation)
+		static PipelineResource Texture(ShaderVisibility visibility, u32 bindLocation)
 		{
-			return {BufferType::ConstantBuffer, visibility, bindLocation, 0};
+			return {ResourceType::Texture, visibility, bindLocation, 0};
 		}
-		static PipelineBuffer StructuredBuffer(ShaderVisibility visibility, u32 bindLocation)
+		static PipelineResource ConstantBuffer(ShaderVisibility visibility, u32 bindLocation)
 		{
-			return {BufferType::ConstantBuffer, visibility, bindLocation, 0};
+			return {ResourceType::ConstantBuffer, visibility, bindLocation, 0};
 		}
-		static PipelineBuffer LocalData(ShaderVisibility visibility, u32 bindLocation, u32 size)
+		static PipelineResource StructuredBuffer(ShaderVisibility visibility, u32 bindLocation)
 		{
-			return {BufferType::LocalData, visibility, bindLocation, size};
+			return {ResourceType::StructuredBuffer, visibility, bindLocation, 0};
+		}
+		static PipelineResource LocalData(ShaderVisibility visibility, u32 bindLocation, u32 size)
+		{
+			return {ResourceType::LocalData, visibility, bindLocation, size};
 		}
 
-		BufferType Type{ BufferType::None };
+		ResourceType Type{ ResourceType::None };
 		ShaderVisibility Visibility{ ShaderVisibility::All };
 		u32 BindLocation{ 0 };
 		u32 Size{ 0 };
 
 		bool IsValid() const
 		{
-			if(Type == BufferType::None)
+			if(Type == ResourceType::None)
 			{
 				return false;
 			}
-			if(Type == BufferType::LocalData && (Size == 0 || Size % 4 != 0))
+			if(Type == ResourceType::LocalData && (Size == 0 || Size % 4 != 0))
 			{
 				return false;
 			}
@@ -608,9 +621,7 @@ namespace Gecko {
 		WindingOrder WindingOrder{ WindingOrder::ClockWise };
 		PrimitiveType PrimitiveType{ PrimitiveType::Triangles };
 
-		std::vector<PipelineBuffer> PipelineBuffers{};
-
-		std::vector<ShaderVisibility> TextureShaderVisibilities{};
+		std::vector<PipelineResource> PipelineResources{};
 
 		std::vector<SamplerDesc> SamplerDescs{};
 		bool DepthBoundsTest{ false };
@@ -665,9 +676,8 @@ namespace Gecko {
 		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
 		const char* EntryPoint{ "main" };
 
-		std::vector<PipelineBuffer> PipelineReadOnlyBuffers{};
-		u32 NumTextures{ 0 };
-		u32 NumUAVs{ 0 };
+		std::vector<PipelineResource> PipelineReadOnlyResources{};
+		std::vector<PipelineResource> PipelineReadWriteResources{};
 		std::vector<SamplerDesc> SamplerDescs{};
 
 		bool IsValid() const

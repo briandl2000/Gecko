@@ -120,10 +120,14 @@ namespace Gecko { namespace DX12 {
 		Ref<Resource> ConstantBufferResource{ nullptr };
 		DescriptorHandle ConstantBufferView{ };
 		u64 MemorySize{ 0 };
-		void* GPUAddress{ nullptr };
 
 		ConstantBuffer_DX12() {}
 		~ConstantBuffer_DX12();
+	};
+
+	struct StructuredBuffer_DX12
+	{
+		Ref<Resource> ConstantBufferResource{ nullptr };
 	};
 	
 	struct Texture_DX12
