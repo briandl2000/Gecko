@@ -15,7 +15,7 @@
 
 #include "Core/Input.h"
 
-#include "CustomPass.h"
+#include "ExampleComputePass.h"
 #include "NodeBasedScene.h"
 #include "DebugSceneUIRenderer.h"
 
@@ -67,7 +67,7 @@ int main()
 		renderer->CreateRenderPass<Gecko::ToneMappingGammaCorrectionPass>("ToneMappingGammaCorrection",
 			ToneMappingGammaCorrectionConfigData);
 
-	//Gecko::RenderPassHandle customPass = renderer->CreateRenderPass<CustomPass>("Custom");
+	//Gecko::RenderPassHandle exampleComputePass = renderer->CreateRenderPass<ExampleComputePass>("ExampleCompute");
 	
 	// Configure renderpasses
 	renderer->ConfigureRenderPasses({
@@ -76,8 +76,8 @@ int main()
 		deferredPBRPass,
 		FXAAPass,
 		bloomPass,
-		toneMappingGammaCorrectionPass
-		//customPass,
+		toneMappingGammaCorrectionPass,
+		//exampleComputePass
 		});
 
 	// Main scene initialisation
