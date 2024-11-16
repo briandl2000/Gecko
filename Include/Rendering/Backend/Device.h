@@ -43,13 +43,13 @@ namespace Gecko {
 		virtual RenderTarget GetCurrentBackBuffer() = 0;
 
 		virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) = 0;
-		virtual VertexBuffer CreateVertexBuffer(const VertexBufferDesc& desc) = 0;
-		virtual IndexBuffer CreateIndexBuffer(const IndexBufferDesc& desc) = 0;
+		virtual Buffer CreateVertexBuffer(const VertexBufferDesc& desc) = 0;
+		virtual Buffer CreateIndexBuffer(const IndexBufferDesc& desc) = 0;
 		virtual GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) = 0;
 		virtual ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) = 0;
 		virtual Texture CreateTexture(const TextureDesc& desc) = 0;
 		virtual Buffer CreateConstantBuffer(const ConstantBufferDesc& desc) = 0;
-		//virtual ConstantBuffer CreateStructuredBuffer(const StructuredBufferDesc& desc) = 0;
+		virtual Buffer CreateStructuredBuffer(const StructuredBufferDesc& desc) = 0;
 
 		virtual void UploadTextureData(Texture texture, void* data, u32 mip = 0, u32 slice = 0) = 0;
 		virtual void UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset = 0) = 0;

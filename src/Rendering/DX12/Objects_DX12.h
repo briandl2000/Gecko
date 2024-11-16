@@ -101,15 +101,25 @@ namespace Gecko { namespace DX12 {
 	{
 		Ref<Resource> VertexBufferResource{ nullptr };
 		D3D12_VERTEX_BUFFER_VIEW VertexBufferView{ };
+		DescriptorHandle ShaderResourceView{ };
 
 		VertexBuffer_DX12() {}
 		~VertexBuffer_DX12();
 	};
 
+	// struct Buffer
+	// {
+	// 	union
+	// 	{
+	// 		D3D12_VERTEX_BUFFER_VIEW VertexBufferView{ };
+	// 	};
+	// }
+
 	struct IndexBuffer_DX12
 	{
 		Ref<Resource> IndexBufferResource{ nullptr };
 		D3D12_INDEX_BUFFER_VIEW IndexBufferView{ };
+		DescriptorHandle ShaderResourceView{ };
 
 		IndexBuffer_DX12() {}
 		~IndexBuffer_DX12();
@@ -117,7 +127,7 @@ namespace Gecko { namespace DX12 {
 
 	struct ConstantBuffer_DX12
 	{
-		Ref<Resource> ConstantBufferResource{ nullptr };
+		Ref<Resource> BufferResource{ nullptr };
 		DescriptorHandle ConstantBufferView{ };
 		u64 MemorySize{ 0 };
 
@@ -127,7 +137,12 @@ namespace Gecko { namespace DX12 {
 
 	struct StructuredBuffer_DX12
 	{
-		Ref<Resource> ConstantBufferResource{ nullptr };
+		Ref<Resource> BufferResource{ nullptr };
+		DescriptorHandle ShaderResourceView{ };
+		u64 MemorySize{ 0 };
+
+		StructuredBuffer_DX12() {}
+		~StructuredBuffer_DX12();
 	};
 	
 	struct Texture_DX12

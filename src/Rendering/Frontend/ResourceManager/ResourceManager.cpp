@@ -22,7 +22,6 @@ namespace Gecko
 		m_CurrentTextureIndex = 0;
 		m_CurrentMaterialIndex = 0;
 		m_CurrentRenderTargetIndex = 0;
-	
 
 		// MipMap Compute Pipeline
 		{
@@ -141,7 +140,7 @@ namespace Gecko
 			};
 
 			VertexBufferDesc vertexDesc;
-			vertexDesc.Layout = Vertex3D::GetLayout();
+			vertexDesc.Stride = Vertex3D::GetLayout().Stride;
 			vertexDesc.VertexData = vertices;
 			vertexDesc.NumVertices = 24;
 

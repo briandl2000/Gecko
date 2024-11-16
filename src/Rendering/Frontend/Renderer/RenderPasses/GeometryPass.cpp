@@ -121,7 +121,7 @@ const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, Resource
 	EnvironmentMap environmentMap = resourceManager->GetEnvironmentMap(sceneRenderInfo.EnvironmentMap);
 	commandList->BindTexture(0, resourceManager->GetTexture(environmentMap.EnvironmentTextureHandle));
 
-	commandList->Draw(cubeMesh.IndexBuffer.Desc.NumIndices);
+	commandList->Draw(cubeMesh.IndexBuffer.Desc.NumElements);
 
 	// Geometry pass
 
@@ -147,7 +147,7 @@ const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, Resource
 		commandList->BindTexture(4, resourceManager->GetTexture(material.OcclusionTextureHandle));
 		commandList->BindConstantBuffer(1, material.MaterialConstantBuffer);
 
-		commandList->Draw(mesh.IndexBuffer.Desc.NumIndices);
+		commandList->Draw(mesh.IndexBuffer.Desc.NumElements);
 	}
 }
 

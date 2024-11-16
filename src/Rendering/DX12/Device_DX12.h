@@ -36,12 +36,13 @@ namespace Gecko { namespace DX12
 			virtual void ExecuteComputeCommandList(Ref<CommandList> commandList) override;
 
 			virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) override;
-			virtual VertexBuffer CreateVertexBuffer(const VertexBufferDesc& desc) override;
-			virtual IndexBuffer CreateIndexBuffer(const IndexBufferDesc& desc) override;
+			virtual Buffer CreateVertexBuffer(const VertexBufferDesc& desc) override;
+			virtual Buffer CreateIndexBuffer(const IndexBufferDesc& desc) override;
 			virtual GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) override;
 			virtual ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) override;
 			virtual Texture CreateTexture(const TextureDesc& desc) override;
 			virtual Buffer CreateConstantBuffer(const ConstantBufferDesc& desc) override;
+			virtual Buffer CreateStructuredBuffer(const StructuredBufferDesc& desc) override;
 
 			virtual void UploadTextureData(Texture texture, void* data, u32 mip = 0, u32 slice = 0) override;
 			virtual void UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset = 0) override;

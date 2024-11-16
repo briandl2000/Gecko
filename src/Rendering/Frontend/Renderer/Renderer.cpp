@@ -74,7 +74,7 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		};
 
 		Gecko::VertexBufferDesc vertexDesc;
-		vertexDesc.Layout = fullScreenQuadVertexLayout;
+		vertexDesc.Stride = fullScreenQuadVertexLayout.Stride;
 		vertexDesc.VertexData = &vertices;
 		vertexDesc.NumVertices = static_cast<u32>(sizeof(vertices) / sizeof(glm::vec2));
 

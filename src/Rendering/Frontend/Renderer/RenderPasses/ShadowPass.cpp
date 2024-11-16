@@ -61,7 +61,7 @@ const void ShadowPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMa
 		commandList->BindVertexBuffer(mesh.VertexBuffer);
 		commandList->BindIndexBuffer(mesh.IndexBuffer);
 
-		commandList->Draw(mesh.IndexBuffer.Desc.NumIndices);
+		commandList->Draw(mesh.IndexBuffer.Desc.NumElements);
 	}
 }
 }
