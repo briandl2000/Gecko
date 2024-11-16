@@ -2,6 +2,7 @@
 #include "Rendering/DX12/Objects_DX12.h"
 
 #include "Rendering/DX12/Device_DX12.h"
+#include "Objects_DX12.h"
 
 namespace Gecko { namespace DX12 {
 
@@ -193,17 +194,25 @@ namespace Gecko { namespace DX12 {
 	VertexBuffer_DX12::~VertexBuffer_DX12()
 	{
 		Device_DX12::FlagResrouceForDeletion(VertexBufferResource);
+		Device_DX12::FlagSrvDescriptorHandleForDeletion(ShaderResourceView);
 	}
 
 	IndexBuffer_DX12::~IndexBuffer_DX12()
 	{
 		Device_DX12::FlagResrouceForDeletion(IndexBufferResource);
+		Device_DX12::FlagSrvDescriptorHandleForDeletion(ShaderResourceView);
 	}
 
 	ConstantBuffer_DX12::~ConstantBuffer_DX12()
 	{
-		Device_DX12::FlagResrouceForDeletion(ConstantBufferResource);
+		Device_DX12::FlagResrouceForDeletion(BufferResource);
 		Device_DX12::FlagSrvDescriptorHandleForDeletion(ConstantBufferView);
+	}
+
+	DX12::StructuredBuffer_DX12::~StructuredBuffer_DX12()
+	{
+		Device_DX12::FlagResrouceForDeletion(BufferResource);
+		Device_DX12::FlagSrvDescriptorHandleForDeletion(ShaderResourceView);
 	}
 
 	Texture_DX12::~Texture_DX12()

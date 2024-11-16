@@ -172,7 +172,7 @@ namespace Gecko {
 
 	struct VertexLayout
 	{
-		std::vector<VertexAttribute> Attributes{};
+		std::vector<VertexAttribute> Attributes{ };
 		u32 Stride{ 0 };
 
 		VertexLayout() = default;
@@ -233,13 +233,15 @@ namespace Gecko {
 
 	struct VertexBufferDesc // The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer. This pointer needs to stay valid until the CreateVertexBuffer function is called.
 	{
-		VertexLayout Layout{ VertexLayout() };
+		u32 Stride{ 0 };
+
+		//VertexLayout Layout{ VertexLayout() };
 		void* VertexData{ nullptr };
 		u32 NumVertices{ 0 };
 
 		bool IsValid() const
 		{
-			if (Layout.Stride == 0 || Layout.Attributes.empty())
+			if (Stride == 0)
 				return false;
 
 			if (!VertexData)
@@ -256,22 +258,28 @@ namespace Gecko {
 		}
 	};
 
-	struct VertexBuffer
+	enum class MemoryType
 	{
-		VertexBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
-
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		None,
+		Shared,
+		Dedicated
 	};
 
 	// Index buffer
+	struct BufferDesc
+	{
+		BufferType Type{ BufferType::None };
+		union
+		{
+			u64 Size{ 0 };
+			u64 NumElements;
+		};
+		u32 Stride{ 0 };
+	
+		MemoryType MemoryType{ MemoryType::None };
+
+		void* data{ nullptr };
+	};
 
 	struct IndexBufferDesc // The Index buffer desc takes in format of the indices, the number of indices and the index data pointer. This pointer needs to stay valid until the CreateIndexBuffer function is called.
 	{
@@ -293,22 +301,6 @@ namespace Gecko {
 		}
 	};
 
-	struct IndexBuffer
-	{
-		IndexBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
-
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-
 	// Constant Buffer
 
 	struct ConstantBufferDesc
@@ -325,16 +317,30 @@ namespace Gecko {
 		}
 	};
 
+	struct StructuredBufferDesc
+	{
+		u32 StructSize{ 0 };
+		u32 NumElements{ 0 };
+
+		bool IsValid() const
+		{
+			return StructSize > 0 && NumElements > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
 	struct Buffer
 	{
-		BufferType Type{ BufferType::None };
-		ConstantBufferDesc Desc{};
+		BufferDesc Desc{ };
 		Ref<void> Data{ nullptr };
 		
 		bool IsValid() const
 		{
 			// You can decide not to use Buffer if you feel like you don't need the void* data
-			return Desc.IsValid() && Data;
+			return Desc.Type != BufferType::None && Data;
 		}
 		operator bool() const
 		{

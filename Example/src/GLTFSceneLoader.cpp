@@ -244,7 +244,7 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 
 	// Create the Vertex3D and index buffers
 	VertexBufferDesc vertexDesc;
-	vertexDesc.Layout = Vertex3D::GetLayout();
+	vertexDesc.Stride = Vertex3D::GetLayout().Stride;
 	vertexDesc.VertexData = vertices.data();
 	vertexDesc.NumVertices = static_cast<u32>(vertices.size());
 
