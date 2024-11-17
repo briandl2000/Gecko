@@ -141,15 +141,15 @@ namespace Gecko
 
 			VertexBufferDesc vertexDesc;
 			vertexDesc.Stride = Vertex3D::GetLayout().Stride;
-			vertexDesc.VertexData = vertices;
 			vertexDesc.NumVertices = 24;
+			vertexDesc.MemoryType = MemoryType::Dedicated;
 
 			IndexBufferDesc indexDesc;
 			indexDesc.IndexFormat = DataFormat::R32_UINT;
 			indexDesc.NumIndices = 36;
-			indexDesc.IndexData = indices;
+			indexDesc.MemoryType = MemoryType::Dedicated;
 
-			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc);
+			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc, vertices, indices);
 		}
 
 		// Create missing Texture
@@ -186,7 +186,7 @@ namespace Gecko
 
 			m_MissingTextureHandle = CreateTexture(textureDesc, emptyTexData.data(), true);
 		}
-
+		
 		// Create missing Material
 		{
 			m_MissingMaterialHandle = CreateMaterial();
@@ -203,7 +203,7 @@ namespace Gecko
 			Gecko::ConstantBufferDesc bufferDesc = {
 				sizeof(SceneDataStruct)
 			};
-
+			bufferDesc.MemoryType = MemoryType::Shared;
 			SceneDataBuffer[i] = m_Device->CreateConstantBuffer(bufferDesc);
 			SceneData[i].CameraPosition = glm::vec3(0., 0., 2.);
 			SceneData[i].ProjectionMatrix = glm::perspective(glm::radians(90.f), Gecko::Platform::GetScreenAspectRatio(), 0.1f, 100.f);
@@ -251,7 +251,7 @@ namespace Gecko
 		m_ComputePipelines.clear();
 	}
 
-	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc)
+	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, void* vertexData, void* indexData)
 	{
 		MeshHandle handle = m_CurrentMeshIndex;
 
@@ -259,6 +259,9 @@ namespace Gecko
 
 		mesh.VertexBuffer = m_Device->CreateVertexBuffer(vertexDesc);
 		mesh.IndexBuffer = m_Device->CreateIndexBuffer(indexDesc);
+
+		m_Device->UploadBufferData(mesh.VertexBuffer, vertexData, mesh.VertexBuffer.Desc.Stride *mesh.VertexBuffer.Desc.NumElements);
+		m_Device->UploadBufferData(mesh.IndexBuffer, indexData, mesh.IndexBuffer.Desc.Stride*mesh.IndexBuffer.Desc.NumElements);
 
 		m_Meshes[handle] = mesh;
 
@@ -290,12 +293,13 @@ namespace Gecko
 	{
 		MaterialHandle handle = m_CurrentMaterialIndex;
 
-		Material outMat;
+		Material outMat;\
 
 		ConstantBufferDesc MaterialBufferDesc =
 		{
 			sizeof(MaterialData)
 		};
+		MaterialBufferDesc.MemoryType = MemoryType::Shared;
 		Gecko::Buffer materialConstantBuffer = m_Device->CreateConstantBuffer(MaterialBufferDesc);
 		//MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer._Buffer);
 		MaterialData materialData = MaterialData();

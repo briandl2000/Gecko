@@ -75,9 +75,9 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 
 		Gecko::VertexBufferDesc vertexDesc;
 		vertexDesc.Stride = fullScreenQuadVertexLayout.Stride;
-		vertexDesc.VertexData = &vertices;
 		vertexDesc.NumVertices = static_cast<u32>(sizeof(vertices) / sizeof(glm::vec2));
-
+		vertexDesc.MemoryType = MemoryType::Dedicated;
+		
 		u16 indices[] = {
 			0, 1, 2
 		};
@@ -85,9 +85,9 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		Gecko::IndexBufferDesc indexDesc;
 		indexDesc.IndexFormat = DataFormat::R16_UINT;
 		indexDesc.NumIndices = 3;
-		indexDesc.IndexData = indices;
+		indexDesc.MemoryType = MemoryType::Dedicated;
 
-		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc);
+		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc, vertices, indices);
 	}
 }
 

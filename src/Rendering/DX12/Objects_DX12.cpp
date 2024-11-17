@@ -4,16 +4,17 @@
 #include "Rendering/DX12/Device_DX12.h"
 #include "Objects_DX12.h"
 
-namespace Gecko { namespace DX12 {
+namespace Gecko::DX12
+{
 
-	
+
 	DXGI_FORMAT FormatToD3D12Format(DataFormat format)
 	{
 		switch (format)
 		{
 		case DataFormat::R8G8B8A8_SRGB: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 		case DataFormat::R8G8B8A8_UNORM: return DXGI_FORMAT_R8G8B8A8_UNORM;
-		
+
 		case DataFormat::R32_FLOAT: return DXGI_FORMAT_R32_FLOAT;
 		case DataFormat::R32G32_FLOAT: return DXGI_FORMAT_R32G32_FLOAT;
 		case DataFormat::R32G32B32_FLOAT: return DXGI_FORMAT_R32G32B32_FLOAT;
@@ -70,7 +71,7 @@ namespace Gecko { namespace DX12 {
 		case PrimitiveType::Triangles: return D3D12_FILL_MODE_SOLID;
 		default: break;
 		}
-		
+
 		ASSERT_MSG(false, "Unkown primitive type");
 		return D3D12_FILL_MODE_WIREFRAME;
 	}
@@ -191,29 +192,22 @@ namespace Gecko { namespace DX12 {
 		CommandList = nullptr;
 	}
 
-	VertexBuffer_DX12::~VertexBuffer_DX12()
-	{
-		Device_DX12::FlagResrouceForDeletion(VertexBufferResource);
-		Device_DX12::FlagSrvDescriptorHandleForDeletion(ShaderResourceView);
-	}
-
-	IndexBuffer_DX12::~IndexBuffer_DX12()
-	{
-		Device_DX12::FlagResrouceForDeletion(IndexBufferResource);
-		Device_DX12::FlagSrvDescriptorHandleForDeletion(ShaderResourceView);
-	}
-
-	ConstantBuffer_DX12::~ConstantBuffer_DX12()
-	{
+	Buffer_DX12::~Buffer_DX12()
+    {
 		Device_DX12::FlagResrouceForDeletion(BufferResource);
-		Device_DX12::FlagSrvDescriptorHandleForDeletion(ConstantBufferView);
-	}
-
-	DX12::StructuredBuffer_DX12::~StructuredBuffer_DX12()
-	{
-		Device_DX12::FlagResrouceForDeletion(BufferResource);
-		Device_DX12::FlagSrvDescriptorHandleForDeletion(ShaderResourceView);
-	}
+		if(ShaderResourceView.IsValid())
+		{
+			Device_DX12::FlagSrvDescriptorHandleForDeletion(ShaderResourceView);
+		}
+		if(ConstantBufferView.IsValid())
+		{
+			Device_DX12::FlagSrvDescriptorHandleForDeletion(ConstantBufferView);
+		}
+		if(ReadWriteBufferView.IsValid())
+		{
+			Device_DX12::FlagSrvDescriptorHandleForDeletion(ReadWriteBufferView);
+		}
+    }
 
 	Texture_DX12::~Texture_DX12()
 	{
@@ -230,8 +224,6 @@ namespace Gecko { namespace DX12 {
 			Device_DX12::FlagSrvDescriptorHandleForDeletion(MipUnorderedAccessViews[i]);
 		}
 	}
-
-
-} }
+}
 
 #endif

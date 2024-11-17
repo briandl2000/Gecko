@@ -245,16 +245,16 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 	// Create the Vertex3D and index buffers
 	VertexBufferDesc vertexDesc;
 	vertexDesc.Stride = Vertex3D::GetLayout().Stride;
-	vertexDesc.VertexData = vertices.data();
 	vertexDesc.NumVertices = static_cast<u32>(vertices.size());
+	vertexDesc.MemoryType = MemoryType::Dedicated;
 
 	IndexBufferDesc indexDesc;
 	indexDesc.IndexFormat = DataFormat::R32_UINT;
 	indexDesc.NumIndices = static_cast<u32>(indices.size());
-	indexDesc.IndexData = indices.data();
+	indexDesc.MemoryType = MemoryType::Dedicated;
 
 	// TODO: check if a BLAS needs to be created.
-	return resourceManager->CreateMesh(vertexDesc, indexDesc);
+	return resourceManager->CreateMesh(vertexDesc, indexDesc, vertices.data(), indices.data());
 }
 
 void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneNode, u32 gltfNodeIndex,
