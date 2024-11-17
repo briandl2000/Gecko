@@ -111,7 +111,7 @@ namespace Gecko { namespace DX12 {
 		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
 		ASSERT_MSG(vertexBuffer.Desc.Type == BufferType::Vertex, "Vertex buffer is invalid!");
 		ASSERT_MSG(vertexBuffer.IsValid(), "Vertex buffer is invalid!");
-		VertexBuffer_DX12* vertexBuffer_DX12 = reinterpret_cast<VertexBuffer_DX12*>(vertexBuffer.Data.get());
+		Buffer_DX12* vertexBuffer_DX12 = reinterpret_cast<Buffer_DX12*>(vertexBuffer.Data.get());
 
 		CommandBuffer->CommandList->IASetVertexBuffers(0, 1, &vertexBuffer_DX12->VertexBufferView);
 	}
@@ -122,7 +122,7 @@ namespace Gecko { namespace DX12 {
 		ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is invalid!");
 		ASSERT_MSG(indexBuffer.Desc.Type == BufferType::Index, "Buffer must be of type Index to be used as an index buffer!");
 		ASSERT_MSG(indexBuffer.IsValid(), "Index buffer is invalid!");
-		IndexBuffer_DX12* indexBuffer_DX12 = reinterpret_cast<IndexBuffer_DX12*>(indexBuffer.Data.get());
+		Buffer_DX12* indexBuffer_DX12 = reinterpret_cast<Buffer_DX12*>(indexBuffer.Data.get());
 
 		CommandBuffer->CommandList->IASetIndexBuffer(&indexBuffer_DX12->IndexBufferView);
 	}
@@ -267,9 +267,9 @@ namespace Gecko { namespace DX12 {
 	{
 		ASSERT_MSG(buffer.IsValid(), "Buffer is invalid!");
 		ASSERT_MSG(buffer.Desc.Type == BufferType::Constant, "Buffer is invalid!");
-		ConstantBuffer_DX12* constantBuffer_DX12 = reinterpret_cast<ConstantBuffer_DX12*>(buffer.Data.get());
+		Buffer_DX12* constantBuffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 		
-		TransitionResource(constantBuffer_DX12->BufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
+		//TransitionResource(constantBuffer_DX12->BufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
 			ASSERT_MSG(m_GraphicsPipeline.IsValid(), "Graphics pipeline is Invalid!");
@@ -300,39 +300,13 @@ namespace Gecko { namespace DX12 {
     void CommandList_DX12::BindStructuredBuffer(u32 slot, Buffer buffer)
     {
     	ASSERT_MSG(buffer.IsValid(), "Buffer is invalid!");
-    	ASSERT_MSG(buffer.Desc.Type != BufferType::Constant, "ConstantBuffer Is not allow to be bound as StructuredBuffer!");
+    	//ASSERT_MSG(buffer.Desc.Type != BufferType::Constant, "ConstantBuffer Is not allow to be bound as StructuredBuffer!");
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle{ 0 };
 		Ref<Resource> bufferResource = nullptr;
 
-		switch(buffer.Desc.Type)
-		{
-		case BufferType::Structured:
-		{
-			StructuredBuffer_DX12* structuredBuffer_DX12 = reinterpret_cast<StructuredBuffer_DX12*>(buffer.Data.get());
-			bufferResource = structuredBuffer_DX12->BufferResource;
-			gpuHandle = structuredBuffer_DX12->ShaderResourceView.GPU;
-		}
-		break;
-		case BufferType::Vertex:
-		{
-			VertexBuffer_DX12* vertexBuffer_DX12 = reinterpret_cast<VertexBuffer_DX12*>(buffer.Data.get());
-			bufferResource = vertexBuffer_DX12->VertexBufferResource;
-			gpuHandle = vertexBuffer_DX12->ShaderResourceView.GPU;
-		}
-		break;
-		case BufferType::Index:
-		{
-			IndexBuffer_DX12* indexBuffer_DX12 = reinterpret_cast<IndexBuffer_DX12*>(buffer.Data.get());
-			bufferResource = indexBuffer_DX12->IndexBufferResource;
-			gpuHandle = indexBuffer_DX12->ShaderResourceView.GPU;
-		}
-		break;
-		default:
-			ASSERT_MSG(false, "Unkown buffer type!");
-			return;
-		break;
-		}
-
+		Buffer_DX12* buffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
+		bufferResource = buffer_DX12->BufferResource;
+		gpuHandle = buffer_DX12->ShaderResourceView.GPU;
 
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{

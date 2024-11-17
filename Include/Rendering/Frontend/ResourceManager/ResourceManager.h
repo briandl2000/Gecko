@@ -22,7 +22,7 @@ public:
 	void Init(Device* device);
 	void Shutdown();
 
-	MeshHandle CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc);
+	MeshHandle CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, void* vertexData, void* indexData);
 	TextureHandle CreateTexture(TextureDesc textureDesc, void* imageData = nullptr, bool mipMap = false);
 	MaterialHandle CreateMaterial();
 	RenderTargetHandle CreateRenderTarget(RenderTargetDesc renderTargetDesc, std::string name, bool KeepWindowAspectRatio);
