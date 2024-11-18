@@ -140,7 +140,7 @@ namespace Gecko
 			};
 
 			VertexBufferDesc vertexDesc;
-			vertexDesc.Stride = Vertex3D::GetLayout().Stride;
+			vertexDesc.Layout = Vertex3D::GetLayout();
 			vertexDesc.NumVertices = 24;
 			vertexDesc.MemoryType = MemoryType::Dedicated;
 

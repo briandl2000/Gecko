@@ -8,8 +8,9 @@
 #include "Rendering/Backend/Device.h"
 
 
-namespace Gecko { namespace DX12 { 
-	
+namespace Gecko::DX12
+{
+
 	enum class PipelineType
 	{
 		None = 0,
@@ -38,12 +39,14 @@ namespace Gecko { namespace DX12 {
 		virtual void BindTexture(u32 slot, Texture texture, u32 mipLevel) override;
 		virtual void BindAsRWTexture(u32 slot, Texture texture) override;
 		virtual void BindAsRWTexture(u32 slot, Texture texture, u32 mipLevel) override;
-	
+
 		virtual void BindGraphicsPipeline(GraphicsPipeline Pipeline) override;
 		virtual void BindComputePipeline(ComputePipeline Pipeline) override;
 
 		virtual void BindConstantBuffer(u32 slot, Buffer buffer) override;
 		virtual void BindStructuredBuffer(u32 slot, Buffer buffer) override;
+
+		virtual void BindAsRWBuffer(u32 slot, Buffer buffer) override;
 
 		virtual void SetLocalData(u32 size, void* data) override;
 
@@ -53,19 +56,19 @@ namespace Gecko { namespace DX12 {
 		virtual void Dispatch(u32 xThreads, u32 yThreads, u32 zThreads) override;
 
 	public:
-		void TransitionSubResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips, 
+		void TransitionSubResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips,
 			u32 numArraySlices, u32 subResourceIndex);
 		void TransitionResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips,
 			u32 numArraySlices);
-		void TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState, 
+		void TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState,
 			D3D12_RESOURCE_STATES newDepthStencilState);
-		
+
 		Ref<CommandBuffer> CommandBuffer;
 
 	private:
-		void GetTextureMipTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource, 
+		void GetTextureMipTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource,
 			D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices, u32 subResourceIndex);
-		void GetTextureTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource, 
+		void GetTextureTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource,
 			D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices);
 
 		PipelineType m_BoundPipelineType;
@@ -74,6 +77,6 @@ namespace Gecko { namespace DX12 {
 	};
 
 
-} }
+}
 
 #endif

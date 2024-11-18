@@ -265,7 +265,6 @@ namespace Gecko::DX12
 		RenderTarget renderTarget;
 		for (u32 i = 0; i < desc.NumRenderTargets; i++)
 		{
-
 			ASSERT_MSG(desc.RenderTargetFormats[i] != DataFormat::None, "None is not a valid format for a render target, did you forget to set it?");
 
 			DXGI_FORMAT format = FormatToD3D12Format(desc.RenderTargetFormats[i]);
@@ -350,191 +349,87 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateVertexBuffer(const VertexBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.MemoryType != MemoryType::None, "None is not a valid memory type!")
-			Ref<Buffer_DX12> vertexBuffer_DX12 = CreateRef<Buffer_DX12>();
-
-		vertexBuffer_DX12->AllocatedMemorySize = desc.NumVertices * desc.Stride;
-
-		D3D12_HEAP_TYPE heapType = desc.MemoryType == MemoryType::Dedicated ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_UPLOAD;
-
-		CD3DX12_HEAP_PROPERTIES heapProps(heapType);
-		CD3DX12_RESOURCE_DESC buffer = CD3DX12_RESOURCE_DESC::Buffer(vertexBuffer_DX12->AllocatedMemorySize);
-		vertexBuffer_DX12->BufferResource = CreateRef<Resource>();
-		vertexBuffer_DX12->BufferResource->CurrentState = desc.MemoryType == MemoryType::Dedicated ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_GENERIC_READ;
-		m_Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &buffer, vertexBuffer_DX12->BufferResource->CurrentState,
-			nullptr, IID_PPV_ARGS(&vertexBuffer_DX12->BufferResource->ResourceDX12));
-
-		// Create the vertex buffer view.
-		vertexBuffer_DX12->VertexBufferView.BufferLocation = vertexBuffer_DX12->BufferResource->ResourceDX12->GetGPUVirtualAddress();
-		vertexBuffer_DX12->VertexBufferView.SizeInBytes = static_cast<u32>(vertexBuffer_DX12->AllocatedMemorySize);
-		vertexBuffer_DX12->VertexBufferView.StrideInBytes = desc.Stride;
-
-		vertexBuffer_DX12->ShaderResourceView = m_SrvDescHeap.Allocate();
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Buffer.FirstElement = 0;
-		srvDesc.Buffer.NumElements = desc.NumVertices;
-		srvDesc.Buffer.StructureByteStride = desc.Stride;
-		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-		m_Device->CreateShaderResourceView(vertexBuffer_DX12->BufferResource->ResourceDX12.Get(),
-			&srvDesc, vertexBuffer_DX12->ShaderResourceView.CPU);
+		ASSERT_MSG(desc.IsValid(), "Vertex buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Vertex;
 		bufferDesc.NumElements = desc.NumVertices;
-		bufferDesc.Stride = desc.Stride;
+		bufferDesc.Stride = desc.Layout.Stride;
 		bufferDesc.MemoryType = desc.MemoryType;
+		bufferDesc.CanReadWrite = desc.CanReadWrite;
 
-		Buffer vertexBuffer(bufferDesc);
-		vertexBuffer.Data = vertexBuffer_DX12;
+		Ref<Buffer_DX12> buffer_DX12 = CreateBuffer(bufferDesc);
 
-		return vertexBuffer;
+		buffer_DX12->VertexBufferView.BufferLocation = buffer_DX12->BufferResource->ResourceDX12->GetGPUVirtualAddress();
+		buffer_DX12->VertexBufferView.SizeInBytes = static_cast<u32>(buffer_DX12->AllocatedMemorySize);
+		buffer_DX12->VertexBufferView.StrideInBytes = bufferDesc.Stride;
+		//buffer_DX12->BufferResource->CurrentState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+
+		Buffer buffer(bufferDesc);
+		buffer.Data = buffer_DX12;
+
+		return buffer;
 	}
 
 	Buffer Device_DX12::CreateIndexBuffer(const IndexBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.MemoryType != MemoryType::None, "None is not a valid memory type!")
-			Ref<Buffer_DX12> indexBuffer_DX12 = CreateRef<Buffer_DX12>();
-
-		indexBuffer_DX12->AllocatedMemorySize = desc.NumIndices * FormatSizeInBytes(desc.IndexFormat);
-
-		D3D12_HEAP_TYPE heapType = desc.MemoryType == MemoryType::Dedicated ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_UPLOAD;
-
-		CD3DX12_HEAP_PROPERTIES heapProps(heapType);
-		CD3DX12_RESOURCE_DESC buffer = CD3DX12_RESOURCE_DESC::Buffer(indexBuffer_DX12->AllocatedMemorySize);
-		indexBuffer_DX12->BufferResource = CreateRef<Resource>();
-		indexBuffer_DX12->BufferResource->CurrentState = desc.MemoryType == MemoryType::Dedicated ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_GENERIC_READ;
-		m_Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &buffer, indexBuffer_DX12->BufferResource->CurrentState,
-			nullptr, IID_PPV_ARGS(&indexBuffer_DX12->BufferResource->ResourceDX12));
-
-		NAME_DIRECTX12_OBJECT(indexBuffer_DX12->BufferResource->ResourceDX12, "IndexBuffer");
-
-		// D3D12_SUBRESOURCE_DATA subresourceData = {};
-		// subresourceData.pData = desc.IndexData;
-		// subresourceData.RowPitch = indexBuffer_DX12->AllocatedMemorySize;
-		// subresourceData.SlicePitch = subresourceData.RowPitch;
-
-		//CopyToResource(indexBuffer_DX12->BufferResource->ResourceDX12, subresourceData);
-
-		indexBuffer_DX12->IndexBufferView.BufferLocation = indexBuffer_DX12->BufferResource->ResourceDX12->GetGPUVirtualAddress();
-		indexBuffer_DX12->IndexBufferView.SizeInBytes = static_cast<u32>(indexBuffer_DX12->AllocatedMemorySize);
-		indexBuffer_DX12->IndexBufferView.Format = FormatToD3D12Format(desc.IndexFormat);
-
-		indexBuffer_DX12->ShaderResourceView = m_SrvDescHeap.Allocate();
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Buffer.FirstElement = 0;
-		srvDesc.Buffer.NumElements = desc.NumIndices;
-		srvDesc.Buffer.StructureByteStride = FormatSizeInBytes(desc.IndexFormat);
-		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-		m_Device->CreateShaderResourceView(indexBuffer_DX12->BufferResource->ResourceDX12.Get(),
-			&srvDesc, indexBuffer_DX12->ShaderResourceView.CPU);
+		ASSERT_MSG(desc.IsValid(), "Index buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Index;
 		bufferDesc.NumElements = desc.NumIndices;
 		bufferDesc.Stride = FormatSizeInBytes(desc.IndexFormat);
 		bufferDesc.MemoryType = desc.MemoryType;
+		bufferDesc.CanReadWrite = desc.CanReadWrite;
 
-		Buffer indexBuffer(bufferDesc);
-		indexBuffer.Data = indexBuffer_DX12;
+		Ref<Buffer_DX12> buffer_DX12 = CreateBuffer(bufferDesc);
 
-		return indexBuffer;
+		buffer_DX12->IndexBufferView.BufferLocation = buffer_DX12->BufferResource->ResourceDX12->GetGPUVirtualAddress();
+		buffer_DX12->IndexBufferView.SizeInBytes = static_cast<u32>(buffer_DX12->AllocatedMemorySize);
+		buffer_DX12->IndexBufferView.Format = FormatToD3D12Format(desc.IndexFormat);
+		//buffer_DX12->BufferResource->CurrentState = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+
+		Buffer buffer(bufferDesc);
+		buffer.Data = buffer_DX12;
+
+		return buffer;
 	}
 
 	Buffer Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.MemoryType != MemoryType::None, "None is not a valid memory type!")
-			Ref<Buffer_DX12> constantBuffer_DX12 = CreateRef<Buffer_DX12>();
-
-		constantBuffer_DX12->AllocatedMemorySize = (desc.Size + 255) & ~255;
-
-		D3D12_HEAP_TYPE heapType = desc.MemoryType == MemoryType::Dedicated ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_UPLOAD;
-
-		CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(heapType);
-		CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(constantBuffer_DX12->AllocatedMemorySize);
-		constantBuffer_DX12->BufferResource = CreateRef<Resource>();
-		constantBuffer_DX12->BufferResource->CurrentState = desc.MemoryType == MemoryType::Dedicated ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_GENERIC_READ;
-		m_Device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &resourceDesc, constantBuffer_DX12->BufferResource->CurrentState,
-			nullptr, IID_PPV_ARGS(&constantBuffer_DX12->BufferResource->ResourceDX12));
-
-		constantBuffer_DX12->ConstantBufferView = m_SrvDescHeap.Allocate();
-
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
-		cbvDesc.BufferLocation = constantBuffer_DX12->BufferResource->ResourceDX12->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = static_cast<u32>(constantBuffer_DX12->AllocatedMemorySize);
-		m_Device->CreateConstantBufferView(&cbvDesc, constantBuffer_DX12->ConstantBufferView.CPU);
-
-		constantBuffer_DX12->ShaderResourceView = m_SrvDescHeap.Allocate();
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Buffer.FirstElement = 0;
-		srvDesc.Buffer.NumElements = 1;
-		srvDesc.Buffer.StructureByteStride = desc.Size;
-		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-		m_Device->CreateShaderResourceView(constantBuffer_DX12->BufferResource->ResourceDX12.Get(),
-			&srvDesc, constantBuffer_DX12->ShaderResourceView.CPU);
+		ASSERT_MSG(desc.IsValid(), "Constant buffer is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Constant;
 		bufferDesc.Size = desc.Size;
 		bufferDesc.MemoryType = desc.MemoryType;
+		bufferDesc.CanReadWrite = false;
 
-		Buffer constantBuffer(bufferDesc);
-		constantBuffer.Data = constantBuffer_DX12;
+		Ref<Buffer_DX12> buffer_DX12 = CreateBuffer(bufferDesc);
 
-		return constantBuffer;
+		Buffer buffer(bufferDesc);
+		buffer.Data = buffer_DX12;
+
+		return buffer;
 	}
 
 	Buffer Device_DX12::CreateStructuredBuffer(const StructuredBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.MemoryType != MemoryType::None, "None is not a valid memory type!")
-			Ref<Buffer_DX12> structuredBuffer_DX12 = CreateRef<Buffer_DX12>();
-
-		structuredBuffer_DX12->BufferResource = CreateRef<Resource>();
-
-		structuredBuffer_DX12->AllocatedMemorySize = desc.NumElements * desc.StructSize;
-
-		D3D12_HEAP_TYPE heapType = desc.MemoryType == MemoryType::Dedicated ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_UPLOAD;
-
-		CD3DX12_HEAP_PROPERTIES heapProperties = CD3DX12_HEAP_PROPERTIES(heapType);
-		CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(structuredBuffer_DX12->AllocatedMemorySize);
-		structuredBuffer_DX12->BufferResource->CurrentState = desc.MemoryType == MemoryType::Dedicated ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_GENERIC_READ;
-		m_Device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_SHARED, &resourceDesc, structuredBuffer_DX12->BufferResource->CurrentState,
-			nullptr, IID_PPV_ARGS(&structuredBuffer_DX12->BufferResource->ResourceDX12));
-
-		structuredBuffer_DX12->ShaderResourceView = m_SrvDescHeap.Allocate();
-
-		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
-		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
-		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		srvDesc.Buffer.FirstElement = 0;
-		srvDesc.Buffer.NumElements = desc.NumElements;
-		srvDesc.Buffer.StructureByteStride = desc.StructSize;
-		srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-		m_Device->CreateShaderResourceView(structuredBuffer_DX12->BufferResource->ResourceDX12.Get(),
-			&srvDesc, structuredBuffer_DX12->ShaderResourceView.CPU);
+		ASSERT_MSG(desc.IsValid(), "Structured buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Structured;
 		bufferDesc.Stride = desc.StructSize;
 		bufferDesc.NumElements = desc.NumElements;
 		bufferDesc.MemoryType = desc.MemoryType;
+		bufferDesc.CanReadWrite = desc.CanReadWrite;
 
-		Buffer structuredBuffer(bufferDesc);
-		structuredBuffer.Data = structuredBuffer_DX12;
+		Ref<Buffer_DX12> buffer_DX12 = CreateBuffer(bufferDesc);
 
-		return structuredBuffer;
+		Buffer buffer(bufferDesc);
+		buffer.Data = buffer_DX12;
+
+		return buffer;
 	}
 
 	Texture Device_DX12::CreateTexture(const TextureDesc& desc)
@@ -820,7 +715,7 @@ namespace Gecko::DX12
 
 		return graphicsPipeline;
 	}
-	
+
 	ComputePipeline Device_DX12::CreateComputePipeline(const ComputePipelineDesc& desc)
 	{
 		Ref<ComputePipeline_DX12> computePipeline_DX12 = CreateRef<ComputePipeline_DX12>();
@@ -1024,11 +919,8 @@ namespace Gecko::DX12
 
 		u32 subResource = D3D12CalcSubresource(mip, slice, 0, texture.Desc.NumMips, texture.Desc.NumArraySlices);
 
-		CopyToResource(
-			texture_DX12->TextureResource->ResourceDX12,
-			subresourceData,
-			subResource
-		);
+		CopyToResource(texture_DX12->TextureResource->ResourceDX12,
+			subresourceData, subResource);
 	}
 
 	void Device_DX12::UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset)
@@ -1051,10 +943,10 @@ namespace Gecko::DX12
 		{
 			D3D12_SUBRESOURCE_DATA subresourceData = {};
 			subresourceData.pData = data;
-			subresourceData.RowPitch = buffer_DX12->AllocatedMemorySize;
+			subresourceData.RowPitch = size;
 			subresourceData.SlicePitch = subresourceData.RowPitch;
 
-			CopyToResource(buffer_DX12->BufferResource->ResourceDX12, subresourceData, 0);
+			CopyToResource(buffer_DX12->BufferResource->ResourceDX12, subresourceData, 0, offset);
 		}
 	}
 
@@ -1722,33 +1614,21 @@ namespace Gecko::DX12
 		return texture;
 	}
 
-	void Device_DX12::CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource)
+	void Device_DX12::CopyToResource(ComPtr<ID3D12Resource>& resource,
+		D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource, u32 offset)
 	{
 		ComPtr<ID3D12Resource> intermediateResource;
 
 		UINT64 requiredSize = GetRequiredIntermediateSize(resource.Get(), 0, 1);
 		CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
 		CD3DX12_RESOURCE_DESC buffer = CD3DX12_RESOURCE_DESC::Buffer(requiredSize);
-		m_Device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&buffer,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&intermediateResource)
-		);
+		m_Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &buffer,
+			D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&intermediateResource));
 
 		Ref<CommandBuffer> copyCommandList = GetFreeCopyCommandBuffer();
 
-		UpdateSubresources(
-			copyCommandList->CommandList.Get(),
-			resource.Get(),
-			intermediateResource.Get(),
-			0,
-			subResource,
-			1,
-			&subResourceData
-		);
+		UpdateSubresources(copyCommandList->CommandList.Get(), resource.Get(),
+			intermediateResource.Get(), offset, subResource, 1, &subResourceData);
 
 		ExecuteCopyCommandBuffer(copyCommandList);
 
@@ -1867,6 +1747,79 @@ namespace Gecko::DX12
 			m_ResourcesToBeDeleted.clear();
 			m_PipelineStatesToBeDeleted.clear();
 		}
+	}
+
+	Ref<Buffer_DX12> Device_DX12::CreateBuffer(const BufferDesc& desc)
+	{
+		// Create the buffer
+		ASSERT_MSG(desc.IsValid(), "BufferDesc is invalid!");
+		Ref<Buffer_DX12> buffer_DX12 = CreateRef<Buffer_DX12>();
+
+		if (desc.Type == BufferType::Constant)
+		{
+			buffer_DX12->AllocatedMemorySize = (desc.Size + 255) & ~255;
+		}
+		else
+		{
+			buffer_DX12->AllocatedMemorySize = desc.NumElements * desc.Stride;
+		}
+
+		// Creating the resource
+		D3D12_HEAP_TYPE heapType = desc.MemoryType == MemoryType::Dedicated ? D3D12_HEAP_TYPE_DEFAULT : D3D12_HEAP_TYPE_UPLOAD;
+		CD3DX12_HEAP_PROPERTIES heapProps(heapType);
+		D3D12_RESOURCE_FLAGS resourceFlags = D3D12_RESOURCE_FLAG_NONE;
+		if (desc.CanReadWrite)
+		{
+			resourceFlags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+		}
+		CD3DX12_RESOURCE_DESC bufferDescDX12 = CD3DX12_RESOURCE_DESC::Buffer(buffer_DX12->AllocatedMemorySize, resourceFlags);
+		buffer_DX12->BufferResource = CreateRef<Resource>();
+		buffer_DX12->BufferResource->CurrentState = desc.MemoryType == MemoryType::Dedicated ? D3D12_RESOURCE_STATE_COMMON : D3D12_RESOURCE_STATE_GENERIC_READ;
+		m_Device->CreateCommittedResource(&heapProps, D3D12_HEAP_FLAG_NONE, &bufferDescDX12, buffer_DX12->BufferResource->CurrentState,
+			nullptr, IID_PPV_ARGS(&buffer_DX12->BufferResource->ResourceDX12));
+
+		if (desc.Type == BufferType::Constant)
+		{
+			buffer_DX12->ConstantBufferView = m_SrvDescHeap.Allocate();
+
+			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+			cbvDesc.BufferLocation = buffer_DX12->BufferResource->ResourceDX12->GetGPUVirtualAddress();
+			cbvDesc.SizeInBytes = static_cast<u32>(buffer_DX12->AllocatedMemorySize);
+			m_Device->CreateConstantBufferView(&cbvDesc, buffer_DX12->ConstantBufferView.CPU);
+		}
+		else
+		{
+			buffer_DX12->ShaderResourceView = m_SrvDescHeap.Allocate();
+			D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc;
+			srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+			srvDesc.Buffer.FirstElement = 0;
+			srvDesc.Buffer.NumElements = desc.NumElements;
+			srvDesc.Buffer.StructureByteStride = desc.Stride;
+			srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+			m_Device->CreateShaderResourceView(buffer_DX12->BufferResource->ResourceDX12.Get(),
+				&srvDesc, buffer_DX12->ShaderResourceView.CPU);
+
+			if (desc.CanReadWrite)
+			{
+				buffer_DX12->ReadWriteBufferView = m_SrvDescHeap.Allocate();
+
+				D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
+				uavDesc.Format = DXGI_FORMAT_UNKNOWN;
+				uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+				uavDesc.Buffer.CounterOffsetInBytes = 0;
+				uavDesc.Buffer.FirstElement = 0;
+				uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+				uavDesc.Buffer.NumElements = desc.NumElements;
+				uavDesc.Buffer.StructureByteStride = desc.Stride;
+
+				m_Device->CreateUnorderedAccessView(buffer_DX12->BufferResource->ResourceDX12.Get(),
+					nullptr, &uavDesc, buffer_DX12->ReadWriteBufferView.CPU);
+			}
+		}
+
+		return buffer_DX12;
 	}
 
 #pragma endregion

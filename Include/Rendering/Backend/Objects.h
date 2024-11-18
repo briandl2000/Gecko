@@ -253,27 +253,21 @@ namespace Gecko
 	 * -------------------------------------------------------------------------------
 	 */
 
-	/**
-	  * @brief
-	  * The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer.
-	  * This pointer needs to stay valid until the CreateVertexBuffer function is called.
-	  */
+	 /**
+		* @brief
+		* The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer.
+		* This pointer needs to stay valid until the CreateVertexBuffer function is called.
+		*/
 	struct VertexBufferDesc
 	{
-		u32 Stride{ 0 };
 		VertexLayout Layout{ VertexLayout() };
 		u32 NumVertices{ 0 };
 		MemoryType MemoryType{ MemoryType::None };
+		bool CanReadWrite{ false };
 
 		bool IsValid() const
 		{
-			if (Stride == 0)
-				return false;
-
-			if (!NumVertices)
-				return false;
-
-			return true;
+			return NumVertices > 0;
 		}
 		operator bool() const
 		{
@@ -291,13 +285,13 @@ namespace Gecko
 		DataFormat IndexFormat{ DataFormat::None };
 		u32 NumIndices{ 0 };
 		MemoryType MemoryType{ MemoryType::None };
+		bool CanReadWrite{ false };
 
 		bool IsValid() const
 		{
 			// IndexBuffer format should always be R16_UINT or R32_UINT
 			if (IndexFormat != DataFormat::R16_UINT && IndexFormat != DataFormat::R32_UINT)
 				return false;
-
 			return NumIndices != 0;
 		}
 		operator bool() const
@@ -334,6 +328,7 @@ namespace Gecko
 		u32 StructSize{ 0 };
 		u32 NumElements{ 0 };
 		MemoryType MemoryType{ MemoryType::None };
+		bool CanReadWrite{ false };
 
 		bool IsValid() const
 		{
@@ -352,20 +347,16 @@ namespace Gecko
 		u32 Size{ 0 };
 		u32 NumElements{ 0 };
 		u32 Stride{ 0 };
+		bool CanReadWrite{ false };
 
 		BufferDesc() = default;
 		BufferDesc(const BufferDesc& desc) = default;
 
 		bool IsValid() const
 		{
-			if (MemoryType == MemoryType::None || Type == BufferType::None)
-			{
-				return false;
-			}
-			if (Type == BufferType::Constant)
-			{
-				return Size > 0;
-			}
+			if (MemoryType == MemoryType::None || Type == BufferType::None) return false;
+			if (MemoryType == MemoryType::Shared && CanReadWrite) return false;
+			if (Type == BufferType::Constant) return Size > 0 && !CanReadWrite;
 			return Stride > 0 && NumElements > 0;
 		}
 		operator bool()
@@ -379,13 +370,12 @@ namespace Gecko
 		BufferDesc Desc{ };
 		Ref<void> Data{ nullptr };
 
-		Buffer()
-			: Desc({BufferType::None})
-		{}
+		Buffer() = default;
 
 		Buffer(const BufferDesc& desc)
 			: Desc(desc)
-		{}
+		{
+		}
 
 		bool IsValid() const
 		{
