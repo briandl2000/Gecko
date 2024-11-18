@@ -245,9 +245,10 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 
 	// Create the Vertex3D and index buffers
 	VertexBufferDesc vertexDesc;
-	vertexDesc.Stride = Vertex3D::GetLayout().Stride;
+	vertexDesc.Layout = Vertex3D::GetLayout();
 	vertexDesc.NumVertices = static_cast<u32>(vertices.size());
 	vertexDesc.MemoryType = MemoryType::Dedicated;
+	vertexDesc.CanReadWrite = true;
 
 	IndexBufferDesc indexDesc;
 	indexDesc.IndexFormat = DataFormat::R32_UINT;

@@ -102,9 +102,11 @@ namespace Gecko::DX12
 		Texture CreateTexture(const TextureDesc& desc, DXGI_FORMAT format, D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE,
 			D3D12_HEAP_FLAGS heapFlags = D3D12_HEAP_FLAG_NONE, const D3D12_CLEAR_VALUE* clearValue = nullptr);
 
-		void CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource = 0);
+		void CopyToResource(ComPtr<ID3D12Resource>& resource, D3D12_SUBRESOURCE_DATA& subResourceData, u32 subResource = 0, u32 offset = 0);
 		void RecreateBackBuffers(u32 width, u32 height);
 		void ProcessDeferredReleases();
+
+		Ref<Buffer_DX12> CreateBuffer(const BufferDesc& desc);
 
 		// Device Data
 		ComPtr<ID3D12Device8> m_Device{ nullptr };
