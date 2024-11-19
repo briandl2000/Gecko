@@ -119,7 +119,7 @@ namespace Gecko
 
 	enum class BufferType
 	{
-		None,
+		None, /** @brief Invalid default buffer type */
 		Vertex,
 		Index,
 		Constant,
@@ -150,8 +150,7 @@ namespace Gecko
 			, AttributeFormat(format)
 			, Size(FormatSizeInBytes(format))
 			, Offset(0)
-		{
-		}
+		{ }
 
 		bool IsValid() const
 		{
@@ -189,7 +188,7 @@ namespace Gecko
 		{
 			CalculateOffsetsAndStride();
 		};
-		~VertexLayout() {};
+		~VertexLayout() { };
 
 		bool IsValid() const
 		{
@@ -238,6 +237,13 @@ namespace Gecko
 
 	/**
 	 * There are 4 different buffer Types each buffer has different properties
+	 * Vertex buffers are used for vertex data in graphics pipelines
+	 * Index buffers are used for index data in graphics pipelines
+	 * Constant buffers are used for any type of data that can not be changed and has one
+	 *  specific size in graphics or compute pipelines
+	 * Structured buffers are arrays of structs that can be used in graphics or compute pipelines
+	 *  you can write to structured bufferes within a compute pipeline
+	 * !!Important!! When binding a buffer as read write it needs to be created in dedicated memory!
 	 *
 	 * 										| Vertex | Index | Constant | Structured |
 	 * -------------------------------------------------------------------------------
@@ -253,11 +259,11 @@ namespace Gecko
 	 * -------------------------------------------------------------------------------
 	 */
 
-	 /**
-		* @brief
-		* The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer.
-		* This pointer needs to stay valid until the CreateVertexBuffer function is called.
-		*/
+	/**
+	 * @brief
+	 * The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer.
+	 * This pointer needs to stay valid until the CreateVertexBuffer function is called.
+	 */
 	struct VertexBufferDesc
 	{
 		VertexLayout Layout{ VertexLayout() };
@@ -340,6 +346,10 @@ namespace Gecko
 		}
 	};
 
+	/** 
+	 * @brief 
+	 * A Struct that holds information about a Buffer
+	 */
 	struct BufferDesc
 	{
 		BufferType Type{ BufferType::None };
@@ -349,9 +359,6 @@ namespace Gecko
 		u32 Stride{ 0 };
 		bool CanReadWrite{ false };
 
-		BufferDesc() = default;
-		BufferDesc(const BufferDesc& desc) = default;
-
 		bool IsValid() const
 		{
 			if (MemoryType == MemoryType::None || Type == BufferType::None) return false;
@@ -359,33 +366,51 @@ namespace Gecko
 			if (Type == BufferType::Constant) return Size > 0 && !CanReadWrite;
 			return Stride > 0 && NumElements > 0;
 		}
-		operator bool()
-		{
-			return IsValid();
-		}
+		operator bool() { return IsValid(); }
 	};
 
+	/**
+	 * @brief
+	 * This is a buffer object. It can be used as either a Vertex, Index, Constant or Structured buffer.
+	 * Buffers are used to bind during a graphics or compute pipeline.
+	 */
 	struct Buffer
 	{
-		BufferDesc Desc{ };
+		/** 
+		 * @brief 
+		 * The descriptor of this buffer. This was generated from either a 
+		 * VertexBufferDesc, IndexBufferDesc, ConstantBufferDesc or StructuredBufferDesc.
+		 */
+		const BufferDesc Desc{ };
+		/** @brief A shared void pointer to API specific data */
 		Ref<void> Data{ nullptr };
 
 		Buffer() = default;
-
 		Buffer(const BufferDesc& desc)
 			: Desc(desc)
+		{ }
+		Buffer(const Buffer& other)
+			: Desc(other.Desc)
+			, Data(other.Data)
+		{ }
+		Buffer& operator=(const Buffer& other)
 		{
+			Buffer* buffer = new(this) Buffer(other);
+			return *buffer;
 		}
 
+		/**
+		 * @brief 
+		 * A function to determine weather this struct is valid.
+		 * It is valid when:
+		 * Desc is valid and Data isn't null
+		 */
 		bool IsValid() const
 		{
-			// You can decide not to use Buffer if you feel like you don't need the void* data
-			return Desc.Type != BufferType::None && Data;
+			return Desc.IsValid() && Data;
 		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		/** @brief Returns the IsValid() method */
+		operator bool() const { return IsValid(); }
 	};
 
 	// Texture
