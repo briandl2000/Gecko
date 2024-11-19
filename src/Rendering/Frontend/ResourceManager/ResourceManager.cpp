@@ -30,15 +30,15 @@ namespace Gecko
 			computePipelineDesc.ShaderVersion = "5_1";
 			computePipelineDesc.PipelineReadOnlyResources = 
 			{
-				PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(MipGenerationData)), 
-				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+				PipelineResource::LocalData(ShaderType::Compute, 0, sizeof(MipGenerationData)), 
+				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
 			computePipelineDesc.PipelineReadWriteResources = 
 			{
-				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
 			computePipelineDesc.SamplerDescs = {
-				{ShaderVisibility::Pixel, SamplerFilter::Linear}
+				{ShaderType::Pixel, SamplerFilter::Linear}
 			};
 
 			DownsamplePipelineHandle = CreateComputePipeline(computePipelineDesc);
@@ -50,15 +50,15 @@ namespace Gecko
 			computePipelineDesc.ComputeShaderPath = "Shaders/HDR_to_cube.gsh";
 			computePipelineDesc.ShaderVersion = "5_1";
 			computePipelineDesc.SamplerDescs = {
-				{ShaderVisibility::Pixel, SamplerFilter::Linear, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap}
+				{ShaderType::Pixel, SamplerFilter::Linear, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap}
 			};
 			computePipelineDesc.PipelineReadOnlyResources = 
 			{
-				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
 			computePipelineDesc.PipelineReadWriteResources = 
 			{
-				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
 
 			HDRToCubeHandle = CreateComputePipeline(computePipelineDesc);
@@ -70,15 +70,15 @@ namespace Gecko
 			computePipelineDesc.ComputeShaderPath = "Shaders/IrradianceMap.gsh";
 			computePipelineDesc.ShaderVersion = "5_1";
 			computePipelineDesc.SamplerDescs = {
-				{ShaderVisibility::Pixel, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp}
+				{ShaderType::Pixel, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp}
 			};
 			computePipelineDesc.PipelineReadOnlyResources = 
 			{
-				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
 			computePipelineDesc.PipelineReadWriteResources = 
 			{
-				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
 
 			IrradianceMapHandle = CreateComputePipeline(computePipelineDesc);

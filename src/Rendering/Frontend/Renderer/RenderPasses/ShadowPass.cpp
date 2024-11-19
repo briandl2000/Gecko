@@ -16,8 +16,8 @@ const void ShadowPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager
 		pipelineDesc.ShaderVersion = "5_1";
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 		pipelineDesc.PipelineResources = {
-			PipelineResource::ConstantBuffer(ShaderVisibility::Vertex, 0),
-			PipelineResource::LocalData(ShaderVisibility::Vertex, 1, sizeof(glm::mat4)),
+			PipelineResource::ConstantBuffer(ShaderType::Vertex, 0),
+			PipelineResource::LocalData(ShaderType::Vertex, 1, sizeof(glm::mat4)),
 		};
 		pipelineDesc.DepthStencilFormat = DataFormat::R32_FLOAT;
 		pipelineDesc.WindingOrder = WindingOrder::CounterClockWise;

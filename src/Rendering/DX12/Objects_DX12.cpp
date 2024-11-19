@@ -36,14 +36,14 @@ namespace Gecko::DX12
 		return DXGI_FORMAT_UNKNOWN;
 	}
 
-	D3D12_SHADER_VISIBILITY ShaderVisibilityToD3D12ShaderVisibility(ShaderVisibility visibility)
+	D3D12_SHADER_VISIBILITY ShaderTypeToD3D12ShaderVisibility(ShaderType visibility)
 	{
 		switch (visibility)
 		{
-		case ShaderVisibility::All: return D3D12_SHADER_VISIBILITY_ALL;
-		case ShaderVisibility::Vertex: return D3D12_SHADER_VISIBILITY_VERTEX;
-		case ShaderVisibility::Pixel: return D3D12_SHADER_VISIBILITY_PIXEL;
-		case ShaderVisibility::Compute: return D3D12_SHADER_VISIBILITY_ALL;
+		case ShaderType::All: return D3D12_SHADER_VISIBILITY_ALL;
+		case ShaderType::Vertex: return D3D12_SHADER_VISIBILITY_VERTEX;
+		case ShaderType::Pixel: return D3D12_SHADER_VISIBILITY_PIXEL;
+		case ShaderType::Compute: return D3D12_SHADER_VISIBILITY_ALL;
 		}
 		ASSERT_MSG(false, "Unkown Shader visibilty");
 		return D3D12_SHADER_VISIBILITY_ALL;

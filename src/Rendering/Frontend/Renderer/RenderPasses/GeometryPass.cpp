@@ -19,14 +19,14 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.VertexLayout = Vertex3D::GetLayout();
 
 		pipelineDesc.PipelineResources = {
-			PipelineResource::ConstantBuffer(ShaderVisibility::All, 0),
-			PipelineResource::ConstantBuffer(ShaderVisibility::Pixel, 1),
-			PipelineResource::LocalData(ShaderVisibility::All, 2, sizeof(glm::mat4)),
-			PipelineResource::Texture(ShaderVisibility::Pixel, 0),
-			PipelineResource::Texture(ShaderVisibility::Pixel, 1),
-			PipelineResource::Texture(ShaderVisibility::Pixel, 2),
-			PipelineResource::Texture(ShaderVisibility::Pixel, 3),
-			PipelineResource::Texture(ShaderVisibility::Pixel, 4),
+			PipelineResource::ConstantBuffer(ShaderType::All, 0),
+			PipelineResource::ConstantBuffer(ShaderType::Pixel, 1),
+			PipelineResource::LocalData(ShaderType::All, 2, sizeof(glm::mat4)),
+			PipelineResource::Texture(ShaderType::Pixel, 0),
+			PipelineResource::Texture(ShaderType::Pixel, 1),
+			PipelineResource::Texture(ShaderType::Pixel, 2),
+			PipelineResource::Texture(ShaderType::Pixel, 3),
+			PipelineResource::Texture(ShaderType::Pixel, 4),
 		};
 
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
@@ -41,8 +41,8 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.PrimitiveType = PrimitiveType::Triangles;
 
 		pipelineDesc.SamplerDescs = {
-			{ShaderVisibility::Pixel, SamplerFilter::Linear},
-			{ShaderVisibility::Pixel, SamplerFilter::Point}
+			{ShaderType::Pixel, SamplerFilter::Linear},
+			{ShaderType::Pixel, SamplerFilter::Point}
 		};
 
 		GBufferPipelineHandle = resourceManager->CreateGraphicsPipeline(pipelineDesc);
@@ -59,8 +59,8 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 		pipelineDesc.PipelineResources = 
 		{	
-			PipelineResource::ConstantBuffer(ShaderVisibility::All, 0),
-			PipelineResource::Texture(ShaderVisibility::Pixel, 0)
+			PipelineResource::ConstantBuffer(ShaderType::All, 0),
+			PipelineResource::Texture(ShaderType::Pixel, 0)
 		};
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
 		pipelineDesc.RenderTextureFormats[1] = DataFormat::R32G32B32A32_FLOAT; // Normal
@@ -71,7 +71,7 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 		pipelineDesc.CullMode = CullMode::Back;
 
 		pipelineDesc.SamplerDescs = {
-			{ ShaderVisibility::Pixel, SamplerFilter::Linear,},
+			{ ShaderType::Pixel, SamplerFilter::Linear,},
 		};
 
 		CubemapPipelineHandle = resourceManager->CreateGraphicsPipeline(pipelineDesc);

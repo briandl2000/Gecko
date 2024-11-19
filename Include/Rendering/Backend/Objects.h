@@ -62,15 +62,6 @@ namespace Gecko
 		Tex2DArray
 	};
 
-	// TODO: Remove Shader visibility and turn it into shader type
-	enum class ShaderVisibility : u8
-	{
-		All,
-		Vertex,
-		Pixel,
-		Compute
-	};
-
 	/** @brief Cull mode */
 	enum class CullMode : u8
 	{
@@ -341,7 +332,7 @@ namespace Gecko
 	 */
 	struct SamplerDesc
 	{
-		ShaderVisibility Visibility{ ShaderVisibility::All };
+		ShaderType Visibility{ ShaderType::All };
 		SamplerFilter Filter{ SamplerFilter::Linear };
 		SamplerWrapMode WrapU{ SamplerWrapMode::Wrap };
 		SamplerWrapMode WrapV{ SamplerWrapMode::Wrap };
@@ -381,7 +372,7 @@ namespace Gecko
 		 * If it is used as a read write resource it reflects the "uX" register slot.
 		 * @return A texture PipelineResource
 		 */
-		static PipelineResource Texture(ShaderVisibility visibility, u32 bindLocation)
+		static PipelineResource Texture(ShaderType visibility, u32 bindLocation)
 		{
 			return { ResourceType::Texture, visibility, bindLocation, 0 };
 		}
@@ -392,7 +383,7 @@ namespace Gecko
 		 * @param bindLocation The constant buffer bind location of this resource. this reflects the "bX" register in hlsl.
 		 * @return A constant buffer PipelineResource
 		 */
-		static PipelineResource ConstantBuffer(ShaderVisibility visibility, u32 bindLocation)
+		static PipelineResource ConstantBuffer(ShaderType visibility, u32 bindLocation)
 		{
 			return { ResourceType::ConstantBuffer, visibility, bindLocation, 0 };
 		}
@@ -405,7 +396,7 @@ namespace Gecko
 		 * (Structured buffers are bound in texture registers)
 		 * @return A structured buffer PipelineResource
 		 */
-		static PipelineResource StructuredBuffer(ShaderVisibility visibility, u32 bindLocation)
+		static PipelineResource StructuredBuffer(ShaderType visibility, u32 bindLocation)
 		{
 			return { ResourceType::StructuredBuffer, visibility, bindLocation, 0 };
 		}
@@ -417,13 +408,13 @@ namespace Gecko
 		 * (You can have only one local data resource per pipeline)
 		 * @return A texture PipelineResource
 		 */
-		static PipelineResource LocalData(ShaderVisibility visibility, u32 bindLocation, u32 size)
+		static PipelineResource LocalData(ShaderType visibility, u32 bindLocation, u32 size)
 		{
 			return { ResourceType::LocalData, visibility, bindLocation, size };
 		}
 
 		ResourceType Type{ ResourceType::None };
-		ShaderVisibility Visibility{ ShaderVisibility::All };
+		ShaderType Visibility{ ShaderType::All };
 		u32 BindLocation{ 0 };
 		u32 Size{ 0 };
 

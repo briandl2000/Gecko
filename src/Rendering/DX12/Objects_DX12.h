@@ -14,7 +14,7 @@ namespace Gecko
 		struct DescriptorHandle;
 
 		DXGI_FORMAT FormatToD3D12Format(DataFormat format);
-		D3D12_SHADER_VISIBILITY ShaderVisibilityToD3D12ShaderVisibility(ShaderVisibility visibility);
+		D3D12_SHADER_VISIBILITY ShaderTypeToD3D12ShaderVisibility(ShaderType visibility);
 		D3D12_CULL_MODE CullModeToD3D12CullMode(CullMode cullMode);
 		D3D12_FILL_MODE PrimitiveTypeToD3D12FillMode(PrimitiveType type);
 		D3D12_PRIMITIVE_TOPOLOGY_TYPE PrimitiveTypeToD3D12PrimitiveTopologyType(PrimitiveType type);

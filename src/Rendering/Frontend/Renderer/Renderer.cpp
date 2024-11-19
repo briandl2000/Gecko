@@ -53,11 +53,11 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		pipelineDesc.CullMode = CullMode::Back;
 
 		pipelineDesc.PipelineResources = {
-			PipelineResource::Texture(ShaderVisibility::Pixel, 0)
+			PipelineResource::Texture(ShaderType::Pixel, 0)
 		};
 
 		pipelineDesc.SamplerDescs = {
-			{ShaderVisibility::Pixel, SamplerFilter::Point, },
+			{ShaderType::Pixel, SamplerFilter::Point, },
 		};
 
 		FullScreenTexturePipelineHandle = m_ResourceManager->CreateGraphicsPipeline(pipelineDesc);

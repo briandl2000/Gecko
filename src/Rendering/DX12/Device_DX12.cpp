@@ -476,7 +476,7 @@ namespace Gecko::DX12
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility));
 					graphicsPipeline_DX12->TextureIndices.push_back(descriptorIndex);
 				}
 				continue;
@@ -489,7 +489,7 @@ namespace Gecko::DX12
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility));
 					graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
 				}
 				continue;
@@ -502,7 +502,7 @@ namespace Gecko::DX12
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility));
 					graphicsPipeline_DX12->TextureIndices.push_back(descriptorIndex);
 				}
 				continue;
@@ -512,7 +512,7 @@ namespace Gecko::DX12
 						pipelineResource.Size / 4,
 						pipelineResource.BindLocation,
 						0,
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility)
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility)
 					);
 					graphicsPipeline_DX12->LocalDataLocation = static_cast<u32>(graphicsPipeline_DX12->ConstantBufferIndices.size());
 					graphicsPipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
@@ -753,7 +753,7 @@ namespace Gecko::DX12
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility));
 					computePipeline_DX12->TextureIndices.push_back(descriptorIndex);
 				}
 				continue;
@@ -766,7 +766,7 @@ namespace Gecko::DX12
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility));
 					computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
 				}
 				continue;
@@ -779,7 +779,7 @@ namespace Gecko::DX12
 					descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 					rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility));
 					computePipeline_DX12->TextureIndices.push_back(descriptorIndex);
 				}
 				continue;
@@ -789,7 +789,7 @@ namespace Gecko::DX12
 						pipelineResource.Size / 4,
 						pipelineResource.BindLocation,
 						0,
-						ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility)
+						ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility)
 					);
 					computePipeline_DX12->LocalDataLocation = i;
 					computePipeline_DX12->ConstantBufferIndices.push_back(descriptorIndex);
@@ -811,7 +811,7 @@ namespace Gecko::DX12
 				descriptorTableRanges[descriptorIndex].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
 				rootParameters[descriptorIndex].InitAsDescriptorTable(1, &descriptorTableRanges[descriptorIndex],
-					ShaderVisibilityToD3D12ShaderVisibility(pipelineResource.Visibility));
+					ShaderTypeToD3D12ShaderVisibility(pipelineResource.Visibility));
 				computePipeline_DX12->UAVIndices.push_back(descriptorIndex);
 			}
 

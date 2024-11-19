@@ -17,7 +17,7 @@ const void ExampleComputePass::SubInit(const Gecko::Platform::AppInfo& appInfo, 
 		// We need only one Read write resource mainy the output texture
 		computePipelineDesc.PipelineReadWriteResources = 
 		{
-			Gecko::PipelineResource::Texture(Gecko::ShaderVisibility::Compute, 0)
+			Gecko::PipelineResource::Texture(Gecko::ShaderType::Compute, 0)
 		};
 
 		m_ExamplePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);

@@ -17,14 +17,14 @@ const void FXAAPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager* 
 		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.PipelineReadOnlyResources = 
 		{ 
-			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(FXAAData)),
-			PipelineResource::Texture(ShaderVisibility::Compute, 0) 
+			PipelineResource::LocalData(ShaderType::Compute, 0, sizeof(FXAAData)),
+			PipelineResource::Texture(ShaderType::Compute, 0) 
 		};
 		computePipelineDesc.SamplerDescs = {
-			{ ShaderVisibility::Compute, SamplerFilter::Point }
+			{ ShaderType::Compute, SamplerFilter::Point }
 		};
 		computePipelineDesc.PipelineReadWriteResources = {
-			PipelineResource::Texture(ShaderVisibility::Compute, 0)
+			PipelineResource::Texture(ShaderType::Compute, 0)
 		};
 
 
