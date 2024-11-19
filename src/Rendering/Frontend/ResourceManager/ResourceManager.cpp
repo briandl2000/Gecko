@@ -22,72 +22,64 @@ namespace Gecko
 		m_CurrentTextureIndex = 0;
 		m_CurrentMaterialIndex = 0;
 		m_CurrentRenderTargetIndex = 0;
-	
 
 		// MipMap Compute Pipeline
 		{
-			std::vector<SamplerDesc> computeSamplerShaderDescs =
-			{
-				{
-					ShaderVisibility::Pixel,
-					SamplerFilter::Linear,
-				}
-			};
-
 			ComputePipelineDesc computePipelineDesc;
 			computePipelineDesc.ComputeShaderPath = "Shaders/DownSample.gsh";
 			computePipelineDesc.ShaderVersion = "5_1";
-			computePipelineDesc.DynamicCallData.BufferLocation = 0;
-			computePipelineDesc.DynamicCallData.Size = sizeof(MipGenerationData);
-			computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-			computePipelineDesc.NumTextures = 1;
-			computePipelineDesc.NumUAVs = 1;
+			computePipelineDesc.PipelineReadOnlyResources = 
+			{
+				PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(MipGenerationData)), 
+				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+			};
+			computePipelineDesc.PipelineReadWriteResources = 
+			{
+				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+			};
+			computePipelineDesc.SamplerDescs = {
+				{ShaderVisibility::Pixel, SamplerFilter::Linear}
+			};
 
 			DownsamplePipelineHandle = CreateComputePipeline(computePipelineDesc);
 		}
 
 		// HDR to Cubemap Compute Pipeline
 		{
-			std::vector<SamplerDesc> computeSamplerShaderDescs =
-			{
-				{
-					ShaderVisibility::Pixel,
-					SamplerFilter::Linear,
-					SamplerWrapMode::Wrap,
-					SamplerWrapMode::Wrap,
-					SamplerWrapMode::Wrap,
-				}
-			};
-
 			ComputePipelineDesc computePipelineDesc;
 			computePipelineDesc.ComputeShaderPath = "Shaders/HDR_to_cube.gsh";
 			computePipelineDesc.ShaderVersion = "5_1";
-			computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-			computePipelineDesc.NumTextures = 1;
-			computePipelineDesc.NumUAVs = 1;
+			computePipelineDesc.SamplerDescs = {
+				{ShaderVisibility::Pixel, SamplerFilter::Linear, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap}
+			};
+			computePipelineDesc.PipelineReadOnlyResources = 
+			{
+				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+			};
+			computePipelineDesc.PipelineReadWriteResources = 
+			{
+				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+			};
 
 			HDRToCubeHandle = CreateComputePipeline(computePipelineDesc);
 		}
 
 		// IradianceMap Compute Pipeline
 		{
-			std::vector<SamplerDesc> computeSamplerShaderDescs =
-			{
-				{
-					ShaderVisibility::Pixel,
-					SamplerFilter::Linear,
-					SamplerWrapMode::Clamp,
-					SamplerWrapMode::Clamp,
-					SamplerWrapMode::Clamp,
-				}
-			};
-
 			ComputePipelineDesc computePipelineDesc;
 			computePipelineDesc.ComputeShaderPath = "Shaders/IrradianceMap.gsh";
 			computePipelineDesc.ShaderVersion = "5_1";
-			computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-			computePipelineDesc.NumTextures = 1;
-			computePipelineDesc.NumUAVs = 1;
+			computePipelineDesc.SamplerDescs = {
+				{ShaderVisibility::Pixel, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp}
+			};
+			computePipelineDesc.PipelineReadOnlyResources = 
+			{
+				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+			};
+			computePipelineDesc.PipelineReadWriteResources = 
+			{
+				PipelineResource::Texture(ShaderVisibility::Compute, 0)
+			};
 
 			IrradianceMapHandle = CreateComputePipeline(computePipelineDesc);
 
@@ -149,15 +141,15 @@ namespace Gecko
 
 			VertexBufferDesc vertexDesc;
 			vertexDesc.Layout = Vertex3D::GetLayout();
-			vertexDesc.VertexData = vertices;
 			vertexDesc.NumVertices = 24;
+			vertexDesc.MemoryType = MemoryType::Dedicated;
 
 			IndexBufferDesc indexDesc;
 			indexDesc.IndexFormat = DataFormat::R32_UINT;
 			indexDesc.NumIndices = 36;
-			indexDesc.IndexData = indices;
+			indexDesc.MemoryType = MemoryType::Dedicated;
 
-			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc);
+			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc, vertices, indices);
 		}
 
 		// Create missing Texture
@@ -194,14 +186,14 @@ namespace Gecko
 
 			m_MissingTextureHandle = CreateTexture(textureDesc, emptyTexData.data(), true);
 		}
-
+		
 		// Create missing Material
 		{
 			m_MissingMaterialHandle = CreateMaterial();
-			Gecko::ConstantBuffer materialConstantBuffer = GetMaterial(m_MissingMaterialHandle).MaterialConstantBuffer;
-			MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer.Buffer);
-			materialData->materialTextureFlags |= 0b00001;
-
+			Gecko::Buffer materialConstantBuffer = GetMaterial(m_MissingMaterialHandle).MaterialConstantBuffer;
+			MaterialData materialData{ };// = reinterpret_cast<MaterialData*>(materialConstantBuffer._Buffer);
+			materialData.materialTextureFlags |= 0b00001;
+			m_Device->UploadBufferData(materialConstantBuffer, &materialData, sizeof(MaterialData));
 		}
 
 		SceneDataBuffer.resize(m_Device->GetNumBackBuffers());
@@ -209,27 +201,27 @@ namespace Gecko
 		for(u32 i = 0; i < m_Device->GetNumBackBuffers(); i++)
 		{
 			Gecko::ConstantBufferDesc bufferDesc = {
-				sizeof(SceneDataStruct),
-				Gecko::ShaderVisibility::All,
+				sizeof(SceneDataStruct)
 			};
-
+			bufferDesc.MemoryType = MemoryType::Shared;
 			SceneDataBuffer[i] = m_Device->CreateConstantBuffer(bufferDesc);
-			SceneData[i] = reinterpret_cast<SceneDataStruct*>(SceneDataBuffer[i].Buffer);
-			SceneData[i]->CameraPosition = glm::vec3(0., 0., 2.);
-			SceneData[i]->ProjectionMatrix = glm::perspective(glm::radians(90.f), Gecko::Platform::GetScreenAspectRatio(), 0.1f, 100.f);
+			SceneData[i].CameraPosition = glm::vec3(0., 0., 2.);
+			SceneData[i].ProjectionMatrix = glm::perspective(glm::radians(90.f), Gecko::Platform::GetScreenAspectRatio(), 0.1f, 100.f);
 
-			SceneData[i]->ViewMatrix = glm::translate(glm::mat4(1.), SceneData[i]->CameraPosition);
-			SceneData[i]->invProjectionMatrix = glm::inverse(SceneData[i]->ProjectionMatrix);
-			SceneData[i]->InvViewMatrix = glm::inverse(SceneData[i]->ViewMatrix);
-			SceneData[i]->ViewOrientation = glm::mat4(glm::mat3(SceneData[i]->ViewMatrix));
-			SceneData[i]->LightDirection.x = 0.f;
-			SceneData[i]->LightDirection.y = -1.f;
-			SceneData[i]->LightDirection.z = 1.f;
+			SceneData[i].ViewMatrix = glm::translate(glm::mat4(1.), SceneData[i].CameraPosition);
+			SceneData[i].invProjectionMatrix = glm::inverse(SceneData[i].ProjectionMatrix);
+			SceneData[i].InvViewMatrix = glm::inverse(SceneData[i].ViewMatrix);
+			SceneData[i].ViewOrientation = glm::mat4(glm::mat3(SceneData[i].ViewMatrix));
+			SceneData[i].LightDirection.x = 0.f;
+			SceneData[i].LightDirection.y = -1.f;
+			SceneData[i].LightDirection.z = 1.f;
 
-			SceneData[i]->AmbientIntensity = 1.f;
-			SceneData[i]->LighIntensity = 1.f;
-			SceneData[i]->LightColor = glm::vec3(1.f);
-			SceneData[i]->Exposure = 2.f;
+			SceneData[i].AmbientIntensity = 1.f;
+			SceneData[i].LighIntensity = 1.f;
+			SceneData[i].LightColor = glm::vec3(1.f);
+			SceneData[i].Exposure = 2.f;
+
+			m_Device->UploadBufferData(SceneDataBuffer[i], &SceneData, sizeof(SceneDataStruct));
 		}
 
 		AddEventListener(Event::SystemEvent::CODE_RESIZED, &ResourceManager::ResizeEvent);
@@ -259,7 +251,7 @@ namespace Gecko
 		m_ComputePipelines.clear();
 	}
 
-	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc)
+	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, void* vertexData, void* indexData)
 	{
 		MeshHandle handle = m_CurrentMeshIndex;
 
@@ -267,6 +259,9 @@ namespace Gecko
 
 		mesh.VertexBuffer = m_Device->CreateVertexBuffer(vertexDesc);
 		mesh.IndexBuffer = m_Device->CreateIndexBuffer(indexDesc);
+
+		m_Device->UploadBufferData(mesh.VertexBuffer, vertexData, mesh.VertexBuffer.Desc.Stride *mesh.VertexBuffer.Desc.NumElements);
+		m_Device->UploadBufferData(mesh.IndexBuffer, indexData, mesh.IndexBuffer.Desc.Stride*mesh.IndexBuffer.Desc.NumElements);
 
 		m_Meshes[handle] = mesh;
 
@@ -298,36 +293,37 @@ namespace Gecko
 	{
 		MaterialHandle handle = m_CurrentMaterialIndex;
 
-		Material outMat;
+		Material outMat;\
 
 		ConstantBufferDesc MaterialBufferDesc =
 		{
-			sizeof(MaterialData),
-			ShaderVisibility::Pixel,
+			sizeof(MaterialData)
 		};
-		Gecko::ConstantBuffer materialConstantBuffer = m_Device->CreateConstantBuffer(MaterialBufferDesc);
-		MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer.Buffer);
-		*materialData = MaterialData();
-		materialData->materialTextureFlags = 0;
+		MaterialBufferDesc.MemoryType = MemoryType::Shared;
+		Gecko::Buffer materialConstantBuffer = m_Device->CreateConstantBuffer(MaterialBufferDesc);
+		//MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer._Buffer);
+		MaterialData materialData = MaterialData();
+		materialData.materialTextureFlags = 0;
 
 
-		materialData->baseColorFactor[0] = static_cast<float>(1.f);
-		materialData->baseColorFactor[1] = static_cast<float>(1.f);
-		materialData->baseColorFactor[2] = static_cast<float>(1.f);
-		materialData->baseColorFactor[3] = static_cast<float>(1.f);
+		materialData.baseColorFactor[0] = static_cast<float>(1.f);
+		materialData.baseColorFactor[1] = static_cast<float>(1.f);
+		materialData.baseColorFactor[2] = static_cast<float>(1.f);
+		materialData.baseColorFactor[3] = static_cast<float>(1.f);
 
-		materialData->normalScale = static_cast<float>(0.f);
+		materialData.normalScale = static_cast<float>(0.f);
 
-		materialData->matallicFactor = static_cast<float>(0.f);
-		materialData->roughnessFactor = static_cast<float>(1.f);
+		materialData.matallicFactor = static_cast<float>(0.f);
+		materialData.roughnessFactor = static_cast<float>(1.f);
 
-		materialData->emissiveFactor[0] = static_cast<float>(0.f);
-		materialData->emissiveFactor[1] = static_cast<float>(0.f);
-		materialData->emissiveFactor[2] = static_cast<float>(0.f);
+		materialData.emissiveFactor[0] = static_cast<float>(0.f);
+		materialData.emissiveFactor[1] = static_cast<float>(0.f);
+		materialData.emissiveFactor[2] = static_cast<float>(0.f);
 
-		materialData->occlusionStrength = static_cast<float>(1.f);
+		materialData.occlusionStrength = static_cast<float>(1.f);
 
-		materialData->materialTextureFlags = 0b00000;
+		materialData.materialTextureFlags = 0b00000;
+		m_Device->UploadBufferData(materialConstantBuffer, &materialData, sizeof(MaterialData));
 
 		outMat.AlbedoTextureHandle = GetMissingTextureHandle();
 		outMat.EmmisiveTextureHandle = GetMissingTextureHandle();
@@ -539,6 +535,11 @@ namespace Gecko
 		return m_ComputePipelines[computePipelineHandle];
 	}
 
+	void ResourceManager::UploadMaterial(Buffer& buffer, void* data, u32 size, u32 offset)
+	{
+		m_Device->UploadBufferData(buffer, data, size, offset);
+	}
+
 	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)
 	{
 		u32 width = eventData.Data.u32[0];
@@ -574,7 +575,7 @@ namespace Gecko
 
 			Ref<CommandList> commandList = m_Device->CreateComputeCommandList();
 			commandList->BindComputePipeline(GetComputePipeline(DownsamplePipelineHandle));
-			commandList->SetDynamicCallData(sizeof(MipGenerationData), &mipGenerationData);
+			commandList->SetLocalData(sizeof(MipGenerationData), &mipGenerationData);
 
 			commandList->BindTexture(0, texture, mipGenerationData.Mip);
 

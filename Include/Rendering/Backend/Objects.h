@@ -1,12 +1,14 @@
 #pragma once
+
 #include "Defines.h"
 
 #include "Core/Asserts.h"
 
 #include <vector>
 
-namespace Gecko {
-	
+namespace Gecko
+{
+
 	enum class ShaderType
 	{
 		All,
@@ -71,7 +73,8 @@ namespace Gecko {
 	{
 		All,
 		Vertex,
-		Pixel
+		Pixel,
+		Compute
 	};
 
 	enum class CullMode
@@ -105,22 +108,34 @@ namespace Gecko {
 		Clamp
 	};
 
+	enum class ResourceType
+	{
+		None,
+		Texture,
+		ConstantBuffer,
+		StructuredBuffer,
+		LocalData
+	};
+
 	enum class BufferType
 	{
+		None, /** @brief Invalid default buffer type */
+		Vertex,
+		Index,
 		Constant,
 		Structured
 	};
 
+	enum class MemoryType
+	{
+		None,
+		Shared,
+		Dedicated
+	};
+
 	u32 FormatSizeInBytes(const DataFormat& format);
 
-	u32 GetRenderTargetResourceIndex(const RenderTargetType& renderTargetType);
-
-	// TODO: find a better place for this
 	u32 CalculateNumberOfMips(u32 width, u32 height);
-
-	// TODO: add a resource structure.
-
-	// Vertex buffer
 
 	struct VertexAttribute
 	{
@@ -128,14 +143,14 @@ namespace Gecko {
 		DataFormat AttributeFormat{ DataFormat::None };
 		u32 Size{ 0 };
 		u32 Offset{ 0 };
-		
+
 		VertexAttribute() = default;
 		VertexAttribute(DataFormat format, const char* name)
 			: Name(name)
 			, AttributeFormat(format)
 			, Size(FormatSizeInBytes(format))
 			, Offset(0)
-		{}
+		{ }
 
 		bool IsValid() const
 		{
@@ -159,7 +174,7 @@ namespace Gecko {
 
 	struct VertexLayout
 	{
-		std::vector<VertexAttribute> Attributes{};
+		std::vector<VertexAttribute> Attributes{ };
 		u32 Stride{ 0 };
 
 		VertexLayout() = default;
@@ -173,7 +188,7 @@ namespace Gecko {
 		{
 			CalculateOffsetsAndStride();
 		};
-		~VertexLayout() {};
+		~VertexLayout() { };
 
 		bool IsValid() const
 		{
@@ -218,24 +233,47 @@ namespace Gecko {
 		}
 	};
 
-	struct VertexBufferDesc // The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer. This pointer needs to stay valid until the CreateVertexBuffer function is called.
+	// Buffers
+
+	/**
+	 * There are 4 different buffer Types each buffer has different properties
+	 * Vertex buffers are used for vertex data in graphics pipelines
+	 * Index buffers are used for index data in graphics pipelines
+	 * Constant buffers are used for any type of data that can not be changed and has one
+	 *  specific size in graphics or compute pipelines
+	 * Structured buffers are arrays of structs that can be used in graphics or compute pipelines
+	 *  you can write to structured bufferes within a compute pipeline
+	 * !!Important!! When binding a buffer as read write it needs to be created in dedicated memory!
+	 *
+	 * 										| Vertex | Index | Constant | Structured |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Vertex Buffer 		| X		 |		 |			|			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Index Buffer 		| 		 | X	 |			|			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Constant Buffer 		|		 |		 | X		|			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Structured Buffer 	| X		 | X	 |			| X			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Read Write Buffer 	| X		 | X	 |			| X			 |
+	 * -------------------------------------------------------------------------------
+	 */
+
+	/**
+	 * @brief
+	 * The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer.
+	 * This pointer needs to stay valid until the CreateVertexBuffer function is called.
+	 */
+	struct VertexBufferDesc
 	{
 		VertexLayout Layout{ VertexLayout() };
-		void* VertexData{ nullptr };
 		u32 NumVertices{ 0 };
+		MemoryType MemoryType{ MemoryType::None };
+		bool CanReadWrite{ false };
 
 		bool IsValid() const
 		{
-			if (Layout.Stride == 0 || Layout.Attributes.empty())
-				return false;
-
-			if (!VertexData)
-				return false;
-
-			if (!NumVertices)
-				return false;
-
-			return true;
+			return NumVertices > 0;
 		}
 		operator bool() const
 		{
@@ -243,36 +281,24 @@ namespace Gecko {
 		}
 	};
 
-	struct VertexBuffer
-	{
-		VertexBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
-
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	// Index buffer
-
-	struct IndexBufferDesc // The Index buffer desc takes in format of the indices, the number of indices and the index data pointer. This pointer needs to stay valid until the CreateIndexBuffer function is called.
+	/**
+	 * @brief
+	 * The Index buffer desc takes in format of the indices, the number of indices and the index data pointer.
+	 * This pointer needs to stay valid until the CreateIndexBuffer function is called.
+	 */
+	struct IndexBufferDesc
 	{
 		DataFormat IndexFormat{ DataFormat::None };
 		u32 NumIndices{ 0 };
-		void* IndexData{ nullptr };
+		MemoryType MemoryType{ MemoryType::None };
+		bool CanReadWrite{ false };
 
 		bool IsValid() const
 		{
 			// IndexBuffer format should always be R16_UINT or R32_UINT
 			if (IndexFormat != DataFormat::R16_UINT && IndexFormat != DataFormat::R32_UINT)
 				return false;
-
-			return NumIndices != 0 && IndexData != nullptr;
+			return NumIndices != 0;
 		}
 		operator bool() const
 		{
@@ -280,19 +306,111 @@ namespace Gecko {
 		}
 	};
 
-	struct IndexBuffer
+	/**
+	 * @brief
+	 * The Constant buffer desc takes in the size of the constant buffer you want to allocate.
+	 */
+	struct ConstantBufferDesc
 	{
-		IndexBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
+		u32 Size{ 0 };
+		MemoryType MemoryType{ MemoryType::None };
 
 		bool IsValid() const
 		{
-			return Desc.IsValid() && Data;
+			return Size > 0;
 		}
 		operator bool() const
 		{
 			return IsValid();
 		}
+	};
+
+	/**
+	 * @brief
+	 * The Structured buffer desc is used to create a structured buffer.
+	 */
+	struct StructuredBufferDesc
+	{
+		u32 StructSize{ 0 };
+		u32 NumElements{ 0 };
+		MemoryType MemoryType{ MemoryType::None };
+		bool CanReadWrite{ false };
+
+		bool IsValid() const
+		{
+			return StructSize > 0 && NumElements > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	/** 
+	 * @brief 
+	 * A Struct that holds information about a Buffer
+	 */
+	struct BufferDesc
+	{
+		BufferType Type{ BufferType::None };
+		MemoryType MemoryType{ MemoryType::None };
+		u32 Size{ 0 };
+		u32 NumElements{ 0 };
+		u32 Stride{ 0 };
+		bool CanReadWrite{ false };
+
+		bool IsValid() const
+		{
+			if (MemoryType == MemoryType::None || Type == BufferType::None) return false;
+			if (MemoryType == MemoryType::Shared && CanReadWrite) return false;
+			if (Type == BufferType::Constant) return Size > 0 && !CanReadWrite;
+			return Stride > 0 && NumElements > 0;
+		}
+		operator bool() { return IsValid(); }
+	};
+
+	/**
+	 * @brief
+	 * This is a buffer object. It can be used as either a Vertex, Index, Constant or Structured buffer.
+	 * Buffers are used to bind during a graphics or compute pipeline.
+	 */
+	struct Buffer
+	{
+		/** 
+		 * @brief 
+		 * The descriptor of this buffer. This was generated from either a 
+		 * VertexBufferDesc, IndexBufferDesc, ConstantBufferDesc or StructuredBufferDesc.
+		 */
+		const BufferDesc Desc{ };
+		/** @brief A shared void pointer to API specific data */
+		Ref<void> Data{ nullptr };
+
+		Buffer() = default;
+		Buffer(const BufferDesc& desc)
+			: Desc(desc)
+		{ }
+		Buffer(const Buffer& other)
+			: Desc(other.Desc)
+			, Data(other.Data)
+		{ }
+		Buffer& operator=(const Buffer& other)
+		{
+			Buffer* buffer = new(this) Buffer(other);
+			return *buffer;
+		}
+
+		/**
+		 * @brief 
+		 * A function to determine weather this struct is valid.
+		 * It is valid when:
+		 * Desc is valid and Data isn't null
+		 */
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		/** @brief Returns the IsValid() method */
+		operator bool() const { return IsValid(); }
 	};
 
 	// Texture
@@ -433,7 +551,6 @@ namespace Gecko {
 		}
 	};
 
-
 	struct RenderTarget
 	{
 		RenderTargetDesc Desc{};
@@ -451,40 +568,6 @@ namespace Gecko {
 			if (!RenderTextures[0].IsValid() && !DepthTexture.IsValid())
 				return false;
 
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	// Constant Buffer
-
-	struct ConstantBufferDesc
-	{
-		u64 Size{ 0 };
-		ShaderVisibility Visibility{ ShaderVisibility::All };
-
-		bool IsValid() const
-		{
-			return Size > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	struct ConstantBuffer
-	{
-		ConstantBufferDesc Desc{};
-		Ref<void> Data{ nullptr };
-		void* Buffer{ nullptr };
-
-		bool IsValid() const
-		{
-			// You can decide not to use Buffer if you feel like you don't need the void* data
 			return Desc.IsValid() && Data;
 		}
 		operator bool() const
@@ -539,6 +622,48 @@ namespace Gecko {
 		}
 	};
 
+	struct PipelineResource
+	{
+		static PipelineResource Texture(ShaderVisibility visibility, u32 bindLocation)
+		{
+			return { ResourceType::Texture, visibility, bindLocation, 0 };
+		}
+		static PipelineResource ConstantBuffer(ShaderVisibility visibility, u32 bindLocation)
+		{
+			return { ResourceType::ConstantBuffer, visibility, bindLocation, 0 };
+		}
+		static PipelineResource StructuredBuffer(ShaderVisibility visibility, u32 bindLocation)
+		{
+			return { ResourceType::StructuredBuffer, visibility, bindLocation, 0 };
+		}
+		static PipelineResource LocalData(ShaderVisibility visibility, u32 bindLocation, u32 size)
+		{
+			return { ResourceType::LocalData, visibility, bindLocation, size };
+		}
+
+		ResourceType Type{ ResourceType::None };
+		ShaderVisibility Visibility{ ShaderVisibility::All };
+		u32 BindLocation{ 0 };
+		u32 Size{ 0 };
+
+		bool IsValid() const
+		{
+			if (Type == ResourceType::None)
+			{
+				return false;
+			}
+			if (Type == ResourceType::LocalData && (Size == 0 || Size % 4 != 0))
+			{
+				return false;
+			}
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
 	struct GraphicsPipelineDesc
 	{
 		const char* VertexShaderPath{ nullptr };
@@ -567,11 +692,7 @@ namespace Gecko {
 		WindingOrder WindingOrder{ WindingOrder::ClockWise };
 		PrimitiveType PrimitiveType{ PrimitiveType::Triangles };
 
-		std::vector<ShaderVisibility> ConstantBufferVisibilities{};
-
-		DynamicCallData DynamicCallData{};
-
-		std::vector<ShaderVisibility> TextureShaderVisibilities{};
+		std::vector<PipelineResource> PipelineResources{};
 
 		std::vector<SamplerDesc> SamplerDescs{};
 		bool DepthBoundsTest{ false };
@@ -626,17 +747,13 @@ namespace Gecko {
 		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
 		const char* EntryPoint{ "main" };
 
-		u32 NumConstantBuffers{ 0 };
-		DynamicCallData DynamicCallData{};
-		u32 NumTextures{ 0 };
-		u32 NumUAVs{ 0 };
+		std::vector<PipelineResource> PipelineReadOnlyResources{};
+		std::vector<PipelineResource> PipelineReadWriteResources{};
 		std::vector<SamplerDesc> SamplerDescs{};
 
 		bool IsValid() const
 		{
 			if (!ComputeShaderPath || !ShaderVersion)
-				return false;
-			if (NumUAVs == 0)
 				return false;
 
 			return true;

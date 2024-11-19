@@ -14,52 +14,40 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 {
 	// BloomDownScale Compute Pipeline
 	{
-		std::vector<SamplerDesc> computeSamplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			}
-		};
-
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomDownScale.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.DynamicCallData.BufferLocation = 0;
-		computePipelineDesc.DynamicCallData.Size = sizeof(BloomData);
-		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-		computePipelineDesc.NumTextures = 1;
-		computePipelineDesc.NumUAVs = 1;
+		computePipelineDesc.PipelineReadOnlyResources = {
+			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)),
+			PipelineResource::Texture(ShaderVisibility::Compute, 0)
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1)
+		};
+		computePipelineDesc.SamplerDescs = {
+			{ ShaderVisibility::Compute, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp }
+		};
 
 		m_DownScalePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}
 
 	// BloomUpScale Compute Pipeline
 	{
-		std::vector<SamplerDesc> computeSamplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			}
-		};
-
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomUpScale.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.DynamicCallData.BufferLocation = 0;
-		computePipelineDesc.DynamicCallData.Size = sizeof(BloomData);
-		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-		computePipelineDesc.NumTextures = 1;
-		computePipelineDesc.NumUAVs = 2;
-
-
+		computePipelineDesc.PipelineReadOnlyResources = {
+			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)),
+			PipelineResource::Texture(ShaderVisibility::Compute, 0)
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1)
+		};
+		computePipelineDesc.SamplerDescs = {
+			{ShaderVisibility::Compute, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp,}
+		};
 		m_UpScalePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 
 	}
@@ -70,9 +58,13 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomThreshold.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.DynamicCallData.BufferLocation = 0;
-		computePipelineDesc.DynamicCallData.Size = sizeof(BloomData);
-		computePipelineDesc.NumUAVs = 1;
+		computePipelineDesc.PipelineReadOnlyResources = 
+		{ 
+			PipelineResource::LocalData(ShaderVisibility::Compute, 0, sizeof(BloomData)) 
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+		};
 
 		m_ThresholdPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 
@@ -83,7 +75,11 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/Bloom/BloomComposite.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.NumUAVs = 3;
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderVisibility::Compute, 0),
+			PipelineResource::Texture(ShaderVisibility::Compute, 1),
+			PipelineResource::Texture(ShaderVisibility::Compute, 2),
+		};
 
 		m_CompositePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}
@@ -140,7 +136,7 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	tempBloomData.Height = downSampleTexture.Desc.Height >> 1;
 	
 	commandList->BindComputePipeline(BloomThreshold);
-	commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
+	commandList->SetLocalData(sizeof(BloomData), &tempBloomData);
 	
 	commandList->BindAsRWTexture(0, downSampleTexture.RenderTextures[0], mipLevel);
 	
@@ -158,7 +154,7 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	heights[mipLevel] = downSampleTexture.Desc.Height;
 	while (mipLevel < downSampleTexture.RenderTextures[0].Desc.NumMips - 1)
 	{
-		commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
+		commandList->SetLocalData(sizeof(BloomData), &tempBloomData);
 	
 		commandList->BindTexture(0, downSampleTexture.RenderTextures[0], mipLevel);
 	
@@ -184,7 +180,7 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	{
 		tempBloomData.Width = widths[mipLevel - 1];
 		tempBloomData.Height = heights[mipLevel - 1];
-		commandList->SetDynamicCallData(sizeof(BloomData), &tempBloomData);
+		commandList->SetLocalData(sizeof(BloomData), &tempBloomData);
 	
 		commandList->BindTexture(0, upSampleTexture.RenderTextures[0], mipLevel);
 	
