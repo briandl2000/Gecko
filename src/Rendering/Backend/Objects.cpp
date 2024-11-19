@@ -2,11 +2,12 @@
 
 #include <cmath>
 
-namespace Gecko {
+namespace Gecko
+{
 
 	u32 CalculateNumberOfMips(u32 width, u32 height)
 	{
-		return 1+static_cast<u32>(std::log2(static_cast<float>(std::max(width, height))));
+		return 1 + static_cast<u32>(std::log2(static_cast<float>(std::max(width, height))));
 	}
 
 	u32 FormatSizeInBytes(const DataFormat& format)
@@ -34,45 +35,6 @@ namespace Gecko {
 		}
 
 		ASSERT_MSG(false, "Unkown Format");
-		return 0;
-	}
-
-	u32 GetRenderTargetResourceIndex(const RenderTargetType& renderTargetType)
-	{
-		switch (renderTargetType)
-		{
-		case RenderTargetType::Target0:
-			return 0;
-			break;
-		case RenderTargetType::Target1:
-			return 1;
-			break;
-		case RenderTargetType::Target2:
-			return 2;
-			break;
-		case RenderTargetType::Target3:
-			return 3;
-			break;
-		case RenderTargetType::Target4:
-			return 4;
-			break;
-		case RenderTargetType::Target5:
-			return 5;
-			break;
-		case RenderTargetType::Target6:
-			return 6;
-			break;
-		case RenderTargetType::Target7:
-			return 7;
-			break;
-		case RenderTargetType::Target8:
-			return 8;
-			break;
-		default:
-			break;
-		}
-
-		ASSERT_MSG(false, "To get the resource index you have to pass a correct render target type from 0 to 8");
 		return 0;
 	}
 

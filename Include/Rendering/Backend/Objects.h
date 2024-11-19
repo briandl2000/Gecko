@@ -9,15 +9,19 @@
 namespace Gecko
 {
 
-	enum class ShaderType
+	/** @brief Shader types */
+	enum class ShaderType : u8
 	{
 		All,
 		Vertex,
-		Pixel
+		Pixel,
+		Compute
 	};
 
-	enum class DataFormat
+	/** @brief Data formats */
+	enum class DataFormat : u16
 	{
+		/** @brief Default invalid data format */
 		None,
 		R8G8B8A8_SRGB,
 		R8G8B8A8_UNORM,
@@ -38,28 +42,17 @@ namespace Gecko
 
 	};
 
-	enum class ClearValueType
+	/** @brief Clear value type  */
+	enum class ClearValueType : u8
 	{
 		RenderTarget,
 		DepthStencil
 	};
 
-	enum class RenderTargetType
+	/** @brief Texture type */
+	enum class TextureType : u8
 	{
-		Target0,
-		Target1,
-		Target2,
-		Target3,
-		Target4,
-		Target5,
-		Target6,
-		Target7,
-		Target8,
-		TargetDepth,
-	};
-
-	enum class TextureType
-	{
+		/** @brief Default invalid texture type*/
 		None,
 		Tex1D,
 		Tex2D,
@@ -69,7 +62,8 @@ namespace Gecko
 		Tex2DArray
 	};
 
-	enum class ShaderVisibility
+	// TODO: Remove Shader visibility and turn it into shader type
+	enum class ShaderVisibility : u8
 	{
 		All,
 		Vertex,
@@ -77,39 +71,46 @@ namespace Gecko
 		Compute
 	};
 
-	enum class CullMode
+	/** @brief Cull mode */
+	enum class CullMode : u8
 	{
 		None,
 		Back,
 		Front
 	};
 
-	enum class WindingOrder
+	/** @brief Winding order */
+	enum class WindingOrder : u8
 	{
 		ClockWise,
 		CounterClockWise
 	};
 
-	enum class PrimitiveType
+	/** @brief Primitive type */
+	enum class PrimitiveType : u8
 	{
 		Lines,
 		Triangles
 	};
 
-	enum class SamplerFilter
+	/** @brief Sampler filter */
+	enum class SamplerFilter : u8
 	{
 		Linear,
 		Point
 	};
 
-	enum class SamplerWrapMode
+	/** @brief Sampler wrap mode */
+	enum class SamplerWrapMode : u8
 	{
 		Wrap,
 		Clamp
 	};
 
-	enum class ResourceType
+	/** @brief Rampler type */
+	enum class ResourceType : u8
 	{
+		/** @brief Default invalid resource type */
 		None,
 		Texture,
 		ConstantBuffer,
@@ -117,26 +118,51 @@ namespace Gecko
 		LocalData
 	};
 
-	enum class BufferType
+	/** @brief Buffer type */
+	enum class BufferType : u8
 	{
-		None, /** @brief Invalid default buffer type */
+		/** @brief Default invalid buffer type */
+		None,
 		Vertex,
 		Index,
 		Constant,
 		Structured
 	};
 
-	enum class MemoryType
+	/** @brief Memory type */
+	enum class MemoryType : u8
 	{
+		/** @brief Default invalid memory type */
 		None,
 		Shared,
 		Dedicated
 	};
 
+	// Helper functions
+
+	/**
+	 * @brief
+	 *
+	 * @param format
+	 * @return The size of the specified data format as a u32
+	 */
 	u32 FormatSizeInBytes(const DataFormat& format);
 
+	/**
+	 * @brief
+	 * A function to get the number of mips of a texture given its width and height
+	 * @param width The width of the texture in pixels
+	 * @param height The height of the texture in pixels
+	 * @return The number of maximal mips for a texture in u32
+	 */
 	u32 CalculateNumberOfMips(u32 width, u32 height);
 
+	// Information structs
+
+	/**
+	 * @brief
+	 * Vertex attribute for creating vertex layouts
+	 */
 	struct VertexAttribute
 	{
 		const char* Name{ "VertexAttribute" };
@@ -146,12 +172,15 @@ namespace Gecko
 
 		VertexAttribute() = default;
 		VertexAttribute(DataFormat format, const char* name)
-			: Name(name)
-			, AttributeFormat(format)
-			, Size(FormatSizeInBytes(format))
-			, Offset(0)
-		{ }
+			: Name(name), AttributeFormat(format), Size(FormatSizeInBytes(format)), Offset(0)
+		{}
 
+		/**
+		 * @brief
+		 * @return true if VertexAttribute is valid.
+		 * VertexAttribute is valid when:
+		 * AttributeFormat != None and Size > 0
+		 */
 		bool IsValid() const
 		{
 			return AttributeFormat != DataFormat::None && Size > 0;
@@ -172,9 +201,13 @@ namespace Gecko
 		}
 	};
 
+	/**
+	 * @brief
+	 * Vertex layout used for vertex and pipeline creation
+	 */
 	struct VertexLayout
 	{
-		std::vector<VertexAttribute> Attributes{ };
+		std::vector<VertexAttribute> Attributes{};
 		u32 Stride{ 0 };
 
 		VertexLayout() = default;
@@ -182,16 +215,27 @@ namespace Gecko
 			: Attributes(attributes)
 		{
 			CalculateOffsetsAndStride();
-		};
+		}
 		VertexLayout(const std::vector<VertexAttribute> attributes)
 			: Attributes(attributes)
 		{
 			CalculateOffsetsAndStride();
-		};
-		~VertexLayout() { };
+		}
+		~VertexLayout() {}
 
+		/**
+		 * @brief
+		 * @return true if VertexLayout is valid.
+		 * VertexLayout is valid when:
+		 * All vertex attributes are valid
+		 */
 		bool IsValid() const
 		{
+			for (const VertexAttribute& attributte : Attributes)
+			{
+				if (!attributte.IsValid())
+					return false;
+			}
 			return true;
 		}
 		operator bool() const
@@ -233,239 +277,15 @@ namespace Gecko
 		}
 	};
 
-	// Buffers
-
-	/**
-	 * There are 4 different buffer Types each buffer has different properties
-	 * Vertex buffers are used for vertex data in graphics pipelines
-	 * Index buffers are used for index data in graphics pipelines
-	 * Constant buffers are used for any type of data that can not be changed and has one
-	 *  specific size in graphics or compute pipelines
-	 * Structured buffers are arrays of structs that can be used in graphics or compute pipelines
-	 *  you can write to structured bufferes within a compute pipeline
-	 * !!Important!! When binding a buffer as read write it needs to be created in dedicated memory!
-	 *
-	 * 										| Vertex | Index | Constant | Structured |
-	 * -------------------------------------------------------------------------------
-	 * Can be bound as Vertex Buffer 		| X		 |		 |			|			 |
-	 * -------------------------------------------------------------------------------
-	 * Can be bound as Index Buffer 		| 		 | X	 |			|			 |
-	 * -------------------------------------------------------------------------------
-	 * Can be bound as Constant Buffer 		|		 |		 | X		|			 |
-	 * -------------------------------------------------------------------------------
-	 * Can be bound as Structured Buffer 	| X		 | X	 |			| X			 |
-	 * -------------------------------------------------------------------------------
-	 * Can be bound as Read Write Buffer 	| X		 | X	 |			| X			 |
-	 * -------------------------------------------------------------------------------
-	 */
-
 	/**
 	 * @brief
-	 * The Vertex buffer desc takes in a layout of the vertex and the raw vertex data pointer.
-	 * This pointer needs to stay valid until the CreateVertexBuffer function is called.
+	 * Clear values used for render target creation
 	 */
-	struct VertexBufferDesc
-	{
-		VertexLayout Layout{ VertexLayout() };
-		u32 NumVertices{ 0 };
-		MemoryType MemoryType{ MemoryType::None };
-		bool CanReadWrite{ false };
-
-		bool IsValid() const
-		{
-			return NumVertices > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	/**
-	 * @brief
-	 * The Index buffer desc takes in format of the indices, the number of indices and the index data pointer.
-	 * This pointer needs to stay valid until the CreateIndexBuffer function is called.
-	 */
-	struct IndexBufferDesc
-	{
-		DataFormat IndexFormat{ DataFormat::None };
-		u32 NumIndices{ 0 };
-		MemoryType MemoryType{ MemoryType::None };
-		bool CanReadWrite{ false };
-
-		bool IsValid() const
-		{
-			// IndexBuffer format should always be R16_UINT or R32_UINT
-			if (IndexFormat != DataFormat::R16_UINT && IndexFormat != DataFormat::R32_UINT)
-				return false;
-			return NumIndices != 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	/**
-	 * @brief
-	 * The Constant buffer desc takes in the size of the constant buffer you want to allocate.
-	 */
-	struct ConstantBufferDesc
-	{
-		u32 Size{ 0 };
-		MemoryType MemoryType{ MemoryType::None };
-
-		bool IsValid() const
-		{
-			return Size > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	/**
-	 * @brief
-	 * The Structured buffer desc is used to create a structured buffer.
-	 */
-	struct StructuredBufferDesc
-	{
-		u32 StructSize{ 0 };
-		u32 NumElements{ 0 };
-		MemoryType MemoryType{ MemoryType::None };
-		bool CanReadWrite{ false };
-
-		bool IsValid() const
-		{
-			return StructSize > 0 && NumElements > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	/** 
-	 * @brief 
-	 * A Struct that holds information about a Buffer
-	 */
-	struct BufferDesc
-	{
-		BufferType Type{ BufferType::None };
-		MemoryType MemoryType{ MemoryType::None };
-		u32 Size{ 0 };
-		u32 NumElements{ 0 };
-		u32 Stride{ 0 };
-		bool CanReadWrite{ false };
-
-		bool IsValid() const
-		{
-			if (MemoryType == MemoryType::None || Type == BufferType::None) return false;
-			if (MemoryType == MemoryType::Shared && CanReadWrite) return false;
-			if (Type == BufferType::Constant) return Size > 0 && !CanReadWrite;
-			return Stride > 0 && NumElements > 0;
-		}
-		operator bool() { return IsValid(); }
-	};
-
-	/**
-	 * @brief
-	 * This is a buffer object. It can be used as either a Vertex, Index, Constant or Structured buffer.
-	 * Buffers are used to bind during a graphics or compute pipeline.
-	 */
-	struct Buffer
-	{
-		/** 
-		 * @brief 
-		 * The descriptor of this buffer. This was generated from either a 
-		 * VertexBufferDesc, IndexBufferDesc, ConstantBufferDesc or StructuredBufferDesc.
-		 */
-		const BufferDesc Desc{ };
-		/** @brief A shared void pointer to API specific data */
-		Ref<void> Data{ nullptr };
-
-		Buffer() = default;
-		Buffer(const BufferDesc& desc)
-			: Desc(desc)
-		{ }
-		Buffer(const Buffer& other)
-			: Desc(other.Desc)
-			, Data(other.Data)
-		{ }
-		Buffer& operator=(const Buffer& other)
-		{
-			Buffer* buffer = new(this) Buffer(other);
-			return *buffer;
-		}
-
-		/**
-		 * @brief 
-		 * A function to determine weather this struct is valid.
-		 * It is valid when:
-		 * Desc is valid and Data isn't null
-		 */
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		/** @brief Returns the IsValid() method */
-		operator bool() const { return IsValid(); }
-	};
-
-	// Texture
-
-	struct TextureDesc
-	{
-		DataFormat Format{ DataFormat::None };
-		u32 Width{ 1 };
-		u32 Height{ 1 };
-		u32 Depth{ 1 };
-		u32 NumMips{ 1 };
-		u32 NumArraySlices{ 1 };
-		TextureType Type{ TextureType::None };
-
-		bool IsValid() const
-		{
-			if (Format == DataFormat::None || Type == TextureType::None)
-				return false;
-
-			if (Type == TextureType::Tex1D || Type == TextureType::Tex1DArray)
-				return Height == 1 && Depth == 1;
-			else if (Type == TextureType::Tex2D || Type == TextureType::Tex2DArray)
-				return Depth == 1;
-
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-
-	};
-
-	struct Texture
-	{
-		TextureDesc Desc{};
-		Ref<void> Data{ nullptr };
-
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	// Render target
-
 	struct ClearValue
 	{
 		union
 		{
-			f32 Values[4]{ 0. };
+			f32 Values[4]{ 0.f };
 			f32 Depth;
 		};
 
@@ -474,9 +294,7 @@ namespace Gecko
 			switch (type)
 			{
 			case ClearValueType::RenderTarget:
-				Values[0] = 0.f;
-				Values[1] = 0.f;
-				Values[2] = 0.f;
+				Values[0] = Values[1] = Values[2] = 0.f;
 				Values[3] = 1.f;
 				break;
 			case ClearValueType::DepthStencil:
@@ -484,7 +302,6 @@ namespace Gecko
 				break;
 			}
 		}
-
 		ClearValue(f32 r, f32 g, f32 b, f32 a)
 		{
 			Values[0] = r;
@@ -518,66 +335,10 @@ namespace Gecko
 		}
 	};
 
-	struct RenderTargetDesc
-	{
-		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
-		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
-		DataFormat RenderTargetFormats[8]{
-			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None,
-			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None
-		};
-		DataFormat DepthStencilFormat{ DataFormat::None };
-		u32 NumRenderTargets{ 0 };
-		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
-		u32 DepthMips{ 1 };
-		u32 Width{ 0 };
-		u32 Height{ 0 };
-
-		bool IsValid() const
-		{
-			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
-			// Assume that if the first RenderTexture does not have a valid format, none of them do
-			if (RenderTargetFormats[0] == DataFormat::None && DepthStencilFormat == DataFormat::None)
-				return false;
-
-			if (Width == 0 || Height == 0)
-				return false;
-
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	struct RenderTarget
-	{
-		RenderTargetDesc Desc{};
-		Texture RenderTextures[8]{
-			Texture(), Texture(), Texture(), Texture(),
-			Texture(), Texture(), Texture(), Texture()
-		};
-		Texture DepthTexture{ Texture() };
-		Ref<void> Data{ nullptr };
-
-		bool IsValid() const
-		{
-			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
-			// Assume that if the first RenderTexture is invalid, all of them are
-			if (!RenderTextures[0].IsValid() && !DepthTexture.IsValid())
-				return false;
-
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
-	// Graphics pipeline
-
+	/**
+	 * @brief
+	 * Sampler descriptor used for pipeline creation
+	 */
 	struct SamplerDesc
 	{
 		ShaderVisibility Visibility{ ShaderVisibility::All };
@@ -606,36 +367,56 @@ namespace Gecko
 		}
 	};
 
-	struct DynamicCallData
-	{
-		i32 BufferLocation{ -1 };
-		u32 Size{ 0 };
-		ShaderVisibility ConstantBufferVisibilities{ ShaderVisibility::All };
-
-		bool IsValid() const
-		{
-			return BufferLocation > -1 && Size > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
-	};
-
+	/**
+	 * @brief
+	 * Pipeline resource used for pipeline creation
+	 */
 	struct PipelineResource
 	{
+		/**
+		 * @brief
+		 *
+		 * @param visibility The shader visibility of this resource
+		 * @param bindLocation The texture bind location of this resource. this reflects the "tX" register in hlsl.
+		 * If it is used as a read write resource it reflects the "uX" register slot.
+		 * @return A texture PipelineResource
+		 */
 		static PipelineResource Texture(ShaderVisibility visibility, u32 bindLocation)
 		{
 			return { ResourceType::Texture, visibility, bindLocation, 0 };
 		}
+		/**
+		 * @brief
+		 *
+		 * @param visibility The shader visibility of this resource
+		 * @param bindLocation The constant buffer bind location of this resource. this reflects the "bX" register in hlsl.
+		 * @return A constant buffer PipelineResource
+		 */
 		static PipelineResource ConstantBuffer(ShaderVisibility visibility, u32 bindLocation)
 		{
 			return { ResourceType::ConstantBuffer, visibility, bindLocation, 0 };
 		}
+		/**
+		 * @brief
+		 *
+		 * @param visibility The shader visibility of this resource
+		 * @param bindLocation The texture bind location of this resource. this reflects the "tX" register in hlsl.
+		 * If it is used as a read write resource it reflects the "uX" register slot.
+		 * (Structured buffers are bound in texture registers)
+		 * @return A structured buffer PipelineResource
+		 */
 		static PipelineResource StructuredBuffer(ShaderVisibility visibility, u32 bindLocation)
 		{
 			return { ResourceType::StructuredBuffer, visibility, bindLocation, 0 };
 		}
+		/**
+		 * @brief
+		 * Local data is used for per call information within pipelines.
+		 * @param visibility The shader visibility of this resource
+		 * @param bindLocation The constant buffer bind location of this resource. this reflects the "bX" register in hlsl.
+		 * (You can have only one local data resource per pipeline)
+		 * @return A texture PipelineResource
+		 */
 		static PipelineResource LocalData(ShaderVisibility visibility, u32 bindLocation, u32 size)
 		{
 			return { ResourceType::LocalData, visibility, bindLocation, size };
@@ -646,6 +427,13 @@ namespace Gecko
 		u32 BindLocation{ 0 };
 		u32 Size{ 0 };
 
+		/**
+		 * @brief
+		 * @return true PipelineResource is valid.
+		 * PipelineResource is valid when:
+		 * Type != None,
+		 * When Type == LocalData Size can't be 0 and Size needs to be a multiple of 4
+		 */
 		bool IsValid() const
 		{
 			if (Type == ResourceType::None)
@@ -664,23 +452,433 @@ namespace Gecko
 		}
 	};
 
+	// Buffers
+
+	/*
+	 * There are 4 different buffer Types each buffer has different properties
+	 * Vertex buffers are used for vertex data in graphics pipelines
+	 * Index buffers are used for index data in graphics pipelines
+	 * Constant buffers are used for any type of data that can not be changed and has one
+	 *  specific size in graphics or compute pipelines
+	 * Structured buffers are arrays of structs that can be used in graphics or compute pipelines
+	 *  you can write to structured bufferes within a compute pipeline
+	 * !!Important!! When binding a buffer as read write it needs to be created in dedicated memory!
+	 *
+	 * 										| Vertex | Index | Constant | Structured |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Vertex Buffer 		| X		 |		 |			|			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Index Buffer 		| 		 | X	 |			|			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Constant Buffer 		|		 |		 | X		|			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Structured Buffer 	| X		 | X	 |			| X			 |
+	 * -------------------------------------------------------------------------------
+	 * Can be bound as Read Write Buffer 	| X		 | X	 |			| X			 |
+	 * -------------------------------------------------------------------------------
+	 */
+
+	 /**
+	  * @brief
+	  * Vertex buffer descriptor used for creating a Buffer of BufferType::Vertex
+	  */
+	struct VertexBufferDesc
+	{
+		VertexLayout Layout{ VertexLayout() };
+		u32 NumVertices{ 0 };
+		MemoryType MemoryType{ MemoryType::None };
+		/** @brief Specifies if you can read and write to the buffer within a compute pipeline */
+		bool CanReadWrite{ false };
+
+		/**
+		 * @brief
+		 * @return true if VertexBufferDesc is valid.
+		 * VertexBufferDesc is valid when:
+		 * Layout.Attributes.Size() > 0,
+		 * Layout is valid,
+		 * NumVertices > 0.
+		 */
+		bool IsValid() const
+		{
+			return Layout.Attributes.size() > 0 && Layout.IsValid() && NumVertices > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	/**
+	 * @brief
+	 * Index buffer descriptor used for creating a Buffer of BufferType::Index
+	 */
+	struct IndexBufferDesc
+	{
+		DataFormat IndexFormat{ DataFormat::None };
+		u32 NumIndices{ 0 };
+		MemoryType MemoryType{ MemoryType::None };
+		/** @brief Specifies if you can read and write to the buffer within a compute pipeline */
+		bool CanReadWrite{ false };
+
+		/**
+		 * @brief
+		 * @return true if IndexBufferDesc is valid.
+		 * IndexBufferDesc is valid when:
+		 * IndexFormat == R16_UINT or IndexFormat == R32_UINT,
+		 * NumIndices > 0
+		 */
+		bool IsValid() const
+		{
+			if (IndexFormat != DataFormat::R16_UINT && IndexFormat != DataFormat::R32_UINT)
+				return false;
+			return NumIndices > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	/**
+	 * @brief
+	 * Constant buffer descriptor used for creating a Buffer of BufferType::Constant
+	 */
+	struct ConstantBufferDesc
+	{
+		u32 Size{ 0 };
+		MemoryType MemoryType{ MemoryType::None };
+
+		/**
+		 * @brief
+		 * @return true if ConstantBufferDesc is valid.
+		 * ConstantBufferDesc is valid when:
+		 * Size > 0.
+		 */
+		bool IsValid() const
+		{
+			return Size > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	/**
+	 * @brief
+	 * Structured buffer descriptor used for creating a Buffer of BufferType::Structured
+	 */
+	struct StructuredBufferDesc
+	{
+		u32 StructSize{ 0 };
+		u32 NumElements{ 0 };
+		MemoryType MemoryType{ MemoryType::None };
+		/** @brief Specifies if you can read and write to the buffer within a compute pipeline */
+		bool CanReadWrite{ false };
+
+		/**
+		 * @brief
+		 * @return true if StructuredBufferDesc is valid.
+		 * StructuredBufferDesc is valid when:
+		 * StructSize > 0,
+		 * NumElements > 0.
+		 */
+		bool IsValid() const
+		{
+			return StructSize > 0 && NumElements > 0;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	/**
+	 * @brief
+	 * Buffer descriptor used for creating a Buffer, this is auto generated from
+	 * the different buffer creation functions on the Device.
+	 */
+	struct BufferDesc
+	{
+		BufferType Type{ BufferType::None };
+		MemoryType MemoryType{ MemoryType::None };
+		u32 Size{ 0 };
+		u32 NumElements{ 0 };
+		u32 Stride{ 0 };
+		/** @brief Specifies if you can read and write to the buffer within a compute pipeline */
+		bool CanReadWrite{ false };
+
+		/**
+		 * @brief
+		 * @return true if BufferDesc is valid.
+		 * BufferDesc is valid when:
+		 * MemoryType != None and Type != None,
+		 * if MemoryType == Shared CanReadWrite must be false,
+		 * if MemoryType == Constant CanReadWrite must be false and Size > 0,
+		 * otherwise Stride > 0 and NumElements > 0
+		 */
+		bool IsValid() const
+		{
+			if (MemoryType == MemoryType::None || Type == BufferType::None)
+				return false;
+			if (MemoryType == MemoryType::Shared && CanReadWrite)
+				return false;
+			if (Type == BufferType::Constant)
+				return Size > 0 && !CanReadWrite;
+			return Stride > 0 && NumElements > 0;
+		}
+		operator bool() { return IsValid(); }
+	};
+
+	/**
+	 * @brief
+	 * This is a buffer object. It can be used as either a Vertex, Index, Constant or Structured buffer.
+	 * Buffers are used to bind during a graphics or compute pipeline.
+	 */
+	struct Buffer
+	{
+		const BufferDesc Desc{};
+		/** @brief A shared void pointer to API specific data */
+		Ref<void> Data{ nullptr };
+
+		Buffer() = default;
+		Buffer(const BufferDesc& desc)
+			: Desc(desc)
+		{}
+		Buffer(const Buffer& other)
+			: Desc(other.Desc), Data(other.Data)
+		{}
+		Buffer& operator=(const Buffer& other)
+		{
+			Buffer* buffer = new (this) Buffer(other);
+			return *buffer;
+		}
+
+		/**
+		 * @brief
+		 * @return true if Buffer is valid.
+		 * Buffer is valid when:
+		 * Desc is valid and Data != nullptr
+		 */
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const { return IsValid(); }
+	};
+
+	// Texture
+
+	/**
+	 * @brief
+	 * Texture descriptor used for creating a Texture object
+	 */
+	struct TextureDesc
+	{
+		DataFormat Format{ DataFormat::None };
+		u32 Width{ 1 };
+		u32 Height{ 1 };
+		u32 Depth{ 1 };
+		u32 NumMips{ 1 };
+		u32 NumArraySlices{ 1 };
+		TextureType Type{ TextureType::None };
+
+		/**
+		 * @brief
+		 * @return true if TextureDesc is valid.
+		 * TextureDesc is valid when:
+		 * Format != DataFormat::None and Type != TextureType::None,
+		 * if Type == Tex1D or Tex1DArray Height and Depth must be 1.
+		 * if Type == Tex2D or Tex2dArray Depth must be 1.
+		 */
+		bool IsValid() const
+		{
+			if (Format == DataFormat::None || Type == TextureType::None)
+				return false;
+			if (Type == TextureType::Tex1D || Type == TextureType::Tex1DArray)
+				return Height == 1 && Depth == 1;
+			else if (Type == TextureType::Tex2D || Type == TextureType::Tex2DArray)
+				return Depth == 1;
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	/**
+	 * @brief
+	 * This is a texture object. Textures are used to bind during a graphics or compute pipeline.
+	 */
+	struct Texture
+	{
+		const TextureDesc Desc{};
+		/** @brief A shared void pointer to API specific data */
+		Ref<void> Data{ nullptr };
+
+		Texture() = default;
+		Texture(const TextureDesc& desc)
+			: Desc(desc)
+		{}
+		Texture(const Texture& other)
+			: Desc(other.Desc), Data(other.Data)
+		{}
+		Texture& operator=(const Texture& other)
+		{
+			Texture* texture = new (this) Texture(other);
+			return *texture;
+		}
+
+		/**
+		 * @brief
+		 * @return true if Texture is valid.
+		 * Texture is valid when:
+		 * Desc is valid and Data != nullptr
+		 */
+		bool IsValid() const
+		{
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	// Render target
+
+	/**
+	 * @brief
+	 * Render target descriptor used for creating a RenderTarget object
+	 */
+	struct RenderTargetDesc
+	{
+		ClearValue RenderTargetClearValues[8]{ ClearValueType::RenderTarget };
+		ClearValue DepthTargetClearValue{ ClearValueType::DepthStencil };
+		DataFormat RenderTargetFormats[8]{
+			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None,
+			DataFormat::None, DataFormat::None, DataFormat::None, DataFormat::None
+		};
+		DataFormat DepthStencilFormat{ DataFormat::None };
+		u32 NumRenderTargets{ 0 };
+		u32 NumMips[8]{ 1, 1, 1, 1, 1, 1, 1, 1 };
+		u32 DepthMips{ 1 };
+		u32 Width{ 0 };
+		u32 Height{ 0 };
+
+		/**
+		 * @brief
+		 * @return true if RenderTargetDesc is valid.
+		 * RenderTargetDesc is valid when:
+		 * Width != 0 and Height != 0.
+		 * if NumRenderTargets > 0 RenderTargetFormats[0] to RenderTargetFormats[NumRenderTargets] cannot be None.
+		 * if no render targets are used DepthStencilFormat cannot be None.
+		 */
+		bool IsValid() const
+		{
+			if (Width == 0 || Height == 0)
+				return false;
+			for (u32 i = 0; i < NumRenderTargets; i++)
+			{
+				if (RenderTargetFormats[i] == DataFormat::None)
+				{
+					return false;
+				}
+			}
+			if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
+				return false;
+			return true;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	/**
+	 * @brief
+	 * This is a render target object. Render targets are used to bind during a graphics pipeline to render to.
+	 * A render target has an array of textures it uses for rendering and a depht texture.
+	 * You can use these textures like any other type of texture.
+	 */
+	struct RenderTarget
+	{
+		const RenderTargetDesc Desc{};
+		Texture RenderTextures[8]{
+			Texture(), Texture(), Texture(), Texture(),
+			Texture(), Texture(), Texture(), Texture() };
+		Texture DepthTexture{ Texture() };
+		/** @brief A shared void pointer to API specific data */
+		Ref<void> Data{ nullptr };
+
+		RenderTarget() = default;
+		RenderTarget(const RenderTargetDesc& desc)
+			: Desc(desc)
+		{}
+		RenderTarget(const RenderTarget& other)
+			: Desc(other.Desc), Data(other.Data)
+		{
+			for (u32 i = 0; i < other.Desc.NumRenderTargets; i++)
+			{
+				RenderTextures[i] = other.RenderTextures[i];
+			}
+			DepthTexture = other.DepthTexture;
+		}
+		RenderTarget& operator=(const RenderTarget& other)
+		{
+			RenderTarget* renderTarget = new (this) RenderTarget(other);
+			return *renderTarget;
+		}
+
+		/**
+		 * @brief
+		 * @return true if RenderTarget is valid.
+		 * RenderTarget is valid when:
+		 * Desc is valid,
+		 * if Desc.NumRenderTargets > 0 RenderTextures[0] to RenderTextures[Desc.NumRenderTargets] are valid,
+		 * if Desc.DepthStencilFormat != None DepthTexture is valid,
+		 * Data != nullptr
+		 */
+		bool IsValid() const
+		{
+			if (!RenderTextures[0].IsValid() && !DepthTexture.IsValid())
+				return false;
+
+			return Desc.IsValid() && Data;
+		}
+		operator bool() const
+		{
+			return IsValid();
+		}
+	};
+
+	// Graphics pipeline
+
+	/**
+	 * @brief
+	 * Graphics pipeline descriptor used for creating a GraphicsPipeline object
+	 */
 	struct GraphicsPipelineDesc
 	{
 		const char* VertexShaderPath{ nullptr };
-		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
+		/** @brief EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main" */
 		const char* VertexEntryPoint{ "main" };
 
 		const char* PixelShaderPath{ nullptr };
+		/** @brief EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main" */
 		const char* PixelEntryPoint{ "main" };
 
-		/* ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y";
-			where type == vs for vertex shaders, ps for pixel shaders (type_ prefix gets added automatically in Device_DX12.cpp);
-			X == main version (e.g. 5 for hlsl shader language 5.1);
-			Y == subversion (e.g. 1 for 5.1);
-			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to
-			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders).
-			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
-			*/
+		/**
+		 * @brief
+		 * ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y";
+		 * where type == vs for vertex shaders, ps for pixel shaders (type_ prefix gets added automatically in Device_DX12.cpp);
+		 * X == main version (e.g. 5 for hlsl shader language 5.1);
+		 * Y == subversion (e.g. 1 for 5.1);
+		 * Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to
+		 * use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders).
+		 * See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
+		 */
 		const char* ShaderVersion{ nullptr };
 
 		VertexLayout VertexLayout{};
@@ -688,15 +886,22 @@ namespace Gecko
 		DataFormat RenderTextureFormats[8]{ DataFormat::None };
 		DataFormat DepthStencilFormat{ DataFormat::None };
 
+		std::vector<PipelineResource> PipelineResources{};
+		std::vector<SamplerDesc> SamplerDescs{};
+
 		CullMode CullMode{ CullMode::None };
 		WindingOrder WindingOrder{ WindingOrder::ClockWise };
 		PrimitiveType PrimitiveType{ PrimitiveType::Triangles };
-
-		std::vector<PipelineResource> PipelineResources{};
-
-		std::vector<SamplerDesc> SamplerDescs{};
 		bool DepthBoundsTest{ false };
 
+		/**
+		 * @brief
+		 * @return true if GraphicsPipelineDesc is valid.
+		 * GraphicsPipelineDesc is valid when:
+		 * VertexShaderPath != nullptr (atleast a vertex shader is needed for a graphics pipeline),
+		 * ShaderVersion != nullptr,
+		 * RenderTargetFormats[0] or DepthStencilFormat != None.
+		 */
 		bool IsValid() const
 		{
 			if (!VertexShaderPath || !ShaderVersion)
@@ -714,11 +919,35 @@ namespace Gecko
 		}
 	};
 
+	/**
+	 * @brief
+	 * This is a graphics pipeline object. Graphics pipelines can be bound on a command buffer.
+	 */
 	struct GraphicsPipeline
 	{
-		GraphicsPipelineDesc Desc{};
+		const GraphicsPipelineDesc Desc{};
+		/** @brief A shared void pointer to API specific data */
 		Ref<void> Data{ nullptr };
 
+		GraphicsPipeline() = default;
+		GraphicsPipeline(const GraphicsPipelineDesc& desc)
+			: Desc(desc)
+		{}
+		GraphicsPipeline(const GraphicsPipeline& other)
+			: Desc(other.Desc), Data(other.Data)
+		{}
+		GraphicsPipeline& operator=(const GraphicsPipeline& other)
+		{
+			GraphicsPipeline* renderTarget = new (this) GraphicsPipeline(other);
+			return *renderTarget;
+		}
+
+		/**
+		 * @brief
+		 * @return true if GraphicsPipeline is valid.
+		 * GraphicsPipeline is valid when:
+		 * Desc is valid and Data != nullptr.
+		 */
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -731,26 +960,38 @@ namespace Gecko
 
 	// Compute pipeline
 
+	/**
+	 * @brief
+	 * Graphics pipeline descriptor used for creating a ComputePipeline object
+	 */
 	struct ComputePipelineDesc
 	{
-		// Path from executable to shader object (source or compiled)
 		const char* ComputeShaderPath{ nullptr };
-		/* ShaderVersion == shader language version that the shader uses, formatted as "type_X_Y",
-			where type == cs for compute shaders (type_ prefix gets added automatically in Device_DX12.cpp),
-			X == main version (e.g. 5 for hlsl shader language 5.1),
-			Y == subversion (e.g. 1 for 5.1).
-			Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to
-			use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders)
-			See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
-			*/
-		const char* ShaderVersion{ nullptr };
-		// EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main"
+		/** @brief EntryPoint == the name of the entrypoint of the shader (DX12 allows for custom entrypoints), usually "main" */
 		const char* EntryPoint{ "main" };
+
+		/**
+		 * @brief
+		 * where type == cs for compute shaders (type_ prefix gets added automatically in Device_DX12.cpp),
+		 * X == main version (e.g. 5 for hlsl shader language 5.1),
+		 * Y == subversion (e.g. 1 for 5.1).
+		 * Users should usually initialise this as pipelineDesc.ShaderVersion = "5_1" or something similar, unless they want to
+		 * use a shader type that has no support built into this library (so anything other than vertex, pixel or compute shaders)
+		 * See for example https://learn.microsoft.com/en-us/windows/win32/direct3dhlsl/specifying-compiler-targets for D3D12
+		 */
+		const char* ShaderVersion{ nullptr };
 
 		std::vector<PipelineResource> PipelineReadOnlyResources{};
 		std::vector<PipelineResource> PipelineReadWriteResources{};
 		std::vector<SamplerDesc> SamplerDescs{};
 
+		/**
+		 * @brief
+		 * @return true if ComputePipelineDesc is valid.
+		 * ComputePipelineDesc is valid when:
+		 * ComputeShaderPath != nullptr,
+		 * ShaderVersion != nullptr.
+		 */
 		bool IsValid() const
 		{
 			if (!ComputeShaderPath || !ShaderVersion)
@@ -764,11 +1005,35 @@ namespace Gecko
 		}
 	};
 
+	/**
+	 * @brief
+	 * This is a compute pipeline object. Compute pipelines can be bound on a command buffer.
+	 */
 	struct ComputePipeline
 	{
-		ComputePipelineDesc Desc{};
+		const ComputePipelineDesc Desc{};
+		/** @brief A shared void pointer to API specific data */
 		Ref<void> Data{ nullptr };
 
+		ComputePipeline() = default;
+		ComputePipeline(const ComputePipelineDesc& desc)
+			: Desc(desc)
+		{}
+		ComputePipeline(const ComputePipeline& other)
+			: Desc(other.Desc), Data(other.Data)
+		{}
+		ComputePipeline& operator=(const ComputePipeline& other)
+		{
+			ComputePipeline* renderTarget = new (this) ComputePipeline(other);
+			return *renderTarget;
+		}
+
+		/**
+		 * @brief
+		 * @return true if ComputePipeline is valid.
+		 * ComputePipeline is valid when:
+		 * Desc is valid and Data != nullptr.
+		 */
 		bool IsValid() const
 		{
 			return Desc.IsValid() && Data;
@@ -778,7 +1043,4 @@ namespace Gecko
 			return IsValid();
 		}
 	};
-
-	// TODO: Make is valid functions for each descriptor structure.
-
 }

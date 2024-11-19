@@ -262,7 +262,7 @@ namespace Gecko::DX12
 	RenderTarget Device_DX12::CreateRenderTarget(const RenderTargetDesc& desc)
 	{
 		Ref<RenderTarget_DX12> renderTargetDX12 = CreateRef<RenderTarget_DX12>();
-		RenderTarget renderTarget;
+		RenderTarget renderTarget(desc);
 		for (u32 i = 0; i < desc.NumRenderTargets; i++)
 		{
 			ASSERT_MSG(desc.RenderTargetFormats[i] != DataFormat::None, "None is not a valid format for a render target, did you forget to set it?");
@@ -341,7 +341,6 @@ namespace Gecko::DX12
 		renderTargetDX12->ViewPort.MinDepth = 0.f;
 		renderTargetDX12->ViewPort.MaxDepth = 1.f;
 
-		renderTarget.Desc = desc;
 		renderTarget.Data = renderTargetDX12;
 
 		return renderTarget;
@@ -709,8 +708,7 @@ namespace Gecko::DX12
 
 		ASSERT(hr == S_OK);
 
-		GraphicsPipeline graphicsPipeline;
-		graphicsPipeline.Desc = desc;
+		GraphicsPipeline graphicsPipeline(desc);
 		graphicsPipeline.Data = graphicsPipeline_DX12;
 
 		return graphicsPipeline;
@@ -901,8 +899,7 @@ namespace Gecko::DX12
 		// Should probably do some nicer error handling here #FIXME
 		ASSERT(hr == S_OK);
 
-		ComputePipeline computePipeline;
-		computePipeline.Desc = desc;
+		ComputePipeline computePipeline(desc);
 		computePipeline.Data = computePipeline_DX12;
 
 		return computePipeline;
@@ -1607,8 +1604,7 @@ namespace Gecko::DX12
 
 		//NAME_DIRECTX12_OBJECT(texture_DX12->TextureResource->ResourceDX12, desc.Name);
 
-		Texture texture;
-		texture.Desc = desc;
+		Texture texture(desc);
 		texture.Data = texture_DX12;
 
 		return texture;
@@ -1683,8 +1679,7 @@ namespace Gecko::DX12
 			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)));
 			texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
 
-			Texture texture;
-			texture.Desc = textureDesc;
+			Texture texture(textureDesc);
 			texture.Data = texture_DX12;
 
 			renderTargetDX12->RenderTargetViews[0] = GetRtvHeap().Allocate();
@@ -1707,7 +1702,7 @@ namespace Gecko::DX12
 			renderTargetDX12->ViewPort.MinDepth = 0.f;
 			renderTargetDX12->ViewPort.MaxDepth = 1.f;
 
-			m_BackBuffers[i].Desc = renderTargetDesc;
+			m_BackBuffers[i] = RenderTarget(renderTargetDesc);
 			m_BackBuffers[i].Data = renderTargetDX12;
 			m_BackBuffers[i].RenderTextures[0] = texture;
 		}
