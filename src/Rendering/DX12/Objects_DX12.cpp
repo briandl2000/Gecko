@@ -30,7 +30,7 @@ namespace Gecko { namespace DX12 {
 		case DataFormat::None: break;
 		}
 
-		ASSERT_MSG(false, "Unkown Format state.");
+		ASSERT(false, "Unkown Format state.");
 		return DXGI_FORMAT_UNKNOWN;
 	}
 
@@ -42,7 +42,7 @@ namespace Gecko { namespace DX12 {
 		case ShaderVisibility::Vertex: return D3D12_SHADER_VISIBILITY_VERTEX;
 		case ShaderVisibility::Pixel: return D3D12_SHADER_VISIBILITY_PIXEL;
 		}
-		ASSERT_MSG(false, "Unkown Shader visibilty");
+		ASSERT(false, "Unkown Shader visibilty");
 		return D3D12_SHADER_VISIBILITY_ALL;
 	}
 
@@ -56,7 +56,7 @@ namespace Gecko { namespace DX12 {
 		default: break;
 		}
 
-		ASSERT_MSG(false, "Unkown Cullmode");
+		ASSERT(false, "Unkown Cullmode");
 		return D3D12_CULL_MODE_NONE;
 	}
 
@@ -68,8 +68,8 @@ namespace Gecko { namespace DX12 {
 		case PrimitiveType::Triangles: return D3D12_FILL_MODE_SOLID;
 		default: break;
 		}
-		
-		ASSERT_MSG(false, "Unkown primitive type");
+
+		ASSERT(false, "Unkown primitive type");
 		return D3D12_FILL_MODE_WIREFRAME;
 	}
 
@@ -82,7 +82,7 @@ namespace Gecko { namespace DX12 {
 		default: break;
 		}
 
-		ASSERT_MSG(false, "Unkown primitive type");
+		ASSERT(false, "Unkown primitive type");
 		return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
 	}
 
@@ -95,7 +95,7 @@ namespace Gecko { namespace DX12 {
 		default: break;
 		}
 
-		ASSERT_MSG(false, "Unkown primitive type");
+		ASSERT(false, "Unkown primitive type");
 		return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 	}
 
@@ -110,7 +110,7 @@ namespace Gecko { namespace DX12 {
 		case TextureType::Tex1DArray: return D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
 		case TextureType::Tex2DArray: return D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 		}
-		ASSERT_MSG(false, "Unkown TextureType");
+		ASSERT(false, "Unkown TextureType");
 		return D3D12_SRV_DIMENSION_UNKNOWN;
 	}
 
@@ -125,7 +125,7 @@ namespace Gecko { namespace DX12 {
 		case TextureType::Tex1DArray: return D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
 		case TextureType::Tex2DArray: return D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
 		}
-		ASSERT_MSG(false, "Unkown TextureType");
+		ASSERT(false, "Unkown TextureType");
 		return D3D12_UAV_DIMENSION_UNKNOWN;
 	}
 
@@ -137,7 +137,7 @@ namespace Gecko { namespace DX12 {
 		case SamplerFilter::Point: return D3D12_FILTER_MIN_MAG_MIP_POINT;
 		}
 
-		ASSERT_MSG(false, "Unkown samplerFilter");
+		ASSERT(false, "Unkown samplerFilter");
 		return D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 	}
 
@@ -149,7 +149,7 @@ namespace Gecko { namespace DX12 {
 		case SamplerWrapMode::Clamp: return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 		}
 
-		ASSERT_MSG(false, "Unkown wrapMode");
+		ASSERT(false, "Unkown wrapMode");
 		return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	}
 

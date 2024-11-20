@@ -33,7 +33,7 @@ namespace Gecko {
 		case DataFormat::None: break;
 		}
 
-		ASSERT_MSG(false, "Unkown Format");
+		ASSERT(false, "Unkown Format");
 		return 0;
 	}
 
@@ -72,7 +72,7 @@ namespace Gecko {
 			break;
 		}
 
-		ASSERT_MSG(false, "To get the resource index you have to pass a correct render target type from 0 to 8");
+		ASSERT(false, "To get the resource index you have to pass a correct render target type from 0 to 8");
 		return 0;
 	}
 

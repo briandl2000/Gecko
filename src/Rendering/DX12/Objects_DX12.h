@@ -38,11 +38,11 @@ namespace Gecko { namespace DX12 {
 
 		void Wait(HANDLE fenceEvent)
 		{
-			ASSERT(Fence && fenceEvent);
+			ASSERT(Fence && fenceEvent, "Cannot wait if Fence or FenceEvent are invalid!");
 
 			if (IsBusy())
 			{
-				DIRECTX12_ASSERT(Fence->SetEventOnCompletion(FenceValue, fenceEvent));
+				DIRECTX12_ASSERT(Fence->SetEventOnCompletion(FenceValue, fenceEvent), nullptr);
 				WaitForSingleObject(fenceEvent, INFINITE);
 			}
 		}

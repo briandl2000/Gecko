@@ -508,7 +508,7 @@ namespace Gecko
 	{
 		if (m_RenderTargets.find(renderTargetHandle) == m_RenderTargets.end())
 		{
-			ASSERT_MSG(false, "Could not find specified RenderTarget!");
+			ASSERT(false, "Could not find specified RenderTarget!");
 		}
 
 		return  m_RenderTargets[renderTargetHandle].RenderTarget;
@@ -523,7 +523,7 @@ namespace Gecko
 	{
 		if (m_GraphicsPipelines.find(graphicsPipelineHandle) == m_GraphicsPipelines.end())
 		{
-			ASSERT_MSG(false, "Could not find specified GraphicsPipeline!");
+			ASSERT(false, "Could not find specified GraphicsPipeline!");
 		}
 
 		return m_GraphicsPipelines[graphicsPipelineHandle];
@@ -533,7 +533,7 @@ namespace Gecko
 	{
 		if (m_ComputePipelines.find(computePipelineHandle) == m_ComputePipelines.end())
 		{
-			ASSERT_MSG(false, "Could not find specified ComputePipeline!");
+			ASSERT(false, "Could not find specified ComputePipeline!");
 		}
 
 		return m_ComputePipelines[computePipelineHandle];

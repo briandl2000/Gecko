@@ -145,8 +145,8 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 		u32 componentSizeInBytes = tinygltf::GetComponentSizeInBytes(accessor.componentType);
 		u32 numComponentsInType = tinygltf::GetNumComponentsInType(accessor.type);
 
-		ASSERT_MSG(componentSizeInBytes == 4, "POSITION needs to be in float format!");
-		ASSERT_MSG(numComponentsInType == 3, "POSITION needs to have 3 components (x, y, z)!");
+		ASSERT(componentSizeInBytes == 4, "POSITION needs to be in float format!");
+		ASSERT(numComponentsInType == 3, "POSITION needs to have 3 components (x, y, z)!");
 
 		u32 size = componentSizeInBytes * numComponentsInType;
 
@@ -170,8 +170,8 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 		u32 componentSizeInBytes = tinygltf::GetComponentSizeInBytes(accessor.componentType);
 		u32 numComponentsInType = tinygltf::GetNumComponentsInType(accessor.type);
 
-		ASSERT_MSG(componentSizeInBytes == 4, "TEXCOORD_0 needs to be in float format!");
-		ASSERT_MSG(numComponentsInType == 2, "TEXCOORD_0 needs to have 2 components (u, v)!");
+		ASSERT(componentSizeInBytes == 4, "TEXCOORD_0 needs to be in float format!");
+		ASSERT(numComponentsInType == 2, "TEXCOORD_0 needs to have 2 components (u, v)!");
 
 		u32 size = componentSizeInBytes * numComponentsInType;
 
@@ -196,8 +196,8 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 			u32 componentSizeInBytes = tinygltf::GetComponentSizeInBytes(accessor.componentType);
 			u32 numComponentsInType = tinygltf::GetNumComponentsInType(accessor.type);
 
-			ASSERT_MSG(componentSizeInBytes == 4, "NORMAL needs to be in float format!");
-			ASSERT_MSG(numComponentsInType == 3, "NORMAL needs to have 3 components (x, y, z)!");
+			ASSERT(componentSizeInBytes == 4, "NORMAL needs to be in float format!");
+			ASSERT(numComponentsInType == 3, "NORMAL needs to have 3 components (x, y, z)!");
 
 			u32 size = componentSizeInBytes * numComponentsInType;
 
@@ -226,8 +226,8 @@ void CalculateNormals(std::vector<Vertex3D>& vertices, const std::vector<u32>& i
 			u32 componentSizeInBytes = tinygltf::GetComponentSizeInBytes(accessor.componentType);
 			u32 numComponentsInType = tinygltf::GetNumComponentsInType(accessor.type);
 
-			ASSERT_MSG(componentSizeInBytes == 4, "TANGENT needs to be in float format!");
-			ASSERT_MSG(numComponentsInType == 4, "TANGENT needs to have 4 components (x, y, z, w)!");
+			ASSERT(componentSizeInBytes == 4, "TANGENT needs to be in float format!");
+			ASSERT(numComponentsInType == 4, "TANGENT needs to have 4 components (x, y, z, w)!");
 
 			u32 size = componentSizeInBytes * numComponentsInType;
 

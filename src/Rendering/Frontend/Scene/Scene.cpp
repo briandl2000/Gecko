@@ -30,7 +30,7 @@ namespace Gecko  {
 		case LightType::Spot:
 			return CreateSpotLight();
 		default:
-			ASSERT_MSG(false, "Unkown light type!");
+			ASSERT(false, "Unknown light type!");
 			return nullptr;
 		}
 	}
