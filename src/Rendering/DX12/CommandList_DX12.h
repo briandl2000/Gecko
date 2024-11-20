@@ -28,47 +28,45 @@ namespace Gecko::DX12
 
 		virtual bool IsValid() override;
 
-		virtual void ClearRenderTarget(RenderTarget renderTarget) override;
+		virtual void ClearRenderTarget(const RenderTarget& renderTarget) override;
 
-		virtual void CopyTextureToTexture(Texture src, Texture dst) override;
+		virtual void CopyTextureToTexture(const Texture& src, const Texture& dst) override;
 
-		virtual void BindRenderTarget(RenderTarget renderTarget) override;
-		virtual void BindVertexBuffer(Buffer vertexBuffer) override;
-		virtual void BindIndexBuffer(Buffer indexBuffer) override;
-		virtual void BindTexture(u32 slot, Texture texture) override;
-		virtual void BindTexture(u32 slot, Texture texture, u32 mipLevel) override;
-		virtual void BindAsRWTexture(u32 slot, Texture texture) override;
-		virtual void BindAsRWTexture(u32 slot, Texture texture, u32 mipLevel) override;
+		virtual void BindRenderTarget(const RenderTarget& renderTarget) override;
 
-		virtual void BindGraphicsPipeline(GraphicsPipeline Pipeline) override;
-		virtual void BindComputePipeline(ComputePipeline Pipeline) override;
-
-		virtual void BindConstantBuffer(u32 slot, Buffer buffer) override;
-		virtual void BindStructuredBuffer(u32 slot, Buffer buffer) override;
-
-		virtual void BindAsRWBuffer(u32 slot, Buffer buffer) override;
-
+		virtual void BindVertexBuffer(const Buffer& vertexBuffer) override;
+		virtual void BindIndexBuffer(const Buffer& indexBuffer) override;
+		virtual void BindConstantBuffer(u32 slot, const Buffer& buffer) override;
+		virtual void BindStructuredBuffer(u32 slot, const Buffer& buffer) override;
+		virtual void BindAsRWBuffer(u32 slot, const Buffer& buffer) override;
 		virtual void SetLocalData(u32 size, void* data) override;
 
-		virtual void Draw(u64 numIndices) override;
-		virtual void DrawAuto(u64 numVertices) override;
+		virtual void BindTexture(u32 slot, const Texture& texture) override;
+		virtual void BindTexture(u32 slot, const Texture& texture, u32 mipLevel) override;
+		virtual void BindAsRWTexture(u32 slot, const Texture& texture) override;
+		virtual void BindAsRWTexture(u32 slot, const Texture& texture, u32 mipLevel) override;
 
+		virtual void BindGraphicsPipeline(const GraphicsPipeline& graphicsPipeline) override;
+		virtual void BindComputePipeline(const ComputePipeline& computePipeline) override;
+
+		virtual void Draw(u32 numIndices) override;
+		virtual void DrawAuto(u32 numVertices) override;
 		virtual void Dispatch(u32 xThreads, u32 yThreads, u32 zThreads) override;
 
 	public:
-		void TransitionSubResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips,
+		void TransitionSubResource(const Ref<Resource>& resource, D3D12_RESOURCE_STATES transtion, u32 numMips,
 			u32 numArraySlices, u32 subResourceIndex);
-		void TransitionResource(Ref<Resource> resource, D3D12_RESOURCE_STATES transtion, u32 numMips,
+		void TransitionResource(const Ref<Resource>& resource, D3D12_RESOURCE_STATES transtion, u32 numMips,
 			u32 numArraySlices);
-		void TransitionRenderTarget(RenderTarget renderTarget, D3D12_RESOURCE_STATES newRenderTargetState,
+		void TransitionRenderTarget(const RenderTarget& renderTarget, D3D12_RESOURCE_STATES newRenderTargetState,
 			D3D12_RESOURCE_STATES newDepthStencilState);
 
 		Ref<CommandBuffer> CommandBuffer;
 
 	private:
-		void GetTextureMipTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource,
+		void GetTextureMipTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, const Ref<Resource>& resource,
 			D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices, u32 subResourceIndex);
-		void GetTextureTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, Ref<Resource> resource,
+		void GetTextureTransitionBarriers(std::vector<CD3DX12_RESOURCE_BARRIER>* barriers, const Ref<Resource>& resource,
 			D3D12_RESOURCE_STATES transtion, u32 numMips, u32 numArraySlices);
 
 		PipelineType m_BoundPipelineType;
