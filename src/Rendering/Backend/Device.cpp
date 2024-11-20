@@ -2,9 +2,9 @@
 
 #include "Rendering/Backend/CommandList.h"
 
-#ifdef WIN32
+#ifdef DIRECTX_12
 #include "Rendering/DX12/Device_DX12.h"
-#endif
+#endif // DIRECTX_12
 
 #include "Core/Asserts.h"
 
@@ -17,11 +17,11 @@ namespace Gecko {
 		case RenderAPI::None:
 			ASSERT_MSG(false, "No RenderAPI is selected");
 			break;
-#ifdef WIN32
+#ifdef DIRECTX_12
 		case RenderAPI::DX12:
 			return CreateRef<DX12::Device_DX12>();
 			break;
-#endif // WIN32
+#endif // DIRECTX_12
 		}
 
 		ASSERT_MSG(false, "Unkown RenderAPI selected");
