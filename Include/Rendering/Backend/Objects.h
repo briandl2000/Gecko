@@ -586,7 +586,7 @@ namespace Gecko
 		{}
 		Buffer& operator=(const Buffer& other)
 		{
-			this->Data = nullptr;
+			this->~Buffer();
 			Buffer* buffer = new (this) Buffer(other);
 			return *buffer;
 		}
@@ -650,7 +650,7 @@ namespace Gecko
 		{}
 		Texture& operator=(const Texture& other)
 		{
-			this->Data = nullptr;
+			this->~Texture();
 			Texture* texture = new (this) Texture(other);
 			return *texture;
 		}
@@ -731,7 +731,7 @@ namespace Gecko
 		}
 		RenderTarget& operator=(const RenderTarget& other)
 		{
-			this->Data = nullptr;
+			this->~RenderTarget();
 			RenderTarget* renderTarget = new (this) RenderTarget(other);
 			return *renderTarget;
 		}
@@ -823,7 +823,7 @@ namespace Gecko
 		{}
 		GraphicsPipeline& operator=(const GraphicsPipeline& other)
 		{
-			this->Data = nullptr;
+			this->~GraphicsPipeline();
 			GraphicsPipeline* renderTarget = new (this) GraphicsPipeline(other);
 			return *renderTarget;
 		}
@@ -897,7 +897,7 @@ namespace Gecko
 		{}
 		ComputePipeline& operator=(const ComputePipeline& other)
 		{
-			this->Data = nullptr;
+			this->~ComputePipeline();
 			ComputePipeline* renderTarget = new (this) ComputePipeline(other);
 			return *renderTarget;
 		}

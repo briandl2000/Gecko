@@ -28,7 +28,7 @@ namespace Gecko
 	/**
 	 * @brief
 	 * The Device class is an interface to Create different objects for gpu rendering.
-	 * It should have an API specific implementation for each possible API.
+	 * It should have an API specific implementation for each possible RenderAPI.
 	 */
 	class Device
 	{
