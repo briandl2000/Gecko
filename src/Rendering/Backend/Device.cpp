@@ -15,7 +15,7 @@ namespace Gecko {
 		switch (s_RenderAPI)
 		{
 		case RenderAPI::None:
-			ASSERT_MSG(false, "No RenderAPI is selected");
+			ASSERT(false, "No RenderAPI is selected");
 			break;
 #ifdef DIRECTX_12
 		case RenderAPI::DX12:
@@ -24,7 +24,7 @@ namespace Gecko {
 #endif // DIRECTX_12
 		}
 
-		ASSERT_MSG(false, "Unkown RenderAPI selected");
+		ASSERT(false, "Unkown RenderAPI selected");
 		return nullptr;
 	}
 }

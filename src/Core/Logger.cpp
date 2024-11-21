@@ -43,7 +43,7 @@ namespace Gecko { namespace Logger
 
     void ReportAssertionFailure(const char* expression, const char* message, const char* file, i32 line)
     {
-        LogOutput(LOG_LEVEL_FATAL, "Assertion Failure: %s, message: '%s', in file: %s, line: %d\n", expression, message, file, line);
+        LogOutput(LOG_LEVEL_FATAL, "Assertion Failure: %s, message: %s \nIn file: %s, line: %d", expression, message, file, line);
     }
 
 } }

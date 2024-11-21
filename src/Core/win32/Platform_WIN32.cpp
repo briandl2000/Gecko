@@ -40,7 +40,7 @@ namespace Gecko { namespace Platform
 
 	bool Init(AppInfo& info)
 	{
-		ASSERT_MSG(s_State == nullptr, "State already initialized, state must be nullptr when calling Init!");
+		ASSERT(s_State == nullptr, "State already initialized, state must be nullptr when calling Init!");
 
 		s_State = CreateScope<PlatformState>();
 
@@ -112,25 +112,25 @@ namespace Gecko { namespace Platform
 
 	void Shutdown()
 	{
-		ASSERT_MSG(s_State != nullptr, "Cannot shutdown platform if platform isn't initialized!");
+		ASSERT(s_State != nullptr, "Cannot shutdown platform if platform isn't initialized!");
 		s_State.release();
 	}
 	
 	const AppInfo& GetAppInfo()
 	{
-		ASSERT_MSG(s_State != nullptr, "Platform state not initialized, did you not initialize platform?");
+		ASSERT(s_State != nullptr, "Platform state not initialized, did you not run Platform::Init()?");
 		return s_State->Info;
 	}
 
 	void* GetWindowData()
 	{
-		ASSERT_MSG(s_State != nullptr, "Platform state not initialized, did you not initialize platform?");
+		ASSERT(s_State != nullptr, "Platform state not initialized, did you not run Platform::Init()?");
 		return s_State->Window;
 	}
 
 	bool PumpMessage()
 	{
-		ASSERT_MSG(s_State != nullptr, "Platform state not initialized, did you not initialize platform?");
+		ASSERT(s_State != nullptr, "Platform state not initialized, did you not run Platform::Init()?");
 		MSG message;
 		while (PeekMessageA(&message, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&message);
@@ -141,7 +141,7 @@ namespace Gecko { namespace Platform
 
 	bool IsRunning()
 	{
-		ASSERT_MSG(s_State != nullptr, "Platform state not initialized, did you not initialize platform?");
+		ASSERT(s_State != nullptr, "Platform state not initialized, did you not run Platform::Init()?");
 		return !s_State->IsClosed;
 	}
 
@@ -261,14 +261,14 @@ namespace Gecko { namespace Platform
 
 	float GetScreenAspectRatio()
 	{
-		ASSERT_MSG(s_State != nullptr, "Platform state not initialized, did you not initialize platform?");
+		ASSERT(s_State != nullptr, "Platform state not initialized, did you not run Platform::Init()?");
 
 		return static_cast<float>(s_State->Info.Width) / static_cast<float>(s_State->Info.Height);
 	}
 
 	float GetTime()
 	{
-		ASSERT_MSG(s_State != nullptr, "Platform state not initialized, did you not initialize platform?");
+		ASSERT(s_State != nullptr, "Platform state not initialized, did you not run Platform::Init()?");
 		
 		static LARGE_INTEGER frequency;
 		static LARGE_INTEGER startTime;
@@ -303,7 +303,7 @@ namespace Gecko { namespace Platform
 	
 	std::string GetLocalPath(std::string filePath)
 	{
-		ASSERT(s_State != nullptr);
+		ASSERT(s_State != nullptr, "Platform state not initialized, did you not run Platform::Init()?");
 
 		return s_State->Info.WorkingDir+filePath;
 	}
@@ -323,6 +323,13 @@ namespace Logger
 		u64 length = strlen(msg);
 		LPDWORD numberWritten = 0;
 		WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), msg, (DWORD)length, numberWritten, 0);
+		/* Reset to debug text (since format from previous level would persist for system messages and
+		   into the next session otherwise) */
+		SetConsoleTextAttribute(consoleHandle, levels[4]);
+		/* Add a break line underneath a fatal message, to break the red marking and
+		   separate consecutive fatal messages */
+		if (level == LOG_LEVEL_FATAL)
+			WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), "\n", (DWORD)1, numberWritten, 0);
 	}
 
 } }

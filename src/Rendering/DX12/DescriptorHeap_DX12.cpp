@@ -12,15 +12,17 @@ namespace Gecko { namespace DX12 {
 
         std::lock_guard<std::mutex> lock(m_Mutex);
 
-        ASSERT(capacity && capacity < D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2);
-        ASSERT(!(m_Type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER && capacity > D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE));
+        ASSERT(capacity, "Cannot create a descriptor heap with no capacity!")
+        ASSERT(capacity < D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2, "Requested capacity for descriptor heap exceeds max capacity!");
+        ASSERT(!(m_Type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER && capacity > D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE),
+            "Requested capacity for sampler heap exceeds max capacity!");
 
         if (m_Type == D3D12_DESCRIPTOR_HEAP_TYPE_DSV || m_Type == D3D12_DESCRIPTOR_HEAP_TYPE_RTV)
         {
             isShaderVisible = false;
         }
 
-        ASSERT(m_Device->GetDevice());
+        ASSERT(m_Device->GetDevice(), "Invalid device!");
 
         D3D12_DESCRIPTOR_HEAP_DESC desc{};
         desc.Type = m_Type;
@@ -28,7 +30,7 @@ namespace Gecko { namespace DX12 {
         desc.Flags = isShaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         desc.NodeMask = 0;
 
-        DIRECTX12_ASSERT(m_Device->GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_Heap)));
+        DIRECTX12_ASSERT(m_Device->GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_Heap)), nullptr);
 
         m_FreeHandles = std::move(CreateScope<u32[]>(capacity));
         m_Capacity = capacity;
@@ -67,8 +69,8 @@ namespace Gecko { namespace DX12 {
     {
         std::lock_guard<std::mutex> lock{ m_Mutex };
 
-        ASSERT(m_Heap);
-        ASSERT(m_Size < m_Capacity);
+        ASSERT(m_Heap, "Invalid heap, cannot allocate!");
+        ASSERT(m_Size < m_Capacity, "Attempting to allocate more than capacity!");
 
         const u32 index{ m_FreeHandles[m_Size] };
         const u32 offset{ index * m_DescriptorSize };
@@ -92,14 +94,14 @@ namespace Gecko { namespace DX12 {
     {
         if (!handle.IsValid()) return;
         std::lock_guard<std::mutex> lock{ m_Mutex };
-        ASSERT(m_Heap && m_Size);
-        ASSERT(handle.CPU.ptr >= m_CPUStart.ptr);
-        ASSERT((handle.CPU.ptr - m_CPUStart.ptr) % m_DescriptorSize == 0);
+        ASSERT(m_Heap && m_Size, "Attempting to free an empty heap!");
+        ASSERT(handle.CPU.ptr >= m_CPUStart.ptr, "Invalid CPU pointer to heap!");
+        ASSERT((handle.CPU.ptr - m_CPUStart.ptr) % m_DescriptorSize == 0, "Invalid offset into heap!");
         const u32 index{ static_cast<u32>(handle.CPU.ptr - m_CPUStart.ptr) / m_DescriptorSize };
 #ifdef DEBUG
-        ASSERT(handle.Container == this);
-        ASSERT(handle.Index < m_Capacity);
-        ASSERT(handle.Index == index);
+        ASSERT(handle.Container == this, "Mismatching heap pointer between heap and handle!");
+        ASSERT(handle.Index < m_Capacity, "Attempting to free out of bounds!");
+        ASSERT(handle.Index == index, "Mismatching memory offset between heap and handle!");
 #endif
 
         m_DeferredFreeIndices.push_back(index);
