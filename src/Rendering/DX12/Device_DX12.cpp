@@ -349,7 +349,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateVertexBuffer(const VertexBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Vertex buffer descriptor is invalid!");
+		ASSERT(desc.IsValid(), "Vertex buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Vertex;
@@ -373,7 +373,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateIndexBuffer(const IndexBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Index buffer descriptor is invalid!");
+		ASSERT(desc.IsValid(), "Index buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Index;
@@ -397,7 +397,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Constant buffer is invalid!");
+		ASSERT(desc.IsValid(), "Constant buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Constant;
@@ -415,7 +415,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateStructuredBuffer(const StructuredBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Structured buffer descriptor is invalid!");
+		ASSERT(desc.IsValid(), "Structured buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Structured;
@@ -467,7 +467,7 @@ namespace Gecko::DX12
 
 				switch (pipelineResource.Type)
 				{
-				case ResourceType::None: ASSERT_MSG(false, "None is not a valid resource type"); continue;
+				case ResourceType::None: ASSERT(false, "None is not a valid resource type"); continue;
 				case ResourceType::Texture:
 				{
 					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -724,8 +724,6 @@ namespace Gecko::DX12
 
 		DIRECTX12_ASSERT(m_Device->CreateGraphicsPipelineState(&graphicsDesc, IID_PPV_ARGS(&graphicsPipeline_DX12->PipelineState)), nullptr);
 
-		ASSERT(hr == S_OK);
-
 		GraphicsPipeline graphicsPipeline(desc);
 		graphicsPipeline.Data = graphicsPipeline_DX12;
 
@@ -761,7 +759,7 @@ namespace Gecko::DX12
 
 				switch (pipelineResource.Type)
 				{
-				case ResourceType::None: ASSERT_MSG(false, "None is not a valid resource type"); continue;
+				case ResourceType::None: ASSERT(false, "None is not a valid resource type"); continue;
 				case ResourceType::Texture:
 				{
 					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -949,8 +947,8 @@ namespace Gecko::DX12
 
 	void Device_DX12::UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset)
 	{
-		ASSERT_MSG(buffer.Desc.MemoryType != MemoryType::None, "None is invalid for memory type!");
-		ASSERT_MSG(buffer.IsValid(), "Buffer is Invalid!");
+		ASSERT(buffer.Desc.MemoryType != MemoryType::None, "None is invalid for memory type!");
+		ASSERT(buffer.IsValid(), "Buffer is Invalid!");
 
 		Buffer_DX12* buffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 
@@ -1370,7 +1368,7 @@ namespace Gecko::DX12
 			type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics Command Queue" :
 			type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy Command Queue" :
 			type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute Command Queue" :
-			"Unkown Command Queue"
+			"Unknown Command Queue"
 		);
 
 		for (u32 i = 0; i < (*commandBuffers).size(); i++)
@@ -1389,7 +1387,7 @@ namespace Gecko::DX12
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics allocator" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy allocator" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute allocator" :
-				"Unkown allocator"
+				"Unknown allocator"
 			);
 
 			DIRECTX12_ASSERT(device->CreateFence(
@@ -1404,7 +1402,7 @@ namespace Gecko::DX12
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics Fence" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy Fence" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute Fence" :
-				"Unkown Fence"
+				"Unknown Fence"
 			);
 
 			DIRECTX12_ASSERT(device->CreateCommandList(
@@ -1423,7 +1421,7 @@ namespace Gecko::DX12
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics CommandList" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy CommandList" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute CommandList" :
-				"Unkown CommandList"
+				"Unknown CommandList"
 			);
 		}
 
@@ -1806,7 +1804,7 @@ namespace Gecko::DX12
 	Ref<Buffer_DX12> Device_DX12::CreateBuffer(const BufferDesc& desc)
 	{
 		// Create the buffer
-		ASSERT_MSG(desc.IsValid(), "BufferDesc is invalid!");
+		ASSERT(desc.IsValid(), "BufferDesc is invalid!");
 		Ref<Buffer_DX12> buffer_DX12 = CreateRef<Buffer_DX12>();
 
 		if (desc.Type == BufferType::Constant)

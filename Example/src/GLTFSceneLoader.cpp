@@ -474,7 +474,7 @@ void LoadNodes(const tinygltf::Model& gltfModel, FlatHierarchyScene* scene, u32 
 		const tinygltf::Material& gltfMaterial = gltfModel.materials[i];
 
 		Material& material = resourceManager->GetMaterial(materialHandles[i]);
-		MaterialData materialData{ };// = reinterpret_cast<MaterialData*>(material.MaterialConstantBuffer._Buffer);
+		MaterialData materialData{ };
 
 		if (gltfMaterial.pbrMetallicRoughness.baseColorTexture.index >= 0) 
 		{

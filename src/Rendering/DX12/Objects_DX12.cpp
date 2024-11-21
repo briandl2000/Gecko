@@ -32,7 +32,7 @@ namespace Gecko::DX12
 		case DataFormat::None: break;
 		}
 
-		ASSERT(false, "Unkown Format state.");
+		ASSERT(false, "Unknown Format state.");
 		return DXGI_FORMAT_UNKNOWN;
 	}
 
@@ -45,7 +45,7 @@ namespace Gecko::DX12
 		case ShaderType::Pixel: return D3D12_SHADER_VISIBILITY_PIXEL;
 		case ShaderType::Compute: return D3D12_SHADER_VISIBILITY_ALL;
 		}
-		ASSERT(false, "Unkown Shader visibilty");
+		ASSERT(false, "Unknown Shader visibilty");
 		return D3D12_SHADER_VISIBILITY_ALL;
 	}
 
@@ -59,7 +59,7 @@ namespace Gecko::DX12
 		default: break;
 		}
 
-		ASSERT(false, "Unkown Cullmode");
+		ASSERT(false, "Unknown Cullmode");
 		return D3D12_CULL_MODE_NONE;
 	}
 
@@ -72,7 +72,7 @@ namespace Gecko::DX12
 		default: break;
 		}
 
-		ASSERT(false, "Unkown primitive type");
+		ASSERT(false, "Unknown primitive type");
 		return D3D12_FILL_MODE_WIREFRAME;
 	}
 
@@ -85,7 +85,7 @@ namespace Gecko::DX12
 		default: break;
 		}
 
-		ASSERT(false, "Unkown primitive type");
+		ASSERT(false, "Unknown primitive type");
 		return D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED;
 	}
 
@@ -98,7 +98,7 @@ namespace Gecko::DX12
 		default: break;
 		}
 
-		ASSERT(false, "Unkown primitive type");
+		ASSERT(false, "Unknown primitive type");
 		return D3D_PRIMITIVE_TOPOLOGY_UNDEFINED;
 	}
 
@@ -113,7 +113,7 @@ namespace Gecko::DX12
 		case TextureType::Tex1DArray: return D3D12_SRV_DIMENSION_TEXTURE1DARRAY;
 		case TextureType::Tex2DArray: return D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
 		}
-		ASSERT(false, "Unkown TextureType");
+		ASSERT(false, "Unknown TextureType");
 		return D3D12_SRV_DIMENSION_UNKNOWN;
 	}
 
@@ -128,7 +128,7 @@ namespace Gecko::DX12
 		case TextureType::Tex1DArray: return D3D12_UAV_DIMENSION_TEXTURE1DARRAY;
 		case TextureType::Tex2DArray: return D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
 		}
-		ASSERT(false, "Unkown TextureType");
+		ASSERT(false, "Unknown TextureType");
 		return D3D12_UAV_DIMENSION_UNKNOWN;
 	}
 
@@ -140,7 +140,7 @@ namespace Gecko::DX12
 		case SamplerFilter::Point: return D3D12_FILTER_MIN_MAG_MIP_POINT;
 		}
 
-		ASSERT(false, "Unkown samplerFilter");
+		ASSERT(false, "Unknown samplerFilter");
 		return D3D12_FILTER_MIN_MAG_MIP_LINEAR;
 	}
 
@@ -152,7 +152,7 @@ namespace Gecko::DX12
 		case SamplerWrapMode::Clamp: return D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 		}
 
-		ASSERT(false, "Unkown wrapMode");
+		ASSERT(false, "Unknown wrapMode");
 		return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 	}
 
