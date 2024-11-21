@@ -947,8 +947,11 @@ namespace Gecko::DX12
 
 	void Device_DX12::UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset)
 	{
-		ASSERT(buffer.Desc.MemoryType != MemoryType::None, "None is invalid for memory type!");
-		ASSERT(buffer.IsValid(), "Buffer is Invalid!");
+		{ // Validity checks
+			ASSERT(buffer.Desc.MemoryType != MemoryType::None, "None is invalid for memory type!");
+			std::string failureReason{};
+			ASSERT(buffer.IsValid(&failureReason), failureReason.c_str());
+		}
 
 		Buffer_DX12* buffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 
@@ -1804,7 +1807,10 @@ namespace Gecko::DX12
 	Ref<Buffer_DX12> Device_DX12::CreateBuffer(const BufferDesc& desc)
 	{
 		// Create the buffer
-		ASSERT(desc.IsValid(), "BufferDesc is invalid!");
+		{ // Validity check
+			std::string failureReason{};
+			ASSERT(desc.IsValid(&failureReason), failureReason.c_str());
+		}
 		Ref<Buffer_DX12> buffer_DX12 = CreateRef<Buffer_DX12>();
 
 		if (desc.Type == BufferType::Constant)
