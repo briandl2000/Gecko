@@ -43,7 +43,10 @@ namespace Gecko::DX12
 
 	void CommandList_DX12::ClearRenderTarget(const RenderTarget& renderTarget)
 	{
-		ASSERT(renderTarget.IsValid(), "Render target is invalid!");
+		{ // Validity check
+			std::string failureReason{};
+			ASSERT(renderTarget.IsValid(&failureReason), failureReason.c_str());
+		}
 		
 		RenderTarget_DX12* renderTargetDX12 = reinterpret_cast<RenderTarget_DX12*>(renderTarget.Data.get());
 		TransitionRenderTarget(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_DEPTH_WRITE);
@@ -72,8 +75,11 @@ namespace Gecko::DX12
 
 	void CommandList_DX12::CopyTextureToTexture(const Texture& src, const Texture& dst)
 	{
-		ASSERT(src.IsValid(), "Source texture is invalid!");
-		ASSERT(dst.IsValid(), "Destination texture is invalid!");
+		{ // Validity checks
+			std::string failureReason{};
+			ASSERT(src.IsValid(&failureReason), ("Source texture is invalid, because " + failureReason).c_str());
+			ASSERT(dst.IsValid(&failureReason), ("Destination texture is invalid, because " + failureReason).c_str());
+		}
 
 		Texture_DX12* srcTexture_DX12 = reinterpret_cast<Texture_DX12*>(src.Data.get());
 		Texture_DX12* dstTexture_DX12 = reinterpret_cast<Texture_DX12*>(dst.Data.get());
@@ -173,14 +179,15 @@ namespace Gecko::DX12
 
 	void CommandList_DX12::BindConstantBuffer(u32 slot, const Buffer& buffer)
 	{
-		ASSERT(buffer.IsValid(), "Buffer is invalid!");
-		ASSERT(buffer.Desc.Type == BufferType::Constant, "Buffer is invalid!");
+		std::string failureReason{};
+		ASSERT(buffer.IsValid(&failureReason), failureReason.c_str());
+		ASSERT(buffer.Desc.Type == BufferType::Constant, "Only constant buffers can be bound in BindConstantBuffer");
 		Buffer_DX12* constantBuffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 
 		// TransitionResource(constantBuffer_DX12->BufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			ASSERT(m_GraphicsPipeline.IsValid(), "Graphics pipeline is Invalid!");
+			ASSERT(m_GraphicsPipeline.IsValid(&failureReason), failureReason.c_str());
 			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
 			ASSERT(slot < graphicsPipeline_DX12->ConstantBufferIndices.size(), "Slot is out of bounds of constant buffer indices!");
 
@@ -192,7 +199,7 @@ namespace Gecko::DX12
 		}
 		else if (m_BoundPipelineType == PipelineType::Compute)
 		{
-			ASSERT(m_ComputePipeline.IsValid(), "Compute pipeline is Invalid!");
+			ASSERT(m_ComputePipeline.IsValid(&failureReason), failureReason.c_str());
 			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
 			ASSERT(slot < computePipeline_DX12->ConstantBufferIndices.size(), "Slot is out of bounds of constant buffer indices!");
 
@@ -207,8 +214,9 @@ namespace Gecko::DX12
 
 	void CommandList_DX12::BindStructuredBuffer(u32 slot, const Buffer& buffer)
 	{
-		ASSERT(buffer.IsValid(), "Buffer is invalid!");
-		//ASSERT(buffer.Desc.Type != BufferType::Constant, "ConstantBuffer Is not allow to be bound as StructuredBuffer!");
+		std::string failureReason{};
+		ASSERT(buffer.IsValid(&failureReason), failureReason.c_str());
+		ASSERT(buffer.Desc.Type != BufferType::Constant, "ConstantBuffer Is not allow to be bound as StructuredBuffer!");
 		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle{ 0 };
 		Ref<Resource> bufferResource = nullptr;
 
@@ -222,7 +230,7 @@ namespace Gecko::DX12
 		}
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			ASSERT(m_GraphicsPipeline.IsValid(), "Graphics pipeline is Invalid!");
+			ASSERT(m_GraphicsPipeline.IsValid(&failureReason), failureReason.c_str());
 			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
 			ASSERT(slot < graphicsPipeline_DX12->TextureIndices.size(), "Slot is out of bounds of constant buffer indices!");
 			TransitionResource(bufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
@@ -233,7 +241,7 @@ namespace Gecko::DX12
 		}
 		else if (m_BoundPipelineType == PipelineType::Compute)
 		{
-			ASSERT(m_ComputePipeline.IsValid(), "Compute pipeline is Invalid!");
+			ASSERT(m_ComputePipeline.IsValid(&failureReason), failureReason.c_str());
 			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
 			ASSERT(slot < computePipeline_DX12->TextureIndices.size(), "Slot is out of bounds of constant buffer indices!");
 			TransitionResource(bufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
@@ -248,10 +256,14 @@ namespace Gecko::DX12
 
 	void CommandList_DX12::BindAsRWBuffer(u32 slot, const Buffer& buffer)
 	{
-		ASSERT(m_BoundPipelineType == PipelineType::Compute, "Compute pipeline must be bound to bind as read write texture!");
-		ASSERT(m_ComputePipeline.IsValid(), "Compute pipeline is invalid!");
-		ASSERT(buffer.IsValid(), "Buffer is invalid!");
-		ASSERT(buffer.Desc.CanReadWrite, "Buffer must be created with CanReadWrite enabled to bind as RWBuffer!");
+		{ // Validity checks
+			std::string failureReason = "Compute pipeline needs to be bound to bind as RW buffer! "
+				"Currently bound type: " + EnumToString(m_BoundPipelineType);
+			ASSERT(m_BoundPipelineType == PipelineType::Compute, failureReason.c_str());
+			ASSERT(m_ComputePipeline.IsValid(&failureReason), failureReason.c_str());
+			ASSERT(buffer.IsValid(&failureReason), failureReason.c_str());
+			ASSERT(buffer.Desc.CanReadWrite, "Buffer must be created with CanReadWrite enabled to bind as RWBuffer!");
+		}
 
 		Buffer_DX12* buffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 		ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
@@ -265,13 +277,16 @@ namespace Gecko::DX12
 
 	void CommandList_DX12::SetLocalData(u32 size, void* data)
 	{
-		ASSERT(size % 4 == 0, "The size of dynamic call data must be a multiple of 32 bits or 4 bytes");
-		ASSERT(size != 0, "Data can't be 0");
-		ASSERT(data != nullptr, "Data can't be nullptr");
+		{ // Validity checks
+			ASSERT(size % 4 == 0, "The size of dynamic call data must be a multiple of 32 bits or 4 bytes");
+			ASSERT(size != 0, "Data can't be 0");
+			ASSERT(data != nullptr, "Data can't be nullptr");
+		}
 
+		std::string failureReason{};
 		if (m_BoundPipelineType == PipelineType::Graphics)
 		{
-			ASSERT(m_GraphicsPipeline.IsValid(), "Graphics pipeline is Invalid!");
+			ASSERT(m_GraphicsPipeline.IsValid(&failureReason), failureReason.c_str());
 			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
 
 			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[graphicsPipeline_DX12->LocalDataLocation];
@@ -280,7 +295,7 @@ namespace Gecko::DX12
 		}
 		else if (m_BoundPipelineType == PipelineType::Compute)
 		{
-			ASSERT(m_ComputePipeline.IsValid(), "Compute pipeline is Invalid!");
+			ASSERT(m_ComputePipeline.IsValid(&failureReason), failureReason.c_str());
 			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
 
 			u32 rootDescriptorTableSlot = computePipeline_DX12->ConstantBufferIndices[computePipeline_DX12->LocalDataLocation];
@@ -292,7 +307,8 @@ namespace Gecko::DX12
 
 	void CommandList_DX12::BindTexture(u32 slot, const Texture& texture)
 	{
-		ASSERT(texture.IsValid(), "Texture buffer is invalid!");
+		std::string failureReason{};
+		ASSERT(texture.IsValid(&failureReason), failureReason.c_str());
 		Texture_DX12* texture_DX12 = reinterpret_cast<Texture_DX12*>(texture.Data.get());
 
 		if (m_BoundPipelineType == PipelineType::Graphics)
