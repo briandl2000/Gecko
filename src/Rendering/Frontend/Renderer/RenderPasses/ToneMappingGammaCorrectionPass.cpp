@@ -18,8 +18,15 @@ const void ToneMappingGammaCorrectionPass::SubInit(const Platform::AppInfo& appI
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/TonemapAndGammaCorrect.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.NumUAVs = 2;
-		computePipelineDesc.NumConstantBuffers = 1;
+		computePipelineDesc.PipelineReadWriteResources = 
+		{
+			PipelineResource::Texture(ShaderType::Compute, 0),
+			PipelineResource::Texture(ShaderType::Compute, 1)
+		};
+		computePipelineDesc.PipelineReadOnlyResources = 
+		{
+			PipelineResource::ConstantBuffer(ShaderType::Compute, 0)
+		};
 
 		TonemapAndGammaCorrectPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}

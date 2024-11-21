@@ -44,19 +44,6 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 
 	// FullScreenTexture Graphics Pipeline
 	{
-		std::vector<ShaderVisibility> textureShaderVisibilities =
-		{
-			ShaderVisibility::Pixel,
-		};
-
-		std::vector<SamplerDesc> samplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Point,
-			},
-		};
-
 		GraphicsPipelineDesc pipelineDesc;
 		pipelineDesc.VertexShaderPath = "Shaders/FullScreenTexture.gsh";
 		pipelineDesc.PixelShaderPath = "Shaders/FullScreenTexture.gsh";
@@ -65,9 +52,13 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R8G8B8A8_UNORM; // Albedo
 		pipelineDesc.CullMode = CullMode::Back;
 
-		pipelineDesc.TextureShaderVisibilities = textureShaderVisibilities;
+		pipelineDesc.PipelineResources = {
+			PipelineResource::Texture(ShaderType::Pixel, 0)
+		};
 
-		pipelineDesc.SamplerDescs = samplerShaderDescs;
+		pipelineDesc.SamplerDescs = {
+			{ShaderType::Pixel, SamplerFilter::Point, },
+		};
 
 		FullScreenTexturePipelineHandle = m_ResourceManager->CreateGraphicsPipeline(pipelineDesc);
 	}
@@ -84,9 +75,9 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 
 		Gecko::VertexBufferDesc vertexDesc;
 		vertexDesc.Layout = fullScreenQuadVertexLayout;
-		vertexDesc.VertexData = &vertices;
 		vertexDesc.NumVertices = static_cast<u32>(sizeof(vertices) / sizeof(glm::vec2));
-
+		vertexDesc.MemoryType = MemoryType::Dedicated;
+		
 		u16 indices[] = {
 			0, 1, 2
 		};
@@ -94,9 +85,9 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		Gecko::IndexBufferDesc indexDesc;
 		indexDesc.IndexFormat = DataFormat::R16_UINT;
 		indexDesc.NumIndices = 3;
-		indexDesc.IndexData = indices;
+		indexDesc.MemoryType = MemoryType::Dedicated;
 
-		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc);
+		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc, vertices, indices);
 	}
 }
 
@@ -130,24 +121,25 @@ void Renderer::RenderScene(const SceneRenderInfo& sceneRenderInfo)
 	u32 currentBackBufferIndex = device->GetCurrentBackBufferIndex();
 
 	// Upload Scene Data for this frame
-	m_ResourceManager->SceneData[currentBackBufferIndex]->useRaytracing = false;
-	m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix = sceneRenderInfo.Camera.View;
-	m_ResourceManager->SceneData[currentBackBufferIndex]->CameraPosition = glm::vec3(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix * glm::vec4(0.f, 0.f, 0.f, 1.f));
-	m_ResourceManager->SceneData[currentBackBufferIndex]->ViewOrientation = glm::mat4(glm::mat3(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix));
-	m_ResourceManager->SceneData[currentBackBufferIndex]->InvViewOrientation = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewOrientation);
-	m_ResourceManager->SceneData[currentBackBufferIndex]->ProjectionMatrix = sceneRenderInfo.Camera.Projection;
-	m_ResourceManager->SceneData[currentBackBufferIndex]->InvViewMatrix = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ViewMatrix);
-	m_ResourceManager->SceneData[currentBackBufferIndex]->invProjectionMatrix = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ProjectionMatrix);
+	m_ResourceManager->SceneData[currentBackBufferIndex].useRaytracing = false;
+	m_ResourceManager->SceneData[currentBackBufferIndex].ViewMatrix = sceneRenderInfo.Camera.View;
+	m_ResourceManager->SceneData[currentBackBufferIndex].CameraPosition = glm::vec3(m_ResourceManager->SceneData[currentBackBufferIndex].ViewMatrix * glm::vec4(0.f, 0.f, 0.f, 1.f));
+	m_ResourceManager->SceneData[currentBackBufferIndex].ViewOrientation = glm::mat4(glm::mat3(m_ResourceManager->SceneData[currentBackBufferIndex].ViewMatrix));
+	m_ResourceManager->SceneData[currentBackBufferIndex].InvViewOrientation = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex].ViewOrientation);
+	m_ResourceManager->SceneData[currentBackBufferIndex].ProjectionMatrix = sceneRenderInfo.Camera.Projection;
+	m_ResourceManager->SceneData[currentBackBufferIndex].InvViewMatrix = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex].ViewMatrix);
+	m_ResourceManager->SceneData[currentBackBufferIndex].invProjectionMatrix = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex].ProjectionMatrix);
 
 	if (sceneRenderInfo.DirectionalLights.size() > 0)
 	{
 		glm::mat4 LighDirectionMatrix = glm::mat3(sceneRenderInfo.DirectionalLights[0].Transform);
-		LighDirectionMatrix = glm::translate(glm::mat4(1.), m_ResourceManager->SceneData[currentBackBufferIndex]->CameraPosition - m_ResourceManager->SceneData[currentBackBufferIndex]->LightDirection * 50.f) * LighDirectionMatrix;
-		m_ResourceManager->SceneData[currentBackBufferIndex]->ShadowMapProjection = glm::ortho(-30.f, 30.f, -30.f, 30.f, -100.f, 100.f) * glm::inverse(LighDirectionMatrix);
-		m_ResourceManager->SceneData[currentBackBufferIndex]->ShadowMapProjectionInv = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex]->ShadowMapProjection);
-		m_ResourceManager->SceneData[currentBackBufferIndex]->LightDirection = glm::normalize(glm::vec3(LighDirectionMatrix * glm::vec4(0., 0., -1., 0.)));
+		LighDirectionMatrix = glm::translate(glm::mat4(1.), m_ResourceManager->SceneData[currentBackBufferIndex].CameraPosition - m_ResourceManager->SceneData[currentBackBufferIndex].LightDirection * 50.f) * LighDirectionMatrix;
+		m_ResourceManager->SceneData[currentBackBufferIndex].ShadowMapProjection = glm::ortho(-30.f, 30.f, -30.f, 30.f, -100.f, 100.f) * glm::inverse(LighDirectionMatrix);
+		m_ResourceManager->SceneData[currentBackBufferIndex].ShadowMapProjectionInv = glm::inverse(m_ResourceManager->SceneData[currentBackBufferIndex].ShadowMapProjection);
+		m_ResourceManager->SceneData[currentBackBufferIndex].LightDirection = glm::normalize(glm::vec3(LighDirectionMatrix * glm::vec4(0., 0., -1., 0.)));
 	}
 
+	device->UploadBufferData(m_ResourceManager->SceneDataBuffer[currentBackBufferIndex], &m_ResourceManager->SceneData[currentBackBufferIndex], sizeof(SceneDataStruct));
 
 	// Create a command list for this frame
 	Gecko::Ref<Gecko::CommandList> commandList = device->CreateGraphicsCommandList();

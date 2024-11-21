@@ -14,33 +14,29 @@ const void DeferredPBRPass::SubInit(const Platform::AppInfo& appInfo, ResourceMa
 
 	// PBR Compute Pipeline
 	{
-		std::vector<SamplerDesc> computeSamplerShaderDescs =
-		{
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Linear,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			},
-			{
-				ShaderVisibility::Pixel,
-				SamplerFilter::Point,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-				SamplerWrapMode::Clamp,
-			}
-		};
-
 		ComputePipelineDesc computePipelineDesc;
 		computePipelineDesc.ComputeShaderPath = "Shaders/PBRShader.gsh";
 		computePipelineDesc.ShaderVersion = "5_1";
-		computePipelineDesc.DynamicCallData.BufferLocation = 1;
-		computePipelineDesc.DynamicCallData.Size = sizeof(PBRData);
-		computePipelineDesc.SamplerDescs = computeSamplerShaderDescs;
-		computePipelineDesc.NumTextures = 4;
-		computePipelineDesc.NumUAVs = 6;
-		computePipelineDesc.NumConstantBuffers = 1;
+		computePipelineDesc.PipelineReadOnlyResources = { 
+			PipelineResource::ConstantBuffer(ShaderType::Compute, 0), 
+			PipelineResource::LocalData(ShaderType::Compute, 1, sizeof(PBRData)),
+			PipelineResource::Texture(ShaderType::Compute, 0),
+			PipelineResource::Texture(ShaderType::Compute, 1),
+			PipelineResource::Texture(ShaderType::Compute, 2),
+			PipelineResource::Texture(ShaderType::Compute, 3),
+		};
+		computePipelineDesc.SamplerDescs = {
+			{ShaderType::Compute, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp},
+			{ShaderType::Compute, SamplerFilter::Point, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp}
+		};
+		computePipelineDesc.PipelineReadWriteResources = {
+			PipelineResource::Texture(ShaderType::Compute, 0),
+			PipelineResource::Texture(ShaderType::Compute, 1),
+			PipelineResource::Texture(ShaderType::Compute, 2),
+			PipelineResource::Texture(ShaderType::Compute, 3),
+			PipelineResource::Texture(ShaderType::Compute, 4),
+			PipelineResource::Texture(ShaderType::Compute, 5),
+		};
 
 		PBRPipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}
@@ -97,7 +93,7 @@ const void DeferredPBRPass::Render(const SceneRenderInfo& sceneRenderInfo, Resou
 
 		u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
 		commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
-		commandList->SetDynamicCallData(sizeof(PBRData), &pbrData);
+		commandList->SetLocalData(sizeof(PBRData), &pbrData);
 		commandList->BindAsRWTexture(0, PBROutput.RenderTextures[0]);
 		commandList->BindAsRWTexture(1, GBuffer.RenderTextures[0]);
 		commandList->BindAsRWTexture(2, GBuffer.RenderTextures[1]);

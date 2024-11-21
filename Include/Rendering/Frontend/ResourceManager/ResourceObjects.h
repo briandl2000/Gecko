@@ -18,8 +18,8 @@ namespace Gecko
 
 	struct Mesh
 	{
-		VertexBuffer VertexBuffer;
-		IndexBuffer IndexBuffer;
+		Buffer VertexBuffer;
+		Buffer IndexBuffer;
 	};
 
 	enum class MaterialTextureFlags : u32
@@ -43,7 +43,7 @@ namespace Gecko
 
 	struct Material
 	{
-		ConstantBuffer MaterialConstantBuffer;
+		Buffer MaterialConstantBuffer;
 		TextureHandle AlbedoTextureHandle;
 		TextureHandle NormalTextureHandle;
 		TextureHandle MetalicRoughnessTextureHandle;

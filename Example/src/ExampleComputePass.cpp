@@ -14,8 +14,11 @@ const void ExampleComputePass::SubInit(const Gecko::Platform::AppInfo& appInfo, 
 		computePipelineDesc.ComputeShaderPath = "Shaders/ExampleCompute.gsh";
 		// All example shaders use HLSL shader version 5.1
 		computePipelineDesc.ShaderVersion = "5_1";
-		// We need only one Unordered Access View, namely the output target
-		computePipelineDesc.NumUAVs = 1;
+		// We need only one Read write resource mainy the output texture
+		computePipelineDesc.PipelineReadWriteResources = 
+		{
+			Gecko::PipelineResource::Texture(Gecko::ShaderType::Compute, 0)
+		};
 
 		m_ExamplePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
 	}

@@ -22,7 +22,7 @@ public:
 	void Init(Device* device);
 	void Shutdown();
 
-	MeshHandle CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc);
+	MeshHandle CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, void* vertexData, void* indexData);
 	TextureHandle CreateTexture(TextureDesc textureDesc, void* imageData = nullptr, bool mipMap = false);
 	MaterialHandle CreateMaterial();
 	RenderTargetHandle CreateRenderTarget(RenderTargetDesc renderTargetDesc, std::string name, bool KeepWindowAspectRatio);
@@ -44,9 +44,11 @@ public:
 
 	u32 GetCurrentBackBufferIndex() { return m_Device->GetCurrentBackBufferIndex(); }
 
+	void UploadMaterial(Buffer& buffer, void* data, u32 size, u32 offset = 0);
+
 	// TEMP
-	std::vector<ConstantBuffer> SceneDataBuffer;
-	std::vector<SceneDataStruct*> SceneData;
+	std::vector<Buffer> SceneDataBuffer;
+	std::vector<SceneDataStruct> SceneData;
 
 	bool ResizeEvent(const Event::EventData& eventData);
 
