@@ -34,7 +34,7 @@ namespace Gecko::DX12
 	{
 		if (s_Device != nullptr)
 		{
-			ASSERT_MSG(false, "Device already initialized!")
+			ASSERT(false, "Device already initialized!")
 		}
 		s_Device = this;
 
@@ -54,7 +54,7 @@ namespace Gecko::DX12
 
 		// Create a fence
 		m_FenceEvent = CreateEventEx(nullptr, nullptr, 0, EVENT_ALL_ACCESS);
-		ASSERT(m_FenceEvent);
+		ASSERT(m_FenceEvent, "Failed to initialize device fence!");
 
 		// Create Discriptor heaps
 		{
@@ -62,7 +62,7 @@ namespace Gecko::DX12
 			result &= m_RtvDescHeap.Initialize(this, 512, false);
 			result &= m_DsvDescHeap.Initialize(this, 512, false);
 			result &= m_SrvDescHeap.Initialize(this, 4096, true);
-			ASSERT_MSG(result, "Failed to initialize heaps!");
+			ASSERT(result, "Failed to initialize heaps!");
 		}
 
 		// Creating the swap chain
@@ -83,9 +83,9 @@ namespace Gecko::DX12
 
 		ComPtr<IDXGISwapChain1> swapChain;
 		HWND window = reinterpret_cast<HWND>(Platform::GetWindowData());
-		DIRECTX12_ASSERT(m_Factory->CreateSwapChainForHwnd(m_GraphicsCommandQueue.Get(), window, &swapchainDesc, nullptr, nullptr, &swapChain));
-		DIRECTX12_ASSERT(m_Factory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER));
-		DIRECTX12_ASSERT(swapChain->QueryInterface(IID_PPV_ARGS(&m_SwapChain)));
+		DIRECTX12_ASSERT(m_Factory->CreateSwapChainForHwnd(m_GraphicsCommandQueue.Get(), window, &swapchainDesc, nullptr, nullptr, &swapChain), nullptr);
+		DIRECTX12_ASSERT(m_Factory->MakeWindowAssociation(window, DXGI_MWA_NO_ALT_ENTER), nullptr);
+		DIRECTX12_ASSERT(swapChain->QueryInterface(IID_PPV_ARGS(&m_SwapChain)), nullptr);
 
 		// Createing the back buffer render targets
 		RecreateBackBuffers(info.Width, info.Height);
@@ -134,6 +134,10 @@ namespace Gecko::DX12
 
 	void Device_DX12::Shutdown()
 	{
+		if (s_Device == nullptr)
+		{
+			ASSERT(false, "Device not created!");
+		}
 
 		Flush();
 
@@ -178,17 +182,13 @@ namespace Gecko::DX12
 #ifdef DEBUG
 		{
 			ComPtr<IDXGIDebug1> debugDevice;
-			DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debugDevice));
-			debugDevice->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+			if(SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debugDevice))))
+				debugDevice->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
 		}
 #endif
 
 		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &Device_DX12::Resize);
 
-		if (s_Device == nullptr)
-		{
-			ASSERT(false);
-		}
 		s_Device = nullptr;
 	}
 
@@ -209,8 +209,8 @@ namespace Gecko::DX12
 		CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
 
 
-		DIRECTX12_ASSERT(commandListDx12.CommandBuffer->CommandList->Close());
-		ID3D12CommandList* const commandLists[]{ commandListDx12.CommandBuffer->CommandList.Get() };
+		DIRECTX12_ASSERT(commandListDx12.CommandBuffer->CommandList->Close(), nullptr);
+		ID3D12CommandList* const commandLists[]{ commandListDx12.CommandBuffer->CommandList.Get()};
 		m_GraphicsCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
 
 		u64 fenceValueForSignal = ++commandListDx12.CommandBuffer->FenceValue;
@@ -227,8 +227,8 @@ namespace Gecko::DX12
 
 		ExecuteGraphicsCommandList(commandList);
 
-		ASSERT(m_SwapChain);
-		DIRECTX12_ASSERT(m_SwapChain->Present(0, 0));
+		ASSERT(m_SwapChain, "Failed to initialise swapchain!");
+		DIRECTX12_ASSERT(m_SwapChain->Present(0, 0), nullptr);
 		m_CurrentBackBufferIndex = m_SwapChain->GetCurrentBackBufferIndex();
 
 		ProcessDeferredReleases();
@@ -250,7 +250,7 @@ namespace Gecko::DX12
 	{
 		CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
 
-		DIRECTX12_ASSERT(commandListDx12.CommandBuffer->CommandList->Close());
+		DIRECTX12_ASSERT(commandListDx12.CommandBuffer->CommandList->Close(), nullptr);
 		ID3D12CommandList* const commandLists[]{ commandListDx12.CommandBuffer->CommandList.Get() };
 		m_ComputeCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
 
@@ -265,8 +265,9 @@ namespace Gecko::DX12
 		RenderTarget renderTarget(desc);
 		for (u32 i = 0; i < desc.NumRenderTargets; i++)
 		{
-			ASSERT_MSG(desc.RenderTargetFormats[i] != DataFormat::None, "None is not a valid format for a render target, did you forget to set it?");
-
+		
+			ASSERT(desc.RenderTargetFormats[i] != DataFormat::None, "None is not a valid format for a render target, did you forget to set it?");
+			
 			DXGI_FORMAT format = FormatToD3D12Format(desc.RenderTargetFormats[i]);
 
 			D3D12_CLEAR_VALUE clearValue;
@@ -348,7 +349,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateVertexBuffer(const VertexBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Vertex buffer descriptor is invalid!");
+		ASSERT(desc.IsValid(), "Vertex buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Vertex;
@@ -372,7 +373,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateIndexBuffer(const IndexBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Index buffer descriptor is invalid!");
+		ASSERT(desc.IsValid(), "Index buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Index;
@@ -396,7 +397,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateConstantBuffer(const ConstantBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Constant buffer is invalid!");
+		ASSERT(desc.IsValid(), "Constant buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Constant;
@@ -414,7 +415,7 @@ namespace Gecko::DX12
 
 	Buffer Device_DX12::CreateStructuredBuffer(const StructuredBufferDesc& desc)
 	{
-		ASSERT_MSG(desc.IsValid(), "Structured buffer descriptor is invalid!");
+		ASSERT(desc.IsValid(), "Structured buffer descriptor is invalid!");
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Structured;
@@ -466,7 +467,7 @@ namespace Gecko::DX12
 
 				switch (pipelineResource.Type)
 				{
-				case ResourceType::None: ASSERT_MSG(false, "None is not a valid resource type"); continue;
+				case ResourceType::None: ASSERT(false, "None is not a valid resource type"); continue;
 				case ResourceType::Texture:
 				{
 					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -557,14 +558,15 @@ namespace Gecko::DX12
 				featureData.HighestVersion,
 				&rootSignatureBlob,
 				&errorBlob
-			));
+			), errorBlob);
+
 			// Create the root signature.
 			DIRECTX12_ASSERT(m_Device->CreateRootSignature(
 				0,
 				rootSignatureBlob->GetBufferPointer(),
 				rootSignatureBlob->GetBufferSize(),
 				IID_PPV_ARGS(&graphicsPipeline_DX12->RootSignature)
-			));
+			), nullptr);
 
 			pRootSignature = graphicsPipeline_DX12->RootSignature.Get();
 			//pipelineCreation.AddPipelineSubObj(D3D12_PIPELINE_STATE_SUBOBJECT_TYPE_ROOT_SIGNATURE, &pRootSignature);
@@ -615,9 +617,17 @@ namespace Gecko::DX12
 			std::string shaderVersion = "vs_";
 			shaderVersion += desc.ShaderVersion;
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "VERTEX", "1", NULL, NULL };
-			HRESULT hr = D3DCompileFromFile(vertexSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-				desc.VertexEntryPoint, shaderVersion.c_str(), flags, 0, &vertexShaderBlob, &errorBlob);
-			ASSERT_MSG(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+			DIRECTX12_ASSERT(D3DCompileFromFile(
+				vertexSource.c_str(), 
+				macros, 
+				D3D_COMPILE_STANDARD_FILE_INCLUDE,
+				desc.VertexEntryPoint, 
+				shaderVersion.c_str(), 
+				flags, 
+				0, 
+				&vertexShaderBlob, 
+				&errorBlob
+			), errorBlob);
 
 			VS = CD3DX12_SHADER_BYTECODE(vertexShaderBlob.Get());
 			piplineStateStream2.VS = VS;
@@ -640,9 +650,17 @@ namespace Gecko::DX12
 			std::string shaderVersion = "ps_";
 			shaderVersion += desc.ShaderVersion;
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "PIXEL", "1", NULL, NULL };
-			HRESULT hr = D3DCompileFromFile(pixelSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-				desc.PixelEntryPoint, shaderVersion.c_str(), flags, 0, &pixelShaderBlob, &errorBlob);
-			ASSERT_MSG(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+			DIRECTX12_ASSERT(D3DCompileFromFile(
+				pixelSource.c_str(), 
+				macros, 
+				D3D_COMPILE_STANDARD_FILE_INCLUDE,
+				desc.PixelEntryPoint, 
+				shaderVersion.c_str(), 
+				flags, 
+				0, 
+				&pixelShaderBlob, 
+				&errorBlob
+			), errorBlob);
 
 			PS = CD3DX12_SHADER_BYTECODE(pixelShaderBlob.Get());
 			piplineStateStream2.PS = PS;
@@ -704,9 +722,7 @@ namespace Gecko::DX12
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsDesc = piplineStateStream2.GraphicsDescV0();
 
-		HRESULT hr = m_Device->CreateGraphicsPipelineState(&graphicsDesc, IID_PPV_ARGS(&graphicsPipeline_DX12->PipelineState));
-
-		ASSERT(hr == S_OK);
+		DIRECTX12_ASSERT(m_Device->CreateGraphicsPipelineState(&graphicsDesc, IID_PPV_ARGS(&graphicsPipeline_DX12->PipelineState)), nullptr);
 
 		GraphicsPipeline graphicsPipeline(desc);
 		graphicsPipeline.Data = graphicsPipeline_DX12;
@@ -743,7 +759,7 @@ namespace Gecko::DX12
 
 				switch (pipelineResource.Type)
 				{
-				case ResourceType::None: ASSERT_MSG(false, "None is not a valid resource type"); continue;
+				case ResourceType::None: ASSERT(false, "None is not a valid resource type"); continue;
 				case ResourceType::Texture:
 				{
 					descriptorTableRanges[descriptorIndex].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
@@ -851,14 +867,15 @@ namespace Gecko::DX12
 				featureData.HighestVersion,
 				&rootSignatureBlob,
 				&errorBlob
-			));
+			), errorBlob);
+
 			// Create the root signature.
 			DIRECTX12_ASSERT(m_Device->CreateRootSignature(
 				0,
 				rootSignatureBlob->GetBufferPointer(),
 				rootSignatureBlob->GetBufferSize(),
 				IID_PPV_ARGS(&computePipeline_DX12->RootSignature)
-			));
+			), nullptr);
 
 			pRootSignature = computePipeline_DX12->RootSignature.Get();
 		}
@@ -881,10 +898,17 @@ namespace Gecko::DX12
 			std::string shaderVersion = "cs_";
 			shaderVersion += desc.ShaderVersion;
 			D3D_SHADER_MACRO macros[] = { "HLSL", "1", "COMPUTE", "1", NULL, NULL };
-			HRESULT hr = D3DCompileFromFile(ComputeSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-				desc.EntryPoint, shaderVersion.c_str(), flags, 0, &computeShaderBlob, &errorBlob);
-			// Should probably do some nicer error handling here #FIXME
-			ASSERT_MSG(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
+			DIRECTX12_ASSERT(D3DCompileFromFile(
+				ComputeSource.c_str(), 
+				macros, 
+				D3D_COMPILE_STANDARD_FILE_INCLUDE,
+				desc.EntryPoint, 
+				shaderVersion.c_str(), 
+				flags, 
+				0, 
+				&computeShaderBlob, 
+				&errorBlob
+			), errorBlob);
 
 			CS = CD3DX12_SHADER_BYTECODE(computeShaderBlob.Get());
 		}
@@ -895,9 +919,10 @@ namespace Gecko::DX12
 		computeStateDesc.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
 		computeStateDesc.NodeMask = 0;
 
-		HRESULT hr = m_Device->CreateComputePipelineState(&computeStateDesc, IID_PPV_ARGS(&computePipeline_DX12->PipelineState));
-		// Should probably do some nicer error handling here #FIXME
-		ASSERT(hr == S_OK);
+		DIRECTX12_ASSERT(m_Device->CreateComputePipelineState(
+			&computeStateDesc, 
+			IID_PPV_ARGS(&computePipeline_DX12->PipelineState)
+		), nullptr);
 
 		ComputePipeline computePipeline(desc);
 		computePipeline.Data = computePipeline_DX12;
@@ -922,8 +947,8 @@ namespace Gecko::DX12
 
 	void Device_DX12::UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset)
 	{
-		ASSERT_MSG(buffer.Desc.MemoryType != MemoryType::None, "None is invalid for memory type!");
-		ASSERT_MSG(buffer.IsValid(), "Buffer is Invalid!");
+		ASSERT(buffer.Desc.MemoryType != MemoryType::None, "None is invalid for memory type!");
+		ASSERT(buffer.IsValid(), "Buffer is Invalid!");
 
 		Buffer_DX12* buffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 
@@ -1072,8 +1097,11 @@ namespace Gecko::DX12
 			index = (index + 1) % m_GraphicsCommandBuffers.size();
 		}
 
-		DIRECTX12_ASSERT(m_GraphicsCommandBuffers[index]->CommandAllocator->Reset());
-		DIRECTX12_ASSERT(m_GraphicsCommandBuffers[index]->CommandList->Reset(m_GraphicsCommandBuffers[index]->CommandAllocator.Get(), nullptr));
+		DIRECTX12_ASSERT(m_GraphicsCommandBuffers[index]->CommandAllocator->Reset(), nullptr);
+		DIRECTX12_ASSERT(m_GraphicsCommandBuffers[index]->CommandList->Reset(
+			m_GraphicsCommandBuffers[index]->CommandAllocator.Get(), 
+			nullptr
+		), nullptr);
 
 		return m_GraphicsCommandBuffers[index];
 	}
@@ -1085,8 +1113,11 @@ namespace Gecko::DX12
 		{
 			if (!m_ComputeCommandBuffers[index]->IsBusy())
 			{
-				DIRECTX12_ASSERT(m_ComputeCommandBuffers[index]->CommandAllocator->Reset());
-				DIRECTX12_ASSERT(m_ComputeCommandBuffers[index]->CommandList->Reset(m_ComputeCommandBuffers[index]->CommandAllocator.Get(), nullptr));
+				DIRECTX12_ASSERT(m_ComputeCommandBuffers[index]->CommandAllocator->Reset(), nullptr);
+				DIRECTX12_ASSERT(m_ComputeCommandBuffers[index]->CommandList->Reset(
+					m_ComputeCommandBuffers[index]->CommandAllocator.Get(), 
+					nullptr
+				), nullptr);
 
 				return m_ComputeCommandBuffers[index];
 			}
@@ -1102,8 +1133,11 @@ namespace Gecko::DX12
 		{
 			if (!m_CopyCommandBuffers[index]->IsBusy())
 			{
-				DIRECTX12_ASSERT(m_CopyCommandBuffers[index]->CommandAllocator->Reset());
-				DIRECTX12_ASSERT(m_CopyCommandBuffers[index]->CommandList->Reset(m_CopyCommandBuffers[index]->CommandAllocator.Get(), nullptr));
+				DIRECTX12_ASSERT(m_CopyCommandBuffers[index]->CommandAllocator->Reset(), nullptr);
+				DIRECTX12_ASSERT(m_CopyCommandBuffers[index]->CommandList->Reset(
+					m_CopyCommandBuffers[index]->CommandAllocator.Get(),
+					nullptr
+				), nullptr);
 
 				return m_CopyCommandBuffers[index];
 			}
@@ -1114,7 +1148,7 @@ namespace Gecko::DX12
 
 	void Device_DX12::ExecuteGraphicsCommandBuffer(Ref<CommandBuffer> graphicsCommandBuffer)
 	{
-		DIRECTX12_ASSERT(graphicsCommandBuffer->CommandList->Close());
+		DIRECTX12_ASSERT(graphicsCommandBuffer->CommandList->Close(), nullptr);
 		ID3D12CommandList* const commandLists[]{ graphicsCommandBuffer->CommandList.Get() };
 		m_GraphicsCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
 
@@ -1124,7 +1158,7 @@ namespace Gecko::DX12
 
 	void Device_DX12::ExecuteComputeCommandBuffer(Ref<CommandBuffer> computeCommandBuffer)
 	{
-		DIRECTX12_ASSERT(computeCommandBuffer->CommandList->Close());
+		DIRECTX12_ASSERT(computeCommandBuffer->CommandList->Close(), nullptr);
 		ID3D12CommandList* const commandLists[]{ computeCommandBuffer->CommandList.Get() };
 		m_ComputeCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
 
@@ -1134,7 +1168,7 @@ namespace Gecko::DX12
 
 	void Device_DX12::ExecuteCopyCommandBuffer(Ref<CommandBuffer> copyCommandBuffer)
 	{
-		DIRECTX12_ASSERT(copyCommandBuffer->CommandList->Close());
+		DIRECTX12_ASSERT(copyCommandBuffer->CommandList->Close(), nullptr);
 		ID3D12CommandList* const commandLists[]{ copyCommandBuffer->CommandList.Get() };
 		m_CopyCommandQueue->ExecuteCommandLists(_countof(commandLists), &commandLists[0]);
 
@@ -1159,7 +1193,7 @@ namespace Gecko::DX12
 	{
 		if (!s_Device)
 		{
-			ASSERT_MSG(false, "Device not initialized!");
+			ASSERT(false, "Device not initialized!");
 		}
 
 		s_Device->m_ResourcesToBeDeleted.push_back(resource);
@@ -1169,7 +1203,7 @@ namespace Gecko::DX12
 	{
 		if (!s_Device)
 		{
-			ASSERT_MSG(false, "Device not initialized!");
+			ASSERT(false, "Device not initialized!");
 		}
 
 		s_Device->m_PipelineStatesToBeDeleted.push_back(pipelineState);
@@ -1179,7 +1213,7 @@ namespace Gecko::DX12
 	{
 		if (!s_Device)
 		{
-			ASSERT_MSG(false, "Device not initialized!");
+			ASSERT(false, "Device not initialized!");
 		}
 
 		s_Device->m_RtvDescHeapHandlesToBeDeleted.push_back(handle);
@@ -1188,7 +1222,7 @@ namespace Gecko::DX12
 	{
 		if (!s_Device)
 		{
-			ASSERT_MSG(false, "Device not initialized!");
+			ASSERT(false, "Device not initialized!");
 		}
 
 		s_Device->m_DsvDescHeapHandlesToBeDeleted.push_back(handle);
@@ -1197,7 +1231,7 @@ namespace Gecko::DX12
 	{
 		if (!s_Device)
 		{
-			ASSERT_MSG(false, "Device not initialized!");
+			ASSERT(false, "Device not initialized!");
 		}
 
 		s_Device->m_SrvDescHeapHandlesToBeDeleted.push_back(handle);
@@ -1213,22 +1247,27 @@ namespace Gecko::DX12
 	{
 		if (m_Device)
 		{
-			ASSERT_MSG(false, "Device already exists! cannot create it again!");
+			ASSERT(false, "Device already exists! cannot create it again!");
 		}
 
 		u32 createFactoryFlags = 0;
 
 #ifdef DEBUG
+		ComPtr<ID3D12Debug3> debugInterface;
+		if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface))))
 		{
-			ComPtr<ID3D12Debug3> debugInterface;
-			DIRECTX12_ASSERT(D3D12GetDebugInterface(IID_PPV_ARGS(&debugInterface)));
 			debugInterface->EnableDebugLayer();
 			debugInterface->SetEnableGPUBasedValidation(true);
 			createFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
 		}
+		else
+		{
+			LOG_WARN("DirectX debug layer requested but not supported by hardware!\n"
+				"\tAre you missing the optional system feature 'Graphics tools'?");
+		}
 #endif
 
-		DIRECTX12_ASSERT(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&m_Factory)));
+		DIRECTX12_ASSERT(CreateDXGIFactory2(createFactoryFlags, IID_PPV_ARGS(&m_Factory)), nullptr);
 
 		ComPtr<IDXGIAdapter1> adapter = GetAdapter(m_Factory);
 		if (!adapter)
@@ -1241,21 +1280,20 @@ namespace Gecko::DX12
 		LOG_DEBUG("Selected Adapter: %ls", adapterDesc.Description);
 
 		D3D_FEATURE_LEVEL maxFeatureLevel{ GetMaxFeatureLevel(adapter) };
-		ASSERT(maxFeatureLevel >= c_MinimumFeatureLevel);
-		if (maxFeatureLevel < c_MinimumFeatureLevel) return;
+		ASSERT(maxFeatureLevel >= c_MinimumFeatureLevel, "Hardware does not support minimum feature level!");
 
-		DIRECTX12_ASSERT(D3D12CreateDevice(adapter.Get(), maxFeatureLevel, IID_PPV_ARGS(&m_Device)));
+		DIRECTX12_ASSERT(D3D12CreateDevice(adapter.Get(), maxFeatureLevel, IID_PPV_ARGS(&m_Device)), nullptr);
 
 		NAME_DIRECTX12_OBJECT(m_Device, "Main Device");
 
 #ifdef DEBUG
+		ComPtr<ID3D12InfoQueue> infoQueue;
+		if (SUCCEEDED(m_Device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
 		{
-			ComPtr<ID3D12InfoQueue> infoQueue;
-			DIRECTX12_ASSERT(m_Device->QueryInterface(IID_PPV_ARGS(&infoQueue)));
 			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 			infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-		}
+		} // no else, warning already logged when trying to create the debug layer
 #endif
 	}
 
@@ -1274,8 +1312,12 @@ namespace Gecko::DX12
 		featureLevelInfo.pFeatureLevelsRequested = c_FeatureLevels;
 
 		ComPtr<ID3D12Device> device;
-		DIRECTX12_ASSERT(D3D12CreateDevice(adapter.Get(), c_MinimumFeatureLevel, IID_PPV_ARGS(&device)));
-		DIRECTX12_ASSERT(device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &featureLevelInfo, sizeof(featureLevelInfo)));
+		DIRECTX12_ASSERT(D3D12CreateDevice(adapter.Get(), c_MinimumFeatureLevel, IID_PPV_ARGS(&device)), nullptr);
+		DIRECTX12_ASSERT(device->CheckFeatureSupport(
+			D3D12_FEATURE_FEATURE_LEVELS,
+			&featureLevelInfo,
+			sizeof(featureLevelInfo)
+		), nullptr);
 		return featureLevelInfo.MaxSupportedFeatureLevel;
 	}
 
@@ -1287,7 +1329,12 @@ namespace Gecko::DX12
 		ComPtr<IDXGIAdapter4> adapter{ nullptr };
 
 		LOG_DEBUG("Going trough adapters: ");
-		for (u32 i = 0; factory->EnumAdapterByGpuPreference(i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND; i++)
+		for (u32 i = 0;
+			factory->EnumAdapterByGpuPreference(
+				i,
+				DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+				IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND;
+			i++)
 		{
 			DXGI_ADAPTER_DESC1 adapterDesc{};
 			adapter->GetDesc1(&adapterDesc);
@@ -1299,8 +1346,8 @@ namespace Gecko::DX12
 				return adapter;
 			}
 		}
-
-		ASSERT_MSG(false, "Could not find a suiting adapter!");
+		
+		ASSERT(false, "Could not find a suiting adapter!");
 		return nullptr;
 	}
 
@@ -1314,14 +1361,14 @@ namespace Gecko::DX12
 		queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
 		queueDesc.NodeMask = 0;
 
-		DIRECTX12_ASSERT(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&(*commandQueue))));
+		DIRECTX12_ASSERT(device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&(*commandQueue))), nullptr);
 
 		NAME_DIRECTX12_OBJECT(
 			(*commandQueue),
 			type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics Command Queue" :
 			type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy Command Queue" :
 			type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute Command Queue" :
-			"Unkown Command Queue"
+			"Unknown Command Queue"
 		);
 
 		for (u32 i = 0; i < (*commandBuffers).size(); i++)
@@ -1332,7 +1379,7 @@ namespace Gecko::DX12
 			DIRECTX12_ASSERT(device->CreateCommandAllocator(
 				type,
 				IID_PPV_ARGS(&commandBuffer->CommandAllocator)
-			));
+			), nullptr);
 
 			NAME_DIRECTX12_OBJECT_INDEXED(
 				commandBuffer->CommandAllocator,
@@ -1340,14 +1387,14 @@ namespace Gecko::DX12
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics allocator" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy allocator" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute allocator" :
-				"Unkown allocator"
+				"Unknown allocator"
 			);
 
 			DIRECTX12_ASSERT(device->CreateFence(
 				0,
 				D3D12_FENCE_FLAG_NONE,
 				IID_PPV_ARGS(&commandBuffer->Fence)
-			));
+			), nullptr);
 
 			NAME_DIRECTX12_OBJECT_INDEXED(
 				commandBuffer->Fence,
@@ -1355,7 +1402,7 @@ namespace Gecko::DX12
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics Fence" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy Fence" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute Fence" :
-				"Unkown Fence"
+				"Unknown Fence"
 			);
 
 			DIRECTX12_ASSERT(device->CreateCommandList(
@@ -1364,9 +1411,9 @@ namespace Gecko::DX12
 				commandBuffer->CommandAllocator.Get(),
 				nullptr,
 				IID_PPV_ARGS(&commandBuffer->CommandList)
-			));
+			), nullptr);
 
-			DIRECTX12_ASSERT(commandBuffer->CommandList->Close());
+			DIRECTX12_ASSERT(commandBuffer->CommandList->Close(), nullptr);
 
 			NAME_DIRECTX12_OBJECT_INDEXED(
 				commandBuffer->CommandList,
@@ -1374,7 +1421,7 @@ namespace Gecko::DX12
 				type == D3D12_COMMAND_LIST_TYPE_DIRECT ? "Graphics CommandList" :
 				type == D3D12_COMMAND_LIST_TYPE_COPY ? "Copy CommandList" :
 				type == D3D12_COMMAND_LIST_TYPE_COMPUTE ? "Compute CommandList" :
-				"Unkown CommandList"
+				"Unknown CommandList"
 			);
 		}
 
@@ -1461,7 +1508,7 @@ namespace Gecko::DX12
 			texture_DX12->TextureResource->CurrentState,
 			clearValue,
 			IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)
-		));
+		), nullptr);
 
 		// SRV
 		{
@@ -1503,7 +1550,8 @@ namespace Gecko::DX12
 		}
 
 		// UAV
-		if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && desc.Format != DataFormat::R8G8B8A8_SRGB)
+		if (textureResourceDesc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS && 
+			desc.Format != DataFormat::R8G8B8A8_SRGB)
 		{
 			texture_DX12->UnorderedAccessView = m_SrvDescHeap.Allocate();
 
@@ -1584,7 +1632,8 @@ namespace Gecko::DX12
 					D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 					uavDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2DARRAY;
 					uavDesc.Format = FormatToD3D12Format(desc.Format);
-					uavDesc.Format = uavDesc.Format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ? DXGI_FORMAT_R8G8B8A8_UNORM : uavDesc.Format;
+					uavDesc.Format = uavDesc.Format == 
+						DXGI_FORMAT_R8G8B8A8_UNORM_SRGB ? DXGI_FORMAT_R8G8B8A8_UNORM : uavDesc.Format;
 					uavDesc.Texture2DArray.MipSlice = i;
 					uavDesc.Texture2DArray.FirstArraySlice = 0;
 					uavDesc.Texture2DArray.ArraySize = desc.Type == TextureType::TexCube ? 6 : 1;
@@ -1597,7 +1646,8 @@ namespace Gecko::DX12
 					);
 				}
 
-				texture_DX12->TextureResource->SubResourceStates[i] = texture_DX12->TextureResource->CurrentState;
+				texture_DX12->TextureResource->SubResourceStates[i] = 
+					texture_DX12->TextureResource->CurrentState;
 			}
 
 		}
@@ -1676,7 +1726,10 @@ namespace Gecko::DX12
 			Ref<Texture_DX12> texture_DX12 = CreateRef<Texture_DX12>();
 
 			texture_DX12->TextureResource = CreateRef<Resource>();
-			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)));
+			DIRECTX12_ASSERT(m_SwapChain->GetBuffer(
+				i, 
+				IID_PPV_ARGS(&texture_DX12->TextureResource->ResourceDX12)
+			), nullptr);
 			texture_DX12->TextureResource->CurrentState = D3D12_RESOURCE_STATE_COMMON;
 
 			Texture texture(textureDesc);
@@ -1687,7 +1740,11 @@ namespace Gecko::DX12
 			D3D12_RENDER_TARGET_VIEW_DESC renderTargetViewDesc{};
 			renderTargetViewDesc.Format = format;
 			renderTargetViewDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-			m_Device->CreateRenderTargetView(texture_DX12->TextureResource->ResourceDX12.Get(), &renderTargetViewDesc, renderTargetDX12->RenderTargetViews[0].CPU);
+			m_Device->CreateRenderTargetView(
+				texture_DX12->TextureResource->ResourceDX12.Get(), 
+				&renderTargetViewDesc, 
+				renderTargetDX12->RenderTargetViews[0].CPU
+			);
 			NAME_DIRECTX12_OBJECT_INDEXED(texture_DX12->TextureResource->ResourceDX12, i, "BackBuffer");
 
 			renderTargetDX12->Rect.left = 0;
@@ -1747,7 +1804,7 @@ namespace Gecko::DX12
 	Ref<Buffer_DX12> Device_DX12::CreateBuffer(const BufferDesc& desc)
 	{
 		// Create the buffer
-		ASSERT_MSG(desc.IsValid(), "BufferDesc is invalid!");
+		ASSERT(desc.IsValid(), "BufferDesc is invalid!");
 		Ref<Buffer_DX12> buffer_DX12 = CreateRef<Buffer_DX12>();
 
 		if (desc.Type == BufferType::Constant)

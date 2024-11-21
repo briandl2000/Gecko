@@ -39,16 +39,16 @@ namespace Gecko
 			u32 DeferredReleasesFlag{ 0 };
 			ComPtr<ID3D12GraphicsCommandList6> CommandList{ nullptr };
 
-			void Wait(HANDLE fenceEvent)
-			{
-				ASSERT(Fence && fenceEvent);
+		void Wait(HANDLE fenceEvent)
+		{
+			ASSERT(Fence && fenceEvent, "Cannot wait if Fence or FenceEvent are invalid!");
 
-				if (IsBusy())
-				{
-					DIRECTX12_ASSERT(Fence->SetEventOnCompletion(FenceValue, fenceEvent));
-					WaitForSingleObject(fenceEvent, INFINITE);
-				}
+			if (IsBusy())
+			{
+				DIRECTX12_ASSERT(Fence->SetEventOnCompletion(FenceValue, fenceEvent), nullptr);
+				WaitForSingleObject(fenceEvent, INFINITE);
 			}
+		}
 
 			bool IsBusy()
 			{

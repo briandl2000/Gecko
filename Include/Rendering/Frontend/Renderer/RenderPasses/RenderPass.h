@@ -60,7 +60,7 @@ public:
 		if (T* t = dynamic_cast<T*>(this))
 			t->SubInit(appInfo, resourceManager, data);
 		else
-			ASSERT_MSG(false, "Invalid render pass initialisation!");
+			ASSERT(false, "Invalid render pass initialisation!");
 	}
 
 	/* Render to output target (pointed to by m_OutputHandle). Any dependencies for rendering should be defined in derived 

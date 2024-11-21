@@ -34,7 +34,7 @@ namespace Gecko
 		case DataFormat::None: break;
 		}
 
-		ASSERT_MSG(false, "Unkown Format");
+		ASSERT(false, "Unkown Format");
 		return 0;
 	}
 
