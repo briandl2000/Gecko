@@ -8,7 +8,7 @@
 
 namespace Gecko
 {
-
+#pragma region enums
 	/** @brief Shader types */
 	enum class ShaderType : u8
 	{
@@ -131,6 +131,19 @@ namespace Gecko
 
 	// Helper functions
 
+	std::string EnumToString(ShaderType val);
+	std::string EnumToString(DataFormat val);
+	std::string EnumToString(ClearValueType val);
+	std::string EnumToString(TextureType val);
+	std::string EnumToString(CullMode val);
+	std::string EnumToString(WindingOrder val);
+	std::string EnumToString(PrimitiveType val);
+	std::string EnumToString(SamplerFilter val);
+	std::string EnumToString(SamplerWrapMode val);
+	std::string EnumToString(ResourceType val);
+	std::string EnumToString(BufferType val);
+	std::string EnumToString(MemoryType val);
+
 	/**
 	 * @brief
 	 *
@@ -147,7 +160,9 @@ namespace Gecko
 	 * @return The number of maximal mips for a texture in u32
 	 */
 	u32 CalculateNumberOfMips(u32 width, u32 height);
+#pragma endregion
 
+#pragma region structs
 	// Information structs
 
 	/**
@@ -168,18 +183,13 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if VertexAttribute is valid.
 		 * VertexAttribute is valid when:
 		 * AttributeFormat != None and Size > 0
 		 */
-		bool IsValid() const
-		{
-			return AttributeFormat != DataFormat::None && Size > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const {	return IsValid(); }
 
 		// Does not check for name equality
 		bool operator==(const VertexAttribute& other) const
@@ -216,23 +226,13 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if VertexLayout is valid.
 		 * VertexLayout is valid when:
 		 * All vertex attributes are valid
 		 */
-		bool IsValid() const
-		{
-			for (const VertexAttribute& attributte : Attributes)
-			{
-				if (!attributte.IsValid())
-					return false;
-			}
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 
 		bool operator==(const VertexLayout& other) const
 		{
@@ -301,14 +301,8 @@ namespace Gecko
 			Values[3] = a;
 		}
 
-		bool IsValid() const
-		{
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 
 		bool operator==(const ClearValue& other) const
 		{
@@ -338,14 +332,8 @@ namespace Gecko
 		SamplerWrapMode WrapV{ SamplerWrapMode::Wrap };
 		SamplerWrapMode WrapW{ SamplerWrapMode::Wrap };
 
-		bool IsValid() const
-		{
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 
 		bool operator==(const SamplerDesc& other) const
 		{
@@ -420,27 +408,14 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true PipelineResource is valid.
 		 * PipelineResource is valid when:
 		 * Type != None,
 		 * When Type == LocalData Size can't be 0 and Size needs to be a multiple of 4
 		 */
-		bool IsValid() const
-		{
-			if (Type == ResourceType::None)
-			{
-				return false;
-			}
-			if (Type == ResourceType::LocalData && (Size == 0 || Size % 4 != 0))
-			{
-				return false;
-			}
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	// Buffers
@@ -483,20 +458,15 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if VertexBufferDesc is valid.
 		 * VertexBufferDesc is valid when:
 		 * Layout.Attributes.Size() > 0,
 		 * Layout is valid,
 		 * NumVertices > 0.
 		 */
-		bool IsValid() const
-		{
-			return Layout.Attributes.size() > 0 && Layout.IsValid() && NumVertices > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -513,21 +483,14 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if IndexBufferDesc is valid.
 		 * IndexBufferDesc is valid when:
 		 * IndexFormat == R16_UINT or IndexFormat == R32_UINT,
 		 * NumIndices > 0
 		 */
-		bool IsValid() const
-		{
-			if (IndexFormat != DataFormat::R16_UINT && IndexFormat != DataFormat::R32_UINT)
-				return false;
-			return NumIndices > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -541,18 +504,13 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if ConstantBufferDesc is valid.
 		 * ConstantBufferDesc is valid when:
 		 * Size > 0.
 		 */
-		bool IsValid() const
-		{
-			return Size > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -569,19 +527,14 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if StructuredBufferDesc is valid.
 		 * StructuredBufferDesc is valid when:
 		 * StructSize > 0,
 		 * NumElements > 0.
 		 */
-		bool IsValid() const
-		{
-			return StructSize > 0 && NumElements > 0;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -601,6 +554,7 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if BufferDesc is valid.
 		 * BufferDesc is valid when:
 		 * MemoryType != None and Type != None,
@@ -608,16 +562,7 @@ namespace Gecko
 		 * if MemoryType == Constant CanReadWrite must be false and Size > 0,
 		 * otherwise Stride > 0 and NumElements > 0
 		 */
-		bool IsValid() const
-		{
-			if (MemoryType == MemoryType::None || Type == BufferType::None)
-				return false;
-			if (MemoryType == MemoryType::Shared && CanReadWrite)
-				return false;
-			if (Type == BufferType::Constant)
-				return Size > 0 && !CanReadWrite;
-			return Stride > 0 && NumElements > 0;
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
 		operator bool() { return IsValid(); }
 	};
 
@@ -648,14 +593,12 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if Buffer is valid.
 		 * Buffer is valid when:
 		 * Desc is valid and Data != nullptr
 		 */
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
 		operator bool() const { return IsValid(); }
 	};
 
@@ -677,26 +620,15 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if TextureDesc is valid.
 		 * TextureDesc is valid when:
 		 * Format != DataFormat::None and Type != TextureType::None,
 		 * if Type == Tex1D or Tex1DArray Height and Depth must be 1.
 		 * if Type == Tex2D or Tex2dArray Depth must be 1.
 		 */
-		bool IsValid() const
-		{
-			if (Format == DataFormat::None || Type == TextureType::None)
-				return false;
-			if (Type == TextureType::Tex1D || Type == TextureType::Tex1DArray)
-				return Height == 1 && Depth == 1;
-			else if (Type == TextureType::Tex2D || Type == TextureType::Tex2DArray)
-				return Depth == 1;
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -725,18 +657,13 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if Texture is valid.
 		 * Texture is valid when:
 		 * Desc is valid and Data != nullptr
 		 */
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	// Render target
@@ -762,31 +689,15 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if RenderTargetDesc is valid.
 		 * RenderTargetDesc is valid when:
 		 * Width != 0 and Height != 0.
 		 * if NumRenderTargets > 0 RenderTargetFormats[0] to RenderTargetFormats[NumRenderTargets] cannot be None.
 		 * if no render targets are used DepthStencilFormat cannot be None.
 		 */
-		bool IsValid() const
-		{
-			if (Width == 0 || Height == 0)
-				return false;
-			for (u32 i = 0; i < NumRenderTargets; i++)
-			{
-				if (RenderTargetFormats[i] == DataFormat::None)
-				{
-					return false;
-				}
-			}
-			if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
-				return false;
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -827,6 +738,7 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if RenderTarget is valid.
 		 * RenderTarget is valid when:
 		 * Desc is valid,
@@ -834,17 +746,8 @@ namespace Gecko
 		 * if Desc.DepthStencilFormat != None DepthTexture is valid,
 		 * Data != nullptr
 		 */
-		bool IsValid() const
-		{
-			if (!RenderTextures[0].IsValid() && !DepthTexture.IsValid())
-				return false;
-
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	// Graphics pipeline
@@ -890,27 +793,15 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if GraphicsPipelineDesc is valid.
 		 * GraphicsPipelineDesc is valid when:
 		 * VertexShaderPath != nullptr (atleast a vertex shader is needed for a graphics pipeline),
 		 * ShaderVersion != nullptr,
 		 * RenderTargetFormats[0] or DepthStencilFormat != None.
 		 */
-		bool IsValid() const
-		{
-			if (!VertexShaderPath || !ShaderVersion)
-				return false;
-			// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
-			// Assume that if the first RenderTexture does not have a valid format, none of them do
-			if (RenderTextureFormats[0] == DataFormat::None && DepthStencilFormat == DataFormat::None)
-				return false;
-
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -939,18 +830,13 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if GraphicsPipeline is valid.
 		 * GraphicsPipeline is valid when:
 		 * Desc is valid and Data != nullptr.
 		 */
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	// Compute pipeline
@@ -982,22 +868,14 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if ComputePipelineDesc is valid.
 		 * ComputePipelineDesc is valid when:
 		 * ComputeShaderPath != nullptr,
 		 * ShaderVersion != nullptr.
 		 */
-		bool IsValid() const
-		{
-			if (!ComputeShaderPath || !ShaderVersion)
-				return false;
-
-			return true;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
 
 	/**
@@ -1026,17 +904,13 @@ namespace Gecko
 
 		/**
 		 * @brief
+		 * @param failureReason Filled in with the reason the object is invalid
 		 * @return true if ComputePipeline is valid.
 		 * ComputePipeline is valid when:
 		 * Desc is valid and Data != nullptr.
 		 */
-		bool IsValid() const
-		{
-			return Desc.IsValid() && Data;
-		}
-		operator bool() const
-		{
-			return IsValid();
-		}
+		bool IsValid(std::string* failureReason = nullptr) const;
+		operator bool() const { return IsValid(); }
 	};
+#pragma endregion
 }

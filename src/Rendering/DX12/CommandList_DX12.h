@@ -19,6 +19,9 @@ namespace Gecko::DX12
 		Raytracing
 	};
 
+	// Helper function
+	std::string EnumToString(PipelineType val);
+
 	class CommandList_DX12 : public CommandList
 	{
 	public:

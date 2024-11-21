@@ -24,7 +24,7 @@ namespace Gecko {
 #endif // DIRECTX_12
 		}
 
-		ASSERT(false, "Unkown RenderAPI selected");
+		ASSERT(false, "Unknown RenderAPI selected");
 		return nullptr;
 	}
 }
