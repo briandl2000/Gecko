@@ -3,7 +3,8 @@
 #include "Rendering/DX12/DescriptorHeap_DX12.h"
 #include "Rendering/DX12/Device_DX12.h"
 
-namespace Gecko { namespace DX12 {
+namespace Gecko::DX12
+{
 
     bool DescriptorHeap::Initialize(Device_DX12* device, u32 capacity, bool isShaderVisible)
     {
@@ -13,7 +14,7 @@ namespace Gecko { namespace DX12 {
         std::lock_guard<std::mutex> lock(m_Mutex);
 
         ASSERT(capacity, "Cannot create a descriptor heap with no capacity!")
-        ASSERT(capacity < D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2, "Requested capacity for descriptor heap exceeds max capacity!");
+            ASSERT(capacity < D3D12_MAX_SHADER_VISIBLE_DESCRIPTOR_HEAP_SIZE_TIER_2, "Requested capacity for descriptor heap exceeds max capacity!");
         ASSERT(!(m_Type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER && capacity > D3D12_MAX_SHADER_VISIBLE_SAMPLER_HEAP_SIZE),
             "Requested capacity for sampler heap exceeds max capacity!");
 
@@ -30,7 +31,7 @@ namespace Gecko { namespace DX12 {
         desc.Flags = isShaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
         desc.NodeMask = 0;
 
-        DIRECTX12_ASSERT(m_Device->GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_Heap)), nullptr);
+        DIRECTX12_ASSERT(m_Device->GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_Heap)));
 
         m_FreeHandles = std::move(CreateScope<u32[]>(capacity));
         m_Capacity = capacity;
@@ -105,10 +106,9 @@ namespace Gecko { namespace DX12 {
 #endif
 
         m_DeferredFreeIndices.push_back(index);
-        m_Device->SetDeferredReleasesFlag();
 
         handle = {};
     }
-} }
+}
 
 #endif

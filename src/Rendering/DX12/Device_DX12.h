@@ -61,8 +61,6 @@ namespace Gecko::DX12
 	public:
 		// Public Methods
 
-		void SetDeferredReleasesFlag();
-
 		void Flush();
 
 		Ref<CommandBuffer> GetFreeGraphicsCommandBuffer();

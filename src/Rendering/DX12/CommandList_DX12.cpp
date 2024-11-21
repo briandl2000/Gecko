@@ -28,8 +28,7 @@ namespace Gecko::DX12
 	}
 
 	CommandList_DX12::~CommandList_DX12()
-	{
-	}
+	{}
 
 	bool CommandList_DX12::IsValid()
 	{
@@ -47,29 +46,19 @@ namespace Gecko::DX12
 			std::string failureReason{};
 			ASSERT(renderTarget.IsValid(&failureReason), failureReason.c_str());
 		}
-		
+
 		RenderTarget_DX12* renderTargetDX12 = reinterpret_cast<RenderTarget_DX12*>(renderTarget.Data.get());
 		TransitionRenderTarget(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_DEPTH_WRITE);
 		for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
 		{
-			CommandBuffer->CommandList->ClearRenderTargetView(
-				renderTargetDX12->RenderTargetViews[i].CPU,
-				renderTarget.Desc.RenderTargetClearValues[i].Values,
-				1,
-				&renderTargetDX12->Rect
-			);
+			CommandBuffer->CommandList->ClearRenderTargetView(renderTargetDX12->RenderTargetViews[i].CPU,
+				renderTarget.Desc.RenderTargetClearValues[i].Values, 1, &renderTargetDX12->Rect);
 		}
 
 		if (renderTarget.Desc.DepthStencilFormat != DataFormat::None)
 		{
-			CommandBuffer->CommandList->ClearDepthStencilView(
-				renderTargetDX12->DepthStencilView.CPU,
-				D3D12_CLEAR_FLAG_DEPTH,
-				renderTarget.Desc.DepthTargetClearValue.Depth,
-				0,
-				1,
-				&renderTargetDX12->Rect
-			);
+			CommandBuffer->CommandList->ClearDepthStencilView(renderTargetDX12->DepthStencilView.CPU,
+				D3D12_CLEAR_FLAG_DEPTH, renderTarget.Desc.DepthTargetClearValue.Depth, 0, 1, &renderTargetDX12->Rect);
 		}
 	}
 
@@ -93,14 +82,7 @@ namespace Gecko::DX12
 		CD3DX12_TEXTURE_COPY_LOCATION Src(srcTextureResource->ResourceDX12.Get());
 		CD3DX12_TEXTURE_COPY_LOCATION Dst(dstTextureResource->ResourceDX12.Get());
 
-		CommandBuffer->CommandList->CopyTextureRegion(
-			&Dst,
-			0,
-			0,
-			0,
-			&Src,
-			nullptr
-		);
+		CommandBuffer->CommandList->CopyTextureRegion(&Dst, 0, 0, 0, &Src, nullptr);
 	}
 
 	void CommandList_DX12::BindRenderTarget(const RenderTarget& renderTarget)
@@ -109,10 +91,17 @@ namespace Gecko::DX12
 			std::string failureReason = "Graphics pipeline needs to be bound to bind render target! "
 				"Currently bound type: " + EnumToString(m_BoundPipelineType);
 			ASSERT(m_BoundPipelineType == PipelineType::Graphics, failureReason.c_str());
-			failureReason = "Graphics pipeline is invalid!";
-			ASSERT(m_GraphicsPipeline.IsValid(&failureReason), failureReason.c_str());
-			failureReason = "Render target is invalid!";
-			ASSERT(renderTarget.IsValid(&failureReason), failureReason.c_str());
+			ASSERT(m_GraphicsPipeline.IsValid(&failureReason), ("Graphics pipeline is invalid, because " + failureReason).c_str());
+			ASSERT(renderTarget.IsValid(&failureReason), ("Render target is invalid, because " + failureReason).c_str());
+			ASSERT(m_GraphicsPipeline.Desc.NumRenderTargets == renderTarget.Desc.NumRenderTargets,
+				"Number of render targets for the pipeline and rendertarget doesn't match!");
+			for (u32 i = 0; i < m_GraphicsPipeline.Desc.NumRenderTargets; i++)
+			{
+				ASSERT(m_GraphicsPipeline.Desc.RenderTextureFormats[i] == renderTarget.Desc.RenderTargetFormats[i],
+					("Render target(" + std::to_string(i) + ") doesn't match in graphics pipeline and render target!").c_str());
+			}
+			ASSERT(m_GraphicsPipeline.Desc.DepthStencilFormat == renderTarget.Desc.DepthStencilFormat,
+				"Depth stencil format in graphics pipeline and render target doesn't match!");
 		}
 
 		RenderTarget_DX12* renderTargetDX12 = reinterpret_cast<RenderTarget_DX12*>(renderTarget.Data.get());
@@ -128,10 +117,7 @@ namespace Gecko::DX12
 			RenderTargetCpuHandles[i] = renderTargetDX12->RenderTargetViews[i].CPU;
 		}
 
-		CommandBuffer->CommandList->OMSetRenderTargets(
-			renderTarget.Desc.NumRenderTargets,
-			RenderTargetCpuHandles,
-			false,
+		CommandBuffer->CommandList->OMSetRenderTargets(renderTarget.Desc.NumRenderTargets, RenderTargetCpuHandles, false,
 			renderTargetDX12->DepthStencilView.IsValid() ? &renderTargetDX12->DepthStencilView.CPU : nullptr);
 	}
 
@@ -181,7 +167,7 @@ namespace Gecko::DX12
 	{
 		std::string failureReason{};
 		ASSERT(buffer.IsValid(&failureReason), failureReason.c_str());
-		ASSERT(buffer.Desc.Type == BufferType::Constant, "Only constant buffers can be bound in BindConstantBuffer");
+		ASSERT(buffer.Desc.Type == BufferType::Constant, "Only constant buffers can be bound in BindConstantBuffer!");
 		Buffer_DX12* constantBuffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 
 		// TransitionResource(constantBuffer_DX12->BufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
@@ -192,7 +178,6 @@ namespace Gecko::DX12
 			ASSERT(slot < graphicsPipeline_DX12->ConstantBufferIndices.size(), "Slot is out of bounds of constant buffer indices!");
 
 			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->ConstantBufferIndices[slot];
-
 			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot,
 				constantBuffer_DX12->ConstantBufferView.GPU);
 			return;
@@ -267,11 +252,11 @@ namespace Gecko::DX12
 
 		Buffer_DX12* buffer_DX12 = reinterpret_cast<Buffer_DX12*>(buffer.Data.get());
 		ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
-		ASSERT(slot < computePipeline_DX12->UAVIndices.size(), "Specified slot is out of bounds!");
+		ASSERT(slot < computePipeline_DX12->ReadWriteIndices.size(), "Specified slot is out of bounds!");
 
 		TransitionResource(buffer_DX12->BufferResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0, 1);
 
-		u32	rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
+		u32	rootDescriptorTableSlot = computePipeline_DX12->ReadWriteIndices[slot];
 		CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, buffer_DX12->ReadWriteBufferView.GPU);
 	}
 
@@ -392,12 +377,12 @@ namespace Gecko::DX12
 
 		Texture_DX12* texture_DX12 = reinterpret_cast<Texture_DX12*>(texture.Data.get());
 		ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
-		ASSERT(slot < computePipeline_DX12->UAVIndices.size(), "Specified slot is out of bounds!");
+		ASSERT(slot < computePipeline_DX12->ReadWriteIndices.size(), "Specified slot is out of bounds!");
 
 		TransitionResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 			texture.Desc.NumMips, texture.Desc.NumArraySlices);
 
-		u32	rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
+		u32	rootDescriptorTableSlot = computePipeline_DX12->ReadWriteIndices[slot];
 		CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->UnorderedAccessView.GPU);
 	}
 
@@ -414,12 +399,12 @@ namespace Gecko::DX12
 
 		Texture_DX12* texture_DX12 = reinterpret_cast<Texture_DX12*>(texture.Data.get());
 		ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
-		ASSERT(slot < computePipeline_DX12->UAVIndices.size(), "Specified slot is out of bounds!");
+		ASSERT(slot < computePipeline_DX12->ReadWriteIndices.size(), "Specified slot is out of bounds!");
 
 		TransitionSubResource(texture_DX12->TextureResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 			texture.Desc.NumMips, texture.Desc.NumArraySlices, mipLevel);
 
-		u32 rootDescriptorTableSlot = computePipeline_DX12->UAVIndices[slot];
+		u32 rootDescriptorTableSlot = computePipeline_DX12->ReadWriteIndices[slot];
 		CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, texture_DX12->MipUnorderedAccessViews[mipLevel].GPU);
 	}
 

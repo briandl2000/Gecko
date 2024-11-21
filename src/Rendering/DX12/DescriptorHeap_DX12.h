@@ -6,7 +6,8 @@
 
 #include "Rendering/DX12/CommonHeaders_DX12.h"
 
-namespace Gecko { namespace DX12 {
+namespace Gecko::DX12
+{
 
     class Device_DX12;
     class DescriptorHeap;
@@ -53,8 +54,8 @@ namespace Gecko { namespace DX12 {
     private:
         ComPtr<ID3D12DescriptorHeap> m_Heap = nullptr;
 
-        D3D12_CPU_DESCRIPTOR_HANDLE m_CPUStart{0};
-        D3D12_GPU_DESCRIPTOR_HANDLE m_GPUStart{0};
+        D3D12_CPU_DESCRIPTOR_HANDLE m_CPUStart{ 0 };
+        D3D12_GPU_DESCRIPTOR_HANDLE m_GPUStart{ 0 };
 
         std::mutex m_Mutex;
 
@@ -69,6 +70,6 @@ namespace Gecko { namespace DX12 {
         Device_DX12* m_Device;
     };
 
-} }
+}
 
 #endif // WIN32

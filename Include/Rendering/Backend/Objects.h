@@ -189,7 +189,7 @@ namespace Gecko
 		 * AttributeFormat != None and Size > 0
 		 */
 		bool IsValid(std::string* failureReason = nullptr) const;
-		operator bool() const {	return IsValid(); }
+		operator bool() const { return IsValid(); }
 
 		// Does not check for name equality
 		bool operator==(const VertexAttribute& other) const
@@ -780,6 +780,7 @@ namespace Gecko
 
 		VertexLayout VertexLayout{};
 
+		u32 NumRenderTargets{ 0 };
 		DataFormat RenderTextureFormats[8]{ DataFormat::None };
 		DataFormat DepthStencilFormat{ DataFormat::None };
 

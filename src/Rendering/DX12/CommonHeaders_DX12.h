@@ -28,44 +28,14 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 #endif
 
 #ifdef DEBUG
-namespace Gecko { namespace Assertions {
-	// I strongly dislike writing macros, so I'm transitioning to a function call instead
-	static std::string DX12FormatAssertMsg(HRESULT hr, ComPtr<ID3DBlob> errorBlob)
-	{
-		std::string totalMsg;
-		LPTSTR msg = NULL;
-		FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-			FORMAT_MESSAGE_ALLOCATE_BUFFER |
-			FORMAT_MESSAGE_IGNORE_INSERTS,
-			NULL,
-			hr,
-			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-			(LPTSTR)&msg,
-			0,
-			NULL);
-		totalMsg.append(msg);
-
-		if (errorBlob)
-		{
-			totalMsg.append("Additional info: ");
-			totalMsg.append((char*)errorBlob->GetBufferPointer());
-		}
-		return totalMsg;
-	}
-} }
-
-#define DIRECTX12_ASSERT(hr, errorBlob)														\
-{																							\
-	/* hr can be a function call, so reassign to make sure it's just the output HRESULT */	\
-	HRESULT resultCode = hr;																\
-	std::string msg = Gecko::Assertions::DX12FormatAssertMsg(resultCode, errorBlob);		\
-	ASSERT(SUCCEEDED(resultCode), msg.c_str());												\
-}
-
+#define DIRECTX12_ASSERT(hr) ASSERT(!FAILED(hr), "")
+#define DIRECTX12_ASSERT_MSG(hr, message) ASSERT(!FAILED(hr), message)
+#define DX12_DEBUG_LAYER
 #else
-#define DIRECTX12_ASSERT(hr, errorBlob) ASSERT(SUCCEEDED(hr), "")
+#define DIRECTX12_ASSERT(hr) hr
+#define DIRECTX12_ASSERT_MSG(hr, message) hr
 #endif
-	
+
 // TODO: Make use of custom string formating and wchar string class
 #ifdef DEBUG
 #define NAME_DIRECTX12_OBJECT(obj, name)			\

@@ -28,7 +28,7 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 			PipelineResource::Texture(ShaderType::Pixel, 3),
 			PipelineResource::Texture(ShaderType::Pixel, 4),
 		};
-
+		pipelineDesc.NumRenderTargets = 5;
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
 		pipelineDesc.RenderTextureFormats[1] = DataFormat::R32G32B32A32_FLOAT; // Normal
 		pipelineDesc.RenderTextureFormats[2] = DataFormat::R32G32B32A32_FLOAT; // Position
@@ -62,6 +62,7 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 			PipelineResource::ConstantBuffer(ShaderType::All, 0),
 			PipelineResource::Texture(ShaderType::Pixel, 0)
 		};
+		pipelineDesc.NumRenderTargets = 5;
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
 		pipelineDesc.RenderTextureFormats[1] = DataFormat::R32G32B32A32_FLOAT; // Normal
 		pipelineDesc.RenderTextureFormats[2] = DataFormat::R32G32B32A32_FLOAT; // Position
@@ -109,10 +110,9 @@ const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, Resource
 	GraphicsPipeline GBufferPipeline = resourceManager->GetGraphicsPipeline(GBufferPipelineHandle);
 
 	// Environment map pass
+	commandList->BindGraphicsPipeline(CubemapPipeline);
 	commandList->ClearRenderTarget(OutputTarget);
 	commandList->BindRenderTarget(OutputTarget);
-
-	commandList->BindGraphicsPipeline(CubemapPipeline);
 	u32 currentBackBufferIndex = resourceManager->GetCurrentBackBufferIndex();
 	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
 	Mesh& cubeMesh = resourceManager->GetMesh(resourceManager->GetCubeMeshHandle());

@@ -135,7 +135,7 @@ namespace Gecko
 	{
 		switch (val)
 		{
-		/* None is a valid cull mode */
+			/* None is a valid cull mode */
 		case CullMode::None:
 			return "None";
 		case CullMode::Back:
@@ -536,15 +536,29 @@ namespace Gecko
 				*failureReason = "Invalid ShaderVersion for GraphicsPipeline!";
 			return false;
 		}
-		// RenderTarget needs to have either at least one valid RenderTexture or a valid DepthTexture (or both)
-		// Assume that if the first RenderTexture does not have a valid format, none of them do
-		if (RenderTextureFormats[0] == DataFormat::None && DepthStencilFormat == DataFormat::None)
+
+		for (u32 i = 0; i < NumRenderTargets; i++)
+		{
+			if (RenderTextureFormats[i] == DataFormat::None)
+			{
+				if (failureReason)
+					*failureReason = "Render texture format of target (" + std::to_string(i) + ") is None, make sure it is set!";
+				return false;
+			}
+		}
+		if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
 		{
 			if (failureReason)
-				*failureReason = "At least one valid RenderTarget or DepthStencil must be specified for a valid GraphicsPipeline!";
+				*failureReason = "Number of render targets is 0 and the depth stencil format is undefined, atleast one render target or the depth stencil need to be set!";
 			return false;
 		}
 
+		if (DepthStencilFormat != DataFormat::None && (DepthStencilFormat != DataFormat::R32_FLOAT))
+		{
+			if (failureReason)
+				*failureReason = "Depth stencil format must be of type R32_FLOAT!";
+			return false;
+		}
 		return true;
 	}
 
