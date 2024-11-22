@@ -8,10 +8,21 @@
 
 namespace Gecko {
 
+	
+	struct Material
+	{
+		u32 materialIndex{ 0 };
+		TextureHandle AlbedoTextureHandle{ 0 };
+		TextureHandle NormalTextureHandle{ 0 };
+		TextureHandle MetalicRoughnessTextureHandle{ 0 };
+		TextureHandle OcclusionTextureHandle{ 0 };
+		TextureHandle EmmisiveTextureHandle{ 0 };
+	};
+
 	struct RenderObjectRenderInfo
 	{
 		MeshHandle MeshHandle{ 0 };
-		MaterialHandle MaterialHandle{ 0 };
+		Material Material;
 		glm::mat4 Transform{ 0.f };
 	};
 

@@ -182,7 +182,7 @@ const void SceneNode::PopulateSceneRenderInfo(SceneRenderInfo* sceneRenderInfo, 
 	{
 		sceneRenderInfo->RenderObjects.push_back({
 			sceneRenderObject->GetMeshHandle(),
-			sceneRenderObject->GetMaterialHandle(),
+			sceneRenderObject->GetMaterial(),
 			worldMatrix
 			});
 	}

@@ -23,17 +23,30 @@ namespace Gecko
 		m_CurrentMaterialIndex = 0;
 		m_CurrentRenderTargetIndex = 0;
 
+		StructuredBufferDesc materialBufferDesc;
+		materialBufferDesc.MemoryType = MemoryType::Shared;
+		materialBufferDesc.NumElements = MAX_MATERIALS;
+		materialBufferDesc.StructSize = sizeof(MaterialData);
+
+		m_MaterialBufferHandle = CreateStructuredBuffer(materialBufferDesc);
+
+		for(u32 i = 0; i < MAX_MATERIALS; i++)
+		{
+			MaterialData mat{ };
+			UploadMaterialData(mat, i);
+		}
+
 		// MipMap Compute Pipeline
 		{
 			ComputePipelineDesc computePipelineDesc;
 			computePipelineDesc.ComputeShaderPath = "Shaders/DownSample.gsh";
 			computePipelineDesc.ShaderVersion = "5_1";
-			computePipelineDesc.PipelineReadOnlyResources = 
+			computePipelineDesc.PipelineReadOnlyResources =
 			{
-				PipelineResource::LocalData(ShaderType::Compute, 0, sizeof(MipGenerationData)), 
+				PipelineResource::LocalData(ShaderType::Compute, 0, sizeof(MipGenerationData)),
 				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
-			computePipelineDesc.PipelineReadWriteResources = 
+			computePipelineDesc.PipelineReadWriteResources =
 			{
 				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
@@ -52,11 +65,11 @@ namespace Gecko
 			computePipelineDesc.SamplerDescs = {
 				{ShaderType::Pixel, SamplerFilter::Linear, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap}
 			};
-			computePipelineDesc.PipelineReadOnlyResources = 
+			computePipelineDesc.PipelineReadOnlyResources =
 			{
 				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
-			computePipelineDesc.PipelineReadWriteResources = 
+			computePipelineDesc.PipelineReadWriteResources =
 			{
 				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
@@ -72,11 +85,11 @@ namespace Gecko
 			computePipelineDesc.SamplerDescs = {
 				{ShaderType::Pixel, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp}
 			};
-			computePipelineDesc.PipelineReadOnlyResources = 
+			computePipelineDesc.PipelineReadOnlyResources =
 			{
 				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
-			computePipelineDesc.PipelineReadWriteResources = 
+			computePipelineDesc.PipelineReadWriteResources =
 			{
 				PipelineResource::Texture(ShaderType::Compute, 0)
 			};
@@ -92,22 +105,22 @@ namespace Gecko
 				{{ 1.f,  1.f,  1.f}, {1.f, 0.f}, { 0.f,  1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
 				{{-1.f,  1.f, -1.f}, {0.f, 1.f}, { 0.f,  1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
 				{{-1.f,  1.f,  1.f}, {0.f, 0.f}, { 0.f,  1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-						   
+
 				{{ 1.f,  1.f, -1.f}, {0.f, 1.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{ 1.f, -1.f, -1.f}, {0.f, 0.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{-1.f,  1.f, -1.f}, {1.f, 1.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{-1.f, -1.f, -1.f}, {1.f, 0.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
-						   
+
 				{{-1.f,  1.f, -1.f}, {0.f, 1.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{-1.f, -1.f, -1.f}, {0.f, 0.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{-1.f,  1.f,  1.f}, {1.f, 1.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{-1.f, -1.f,  1.f}, {1.f, 0.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-						   
+
 				{{ 1.f,  1.f, -1.f}, {0.f, 0.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{ 1.f, -1.f, -1.f}, {0.f, 1.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{ 1.f,  1.f,  1.f}, {1.f, 0.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{ 1.f, -1.f,  1.f}, {1.f, 1.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-						   
+
 				{{ 1.f,  1.f,  1.f}, {0.f, 0.f}, { 0.f,  0.f,  1.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{ 1.f, -1.f,  1.f}, {0.f, 1.f}, { 0.f,  0.f,  1.f}, {0.f, 1.f, 0.f, 0.f}},
 				{{-1.f,  1.f,  1.f}, {1.f, 0.f}, { 0.f,  0.f,  1.f}, {0.f, 1.f, 0.f, 0.f}},
@@ -123,20 +136,20 @@ namespace Gecko
 				1, 0, 3,
 				3, 0, 2,
 
-				0+4, 1+4, 3+4,
-				0+4, 3+4, 2+4,
+				0 + 4, 1 + 4, 3 + 4,
+				0 + 4, 3 + 4, 2 + 4,
 
-				0+8, 1+8, 3+8,
-				0+8, 3+8, 2+8,
+				0 + 8, 1 + 8, 3 + 8,
+				0 + 8, 3 + 8, 2 + 8,
 
-				1+12, 0+12, 3+12,
-				3+12, 0+12, 2+12,
+				1 + 12, 0 + 12, 3 + 12,
+				3 + 12, 0 + 12, 2 + 12,
 
-				1+16, 0+16, 3+16,
-				3+16, 0+16, 2+16,
+				1 + 16, 0 + 16, 3 + 16,
+				3 + 16, 0 + 16, 2 + 16,
 
-				0+20, 1+20, 3+20,
-				0+20, 3+20, 2+20,
+				0 + 20, 1 + 20, 3 + 20,
+				0 + 20, 3 + 20, 2 + 20,
 			};
 
 			VertexBufferDesc vertexDesc;
@@ -186,19 +199,10 @@ namespace Gecko
 
 			m_MissingTextureHandle = CreateTexture(textureDesc, emptyTexData.data(), true);
 		}
-		
-		// Create missing Material
-		{
-			m_MissingMaterialHandle = CreateMaterial();
-			Gecko::Buffer materialConstantBuffer = GetMaterial(m_MissingMaterialHandle).MaterialConstantBuffer;
-			MaterialData materialData{ };// = reinterpret_cast<MaterialData*>(materialConstantBuffer._Buffer);
-			materialData.materialTextureFlags |= 0b00001;
-			m_Device->UploadBufferData(materialConstantBuffer, &materialData, sizeof(MaterialData));
-		}
 
 		SceneDataBuffer.resize(m_Device->GetNumBackBuffers());
 		SceneData.resize(m_Device->GetNumBackBuffers());
-		for(u32 i = 0; i < m_Device->GetNumBackBuffers(); i++)
+		for (u32 i = 0; i < m_Device->GetNumBackBuffers(); i++)
 		{
 			Gecko::ConstantBufferDesc bufferDesc = {
 				sizeof(SceneDataStruct)
@@ -224,6 +228,7 @@ namespace Gecko
 			m_Device->UploadBufferData(SceneDataBuffer[i], &SceneData, sizeof(SceneDataStruct));
 		}
 
+
 		AddEventListener(Event::SystemEvent::CODE_RESIZED, &ResourceManager::ResizeEvent);
 	}
 
@@ -243,12 +248,12 @@ namespace Gecko
 		SceneData.clear();
 
 		m_EnvironmentMaps.clear();
-		m_Materials.clear();
 		m_Textures.clear();
 		m_Meshes.clear();
 		m_RenderTargets.clear();
 		m_GraphicsPipelines.clear();
 		m_ComputePipelines.clear();
+		m_Buffers.clear();
 	}
 
 	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, void* vertexData, void* indexData)
@@ -260,8 +265,8 @@ namespace Gecko
 		mesh.VertexBuffer = m_Device->CreateVertexBuffer(vertexDesc);
 		mesh.IndexBuffer = m_Device->CreateIndexBuffer(indexDesc);
 
-		m_Device->UploadBufferData(mesh.VertexBuffer, vertexData, mesh.VertexBuffer.Desc.Stride *mesh.VertexBuffer.Desc.NumElements);
-		m_Device->UploadBufferData(mesh.IndexBuffer, indexData, mesh.IndexBuffer.Desc.Stride*mesh.IndexBuffer.Desc.NumElements);
+		m_Device->UploadBufferData(mesh.VertexBuffer, vertexData, mesh.VertexBuffer.Desc.Stride * mesh.VertexBuffer.Desc.NumElements);
+		m_Device->UploadBufferData(mesh.IndexBuffer, indexData, mesh.IndexBuffer.Desc.Stride * mesh.IndexBuffer.Desc.NumElements);
 
 		m_Meshes[handle] = mesh;
 
@@ -272,7 +277,7 @@ namespace Gecko
 	TextureHandle ResourceManager::CreateTexture(TextureDesc textureDesc, void* imageData, bool mipMap)
 	{
 		TextureHandle handle = m_CurrentTextureIndex;
-	
+
 		Texture outTex = m_Device->CreateTexture(textureDesc);
 		m_Textures[handle] = outTex;
 
@@ -286,56 +291,6 @@ namespace Gecko
 		}
 
 		m_CurrentTextureIndex++;
-		return handle;
-	}
-
-	MaterialHandle ResourceManager::CreateMaterial()
-	{
-		MaterialHandle handle = m_CurrentMaterialIndex;
-
-		Material outMat;\
-
-		ConstantBufferDesc MaterialBufferDesc =
-		{
-			sizeof(MaterialData)
-		};
-		MaterialBufferDesc.MemoryType = MemoryType::Shared;
-		Gecko::Buffer materialConstantBuffer = m_Device->CreateConstantBuffer(MaterialBufferDesc);
-		//MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer._Buffer);
-		MaterialData materialData = MaterialData();
-		materialData.materialTextureFlags = 0;
-
-
-		materialData.baseColorFactor[0] = static_cast<float>(1.f);
-		materialData.baseColorFactor[1] = static_cast<float>(1.f);
-		materialData.baseColorFactor[2] = static_cast<float>(1.f);
-		materialData.baseColorFactor[3] = static_cast<float>(1.f);
-
-		materialData.normalScale = static_cast<float>(0.f);
-
-		materialData.matallicFactor = static_cast<float>(0.f);
-		materialData.roughnessFactor = static_cast<float>(1.f);
-
-		materialData.emissiveFactor[0] = static_cast<float>(0.f);
-		materialData.emissiveFactor[1] = static_cast<float>(0.f);
-		materialData.emissiveFactor[2] = static_cast<float>(0.f);
-
-		materialData.occlusionStrength = static_cast<float>(1.f);
-
-		materialData.materialTextureFlags = 0b00000;
-		m_Device->UploadBufferData(materialConstantBuffer, &materialData, sizeof(MaterialData));
-
-		outMat.AlbedoTextureHandle = GetMissingTextureHandle();
-		outMat.EmmisiveTextureHandle = GetMissingTextureHandle();
-		outMat.MetalicRoughnessTextureHandle = GetMissingTextureHandle();
-		outMat.NormalTextureHandle = GetMissingTextureHandle();
-		outMat.OcclusionTextureHandle = GetMissingTextureHandle();
-
-		outMat.MaterialConstantBuffer = materialConstantBuffer;
-
-		m_Materials[handle] = outMat;
-
-		m_CurrentMaterialIndex++;
 		return handle;
 	}
 
@@ -492,14 +447,6 @@ namespace Gecko
 		return m_Textures[textureHandle];
 	}
 
-	Material& ResourceManager::GetMaterial(const MaterialHandle& materialHandle)
-	{
-		if (m_Materials.find(materialHandle) == m_Materials.end())
-			return m_Materials[m_MissingMaterialHandle];
-
-		return m_Materials[materialHandle];
-	}
-
 	RenderTarget& ResourceManager::GetRenderTarget(const RenderTargetHandle& renderTargetHandle)
 	{
 		if (m_RenderTargets.find(renderTargetHandle) == m_RenderTargets.end())
@@ -535,11 +482,6 @@ namespace Gecko
 		return m_ComputePipelines[computePipelineHandle];
 	}
 
-	void ResourceManager::UploadMaterial(Buffer& buffer, void* data, u32 size, u32 offset)
-	{
-		m_Device->UploadBufferData(buffer, data, size, offset);
-	}
-
 	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)
 	{
 		u32 width = eventData.Data.u32[0];
@@ -559,6 +501,87 @@ namespace Gecko
 		}
 
 		return false;
+	}
+
+	BufferHandle ResourceManager::CreateVertexBuffer(const VertexBufferDesc& desc, void* vertexData)
+	{
+		MeshHandle handle = m_CurrentBufferIndex;
+
+		Buffer vertexBuffer = m_Device->CreateVertexBuffer(desc);
+
+		if (vertexData)
+		{
+			m_Device->UploadBufferData(vertexBuffer, vertexData, vertexBuffer.Desc.Size);
+		}
+		m_Buffers[handle] = vertexBuffer;
+
+		m_CurrentBufferIndex++;
+
+		return handle;
+	}
+
+	BufferHandle ResourceManager::CreateIndexBuffer(const IndexBufferDesc& desc, void* indexData)
+	{
+		MeshHandle handle = m_CurrentBufferIndex;
+
+		Buffer indexBuffer = m_Device->CreateIndexBuffer(desc);
+
+		if (indexData)
+		{
+			m_Device->UploadBufferData(indexBuffer, indexData, indexBuffer.Desc.Size);
+		}
+		m_Buffers[handle] = indexBuffer;
+
+		m_CurrentBufferIndex++;
+
+		return handle;
+	}
+
+	BufferHandle ResourceManager::CreateConstantBuffer(const ConstantBufferDesc& desc, void* constantData)
+	{
+		MeshHandle handle = m_CurrentBufferIndex;
+
+		Buffer constantBuffer = m_Device->CreateConstantBuffer(desc);
+		if (constantData)
+		{
+			m_Device->UploadBufferData(constantBuffer, constantData, constantBuffer.Desc.Size);
+		}
+		m_Buffers[handle] = constantBuffer;
+
+		m_CurrentBufferIndex++;
+
+		return handle;
+	}
+
+	BufferHandle ResourceManager::CreateStructuredBuffer(const StructuredBufferDesc& desc, void* structuredData)
+	{
+		MeshHandle handle = m_CurrentBufferIndex;
+
+		Buffer structuredBuffer = m_Device->CreateStructuredBuffer(desc);
+		if (structuredData)
+		{
+			m_Device->UploadBufferData(structuredBuffer, structuredData, structuredBuffer.Desc.Size);
+		}
+		m_Buffers[handle] = structuredBuffer;
+
+		m_CurrentBufferIndex++;
+
+		return handle;
+	}
+
+	Buffer& ResourceManager::GetBuffer(const BufferHandle& bufferHandle)
+	{
+		if (m_Buffers.find(bufferHandle) == m_Buffers.end())
+		{
+			ASSERT(false, "Could not find specified BufferHandle!");
+		}
+
+		return m_Buffers[bufferHandle];
+	}
+
+	void ResourceManager::UploadMaterialData(MaterialData& data, u32 slot)
+	{
+		m_Device->UploadBufferData(GetBuffer(m_MaterialBufferHandle), reinterpret_cast<void*>(&data), sizeof(MaterialData), sizeof(MaterialData) * slot);
 	}
 
 	void ResourceManager::MipMapTexture(Texture texture)

@@ -319,7 +319,7 @@ void LoadNodes(const tinygltf::Model& gltfModel, Scene* scene, SceneNode* sceneN
 		{
 			Scope<SceneRenderObject> sceneRenderObject = scene->CreateSceneRenderObject();
 			sceneRenderObject->SetMeshHandle(primitiveObject.GetMeshHandle());
-			sceneRenderObject->SetMaterialHandle(primitiveObject.GetMaterialHandle());
+			sceneRenderObject->SetMaterial(primitiveObject.GetMaterial());
 			sceneNode->AppendSceneRenderObject(&sceneRenderObject);
 		}
 	}
@@ -391,7 +391,7 @@ void LoadNodes(const tinygltf::Model& gltfModel, FlatHierarchyScene* scene, u32 
 		{
 			Scope<SceneRenderObject> sceneRenderObject = scene->CreateSceneRenderObject();
 			sceneRenderObject->SetMeshHandle(primitiveObject.GetMeshHandle());
-			sceneRenderObject->SetMaterialHandle(primitiveObject.GetMaterialHandle());
+			sceneRenderObject->SetMaterial(primitiveObject.GetMaterial());
 			sceneRenderObject->GetModifiableTransform() = Transform(translation, glm::eulerAngles(rotation), scale);
 			scene->AppendSceneRenderObject(&sceneRenderObject);
 		}
@@ -463,18 +463,18 @@ void LoadNodes(const tinygltf::Model& gltfModel, FlatHierarchyScene* scene, u32 
 	return textureHandles;
 }
 	
-[[nodiscard]] std::vector<MaterialHandle> LoadMaterials(ResourceManager* resourceManager, const tinygltf::Model& gltfModel, const std::vector<TextureHandle> textureHandles)
+[[nodiscard]] std::vector<Material> LoadMaterials(ResourceManager* resourceManager, const tinygltf::Model& gltfModel, const std::vector<TextureHandle> textureHandles)
 {
-	std::vector<MaterialHandle> materialHandles(gltfModel.materials.size(), resourceManager->GetMissingMaterialHandle());
+	std::vector<Material> materials(gltfModel.materials.size());
 
 	// Load the materials
 	for (u32 i = 0; i < gltfModel.materials.size(); i++)
 	{
-		materialHandles[i] = resourceManager->CreateMaterial();
-		const tinygltf::Material& gltfMaterial = gltfModel.materials[i];
-
-		Material& material = resourceManager->GetMaterial(materialHandles[i]);
+		Material& material = materials[i];
+		material.materialIndex = resourceManager->NewMaterialSlot();
 		MaterialData materialData{ };
+
+		const tinygltf::Material& gltfMaterial = gltfModel.materials[i];
 
 		if (gltfMaterial.pbrMetallicRoughness.baseColorTexture.index >= 0) 
 		{
@@ -517,13 +517,13 @@ void LoadNodes(const tinygltf::Model& gltfModel, FlatHierarchyScene* scene, u32 
 		}
 		materialData.occlusionStrength = static_cast<f32>(gltfMaterial.occlusionTexture.strength);
 
-		resourceManager->UploadMaterial(material.MaterialConstantBuffer, &materialData, sizeof(MaterialData));	
+		resourceManager->UploadMaterialData(materialData, material.materialIndex);	
 	}
 
-	return materialHandles;
+	return materials;
 }
 	
-[[nodiscard]] std::vector<std::vector<SceneRenderObject>> LoadMeshes(ResourceManager* resourceManager, const tinygltf::Model& gltfModel, const std::vector<MaterialHandle>& materialHandles)
+[[nodiscard]] std::vector<std::vector<SceneRenderObject>> LoadMeshes(ResourceManager* resourceManager, const tinygltf::Model& gltfModel, const std::vector<Material>& materials)
 {
 	std::vector<std::vector<SceneRenderObject>> sceneRenderObjects(gltfModel.meshes.size());
 
@@ -543,11 +543,11 @@ void LoadNodes(const tinygltf::Model& gltfModel, FlatHierarchyScene* scene, u32 
 
 			if (prim.material >= 0)
 			{
-				sceneRenderObject.SetMaterialHandle(materialHandles[prim.material]);
+				sceneRenderObject.SetMaterial(materials[prim.material]);
 			}
 			else
 			{
-				sceneRenderObject.SetMaterialHandle(resourceManager->GetMissingMaterialHandle());
+				sceneRenderObject.SetMaterial(Material());
 			}
 		}
 	}
@@ -595,8 +595,8 @@ SceneHandle GLTFSceneLoader::LoadNodeBasedScene(const std::string& pathString, A
 	}
 
 	std::vector<TextureHandle> textureHandles = LoadTextures(ctx.GetResourceManager(), model);
-	std::vector<MaterialHandle> materialHandles = LoadMaterials(ctx.GetResourceManager(), model, textureHandles);
-	std::vector<std::vector<SceneRenderObject>> sceneRenderObjects = LoadMeshes(ctx.GetResourceManager(), model, materialHandles);
+	std::vector<Material> materials = LoadMaterials(ctx.GetResourceManager(), model, textureHandles);
+	std::vector<std::vector<SceneRenderObject>> sceneRenderObjects = LoadMeshes(ctx.GetResourceManager(), model, materials);
 
 	// Loading nodes
 	NodeBasedScene* scene = ctx.GetSceneManager()->GetScene<NodeBasedScene>(sceneIdx);
@@ -654,8 +654,8 @@ Gecko::SceneHandle GLTFSceneLoader::LoadFlatHierarchyScene(const std::string& pa
 	}
 
 	std::vector<TextureHandle> textureHandles = LoadTextures(ctx.GetResourceManager(), model);
-	std::vector<MaterialHandle> materialHandles = LoadMaterials(ctx.GetResourceManager(), model, textureHandles);
-	std::vector<std::vector<SceneRenderObject>> sceneRenderObjects = LoadMeshes(ctx.GetResourceManager(), model, materialHandles);
+	std::vector<Material> materials = LoadMaterials(ctx.GetResourceManager(), model, textureHandles);
+	std::vector<std::vector<SceneRenderObject>> sceneRenderObjects = LoadMeshes(ctx.GetResourceManager(), model, materials);
 
 	// Loading nodes
 	FlatHierarchyScene* scene = ctx.GetSceneManager()->GetScene<FlatHierarchyScene>(sceneIdx);

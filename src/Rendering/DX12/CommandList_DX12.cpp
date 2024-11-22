@@ -218,7 +218,7 @@ namespace Gecko::DX12
 			ASSERT(m_GraphicsPipeline.IsValid(&failureReason), failureReason.c_str());
 			GraphicsPipeline_DX12* graphicsPipeline_DX12 = reinterpret_cast<GraphicsPipeline_DX12*>(m_GraphicsPipeline.Data.get());
 			ASSERT(slot < graphicsPipeline_DX12->TextureIndices.size(), "Slot is out of bounds of constant buffer indices!");
-			TransitionResource(bufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
+			//TransitionResource(bufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
 
 			u32 rootDescriptorTableSlot = graphicsPipeline_DX12->TextureIndices[slot];
 			CommandBuffer->CommandList->SetGraphicsRootDescriptorTable(rootDescriptorTableSlot, gpuHandle);
@@ -229,7 +229,7 @@ namespace Gecko::DX12
 			ASSERT(m_ComputePipeline.IsValid(&failureReason), failureReason.c_str());
 			ComputePipeline_DX12* computePipeline_DX12 = reinterpret_cast<ComputePipeline_DX12*>(m_ComputePipeline.Data.get());
 			ASSERT(slot < computePipeline_DX12->TextureIndices.size(), "Slot is out of bounds of constant buffer indices!");
-			TransitionResource(bufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
+			//TransitionResource(bufferResource, D3D12_RESOURCE_STATE_COMMON, 0, 1);
 
 			u32 rootDescriptorTableSlot = computePipeline_DX12->TextureIndices[slot];
 			CommandBuffer->CommandList->SetComputeRootDescriptorTable(rootDescriptorTableSlot, gpuHandle);

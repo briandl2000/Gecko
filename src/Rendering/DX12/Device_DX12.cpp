@@ -361,6 +361,7 @@ namespace Gecko::DX12
 		bufferDesc.Type = BufferType::Vertex;
 		bufferDesc.NumElements = desc.NumVertices;
 		bufferDesc.Stride = desc.Layout.Stride;
+		bufferDesc.Size = bufferDesc.NumElements * bufferDesc.Stride;
 		bufferDesc.MemoryType = desc.MemoryType;
 		bufferDesc.CanReadWrite = desc.CanReadWrite;
 
@@ -386,6 +387,7 @@ namespace Gecko::DX12
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Index;
 		bufferDesc.NumElements = desc.NumIndices;
+		bufferDesc.Size = bufferDesc.NumElements * bufferDesc.Stride;
 		bufferDesc.Stride = FormatSizeInBytes(desc.IndexFormat);
 		bufferDesc.MemoryType = desc.MemoryType;
 		bufferDesc.CanReadWrite = desc.CanReadWrite;
@@ -411,6 +413,8 @@ namespace Gecko::DX12
 
 		BufferDesc bufferDesc{ };
 		bufferDesc.Type = BufferType::Constant;
+		bufferDesc.NumElements = 1;
+		bufferDesc.Stride = desc.Size;
 		bufferDesc.Size = desc.Size;
 		bufferDesc.MemoryType = desc.MemoryType;
 		bufferDesc.CanReadWrite = false;
@@ -434,6 +438,7 @@ namespace Gecko::DX12
 		bufferDesc.Type = BufferType::Structured;
 		bufferDesc.Stride = desc.StructSize;
 		bufferDesc.NumElements = desc.NumElements;
+		bufferDesc.Size = bufferDesc.NumElements * bufferDesc.Stride;
 		bufferDesc.MemoryType = desc.MemoryType;
 		bufferDesc.CanReadWrite = desc.CanReadWrite;
 

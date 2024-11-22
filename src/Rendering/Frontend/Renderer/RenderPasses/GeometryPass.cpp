@@ -20,13 +20,13 @@ const void GeometryPass::SubInit(const Platform::AppInfo& appInfo, ResourceManag
 
 		pipelineDesc.PipelineResources = {
 			PipelineResource::ConstantBuffer(ShaderType::All, 0),
-			PipelineResource::ConstantBuffer(ShaderType::Pixel, 1),
-			PipelineResource::LocalData(ShaderType::All, 2, sizeof(glm::mat4)),
+			PipelineResource::LocalData(ShaderType::All, 1, sizeof(MeshInstanceData)),
 			PipelineResource::Texture(ShaderType::Pixel, 0),
 			PipelineResource::Texture(ShaderType::Pixel, 1),
 			PipelineResource::Texture(ShaderType::Pixel, 2),
 			PipelineResource::Texture(ShaderType::Pixel, 3),
 			PipelineResource::Texture(ShaderType::Pixel, 4),
+			PipelineResource::StructuredBuffer(ShaderType::Pixel, 5),
 		};
 		pipelineDesc.NumRenderTargets = 5;
 		pipelineDesc.RenderTextureFormats[0] = DataFormat::R32G32B32A32_FLOAT; // Albedo
@@ -127,25 +127,28 @@ const void GeometryPass::Render(const SceneRenderInfo& sceneRenderInfo, Resource
 
 	commandList->BindGraphicsPipeline(GBufferPipeline);
 	commandList->BindConstantBuffer(0, resourceManager->SceneDataBuffer[currentBackBufferIndex]);
+	commandList->BindStructuredBuffer(5, 
+		resourceManager->GetBuffer(resourceManager->GetMaterialBufferHandle()));
 	for (u32 i = 0; i < sceneRenderInfo.RenderObjects.size(); i++)
 	{
 		const RenderObjectRenderInfo& meshInstanceDescriptor = sceneRenderInfo.RenderObjects[i];
 
-		glm::mat4 transformMatrix = meshInstanceDescriptor.Transform;
+		MeshInstanceData localData;
+		localData.Transform = meshInstanceDescriptor.Transform;
+		const Material& material = meshInstanceDescriptor.Material;// resourceManager->GetMaterial(meshInstanceDescriptor.MaterialHandle);
+		localData.MaterialIndex = material.materialIndex;
 
-		commandList->SetLocalData(sizeof(glm::mat4), (void*)(&transformMatrix));
+		commandList->SetLocalData(sizeof(MeshInstanceData), (void*)(&localData));
 
 		Mesh& mesh = resourceManager->GetMesh(meshInstanceDescriptor.MeshHandle);
 		commandList->BindVertexBuffer(mesh.VertexBuffer);
 		commandList->BindIndexBuffer(mesh.IndexBuffer);
 
-		Material& material = resourceManager->GetMaterial(meshInstanceDescriptor.MaterialHandle);
 		commandList->BindTexture(0, resourceManager->GetTexture(material.AlbedoTextureHandle));
 		commandList->BindTexture(1, resourceManager->GetTexture(material.NormalTextureHandle));
 		commandList->BindTexture(2, resourceManager->GetTexture(material.MetalicRoughnessTextureHandle));
 		commandList->BindTexture(3, resourceManager->GetTexture(material.EmmisiveTextureHandle));
 		commandList->BindTexture(4, resourceManager->GetTexture(material.OcclusionTextureHandle));
-		commandList->BindConstantBuffer(1, material.MaterialConstantBuffer);
 
 		commandList->Draw(mesh.IndexBuffer.Desc.NumElements);
 	}

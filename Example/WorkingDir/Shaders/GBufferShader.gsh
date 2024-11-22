@@ -44,15 +44,22 @@ struct Material {
 };
 
 ConstantBuffer<SceneData> sd : register(b0);
-ConstantBuffer<Material> material : register(b1);
 
-DYNAMIC_CALL_DATA(ModelData, modelData, b2);
+struct MeshInstanceData
+{
+	float4x4 modelTransform;
+	unsigned int MaterialIndex;
+};
+
+DYNAMIC_CALL_DATA(MeshInstanceData, modelData, b1);
 
 Texture2D diffuseTex : register(t0);
 Texture2D normalTex : register(t1);
 Texture2D MRTex : register(t2);
 Texture2D EmmisiveTex : register(t3);
 Texture2D OcclusionTex : register(t4);
+StructuredBuffer<Material> materials : register(t5);
+
 SamplerState LinearSampler : register(s0);
 SamplerState PointSampler : register(s1);
 
@@ -97,6 +104,8 @@ PS_Output main(VS_OUTPUT input)
 
 
 	float2 sampleUV = input.uv;
+
+	Material material = materials[modelData.MaterialIndex];
 
 	float4 albedo = material.baseColorFactor;
 	if (material.materialMaps & DIFFUSE_MAP_FLAG) {

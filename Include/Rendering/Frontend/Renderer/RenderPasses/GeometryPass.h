@@ -7,7 +7,12 @@
 namespace Gecko
 {
 
-
+// TODO: REMOVE THIS, this is for testing
+struct MeshInstanceData
+{
+	glm::mat4 Transform;
+	u32 MaterialIndex;
+};
 
 class GeometryPass : public RenderPass<GeometryPass>
 {

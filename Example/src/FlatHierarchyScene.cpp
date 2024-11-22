@@ -51,7 +51,7 @@ const void FlatHierarchyScene::PopulateSceneRenderInfo(SceneRenderInfo* sceneRen
 	{
 		sceneRenderInfo->RenderObjects.push_back({
 			sceneRenderObject->GetMeshHandle(),
-			sceneRenderObject->GetMaterialHandle(),
+			sceneRenderObject->GetMaterial(),
 			sceneRenderObject->GetTransform().GetMat4() * transform
 			});
 	}
