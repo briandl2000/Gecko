@@ -1,7 +1,6 @@
 #include "ShaderDefines.h"
 
-RW_Texture2D_Arr<float4> Input : register(u0);
-RW_Texture2D_Arr<float4> Output : register(u1);
+RW_Texture2D_Arr<float4> Output : register(u0);
 
 ConstantBuffer<SceneData> sd : register(b0);
 
@@ -36,7 +35,7 @@ float3 Uncharted2ToneMapping(float3 color)
 [N_THREADS(8, 8, 1)]
 void main(uint3 DTid : S_INPUT_DISPATCH_ID)
 {
-	float3 color = Input[DTid].rgb;
+	float3 color = Output[DTid].rgb;
 
     color = Uncharted2ToneMapping(color);
 	float Gamma = 1. / 2.2;

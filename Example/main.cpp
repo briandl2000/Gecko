@@ -62,7 +62,7 @@ int main()
 	Gecko::RenderPassHandle bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>("Bloom", BloomConfigData);
 
 	Gecko::ToneMappingGammaCorrectionPass::ConfigData ToneMappingGammaCorrectionConfigData;
-	ToneMappingGammaCorrectionConfigData.PrevPass = bloomPass;
+	ToneMappingGammaCorrectionConfigData.PrevPassOutput = renderer->GetRenderPassByHandle(bloomPass)->GetOutputHandle();
 	Gecko::RenderPassHandle toneMappingGammaCorrectionPass = 
 		renderer->CreateRenderPass<Gecko::ToneMappingGammaCorrectionPass>("ToneMappingGammaCorrection",
 			ToneMappingGammaCorrectionConfigData);
