@@ -58,7 +58,7 @@ int main()
 	Gecko::FXAAPass::ConfigData FXAAConfigData(deferredPBRPass);
 	Gecko::RenderPassHandle FXAAPass = renderer->CreateRenderPass<Gecko::FXAAPass>("FXAA", FXAAConfigData);
 
-	Gecko::BloomPass::ConfigData BloomConfigData(FXAAPass);
+	Gecko::BloomPass::ConfigData BloomConfigData(renderer->GetRenderPassByHandle(FXAAPass)->GetOutputHandle());
 	Gecko::RenderPassHandle bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>("Bloom", BloomConfigData);
 
 	Gecko::ToneMappingGammaCorrectionPass::ConfigData ToneMappingGammaCorrectionConfigData;
