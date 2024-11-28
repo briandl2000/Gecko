@@ -77,8 +77,7 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		computePipelineDesc.ShaderVersion = "5_1";
 		computePipelineDesc.PipelineReadWriteResources = {
 			PipelineResource::Texture(ShaderType::Compute, 0),
-			PipelineResource::Texture(ShaderType::Compute, 1),
-			PipelineResource::Texture(ShaderType::Compute, 2),
+			PipelineResource::Texture(ShaderType::Compute, 1)
 		};
 
 		m_CompositePipelineHandle = resourceManager->CreateComputePipeline(computePipelineDesc);
@@ -97,28 +96,26 @@ const void BloomPass::SubInit(const Platform::AppInfo& appInfo, ResourceManager*
 		renderTargetDesc.RenderTargetClearValues[i].Values[3] = 0.f;
 	}
 	renderTargetDesc.RenderTargetFormats[0] = DataFormat::R32G32B32A32_FLOAT;
-
-	m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "BloomOutput", true);
-
 	renderTargetDesc.NumMips[0] = 8;
+
 	m_DownScaleRenderTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "m_DownScaleRenderTargetHandle", true);
 	m_UpScaleRenderTargetHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "m_UpScaleRenderTargetHandle", true);
 
 	m_BloomData.Width = appInfo.Width;
 	m_BloomData.Height = appInfo.Height;
 	m_BloomData.Threshold = .9f;
-
-	m_ConfigData = dependencies;
+	
+	// This pass modifies the render target output of the previous pass in-place,
+	// so no need to create a new output target for the final output
+	m_OutputHandle = dependencies.PrevPassOutput;
 }
 
 const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceManager* resourceManager,
 	const Renderer* renderer, Ref<CommandList> commandList)
 {
-
-	RenderTarget inputTarget = resourceManager->GetRenderTarget(renderer->GetRenderPassByHandle(m_ConfigData.PrevPass)->GetOutputHandle());
 	RenderTarget downSampleTexture = resourceManager->GetRenderTarget(m_DownScaleRenderTargetHandle);
 	RenderTarget upSampleTexture = resourceManager->GetRenderTarget(m_UpScaleRenderTargetHandle);
-	RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
+	RenderTarget modifyTarget = resourceManager->GetRenderTarget(m_OutputHandle);
 
 	ComputePipeline BloomDownScale = resourceManager->GetComputePipeline(m_DownScalePipelineHandle);
 	ComputePipeline BloomUpScale = resourceManager->GetComputePipeline(m_UpScalePipelineHandle);
@@ -126,7 +123,7 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	ComputePipeline BloomComposite = resourceManager->GetComputePipeline(m_CompositePipelineHandle);
 
 	commandList->CopyTextureToTexture(
-		inputTarget.RenderTextures[0],
+		modifyTarget.RenderTextures[0],
 		downSampleTexture.RenderTextures[0]
 	);
 
@@ -198,12 +195,11 @@ const void BloomPass::Render(const SceneRenderInfo& sceneRenderInfo, ResourceMan
 	
 	commandList->BindComputePipeline(BloomComposite);
 	commandList->BindAsRWTexture(0, upSampleTexture.RenderTextures[0], 0);
-	commandList->BindAsRWTexture(1, inputTarget.RenderTextures[0]);
-	commandList->BindAsRWTexture(2, outputTarget.RenderTextures[0]);
+	commandList->BindAsRWTexture(1, modifyTarget.RenderTextures[0]);
 	
 	commandList->Dispatch(
-		std::max(1u, outputTarget.Desc.Width / 8 + 1),
-		std::max(1u, outputTarget.Desc.Height / 8 + 1),
+		std::max(1u, modifyTarget.Desc.Width / 8 + 1),
+		std::max(1u, modifyTarget.Desc.Height / 8 + 1),
 		1
 	);
 }

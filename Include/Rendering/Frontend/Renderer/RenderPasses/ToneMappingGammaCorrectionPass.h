@@ -13,13 +13,13 @@ public:
 	struct ConfigData : public BaseConfigData
 	{
 		ConfigData() :
-			PrevPass(RenderPassHandle())
+			PrevPassOutput(RenderTargetHandle())
 		{}
-		ConfigData(RenderPassHandle handle) :
-			PrevPass(handle)
+		ConfigData(RenderTargetHandle handle) :
+			PrevPassOutput(handle)
 		{}
-
-		RenderPassHandle PrevPass;
+		
+		RenderTargetHandle PrevPassOutput;
 	};
 
 	ToneMappingGammaCorrectionPass() = default;
@@ -36,8 +36,6 @@ protected:
 
 private:
 	ComputePipelineHandle TonemapAndGammaCorrectPipelineHandle;
-
-	ConfigData m_ConfigData;
 };
 
 }

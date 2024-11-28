@@ -20,13 +20,13 @@ public:
 	struct ConfigData : public BaseConfigData
 	{
 		ConfigData() :
-			PrevPass(RenderPassHandle())
+			PrevPassOutput(RenderTargetHandle())
 		{}
-		ConfigData(RenderPassHandle handle) :
-			PrevPass(handle)
+		ConfigData(RenderTargetHandle handle) :
+			PrevPassOutput(handle)
 		{}
 		
-		RenderPassHandle PrevPass;
+		RenderTargetHandle PrevPassOutput;
 	};
 
 	BloomPass() = default;
@@ -51,9 +51,6 @@ private:
 	ComputePipelineHandle m_UpScalePipelineHandle;
 	ComputePipelineHandle m_ThresholdPipelineHandle;
 	ComputePipelineHandle m_CompositePipelineHandle;
-
-	ConfigData m_ConfigData;
-
 };
 
 }
