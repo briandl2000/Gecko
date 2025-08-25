@@ -1033,19 +1033,43 @@ namespace Gecko::DX12
 		for (u32 i = 0; i < m_GraphicsCommandBuffers.size(); i++)
 		{
 			Ref<CommandBuffer> commandBuffer{ m_GraphicsCommandBuffers[i] };
-			commandBuffer->Wait(m_FenceEvent);
+			//commandBuffer->Wait(m_FenceEvent);
+
+			u64 fenceValueForSignal = ++commandBuffer->FenceValue;
+			m_GraphicsCommandQueue->Signal(commandBuffer->Fence.Get(), fenceValueForSignal);
+			if (commandBuffer->Fence->GetCompletedValue() < commandBuffer->FenceValue)
+			{
+				commandBuffer->Fence->SetEventOnCompletion(fenceValueForSignal, m_FenceEvent);
+				WaitForSingleObject(m_FenceEvent, INFINITE);
+			}
 		}
 
 		for (u32 i = 0; i < m_ComputeCommandBuffers.size(); i++)
 		{
 			Ref<CommandBuffer> commandBuffer{ m_ComputeCommandBuffers[i] };
-			commandBuffer->Wait(m_FenceEvent);
+			//commandBuffer->Wait(m_FenceEvent);
+
+			u64 fenceValueForSignal = ++commandBuffer->FenceValue;
+			m_GraphicsCommandQueue->Signal(commandBuffer->Fence.Get(), fenceValueForSignal);
+			if (commandBuffer->Fence->GetCompletedValue() < commandBuffer->FenceValue)
+			{
+				commandBuffer->Fence->SetEventOnCompletion(fenceValueForSignal, m_FenceEvent);
+				WaitForSingleObject(m_FenceEvent, INFINITE);
+			}
 		}
 
 		for (u32 i = 0; i < m_CopyCommandBuffers.size(); i++)
 		{
 			Ref<CommandBuffer> commandBuffer{ m_CopyCommandBuffers[i] };
-			commandBuffer->Wait(m_FenceEvent);
+			//commandBuffer->Wait(m_FenceEvent);
+
+			u64 fenceValueForSignal = ++commandBuffer->FenceValue;
+			m_GraphicsCommandQueue->Signal(commandBuffer->Fence.Get(), fenceValueForSignal);
+			if (commandBuffer->Fence->GetCompletedValue() < commandBuffer->FenceValue)
+			{
+				commandBuffer->Fence->SetEventOnCompletion(fenceValueForSignal, m_FenceEvent);
+				WaitForSingleObject(m_FenceEvent, INFINITE);
+			}
 		}
 	}
 

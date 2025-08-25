@@ -341,6 +341,7 @@ namespace Gecko
 
 	RenderTargetHandle ResourceManager::CreateRenderTarget(RenderTargetDesc renderTargetDesc, std::string name, bool KeepWindowAspectRatio)
 	{
+		name;
 		RenderTargetHandle handle = m_CurrentRenderTargetIndex;
 
 		RenderTarget outRenderTarget = m_Device->CreateRenderTarget(renderTargetDesc);
