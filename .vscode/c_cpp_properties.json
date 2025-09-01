@@ -8,7 +8,6 @@
                 "${workspaceFolder}/Example/**",
                 "${workspaceFolder}/Example/src/**",
                 "${workspaceFolder}/Example/Include/**",
-                "${workspaceFolder}/ThirdParty/imgui/**",
                 "${workspaceFolder}/ThirdParty/glm/glm/**",
                 "${workspaceFolder}/ThirdParty/stb_image/**",
                 "${workspaceFolder}/ThirdParty/tinygltf/**"
@@ -36,7 +35,6 @@
                 "${workspaceFolder}/Example/**",
                 "${workspaceFolder}/Example/src/**",
                 "${workspaceFolder}/Example/Include/**",
-                "${workspaceFolder}/ThirdParty/imgui/**",
                 "${workspaceFolder}/ThirdParty/glm/glm/**",
                 "${workspaceFolder}/ThirdParty/stb_image/**",
                 "${workspaceFolder}/ThirdParty/tinygltf/**"

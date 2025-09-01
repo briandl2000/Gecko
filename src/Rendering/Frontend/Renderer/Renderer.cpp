@@ -7,7 +7,6 @@
 #include "Rendering/Frontend/Scene/Scene.h"
 
 #include "stb_image.h"
-#include <imgui.h>
 #include "Core/Platform.h"
 
 #include "glm/matrix.hpp"
@@ -166,11 +165,6 @@ void Renderer::RenderScene(const SceneRenderInfo& sceneRenderInfo)
 	commandList->BindRenderTarget(renderTarget);
 
 	commandList->Draw(3);
-
-	// TODO: move this to its own function
-	// Render ImGui
-	commandList->BindRenderTarget(renderTarget);
-	device->ImGuiRender(commandList);
 
 	// Execute command list and display it
 	device->ExecuteGraphicsCommandListAndFlip(commandList);

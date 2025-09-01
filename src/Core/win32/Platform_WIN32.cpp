@@ -14,10 +14,6 @@
 
 #include <vector>
 
-#include <backends/imgui_impl_win32.h>
-
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
 namespace Gecko { namespace Platform 
 {
 	// Platform state
@@ -149,9 +145,6 @@ namespace Gecko { namespace Platform
     {
 		LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
-			if (ImGui_ImplWin32_WndProcHandler(hwnd, uMsg, wParam, lParam))
-				return true;
-
 			Event::EventData data {};
 			data.Sender = nullptr;
 

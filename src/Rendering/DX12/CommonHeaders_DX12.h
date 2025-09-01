@@ -23,6 +23,7 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d12.lib")
+#pragma comment(lib, "d3dcompiler.lib")
 #ifdef DEBUG
 #pragma comment(lib, "dxguid.lib")
 #endif

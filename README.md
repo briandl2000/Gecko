@@ -18,7 +18,6 @@ For my graduation year at [BUAS](https://www.buas.nl/) I am working on a persona
 - FXAA.
 - Tone mapping.
 - Deferred rendering.
-- imgui rendering.
 - Render API abstraction.
 
 ## How to use

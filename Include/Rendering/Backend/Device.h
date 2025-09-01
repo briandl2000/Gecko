@@ -160,10 +160,6 @@ namespace Gecko
 		 */
 		virtual void UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset = 0) = 0;
 
-		// TODO: imgui methods should probably go in the command list
-		virtual void DrawTextureInImGui(Texture texture, u32 width = 0, u32 height = 0) = 0;
-		virtual void ImGuiRender(Ref<CommandList> commandList) = 0;
-
 		virtual u32 GetNumBackBuffers() = 0;
 		virtual u32 GetCurrentBackBufferIndex() = 0;
 	};

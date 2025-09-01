@@ -50,9 +50,6 @@ namespace Gecko::DX12
 		virtual void UploadTextureData(Texture texture, void* data, u32 mip = 0, u32 slice = 0) override;
 		virtual void UploadBufferData(Buffer buffer, void* data, u32 size, u32 offset = 0) override;
 
-		virtual void DrawTextureInImGui(Texture texture, u32 width = 0, u32 height = 0) override;
-		virtual void ImGuiRender(Ref<CommandList> commandList) override;
-
 		virtual u32 GetNumBackBuffers() { return m_NumBackBuffers; };
 		virtual u32 GetCurrentBackBufferIndex() { return m_CurrentBackBufferIndex; };
 
@@ -120,8 +117,6 @@ namespace Gecko::DX12
 		std::vector<DescriptorHandle> m_DsvDescHeapHandlesToBeDeleted{};
 		std::vector<DescriptorHandle> m_SrvDescHeapHandlesToBeDeleted{};
 		std::vector<ComPtr<ID3D12PipelineState>> m_PipelineStatesToBeDeleted{};
-
-		DescriptorHandle m_ImGuiHandle{};
 
 		std::mutex m_DeferredReleasesMutex{};
 

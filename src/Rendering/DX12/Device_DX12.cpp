@@ -9,8 +9,6 @@
 #include <dxgi1_6.h>
 #include "d3dx12.h"
 #include <d3dcompiler.h>
-#include <backends/imgui_impl_win32.h>
-#include <backends/imgui_impl_dx12.h>
 #include "Device_DX12.h"
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
@@ -90,56 +88,12 @@ namespace Gecko::DX12
 		// Createing the back buffer render targets
 		RecreateBackBuffers(info.Width, info.Height);
 
-		// Setting up ImGui
-		// ImGui stuff
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
-		ImGuiIO& io = ImGui::GetIO(); (void)io;
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
-		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-		//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
-		io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
-		//io.ConfigViewportsNoAutoMerge = true;
-		//io.ConfigViewportsNoTaskBarIcon = true;
-		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-		// Setup Dear ImGui style
-		ImGui::StyleColorsDark();
-		//ImGui::StyleColorsLight();
-
-		// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
-		ImGuiStyle& style = ImGui::GetStyle();
-		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
-			style.WindowRounding = 0.0f;
-			style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-		}
-
-		ImGui_ImplWin32_Init(window);
-		m_ImGuiHandle = m_SrvDescHeap.Allocate();
-		ImGui_ImplDX12_Init(
-			m_Device.Get(),
-			info.NumBackBuffers,
-			FormatToD3D12Format(m_BackBufferFormat),
-			m_SrvDescHeap.Heap(),
-			m_ImGuiHandle.CPU,
-			m_ImGuiHandle.GPU
-		);
-
-		ImGui_ImplDX12_NewFrame();
-		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
-
 	}
 
 	void Device_DX12::Shutdown()
 	{
 
 		Flush();
-
-		ImGui_ImplDX12_Shutdown();
-		ImGui_ImplWin32_Shutdown();
-		ImGui::DestroyContext();
 
 		CloseHandle(m_FenceEvent);
 		m_NumBackBuffers = 0;
@@ -974,52 +928,6 @@ namespace Gecko::DX12
 
 			CopyToResource(buffer_DX12->BufferResource->ResourceDX12, subresourceData, 0, offset);
 		}
-	}
-
-	void Device_DX12::DrawTextureInImGui(Texture texture, u32 width, u32 height)
-	{
-		Texture_DX12* texture_DX12 = (Texture_DX12*)texture.Data.get();
-
-		ImVec2 size = {
-			static_cast<float>(width),
-			static_cast<float>(height)
-		};
-		if (width == 0 || height == 0)
-		{
-			size = {
-				static_cast<float>(texture.Desc.Width),
-				static_cast<float>(texture.Desc.Height)
-			};
-		}
-
-		for (u32 i = 0; i < texture.Desc.NumMips; i++)
-		{
-			ImGui::Image(static_cast<ImU64>(texture_DX12->MipShaderResourceViews[i].GPU.ptr), size);
-		}
-
-	};
-
-	void Device_DX12::ImGuiRender(Ref<CommandList> commandList)
-	{
-		// Execute Command list
-		CommandList_DX12& commandListDx12 = *(CommandList_DX12*)commandList.get();
-
-		ImGui::Render();
-		ID3D12DescriptorHeap* heap = m_SrvDescHeap.Heap();
-		commandListDx12.CommandBuffer->CommandList->SetDescriptorHeaps(1, &heap);
-		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandListDx12.CommandBuffer->CommandList.Get());
-
-		// Update and Render additional Platform Windows
-		ImGuiIO& io = ImGui::GetIO(); (void)io;
-		if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-		{
-			ImGui::UpdatePlatformWindows();
-			ImGui::RenderPlatformWindowsDefault(NULL, (void*)commandListDx12.CommandBuffer->CommandList.Get());
-		}
-
-		ImGui_ImplDX12_NewFrame();
-		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
 	}
 
 #pragma endregion

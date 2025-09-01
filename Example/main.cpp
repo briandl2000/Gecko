@@ -17,7 +17,6 @@
 
 #include "ExampleComputePass.h"
 #include "NodeBasedScene.h"
-#include "DebugSceneUIRenderer.h"
 
 int main()
 {
@@ -153,12 +152,8 @@ int main()
 		glm::vec3 movement = glm::mat3(cameraNode->GetModifiableTransform().GetMat4()) * pos;
 		
 		cameraNode->GetModifiableTransform().Position += movement * deltaTime;
-
-		// Do the imgui things
-		DebugSceneUIRenderer::RenderDebugUI(ctx);
 		
 		renderer->RenderScene(mainScene->GetSceneRenderInfo());
-
 
 		Gecko::Input::Update();
 	}

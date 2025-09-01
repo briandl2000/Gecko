@@ -17,8 +17,6 @@ namespace Gecko { namespace Event
 		CODE_MOUSE_WHEEL = 0x07,
 		CODE_RESIZED = 0x08,
 
-		CODE_IMGUI_EVENT = 0x09,
-
 		MAX_EVENT_CODE = 0xFF
 	};
 

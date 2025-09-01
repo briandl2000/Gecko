@@ -56,7 +56,6 @@ target_include_directories(Gecko PUBLIC "./Include")
 target_include_directories(Gecko PRIVATE "./src")
 target_include_directories(Gecko PUBLIC "./ThirdParty/glm")
 target_include_directories(Gecko PUBLIC "./ThirdParty/stb_image")
-target_include_directories(Gecko PUBLIC "./ThirdParty/imgui")
 target_include_directories(Gecko PUBLIC "./ThirdParty/tinygltf")
 
 add_subdirectory(Example)
