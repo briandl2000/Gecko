@@ -2,21 +2,148 @@
 
 #include "Rendering/Frontend/ApplicationContext.h"
 
-#include "GLTFSceneLoader.h"
-
-#include "Rendering/Frontend/Renderer/RenderPasses/RenderPass.h"
-#include "Rendering/Frontend/Renderer/RenderPasses/ShadowPass.h"
-#include "Rendering/Frontend/Renderer/RenderPasses/GeometryPass.h"
-#include "Rendering/Frontend/Renderer/RenderPasses/DeferredPBRPass.h"
-#include "Rendering/Frontend/Renderer/RenderPasses/FXAAPass.h"
-#include "Rendering/Frontend/Renderer/RenderPasses/BloomPass.h"
-#include "Rendering/Frontend/Renderer/RenderPasses/ToneMappingGammaCorrectionPass.h"
-#include "Rendering/Frontend/Scene/SceneObjects/Transform.h"
-
 #include "Core/Input.h"
 
-#include "ExampleComputePass.h"
-#include "NodeBasedScene.h"
+#include "Rendering/Backend/CommandList.h"
+#include "Rendering/Frontend/Scene/Scene.h"
+#include "Rendering/Frontend/Scene/SceneObjects/Transform.h"
+#include "Rendering/Frontend/Renderer/RenderPasses/RenderPass.h"
+
+class SceneExample : public Gecko::Scene
+{
+public:
+	SceneExample() = default;
+	virtual ~SceneExample() 
+	{
+
+	}
+
+	virtual void Init(const std::string& name) override
+	{
+
+	}
+
+	// Adjust aspect ratios of cameras
+	virtual bool OnResize(const Gecko::Event::EventData& data) override
+	{
+		return false;
+	}
+
+protected:
+	virtual const void PopulateSceneRenderInfo(Gecko::SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const
+	{
+
+	}
+
+private:
+};
+
+
+struct float3 {
+	union {
+		struct {
+			float x;
+			float y;
+			float z;
+		} pos;
+		struct {
+			float r;
+			float g;
+			float b;
+		} col;
+		float arr[3];
+	};
+};
+
+struct Vertex
+{
+	float3 position;
+	float3 color;
+
+	static const Gecko::VertexLayout GetLayout() {
+		Gecko::VertexLayout layout({
+			{ Gecko::DataFormat::R32G32B32_FLOAT, "POSITION"},
+			{ Gecko::DataFormat::R32G32B32_FLOAT, "COLOR"}
+		});
+		return layout;
+	}
+};
+
+Gecko::MeshHandle MeshHandle;
+
+class TrianglePass : public Gecko::RenderPass<TrianglePass>
+{
+public:
+	struct ConfigData : public Gecko::BaseConfigData
+	{};
+
+	TrianglePass() = default;
+	virtual ~TrianglePass() {}
+	virtual const void Render(const Gecko::SceneRenderInfo& sceneRenderInfo, Gecko::ResourceManager* resourceManager,
+	const Gecko::Renderer* renderer, Gecko::Ref<Gecko::CommandList> commandList) override
+	{
+		Gecko::RenderTarget outputTarget = resourceManager->GetRenderTarget(m_OutputHandle);
+		Gecko::GraphicsPipeline pipeline = resourceManager->GetGraphicsPipeline(pipelineHandle);
+
+		commandList->ClearRenderTarget(outputTarget);
+
+		commandList->BindGraphicsPipeline(pipeline);
+		commandList->BindRenderTarget(outputTarget);
+
+		Gecko::Mesh& mesh = resourceManager->GetMesh(MeshHandle);
+		commandList->BindVertexBuffer(mesh.VertexBuffer);
+		commandList->BindIndexBuffer(mesh.IndexBuffer);
+
+		commandList->Draw(3);
+	}
+
+
+protected:
+	friend class Gecko::RenderPass<TrianglePass>;
+	// Called by RenderPass<GeometryPass> to initialise this object with config data
+	virtual const void SubInit(const Gecko::Platform::AppInfo& appInfo, Gecko::ResourceManager* resourceManager, const ConfigData& dependencies)
+	{
+		{	
+			Gecko::GraphicsPipelineDesc pipelineDesc;
+			pipelineDesc.VertexShaderPath = "Shaders/triangle.gsh";
+			pipelineDesc.PixelShaderPath = "Shaders/triangle.gsh";
+			pipelineDesc.ShaderVersion = "5_1";
+
+			pipelineDesc.VertexLayout = Vertex::GetLayout();
+
+			pipelineDesc.PipelineResources = {};
+			pipelineDesc.NumRenderTargets = 1;
+			pipelineDesc.RenderTextureFormats[0] = Gecko::DataFormat::R8G8B8A8_UNORM;
+
+			pipelineDesc.WindingOrder = Gecko::WindingOrder::CounterClockWise;
+			pipelineDesc.CullMode = Gecko::CullMode::Back;
+			pipelineDesc.PrimitiveType = Gecko::PrimitiveType::Triangles;
+
+			pipelineDesc.SamplerDescs = {
+				{Gecko::ShaderType::Pixel, Gecko::SamplerFilter::Linear},
+				{Gecko::ShaderType::Pixel, Gecko::SamplerFilter::Point}
+			};
+
+			pipelineHandle = resourceManager->CreateGraphicsPipeline(pipelineDesc);
+		}
+
+
+		Gecko::RenderTargetDesc renderTargetDesc;
+		renderTargetDesc.Width = appInfo.Width;
+		renderTargetDesc.Height = appInfo.Height;
+		renderTargetDesc.NumRenderTargets = 1;
+		renderTargetDesc.RenderTargetClearValues[0].Values[0] = 0.f;
+		renderTargetDesc.RenderTargetClearValues[0].Values[1] = 0.f;
+		renderTargetDesc.RenderTargetClearValues[0].Values[2] = 0.f;
+		renderTargetDesc.RenderTargetClearValues[0].Values[3] = 0.f;
+		renderTargetDesc.RenderTargetFormats[0] = Gecko::DataFormat::R8G8B8A8_UNORM; // color
+
+		m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "render target", true);
+	}
+
+private:
+	Gecko::GraphicsPipelineHandle pipelineHandle;
+};
 
 int main()
 {
@@ -46,78 +173,40 @@ int main()
 	Gecko::ResourceManager* resourceManager = ctx.GetResourceManager();
 
 	// Create the render passess
-	Gecko::RenderPassHandle shadowPass = renderer->CreateRenderPass<Gecko::ShadowPass>("Shadow");
-	Gecko::RenderPassHandle geometryPass = renderer->CreateRenderPass<Gecko::GeometryPass>("Geo");
-
-	Gecko::DeferredPBRPass::ConfigData PBRConfigData;
-	PBRConfigData.GeoPass = geometryPass;
-	PBRConfigData.ShadowPass = shadowPass;
-	Gecko::RenderPassHandle deferredPBRPass = renderer->CreateRenderPass<Gecko::DeferredPBRPass>("PBR", PBRConfigData);
-
-	Gecko::FXAAPass::ConfigData FXAAConfigData(deferredPBRPass);
-	Gecko::RenderPassHandle FXAAPass = renderer->CreateRenderPass<Gecko::FXAAPass>("FXAA", FXAAConfigData);
-
-	Gecko::BloomPass::ConfigData BloomConfigData(renderer->GetRenderPassByHandle(FXAAPass)->GetOutputHandle());
-	Gecko::RenderPassHandle bloomPass = renderer->CreateRenderPass<Gecko::BloomPass>("Bloom", BloomConfigData);
-
-	Gecko::ToneMappingGammaCorrectionPass::ConfigData ToneMappingGammaCorrectionConfigData;
-	ToneMappingGammaCorrectionConfigData.PrevPassOutput = renderer->GetRenderPassByHandle(bloomPass)->GetOutputHandle();
-	Gecko::RenderPassHandle toneMappingGammaCorrectionPass = 
-		renderer->CreateRenderPass<Gecko::ToneMappingGammaCorrectionPass>("ToneMappingGammaCorrection",
-			ToneMappingGammaCorrectionConfigData);
-
-	//Gecko::RenderPassHandle exampleComputePass = renderer->CreateRenderPass<ExampleComputePass>("ExampleCompute");
+	Gecko::RenderPassHandle trianglePass = renderer->CreateRenderPass<TrianglePass>("Triangle");
 	
 	// Configure renderpasses
 	renderer->ConfigureRenderPasses({
-		shadowPass,
-		geometryPass,
-		deferredPBRPass,
-		FXAAPass,
-		bloomPass,
-		toneMappingGammaCorrectionPass,
-		//exampleComputePass
+		trianglePass,
 		});
 
 	// Main scene initialisation
 	Gecko::SceneManager* sceneManager = ctx.GetSceneManager();
-	Gecko::u32 mainSceneIdx = sceneManager->CreateScene<NodeBasedScene>("Main Scene");
-	NodeBasedScene* mainScene = sceneManager->GetScene<NodeBasedScene>(mainSceneIdx);
-
-	// Add an environment map
-	mainScene->SetEnvironmentMapHandle(resourceManager->CreateEnvironmentMap("Assets/scythian_tombs_2_4k.hdr"));
-
-	// Load the Sponza gltf scene
-	SceneNode* sponzaNode = mainScene->GetRootNode()->AddNode("Sponza node");
-	Gecko::SceneHandle sponzaScene = GLTFSceneLoader::LoadNodeBasedScene("Assets/sponza/glb/Sponza.glb", ctx);
-	sponzaNode->AppendSceneData(*sceneManager->GetScene<NodeBasedScene>(sponzaScene));
-	sponzaNode->GetModifiableTransform().Rotation.y = 90.f;
-
-	// Load Helmet gltf Scene
-	SceneNode* helmetRootNode = mainScene->GetRootNode()->AddNode("Helmet node");
-	Gecko::SceneHandle helmetScene = GLTFSceneLoader::LoadNodeBasedScene("Assets/gltfHelmet/glTF-Binary/DamagedHelmet.glb", ctx);
-	helmetRootNode->AppendSceneData(*sceneManager->GetScene<NodeBasedScene>(helmetScene));
-	helmetRootNode->GetModifiableTransform().Position.y = 3.f;
-
-	// Create a camera in the scene
-	SceneNode* cameraNode = mainScene->GetRootNode()->AddNode("Camera node");
-	Gecko::Scope<Gecko::SceneCamera> camera = mainScene->CreateCamera(Gecko::ProjectionType::Perspective);
-	camera->SetIsMain(true);
-	camera->SetAutoAspectRatio(true);
-	cameraNode->AttachCamera(&camera);
-	cameraNode->GetModifiableTransform().Position.z = 4.f;
-	cameraNode->GetModifiableTransform().Position.y = 2.f;
-
-	// Create directional light
-	Gecko::Scope<Gecko::SceneDirectionalLight> directionalLight = mainScene->CreateDirectionalLight();
-	SceneNode* lightNode = mainScene->GetRootNode()->AddNode("Light node");
-	directionalLight->SetColor({ 1., 1., 1. });
-	directionalLight->SetIntenstiy(1.f);
-	lightNode->AppendLight(&Gecko::CreateScopeFromRaw<Gecko::SceneLight>(directionalLight.release()));
-	lightNode->GetModifiableTransform().Rotation.x = -90.f;
+	Gecko::u32 mainSceneIdx = sceneManager->CreateScene<SceneExample>("Main Scene");
+	SceneExample* mainScene = sceneManager->GetScene<SceneExample>(mainSceneIdx);
 
 	Gecko::f32 lastTime = Gecko::Platform::GetTime();
-	
+
+	Vertex triangleVertices[] = {
+		{ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
+		{ { 0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
+		{ { 0.0f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f } }
+	};
+	Gecko::u32 indices[] = { 0, 1, 2 };
+
+	// Create the Vertex3D and index buffers
+	Gecko::VertexBufferDesc vertexDesc;
+	vertexDesc.Layout = Vertex::GetLayout();
+	vertexDesc.NumVertices = static_cast<Gecko::u32>(3);
+	vertexDesc.MemoryType = Gecko::MemoryType::Dedicated;
+	vertexDesc.CanReadWrite = true;
+
+	Gecko::IndexBufferDesc indexDesc;
+	indexDesc.IndexFormat = Gecko::DataFormat::R32_UINT;
+	indexDesc.NumIndices = static_cast<Gecko::u32>(3);
+	indexDesc.MemoryType = Gecko::MemoryType::Dedicated;
+
+	MeshHandle = resourceManager->CreateMesh(vertexDesc, indexDesc, triangleVertices, indices);
 
 	while (Gecko::Platform::IsRunning()) {
 		Gecko::Platform::PumpMessage();
@@ -125,34 +214,7 @@ int main()
 		Gecko::f32 currentTime = Gecko::Platform::GetTime();
 		Gecko::f32 deltaTime = (currentTime - lastTime);
 		lastTime = currentTime;
-
-		helmetRootNode->GetModifiableTransform().Rotation.y += .73f * deltaTime * 50.f;
-		helmetRootNode->GetModifiableTransform().Rotation.x += 1.6f * deltaTime * 50.f;
-		helmetRootNode->GetModifiableTransform().Rotation.z += 1.0f * deltaTime * 50.f;
-	
-		glm::vec3 rot{ 0. };
-		
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::UP))		rot.x += 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::DOWN))	rot.x -= 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::LEFT))	rot.y += 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::RIGHT))	rot.y -= 1.f;
-
-		cameraNode->GetModifiableTransform().Rotation += rot * deltaTime * 40.f;
-		
-		glm::vec3 pos{ 0. };
-
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::W))		pos.z -= 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::S))		pos.z += 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::A))		pos.x -= 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::D))		pos.x += 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::LSHIFT)) pos.y -= 1.f;
-		if (Gecko::Input::IsKeyDown(Gecko::Input::Key::SPACE))	pos.y += 1.f;
-		if (glm::length2(pos) > 0.) pos = glm::normalize(pos);
-
-		glm::vec3 movement = glm::mat3(cameraNode->GetModifiableTransform().GetMat4()) * pos;
-		
-		cameraNode->GetModifiableTransform().Position += movement * deltaTime;
-		
+				
 		renderer->RenderScene(mainScene->GetSceneRenderInfo());
 
 		Gecko::Input::Update();
