@@ -2,7 +2,24 @@
 
 #include "Rendering/Backend/CommandList.h"
 
+#if defined(WIN32)
+#pragma warning( push )
+#pragma warning(disable : 4244)
+#endif
+
+#define STBI_MALLOC(sz) Gecko::Platform::CustomAllocate(sz)
+#define STBI_REALLOC(p,newsz) Gecko::Platform::CustomRealloc(p,newsz)
+#define STBI_FREE(p) Gecko::Platform::CustomFree(p)
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+
+#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+#if defined(WIN32)
+#pragma warning( pop )
+#endif
 
 namespace Gecko
 {

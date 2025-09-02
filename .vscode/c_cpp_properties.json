@@ -10,7 +10,6 @@
                 "${workspaceFolder}/Example/Include/**",
                 "${workspaceFolder}/ThirdParty/glm/glm/**",
                 "${workspaceFolder}/ThirdParty/stb_image/**",
-                "${workspaceFolder}/ThirdParty/tinygltf/**"
             ],
             // "customConfigurationVariables": {
 
@@ -33,11 +32,8 @@
                 "${workspaceFolder}/Include/**",
                 "${workspaceFolder}/Src/**",
                 "${workspaceFolder}/Example/**",
-                "${workspaceFolder}/Example/src/**",
-                "${workspaceFolder}/Example/Include/**",
                 "${workspaceFolder}/ThirdParty/glm/glm/**",
-                "${workspaceFolder}/ThirdParty/stb_image/**",
-                "${workspaceFolder}/ThirdParty/tinygltf/**"
+                "${workspaceFolder}/ThirdParty/stb_image/**"
             ],
             // "customConfigurationVariables": {
 
