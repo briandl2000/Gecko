@@ -37,7 +37,6 @@ protected:
 private:
 };
 
-
 struct float3 {
 	union {
 		struct {
@@ -68,7 +67,8 @@ struct Vertex
 	}
 };
 
-Gecko::MeshHandle MeshHandle;
+Gecko::BufferHandle vertexBufferHandle;
+Gecko::BufferHandle indexBufferHandle;
 
 class TrianglePass : public Gecko::RenderPass<TrianglePass>
 {
@@ -89,9 +89,8 @@ public:
 		commandList->BindGraphicsPipeline(pipeline);
 		commandList->BindRenderTarget(outputTarget);
 
-		Gecko::Mesh& mesh = resourceManager->GetMesh(MeshHandle);
-		commandList->BindVertexBuffer(mesh.VertexBuffer);
-		commandList->BindIndexBuffer(mesh.IndexBuffer);
+		commandList->BindVertexBuffer(resourceManager->GetBuffer(vertexBufferHandle));
+		commandList->BindIndexBuffer(resourceManager->GetBuffer(indexBufferHandle));
 
 		commandList->Draw(3);
 	}
@@ -137,7 +136,7 @@ protected:
 		renderTargetDesc.RenderTargetClearValues[0].Values[3] = 0.f;
 		renderTargetDesc.RenderTargetFormats[0] = Gecko::DataFormat::R8G8B8A8_UNORM; // color
 
-		m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc, "render target", true);
+		m_OutputHandle = resourceManager->CreateRenderTarget(renderTargetDesc);
 	}
 
 private:
@@ -186,6 +185,10 @@ int main()
 
 	Gecko::f32 lastTime = Gecko::Platform::GetTime();
 
+	// FPS tracking variables
+	Gecko::f32 fpsTimer = 0.0f;
+	int frameCount = 0;
+
 	Vertex triangleVertices[] = {
 		{ { -0.5f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
 		{ { 0.5f, -0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
@@ -198,14 +201,16 @@ int main()
 	vertexDesc.Layout = Vertex::GetLayout();
 	vertexDesc.NumVertices = static_cast<Gecko::u32>(3);
 	vertexDesc.MemoryType = Gecko::MemoryType::Dedicated;
-	vertexDesc.CanReadWrite = true;
+	vertexDesc.CanReadWrite = false;
+
+	vertexBufferHandle = resourceManager->CreateBuffer(vertexDesc, triangleVertices);
 
 	Gecko::IndexBufferDesc indexDesc;
 	indexDesc.IndexFormat = Gecko::DataFormat::R32_UINT;
 	indexDesc.NumIndices = static_cast<Gecko::u32>(3);
 	indexDesc.MemoryType = Gecko::MemoryType::Dedicated;
 
-	MeshHandle = resourceManager->CreateMesh(vertexDesc, indexDesc, triangleVertices, indices);
+	indexBufferHandle = resourceManager->CreateBuffer(indexDesc, indices);
 
 	while (Gecko::Platform::IsRunning()) {
 		Gecko::Platform::PumpMessage();
@@ -213,6 +218,17 @@ int main()
 		Gecko::f32 currentTime = Gecko::Platform::GetTime();
 		Gecko::f32 deltaTime = (currentTime - lastTime);
 		lastTime = currentTime;
+
+		// FPS calculation
+		fpsTimer += deltaTime;
+		frameCount++;
+		
+		if (fpsTimer >= 1.0f) {
+			float fps = frameCount / fpsTimer;
+			printf("FPS: %.1f\n", fps);
+			fpsTimer = 0.0f;
+			frameCount = 0;
+		}
 				
 		renderer->RenderScene(mainScene->GetSceneRenderInfo());
 

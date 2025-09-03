@@ -35,9 +35,8 @@ namespace Gecko
 	void ResourceManager::Init(Device* device)
 	{
 		m_Device = device;
-		m_CurrentMeshIndex = 0;
+		m_CurrentBufferIndex = 0;
 		m_CurrentTextureIndex = 0;
-		m_CurrentMaterialIndex = 0;
 		m_CurrentRenderTargetIndex = 0;
 
 		// MipMap Compute Pipeline
@@ -59,46 +58,6 @@ namespace Gecko
 			};
 
 			DownsamplePipelineHandle = CreateComputePipeline(computePipelineDesc);
-		}
-
-		// HDR to Cubemap Compute Pipeline
-		{
-			ComputePipelineDesc computePipelineDesc;
-			computePipelineDesc.ComputeShaderPath = "Shaders/HDR_to_cube.gsh";
-			computePipelineDesc.ShaderVersion = "5_1";
-			computePipelineDesc.SamplerDescs = {
-				{ShaderType::Pixel, SamplerFilter::Linear, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap, SamplerWrapMode::Wrap}
-			};
-			computePipelineDesc.PipelineReadOnlyResources = 
-			{
-				PipelineResource::Texture(ShaderType::Compute, 0)
-			};
-			computePipelineDesc.PipelineReadWriteResources = 
-			{
-				PipelineResource::Texture(ShaderType::Compute, 0)
-			};
-
-			HDRToCubeHandle = CreateComputePipeline(computePipelineDesc);
-		}
-
-		// IradianceMap Compute Pipeline
-		{
-			ComputePipelineDesc computePipelineDesc;
-			computePipelineDesc.ComputeShaderPath = "Shaders/IrradianceMap.gsh";
-			computePipelineDesc.ShaderVersion = "5_1";
-			computePipelineDesc.SamplerDescs = {
-				{ShaderType::Pixel, SamplerFilter::Linear, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp, SamplerWrapMode::Clamp}
-			};
-			computePipelineDesc.PipelineReadOnlyResources = 
-			{
-				PipelineResource::Texture(ShaderType::Compute, 0)
-			};
-			computePipelineDesc.PipelineReadWriteResources = 
-			{
-				PipelineResource::Texture(ShaderType::Compute, 0)
-			};
-
-			IrradianceMapHandle = CreateComputePipeline(computePipelineDesc);
 		}
 
 		// Create missing Texture
@@ -135,55 +94,52 @@ namespace Gecko
 
 			m_MissingTextureHandle = CreateTexture(textureDesc, emptyTexData.data(), true);
 		}
-		
-		// Create missing Material
-		{
-			m_MissingMaterialHandle = CreateMaterial();
-			Gecko::Buffer materialConstantBuffer = GetMaterial(m_MissingMaterialHandle).MaterialConstantBuffer;
-			MaterialData materialData{ };// = reinterpret_cast<MaterialData*>(materialConstantBuffer._Buffer);
-			materialData.materialTextureFlags |= 0b00001;
-			m_Device->UploadBufferData(materialConstantBuffer, &materialData, sizeof(MaterialData));
-		}
-
-		AddEventListener(Event::SystemEvent::CODE_RESIZED, &ResourceManager::ResizeEvent);
 	}
 
 	void ResourceManager::Shutdown()
 	{
-		RemoveEventListener(Event::SystemEvent::CODE_RESIZED, &ResourceManager::ResizeEvent);
-
-		m_CurrentMeshIndex = 0;
+		m_CurrentBufferIndex = 0;
 		m_CurrentTextureIndex = 0;
-		m_CurrentMaterialIndex = 0;
 		m_CurrentRenderTargetIndex = 0;
-		m_CurrentEnvironmentMapsIndex = 0;
 		m_CurrentGraphicsPipelineIndex = 0;
 		m_CurrentComputePipelineIndex = 0;
 
-		m_EnvironmentMaps.clear();
-		m_Materials.clear();
 		m_Textures.clear();
-		m_Meshes.clear();
+		m_Buffers.clear();
 		m_RenderTargets.clear();
 		m_GraphicsPipelines.clear();
 		m_ComputePipelines.clear();
 	}
 
-	MeshHandle ResourceManager::CreateMesh(VertexBufferDesc vertexDesc, IndexBufferDesc indexDesc, void* vertexData, void* indexData)
+	BufferHandle ResourceManager::CreateBuffer(VertexBufferDesc vertexDesc, void* vertexData)
 	{
-		MeshHandle handle = m_CurrentMeshIndex;
+		BufferHandle handle = m_CurrentBufferIndex;
 
-		Mesh mesh;
+		Buffer buffer;
 
-		mesh.VertexBuffer = m_Device->CreateVertexBuffer(vertexDesc);
-		mesh.IndexBuffer = m_Device->CreateIndexBuffer(indexDesc);
+		buffer = m_Device->CreateVertexBuffer(vertexDesc);
 
-		m_Device->UploadBufferData(mesh.VertexBuffer, vertexData, mesh.VertexBuffer.Desc.Stride *mesh.VertexBuffer.Desc.NumElements);
-		m_Device->UploadBufferData(mesh.IndexBuffer, indexData, mesh.IndexBuffer.Desc.Stride*mesh.IndexBuffer.Desc.NumElements);
+		m_Device->UploadBufferData(buffer, vertexData, buffer.Desc.Stride * buffer.Desc.NumElements);
 
-		m_Meshes[handle] = mesh;
+		m_Buffers[handle] = buffer;
 
-		m_CurrentMeshIndex++;
+		m_CurrentBufferIndex++;
+		return handle;
+	}
+
+	BufferHandle ResourceManager::CreateBuffer(IndexBufferDesc indexDesc, void* indexData)
+	{
+		BufferHandle handle = m_CurrentBufferIndex;
+
+		Buffer buffer;
+
+		buffer = m_Device->CreateIndexBuffer(indexDesc);
+
+		m_Device->UploadBufferData(buffer, indexData, buffer.Desc.Stride * buffer.Desc.NumElements);
+
+		m_Buffers[handle] = buffer;
+
+		m_CurrentBufferIndex++;
 		return handle;
 	}
 
@@ -207,169 +163,14 @@ namespace Gecko
 		return handle;
 	}
 
-	MaterialHandle ResourceManager::CreateMaterial()
+	RenderTargetHandle ResourceManager::CreateRenderTarget(RenderTargetDesc renderTargetDesc)
 	{
-		MaterialHandle handle = m_CurrentMaterialIndex;
-
-		Material outMat;\
-
-		ConstantBufferDesc MaterialBufferDesc =
-		{
-			sizeof(MaterialData)
-		};
-		MaterialBufferDesc.MemoryType = MemoryType::Shared;
-		Gecko::Buffer materialConstantBuffer = m_Device->CreateConstantBuffer(MaterialBufferDesc);
-		//MaterialData* materialData = reinterpret_cast<MaterialData*>(materialConstantBuffer._Buffer);
-		MaterialData materialData = MaterialData();
-		materialData.materialTextureFlags = 0;
-
-
-		materialData.baseColorFactor[0] = static_cast<float>(1.f);
-		materialData.baseColorFactor[1] = static_cast<float>(1.f);
-		materialData.baseColorFactor[2] = static_cast<float>(1.f);
-		materialData.baseColorFactor[3] = static_cast<float>(1.f);
-
-		materialData.normalScale = static_cast<float>(0.f);
-
-		materialData.matallicFactor = static_cast<float>(0.f);
-		materialData.roughnessFactor = static_cast<float>(1.f);
-
-		materialData.emissiveFactor[0] = static_cast<float>(0.f);
-		materialData.emissiveFactor[1] = static_cast<float>(0.f);
-		materialData.emissiveFactor[2] = static_cast<float>(0.f);
-
-		materialData.occlusionStrength = static_cast<float>(1.f);
-
-		materialData.materialTextureFlags = 0b00000;
-		m_Device->UploadBufferData(materialConstantBuffer, &materialData, sizeof(MaterialData));
-
-		outMat.AlbedoTextureHandle = GetMissingTextureHandle();
-		outMat.EmmisiveTextureHandle = GetMissingTextureHandle();
-		outMat.MetalicRoughnessTextureHandle = GetMissingTextureHandle();
-		outMat.NormalTextureHandle = GetMissingTextureHandle();
-		outMat.OcclusionTextureHandle = GetMissingTextureHandle();
-
-		outMat.MaterialConstantBuffer = materialConstantBuffer;
-
-		m_Materials[handle] = outMat;
-
-		m_CurrentMaterialIndex++;
-		return handle;
-	}
-
-	RenderTargetHandle ResourceManager::CreateRenderTarget(RenderTargetDesc renderTargetDesc, std::string name, bool KeepWindowAspectRatio)
-	{
-		name;
 		RenderTargetHandle handle = m_CurrentRenderTargetIndex;
 
 		RenderTarget outRenderTarget = m_Device->CreateRenderTarget(renderTargetDesc);
-		m_RenderTargets[handle].RenderTarget = outRenderTarget;
-		m_RenderTargets[handle].KeepWindowAspectRatio = KeepWindowAspectRatio;
-		m_RenderTargets[handle].WidthScale = 1.f;
+		m_RenderTargets[handle] = outRenderTarget;
 
 		m_CurrentRenderTargetIndex++;
-		return handle;
-	}
-
-	EnvironmentMapHandle ResourceManager::CreateEnvironmentMap(std::string path)
-	{
-		RenderTargetHandle handle = m_CurrentEnvironmentMapsIndex;
-
-		EnvironmentMap outEnvironmentMap;
-
-		Texture HDRTexture;
-		Texture EnvironmentTexture;
-		Texture IrradianceTexture;
-
-		// Make Cube map Texture
-		{
-			TextureDesc textureDesc;
-			textureDesc.Width = 512;
-			textureDesc.Height = 512;
-			textureDesc.Type = TextureType::TexCube;
-			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
-			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
-			textureDesc.NumArraySlices = 6;
-			outEnvironmentMap.EnvironmentTextureHandle = CreateTexture(textureDesc);
-			EnvironmentTexture = GetTexture(outEnvironmentMap.EnvironmentTextureHandle);
-		}
-
-		// Load HDR Texture
-		{
-			int x, y, n;
-			f32* data = stbi_loadf(Platform::GetLocalPath(path).c_str(), &x, &y, &n, 4);
-
-			TextureDesc textureDesc;
-			textureDesc.Width = x;
-			textureDesc.Height = y;
-			textureDesc.Type = TextureType::Tex2D;
-			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
-			textureDesc.NumMips = 1;
-			textureDesc.NumArraySlices = 1;
-			outEnvironmentMap.HDRTextureHandle = CreateTexture(textureDesc, data);
-			HDRTexture = GetTexture(outEnvironmentMap.HDRTextureHandle);;
-
-			stbi_image_free(data);
-
-
-			// computeShader to upload to cubemap
-
-			{
-				Ref<CommandList> commandList = m_Device->CreateComputeCommandList();
-
-				commandList->BindComputePipeline(GetComputePipeline(HDRToCubeHandle));
-
-				commandList->BindTexture(0, HDRTexture);
-
-				commandList->BindAsRWTexture(0, EnvironmentTexture);
-
-				commandList->Dispatch(
-					EnvironmentTexture.Desc.Width / 32,
-					EnvironmentTexture.Desc.Height / 32,
-					6
-				);
-
-				m_Device->ExecuteComputeCommandList(commandList);
-			}
-			MipMapTexture(EnvironmentTexture);
-
-		}
-
-		// Generate IrradianceMap
-		{
-			TextureDesc textureDesc;
-			textureDesc.Width = 32;
-			textureDesc.Height = 32;
-			textureDesc.Type = TextureType::TexCube;
-			textureDesc.Format = DataFormat::R32G32B32A32_FLOAT;
-			textureDesc.NumMips = CalculateNumberOfMips(textureDesc.Width, textureDesc.Height);
-			textureDesc.NumArraySlices = 6;
-			outEnvironmentMap.IrradianceTextureHandle = CreateTexture(textureDesc);
-			IrradianceTexture = GetTexture(outEnvironmentMap.IrradianceTextureHandle);
-
-			{
-				Ref<CommandList> commandList = m_Device->CreateComputeCommandList();
-
-				commandList->BindComputePipeline(GetComputePipeline(IrradianceMapHandle));
-
-				commandList->BindTexture(0, EnvironmentTexture);
-				commandList->BindAsRWTexture(0, IrradianceTexture);
-
-				commandList->Dispatch(
-					IrradianceTexture.Desc.Width / 32,
-					IrradianceTexture.Desc.Height / 32,
-					6
-				);
-
-				m_Device->ExecuteComputeCommandList(commandList);
-			}
-		}
-
-		m_EnvironmentMaps[handle] = outEnvironmentMap;
-		m_CurrentEnvironmentMapsIndex++;
-
-
-
 		return handle;
 	}
 
@@ -395,10 +196,10 @@ namespace Gecko
 		return handle;
 	}
 
-	Mesh& ResourceManager::GetMesh(const MeshHandle& meshHandle)
+	Buffer& ResourceManager::GetBuffer(const BufferHandle& bufferHandle)
 	{
-		// TODO: raise error when mesh not found 
-		return m_Meshes[meshHandle];
+		// TODO: raise error when buffer not found
+		return m_Buffers[bufferHandle];
 	}
 
 	Texture& ResourceManager::GetTexture(const TextureHandle& textureHandle)
@@ -409,14 +210,6 @@ namespace Gecko
 		return m_Textures[textureHandle];
 	}
 
-	Material& ResourceManager::GetMaterial(const MaterialHandle& materialHandle)
-	{
-		if (m_Materials.find(materialHandle) == m_Materials.end())
-			return m_Materials[m_MissingMaterialHandle];
-
-		return m_Materials[materialHandle];
-	}
-
 	RenderTarget& ResourceManager::GetRenderTarget(const RenderTargetHandle& renderTargetHandle)
 	{
 		if (m_RenderTargets.find(renderTargetHandle) == m_RenderTargets.end())
@@ -424,12 +217,7 @@ namespace Gecko
 			ASSERT(false, "Could not find specified RenderTarget!");
 		}
 
-		return  m_RenderTargets[renderTargetHandle].RenderTarget;
-	}
-
-	EnvironmentMap& ResourceManager::GetEnvironmentMap(const EnvironmentMapHandle& environmentMapHandle)
-	{
-		return m_EnvironmentMaps[environmentMapHandle];
+		return  m_RenderTargets[renderTargetHandle];
 	}
 
 	GraphicsPipeline& ResourceManager::GetGraphicsPipeline(const GraphicsPipelineHandle& graphicsPipelineHandle)
@@ -455,27 +243,6 @@ namespace Gecko
 	void ResourceManager::UploadMaterial(Buffer& buffer, void* data, u32 size, u32 offset)
 	{
 		m_Device->UploadBufferData(buffer, data, size, offset);
-	}
-
-	bool ResourceManager::ResizeEvent(const Event::EventData& eventData)
-	{
-		u32 width = eventData.Data.u32[0];
-		u32 height = eventData.Data.u32[1];
-		width = width == 0 ? 1 : width;
-		height = height == 0 ? 1 : height;
-
-		for (auto& [key, val] : m_RenderTargets)
-		{
-			if (val.KeepWindowAspectRatio)
-			{
-				RenderTargetDesc renderTargetDesc = val.RenderTarget.Desc;
-				renderTargetDesc.Width = static_cast<u32>(width * val.WidthScale);
-				renderTargetDesc.Height = static_cast<u32>(height * val.WidthScale);
-				val.RenderTarget = m_Device->CreateRenderTarget(renderTargetDesc);
-			}
-		}
-
-		return false;
 	}
 
 	void ResourceManager::MipMapTexture(Texture texture)

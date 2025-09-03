@@ -63,7 +63,8 @@ private:
 
 	GraphicsPipelineHandle FullScreenTexturePipelineHandle;
 
-	MeshHandle quadMeshHandle{ 0 };
+	BufferHandle quadVertexHandle{ 0 };
+	BufferHandle quadIndexHandle{ 0 };
 
 	Platform::AppInfo m_Info;
 };

@@ -71,7 +71,8 @@ void Renderer::Init(Platform::AppInfo& info, ResourceManager* resourceManager, D
 		indexDesc.NumIndices = 3;
 		indexDesc.MemoryType = MemoryType::Dedicated;
 
-		quadMeshHandle = m_ResourceManager->CreateMesh(vertexDesc, indexDesc, vertices, indices);
+		quadVertexHandle = m_ResourceManager->CreateBuffer(vertexDesc, vertices);
+		quadIndexHandle = m_ResourceManager->CreateBuffer(indexDesc, indices);
 	}
 }
 
@@ -106,9 +107,8 @@ void Renderer::RenderScene(const SceneRenderInfo& sceneRenderInfo)
 	
 	GraphicsPipeline FullScreenTexturePipeline = m_ResourceManager->GetGraphicsPipeline(FullScreenTexturePipelineHandle);
 	commandList->BindGraphicsPipeline(FullScreenTexturePipeline);
-	Mesh quadMesh = m_ResourceManager->GetMesh(quadMeshHandle);
-	commandList->BindVertexBuffer(quadMesh.VertexBuffer);
-	commandList->BindIndexBuffer(quadMesh.IndexBuffer);
+	commandList->BindVertexBuffer(m_ResourceManager->GetBuffer(quadVertexHandle));
+	commandList->BindIndexBuffer(m_ResourceManager->GetBuffer(quadIndexHandle));
 	commandList->BindTexture(0, inputTarget.RenderTextures[0]);
 	commandList->BindRenderTarget(renderTarget);
 
