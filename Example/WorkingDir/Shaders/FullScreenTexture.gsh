@@ -1,4 +1,3 @@
-#include "ShaderDefines.h"
 
 struct VS_INPUT
 {
@@ -7,7 +6,7 @@ struct VS_INPUT
 
 struct VS_OUTPUT
 {
-	float4 Position : S_OUTPUT_POSITION;
+	float4 Position : SV_POSITION;
 	float2 uv : TEXCOORD;
 };
 
@@ -25,7 +24,7 @@ VS_OUTPUT main(VS_INPUT Input)
 	return Output;
 }
 #elif defined(PIXEL)
-float4 main(VS_OUTPUT input) : S_OUTPUT_TARGET
+float4 main(VS_OUTPUT input) : SV_TARGET
 {
 	return float4(inputTexture.Sample(LinearSampler, input.uv).xyz, 1.);
 }

@@ -1,7 +1,5 @@
-#include "ShaderDefines.h"
-
-Texture2D_Arr<float4> InputTexture : register(t0);
-RW_Texture2D_Arr<float4> OutputTexture : register(u0);
+Texture2DArray<float4> InputTexture : register(t0);
+RWTexture2DArray<float4> OutputTexture : register(u0);
 SamplerState LinearSampler : register(s0);
 
 struct MipGenerationData
@@ -26,16 +24,16 @@ float4 linear_to_srgb(float4 col)
 	return r;
 }
 
-DYNAMIC_CALL_DATA(MipGenerationData, mipGenerationData, b0);
+ConstantBuffer<MipGenerationData> mipGenerationData : register(b0);
 
 #if defined (COMPUTE)
-[N_THREADS(8, 8, 1)]
-void main(uint3 DTid : S_INPUT_DISPATCH_ID)
+[numthreads(8, 8, 1)]
+void main(uint3 id : SV_DispatchThreadID)
 {
-	float3 uv = float3(float2(DTid.xy*2+1)/float2(mipGenerationData.width, mipGenerationData.height), DTid.z);
+	float3 uv = float3(float2(id.xy*2+1)/float2(mipGenerationData.width, mipGenerationData.height), id.z);
 
-	float4 color = SAMPLE_TEXTURE_LEVEL(InputTexture, LinearSampler, uv, 0.);
+	float4 color = InputTexture.SampleLevel(LinearSampler, uv, 0.0);
 
-	OutputTexture[DTid] = mipGenerationData.srgb ? linear_to_srgb(color) : color;
+	OutputTexture[id] = mipGenerationData.srgb ? linear_to_srgb(color) : color;
 }
 #endif
