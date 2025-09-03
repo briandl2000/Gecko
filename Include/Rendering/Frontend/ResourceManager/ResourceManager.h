@@ -40,15 +40,10 @@ public:
 
 	TextureHandle GetMissingTextureHandle() { return m_MissingTextureHandle; }
 	MaterialHandle GetMissingMaterialHandle() { return m_MissingMaterialHandle; }
-	MaterialHandle GetCubeMeshHandle() { return m_CubeMeshHandle; }
 
 	u32 GetCurrentBackBufferIndex() { return m_Device->GetCurrentBackBufferIndex(); }
 
 	void UploadMaterial(Buffer& buffer, void* data, u32 size, u32 offset = 0);
-
-	// TEMP
-	std::vector<Buffer> SceneDataBuffer;
-	std::vector<SceneDataStruct> SceneData;
 
 	bool ResizeEvent(const Event::EventData& eventData);
 
@@ -61,7 +56,6 @@ private:
 
 	TextureHandle m_MissingTextureHandle{ 0 };
 	MaterialHandle m_MissingMaterialHandle{ 0 };
-	MeshHandle m_CubeMeshHandle{ 0 };
 
 	ComputePipelineHandle DownsamplePipelineHandle;
 	ComputePipelineHandle HDRToCubeHandle;

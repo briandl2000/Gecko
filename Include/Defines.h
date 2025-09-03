@@ -5,13 +5,6 @@
 #pragma  warning(disable : 4201)
 #endif
 
-#define  GLM_ENABLE_EXPERIMENTAL
-#include <glm/glm.hpp>
-#include <glm/matrix.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/quaternion.hpp>
-#include <glm/gtx/euler_angles.hpp>
-
 #ifdef WIN32
 #pragma warning( pop )
 #endif

@@ -99,74 +99,6 @@ namespace Gecko
 			};
 
 			IrradianceMapHandle = CreateComputePipeline(computePipelineDesc);
-
-		}
-
-		// Create missing Mesh
-		{
-			Vertex3D vertices[] = {
-				{{ 1.f,  1.f, -1.f}, {1.f, 1.f}, { 0.f,  1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-				{{ 1.f,  1.f,  1.f}, {1.f, 0.f}, { 0.f,  1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-				{{-1.f,  1.f, -1.f}, {0.f, 1.f}, { 0.f,  1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-				{{-1.f,  1.f,  1.f}, {0.f, 0.f}, { 0.f,  1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-						   
-				{{ 1.f,  1.f, -1.f}, {0.f, 1.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{ 1.f, -1.f, -1.f}, {0.f, 0.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{-1.f,  1.f, -1.f}, {1.f, 1.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{-1.f, -1.f, -1.f}, {1.f, 0.f}, { 0.f,  0.f, -1.f}, {0.f, 1.f, 0.f, 0.f}},
-						   
-				{{-1.f,  1.f, -1.f}, {0.f, 1.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{-1.f, -1.f, -1.f}, {0.f, 0.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{-1.f,  1.f,  1.f}, {1.f, 1.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{-1.f, -1.f,  1.f}, {1.f, 0.f}, {-1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-						   
-				{{ 1.f,  1.f, -1.f}, {0.f, 0.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{ 1.f, -1.f, -1.f}, {0.f, 1.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{ 1.f,  1.f,  1.f}, {1.f, 0.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{ 1.f, -1.f,  1.f}, {1.f, 1.f}, { 1.f,  0.f,  0.f}, {0.f, 1.f, 0.f, 0.f}},
-						   
-				{{ 1.f,  1.f,  1.f}, {0.f, 0.f}, { 0.f,  0.f,  1.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{ 1.f, -1.f,  1.f}, {0.f, 1.f}, { 0.f,  0.f,  1.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{-1.f,  1.f,  1.f}, {1.f, 0.f}, { 0.f,  0.f,  1.f}, {0.f, 1.f, 0.f, 0.f}},
-				{{-1.f, -1.f,  1.f}, {1.f, 1.f}, { 0.f,  0.f,  1.f}, {0.f, 1.f, 0.f, 0.f}},
-
-				{{ 1.f, -1.f, -1.f}, {0.f, 1.f}, { 0.f, -1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-				{{ 1.f, -1.f,  1.f}, {0.f, 0.f}, { 0.f, -1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-				{{-1.f, -1.f, -1.f}, {1.f, 1.f}, { 0.f, -1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}},
-				{{-1.f, -1.f,  1.f}, {1.f, 0.f}, { 0.f, -1.f,  0.f}, {1.f, 0.f, 0.f, 0.f}}
-			};
-
-			u32 indices[] = {
-				1, 0, 3,
-				3, 0, 2,
-
-				0+4, 1+4, 3+4,
-				0+4, 3+4, 2+4,
-
-				0+8, 1+8, 3+8,
-				0+8, 3+8, 2+8,
-
-				1+12, 0+12, 3+12,
-				3+12, 0+12, 2+12,
-
-				1+16, 0+16, 3+16,
-				3+16, 0+16, 2+16,
-
-				0+20, 1+20, 3+20,
-				0+20, 3+20, 2+20,
-			};
-
-			VertexBufferDesc vertexDesc;
-			vertexDesc.Layout = Vertex3D::GetLayout();
-			vertexDesc.NumVertices = 24;
-			vertexDesc.MemoryType = MemoryType::Dedicated;
-
-			IndexBufferDesc indexDesc;
-			indexDesc.IndexFormat = DataFormat::R32_UINT;
-			indexDesc.NumIndices = 36;
-			indexDesc.MemoryType = MemoryType::Dedicated;
-
-			m_CubeMeshHandle = CreateMesh(vertexDesc, indexDesc, vertices, indices);
 		}
 
 		// Create missing Texture
@@ -213,34 +145,6 @@ namespace Gecko
 			m_Device->UploadBufferData(materialConstantBuffer, &materialData, sizeof(MaterialData));
 		}
 
-		SceneDataBuffer.resize(m_Device->GetNumBackBuffers());
-		SceneData.resize(m_Device->GetNumBackBuffers());
-		for(u32 i = 0; i < m_Device->GetNumBackBuffers(); i++)
-		{
-			Gecko::ConstantBufferDesc bufferDesc = {
-				sizeof(SceneDataStruct)
-			};
-			bufferDesc.MemoryType = MemoryType::Shared;
-			SceneDataBuffer[i] = m_Device->CreateConstantBuffer(bufferDesc);
-			SceneData[i].CameraPosition = glm::vec3(0., 0., 2.);
-			SceneData[i].ProjectionMatrix = glm::perspective(glm::radians(90.f), Gecko::Platform::GetScreenAspectRatio(), 0.1f, 100.f);
-
-			SceneData[i].ViewMatrix = glm::translate(glm::mat4(1.), SceneData[i].CameraPosition);
-			SceneData[i].invProjectionMatrix = glm::inverse(SceneData[i].ProjectionMatrix);
-			SceneData[i].InvViewMatrix = glm::inverse(SceneData[i].ViewMatrix);
-			SceneData[i].ViewOrientation = glm::mat4(glm::mat3(SceneData[i].ViewMatrix));
-			SceneData[i].LightDirection.x = 0.f;
-			SceneData[i].LightDirection.y = -1.f;
-			SceneData[i].LightDirection.z = 1.f;
-
-			SceneData[i].AmbientIntensity = 1.f;
-			SceneData[i].LighIntensity = 1.f;
-			SceneData[i].LightColor = glm::vec3(1.f);
-			SceneData[i].Exposure = 2.f;
-
-			m_Device->UploadBufferData(SceneDataBuffer[i], &SceneData, sizeof(SceneDataStruct));
-		}
-
 		AddEventListener(Event::SystemEvent::CODE_RESIZED, &ResourceManager::ResizeEvent);
 	}
 
@@ -255,9 +159,6 @@ namespace Gecko
 		m_CurrentEnvironmentMapsIndex = 0;
 		m_CurrentGraphicsPipelineIndex = 0;
 		m_CurrentComputePipelineIndex = 0;
-
-		SceneDataBuffer.clear();
-		SceneData.clear();
 
 		m_EnvironmentMaps.clear();
 		m_Materials.clear();
@@ -496,9 +397,7 @@ namespace Gecko
 
 	Mesh& ResourceManager::GetMesh(const MeshHandle& meshHandle)
 	{
-		if (m_Meshes.find(meshHandle) == m_Meshes.end())
-			return m_Meshes[m_CubeMeshHandle];
-
+		// TODO: raise error when mesh not found 
 		return m_Meshes[meshHandle];
 	}
 

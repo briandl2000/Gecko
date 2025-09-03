@@ -6,7 +6,6 @@
 
 #include "Rendering/Backend/CommandList.h"
 #include "Rendering/Frontend/Scene/Scene.h"
-#include "Rendering/Frontend/Scene/SceneObjects/Transform.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/RenderPass.h"
 
 class SceneExample : public Gecko::Scene
@@ -30,7 +29,7 @@ public:
 	}
 
 protected:
-	virtual const void PopulateSceneRenderInfo(Gecko::SceneRenderInfo* sceneRenderInfo, const glm::mat4& transform) const
+	virtual const void PopulateSceneRenderInfo(Gecko::SceneRenderInfo* sceneRenderInfo) const
 	{
 
 	}
