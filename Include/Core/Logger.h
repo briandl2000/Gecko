@@ -17,21 +17,21 @@
 
 namespace Gecko { namespace Logger
 {
-    enum eLogLevel
-    {
-        LOG_LEVEL_FATAL = 0,
-        LOG_LEVEL_ERROR = 1,
-        LOG_LEVEL_WARN = 2,
-        LOG_LEVEL_INFO = 3,
-        LOG_LEVEL_DEBUG = 4,
-        LOG_LEVEL_TRACE = 5
-    };
+  enum eLogLevel
+  {
+    LOG_LEVEL_FATAL = 0,
+    LOG_LEVEL_ERROR = 1,
+    LOG_LEVEL_WARN = 2,
+    LOG_LEVEL_INFO = 3,
+    LOG_LEVEL_DEBUG = 4,
+    LOG_LEVEL_TRACE = 5
+  };
 
-    bool Init();
-    void Shutdown();
-    void LogOutput(eLogLevel level, std::string message, ...);
+  bool Init();
+  void Shutdown();
+  void LogOutput(eLogLevel level, std::string message, ...);
 
-    void ConsoleWrite(char* msg, Logger::eLogLevel level);
+  void ConsoleWrite(char* msg, Logger::eLogLevel level);
 } }
 
 #ifndef LOG_FATAL

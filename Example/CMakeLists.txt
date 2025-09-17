@@ -8,6 +8,4 @@ target_compile_definitions("${EXAMPLE_NAME}" PUBLIC WORKING_DIR_PATH="${CMAKE_CU
 
 target_link_libraries("${EXAMPLE_NAME}" PUBLIC "${GECKO}")
 
-target_include_directories("${EXAMPLE_NAME}" PUBLIC "./Include")
 target_include_directories("${EXAMPLE_NAME}" PUBLIC "../Include")
-target_include_directories("${EXAMPLE_NAME}" PUBLIC "../ThirdParty/glm")

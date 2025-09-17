@@ -39,30 +39,30 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 
 // TODO: Make use of custom string formating and wchar string class
 #ifdef DEBUG
-#define NAME_DIRECTX12_OBJECT(obj, name)			\
-{													\
-	const size_t cSize = strlen(name)+1;			\
-	wchar_t* wc = new wchar_t[cSize];				\
-	size_t outSize;									\
-	mbstowcs_s(&outSize, wc, cSize, name, cSize-1);	\
-	obj->SetName(wc);								\
-	delete[] wc;									\
-	LOG_DEBUG("D3D12 Object Created: %s", name);	\
+#define NAME_DIRECTX12_OBJECT(obj, name)           \
+{                                                  \
+  const size_t cSize = strlen(name)+1;             \
+  wchar_t* wc = new wchar_t[cSize];                \
+  size_t outSize;                                  \
+  mbstowcs_s(&outSize, wc, cSize, name, cSize-1);  \
+  obj->SetName(wc);                                \
+  delete[] wc;                                     \
+  LOG_DEBUG("D3D12 Object Created: %s", name);     \
 }
 
-#define NAME_DIRECTX12_OBJECT_INDEXED(obj, n, name)			\
-{															\
-	wchar_t outName[128];									\
-	const size_t cSize = strlen(name)+1;					\
-	wchar_t* wc = new wchar_t[cSize];						\
-	size_t outSize;											\
-	mbstowcs_s(&outSize, wc, cSize, name, cSize-1);			\
-	if(swprintf_s(outName, L"%s[%u]", wc, n) > 0)			\
-	{														\
-		obj->SetName(outName);								\
-		LOG_DEBUG("D3D12 Object Created: %s[%u]", name, n);	\
-	}														\
-	delete[] wc;											\
+#define NAME_DIRECTX12_OBJECT_INDEXED(obj, n, name)      \
+{                                                        \
+  wchar_t outName[128];                                  \
+  const size_t cSize = strlen(name)+1;                   \
+  wchar_t* wc = new wchar_t[cSize];                      \
+  size_t outSize;                                        \
+  mbstowcs_s(&outSize, wc, cSize, name, cSize-1);        \
+  if(swprintf_s(outName, L"%s[%u]", wc, n) > 0)          \
+  {                                                      \
+    obj->SetName(outName);                               \
+    LOG_DEBUG("D3D12 Object Created: %s[%u]", name, n);  \
+  }                                                      \
+  delete[] wc;                                           \
 }
 #else
 #define NAME_DIRECTX12_OBJECT(obj, name)
@@ -70,15 +70,15 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 #endif
 
 #ifndef DISABLE_COPY
-#define DISABLE_COPY(T)					\
-		explicit T(const T&) = delete;	\
-		T& operator=(const T&) = delete;
+#define DISABLE_COPY(T)              \
+    explicit T(const T&) = delete;   \
+    T& operator=(const T&) = delete;
 #endif
 
 #ifndef DISABLE_MOVE
-#define DISABLE_MOVE(T)				\
-		explicit T(T&&) = delete;	\
-		T& operator=(T&&) = delete;
+#define DISABLE_MOVE(T)          \
+    explicit T(T&&) = delete;    \
+    T& operator=(T&&) = delete;
 #endif
 
 #ifndef DISABLE_COPY_AND_MOVE

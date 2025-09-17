@@ -2,13 +2,11 @@
 
 #include "Defines.h"
 
-#include "Rendering/Frontend/ResourceManager/ResourceObjects.h"
-
 namespace Gecko {
 
-	struct SceneRenderInfo
-	{
-		
-	};
+  struct SceneRenderInfo
+  {
+    
+  };
 
 }

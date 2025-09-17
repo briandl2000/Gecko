@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 project(GECKO VERSION 1.0.0 LANGUAGES C CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -12,7 +12,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) #link time optimization
 
 if(MSVC) 
-	add_compile_options(/arch:AVX2) #make sure SIMD optimizations take place
+  add_compile_options(/arch:AVX2) #make sure SIMD optimizations take place
 endif()
 
 set(GECKO Gecko)
@@ -23,31 +23,39 @@ option(PRODUCTION_BUILD "Make this a production build" OFF)
 add_library("${GECKO}")
 
 if(PRODUCTION_BUILD)
-	target_compile_definitions("${GECKO}" PUBLIC PRODUCTION_BUILD) 
+  target_compile_definitions("${GECKO}" PUBLIC PRODUCTION_BUILD) 
 endif()
 
 if(RELEASE)
-	target_compile_definitions("${GECKO}" PUBLIC RELEASE)
+  target_compile_definitions("${GECKO}" PUBLIC RELEASE)
 else()
-	target_compile_definitions("${GECKO}" PUBLIC DEBUG)
+  target_compile_definitions("${GECKO}" PUBLIC DEBUG)
 endif()
 
 if (WIN32)
-	target_compile_definitions("${GECKO}" PUBLIC DIRECTX_12)
+  target_compile_definitions("${GECKO}" PUBLIC DIRECTX_12)
 endif (WIN32)
 
 if(MSVC) # If using the VS compiler...
-	target_compile_definitions("${GECKO}" PUBLIC _CRT_SECURE_NO_WARNINGS)
+  target_compile_definitions("${GECKO}" PUBLIC _CRT_SECURE_NO_WARNINGS)
 
-	#set_property(TARGET "${GECKO}" PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDebug<$<CONFIG:Debug>:Debug>")
-	#set_property(TARGET "${GECKO}" PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
+  #set_property(TARGET "${GECKO}" PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreadedDebug<$<CONFIG:Debug>:Debug>")
+  #set_property(TARGET "${GECKO}" PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Release>:Release>")
 endif()
 
 if(MSVC)
-	target_compile_options("${GECKO}" PRIVATE /W4 /WX)
+  target_compile_options("${GECKO}" PRIVATE /W4 /WX)
 else()
-	target_compile_options("${GECKO}" PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  target_compile_options("${GECKO}" PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
+
+set(_OUT ${CMAKE_BINARY_DIR}/out)
+foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
+  string(TOUPPER ${cfg} CFGU)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CFGU} ${_OUT}/bin/${cfg})
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${CFGU} ${_OUT}/bin/${cfg})
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${CFGU} ${_OUT}/lib/${cfg})
+endforeach()
 
 file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 target_sources("${GECKO}" PRIVATE ${MY_SOURCES})

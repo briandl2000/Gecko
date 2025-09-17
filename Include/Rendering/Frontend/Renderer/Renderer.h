@@ -3,16 +3,13 @@
 
 #include "Defines.h"
 
-#include "Rendering/Backend/Objects.h"
 #include "Rendering/Backend/Device.h"
 #include "Rendering/Frontend/ResourceManager/ResourceManager.h"
 #include "Rendering/Frontend/Renderer/RenderPasses/RenderPass.h"
 
 #include "Core/Platform.h"
 
-
 namespace Gecko {
-
 
 struct SceneDescriptor;
 
@@ -22,51 +19,51 @@ static unsigned int s_NumRenderPasses = 0;
 class Renderer
 {
 public:
-	Renderer() = default;
-	~Renderer();
-	
-	void Init(Platform::AppInfo& info, ResourceManager* resourceManager, Device* _device);
-	void Shutdown();
+  Renderer() = default;
+  ~Renderer();
+  
+  void Init(Platform::AppInfo& info, ResourceManager* resourceManager, Device* _device);
+  void Shutdown();
 
-	template<typename T>
-	RenderPassHandle CreateRenderPass(std::string name,
-		const RenderPassInterface::ConfigDataInterface& dependencies = RenderPassInterface::ConfigDataInterface())
-	{
-		Ref<T> renderPass = CreateRef<T>();
-		renderPass->Init(m_Info, m_ResourceManager, dependencies);
-		RenderPassHandle handle = name;
-		m_RenderPasses.emplace(std::make_pair(handle, renderPass));
-		return handle;
-	}
+  template<typename T>
+  RenderPassHandle CreateRenderPass(std::string name,
+    const RenderPassInterface::ConfigDataInterface& dependencies = RenderPassInterface::ConfigDataInterface())
+  {
+    Ref<T> renderPass = CreateRef<T>();
+    renderPass->Init(m_Info, m_ResourceManager, dependencies);
+    RenderPassHandle handle = name;
+    m_RenderPasses.emplace(std::make_pair(handle, renderPass));
+    return handle;
+  }
 
-	const Ref<RenderPassInterface>& GetRenderPassByHandle(RenderPassHandle id) const
-	{
-		return m_RenderPasses.at(id);
-	}
+  const Ref<RenderPassInterface>& GetRenderPassByHandle(RenderPassHandle id) const
+  {
+    return m_RenderPasses.at(id);
+  }
 
-	void ConfigureRenderPasses(const std::vector<RenderPassHandle>& renderPassStack)
-	{
-		m_RenderPassStack = renderPassStack;
-	}
+  void ConfigureRenderPasses(const std::vector<RenderPassHandle>& renderPassStack)
+  {
+    m_RenderPassStack = renderPassStack;
+  }
 
-	void RenderScene(const SceneRenderInfo& sceneRenderInfo);
-	void Present();
+  void RenderScene(const SceneRenderInfo& sceneRenderInfo);
+  void Present();
 
 private:
 
-	Device* device;
+  Device* device;
 
-	ResourceManager* m_ResourceManager;
+  ResourceManager* m_ResourceManager;
 
-	std::unordered_map<RenderPassHandle, Ref<RenderPassInterface>> m_RenderPasses;
-	std::vector<RenderPassHandle> m_RenderPassStack;
+  std::unordered_map<RenderPassHandle, Ref<RenderPassInterface>> m_RenderPasses;
+  std::vector<RenderPassHandle> m_RenderPassStack;
 
-	GraphicsPipelineHandle FullScreenTexturePipelineHandle;
+  GraphicsPipelineHandle FullScreenTexturePipelineHandle;
 
-	BufferHandle quadVertexHandle{ 0 };
-	BufferHandle quadIndexHandle{ 0 };
+  BufferHandle quadVertexHandle{ 0 };
+  BufferHandle quadIndexHandle{ 0 };
 
-	Platform::AppInfo m_Info;
+  Platform::AppInfo m_Info;
 };
 
 }

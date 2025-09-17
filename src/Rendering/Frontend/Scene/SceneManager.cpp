@@ -1,8 +1,5 @@
 #include "Rendering/Frontend/Scene/SceneManager.h"
 
-#include "Rendering/Frontend/Scene/Scene.h"
-#include "Rendering/Frontend/ResourceManager/ResourceManager.h"
-
 namespace Gecko {
 
 	void SceneManager::Init()
