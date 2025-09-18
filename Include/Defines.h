@@ -29,11 +29,7 @@ using i64 = int64_t;
 using f32 = float;
 using f64 = double ;
 
-#if defined(__clang__) || defined(__gcc__)
-#define STATIC_ASSERT _Static_assert
-#else
 #define STATIC_ASSERT static_assert
-#endif
 
 STATIC_ASSERT(sizeof(u8) == 1, "Expected u8 to be 1 byte.");
 STATIC_ASSERT(sizeof(u16) == 2, "Expected u16 to be 2 byte.");

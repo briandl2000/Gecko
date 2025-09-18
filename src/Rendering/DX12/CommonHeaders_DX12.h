@@ -6,7 +6,26 @@
 #include "Core/Asserts.h"
 #include "Core/Logger.h"
 
+// CommonHeaders_DX12.h
+#if defined(__clang__)
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wswitch"
+#endif
+#if defined(_MSC_VER)
+  #pragma warning(push)
+  // 4061/4062 = enumerator not explicitly handled in switch (MSVC)
+  #pragma warning(disable: 4061 4062)
+#endif
+
 #include "Rendering/DX12/d3dx12.h"
+
+#if defined(_MSC_VER)
+  #pragma warning(pop)
+#endif
+#if defined(__clang__)
+  #pragma clang diagnostic pop
+#endif
+
 #include <dxgi1_6.h>
 #include <d3d12.h>
 #ifdef DEBUG
@@ -70,15 +89,15 @@ using ComPtr = Microsoft::WRL::ComPtr<T>;
 #endif
 
 #ifndef DISABLE_COPY
-#define DISABLE_COPY(T)              \
-    explicit T(const T&) = delete;   \
-    T& operator=(const T&) = delete;
+#define DISABLE_COPY(T)            \
+  explicit T(const T&) = delete;   \
+  T& operator=(const T&) = delete;
 #endif
 
 #ifndef DISABLE_MOVE
-#define DISABLE_MOVE(T)          \
-    explicit T(T&&) = delete;    \
-    T& operator=(T&&) = delete;
+#define DISABLE_MOVE(T)        \
+  explicit T(T&&) = delete;    \
+  T& operator=(T&&) = delete;
 #endif
 
 #ifndef DISABLE_COPY_AND_MOVE

@@ -589,7 +589,7 @@ namespace Gecko::DX12
 
       std::string shaderVersion = "vs_";
       shaderVersion += desc.ShaderVersion;
-      D3D_SHADER_MACRO macros[] = { "HLSL", "1", "VERTEX", "1", NULL, NULL };
+      D3D_SHADER_MACRO macros[] = { {"HLSL", "1"}, {"VERTEX", "1"}, {NULL, NULL} };
       HRESULT hr = D3DCompileFromFile(vertexSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
         desc.VertexEntryPoint, shaderVersion.c_str(), flags, 0, &vertexShaderBlob, &errorBlob);
       ASSERT(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
@@ -614,7 +614,7 @@ namespace Gecko::DX12
 
       std::string shaderVersion = "ps_";
       shaderVersion += desc.ShaderVersion;
-      D3D_SHADER_MACRO macros[] = { "HLSL", "1", "PIXEL", "1", NULL, NULL };
+      D3D_SHADER_MACRO macros[] = { {"HLSL", "1"}, {"PIXEL", "1"}, {NULL, NULL} };
       HRESULT hr = D3DCompileFromFile(pixelSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
         desc.PixelEntryPoint, shaderVersion.c_str(), flags, 0, &pixelShaderBlob, &errorBlob);
       ASSERT(hr == S_OK, reinterpret_cast<char*>(errorBlob->GetBufferPointer()));
@@ -855,7 +855,7 @@ namespace Gecko::DX12
 
       std::string shaderVersion = "cs_";
       shaderVersion += desc.ShaderVersion;
-      D3D_SHADER_MACRO macros[] = { "HLSL", "1", "COMPUTE", "1", NULL, NULL };
+      D3D_SHADER_MACRO macros[] = { {"HLSL", "1"}, {"COMPUTE", "1"}, {NULL, NULL} };
       HRESULT hr = D3DCompileFromFile(ComputeSource.c_str(), macros, D3D_COMPILE_STANDARD_FILE_INCLUDE,
         desc.EntryPoint, shaderVersion.c_str(), flags, 0, &computeShaderBlob, &errorBlob);
       // Should probably do some nicer error handling here #FIXME
@@ -1351,6 +1351,9 @@ namespace Gecko::DX12
         static_cast<u16>(desc.NumMips)
       );
       break;
+    default:
+      ASSERT(false, "Unkown texture type");
+      break;
     }
 
     CD3DX12_HEAP_PROPERTIES heapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -1402,6 +1405,9 @@ namespace Gecko::DX12
       case TextureType::Tex2DArray:
         srvDesc.Texture2DArray.MipLevels = desc.NumMips;
         srvDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
+        break;
+      default:
+        ASSERT(false, "Unkown texture type");
         break;
       }
 
@@ -1455,6 +1461,9 @@ namespace Gecko::DX12
         uavDesc.Texture2DArray.ArraySize = desc.NumArraySlices;
         uavDesc.Texture2DArray.MipSlice = 0;
         uavDesc.Texture2DArray.PlaneSlice = 0;
+        break;
+      default:
+        ASSERT(false, "Unkown texture type");
         break;
       }
 

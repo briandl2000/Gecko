@@ -69,8 +69,8 @@ namespace Gecko { namespace Event
   {
   public:
     EventCallback(u32 code, T* listener, bool (T::* callback)(const EventData& data))
-      : m_Listener(listener)
-      , m_Callback(callback)
+      : m_Callback(callback)
+      , m_Listener(listener)
       , m_Code(code)
     {
       EventRegister(m_Code, this);

@@ -35,18 +35,18 @@ namespace Gecko { namespace Logger
 } }
 
 #ifndef LOG_FATAL
-#define LOG_FATAL(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_FATAL, message, ##__VA_ARGS__);
+#define LOG_FATAL(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_FATAL, message __VA_OPT__(,) __VA_ARGS__);
 #endif
 
 
 #ifndef LOG_ERROR
 // Logs an error-level message.
-#define LOG_ERROR(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_ERROR, message, ##__VA_ARGS__);
+#define LOG_ERROR(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_ERROR, message __VA_OPT__(,) __VA_ARGS__);
 #endif
 
 #if LOG_WARN_ENABLED == 1
 // Logs a warning-level message.
-#define LOG_WARN(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_WARN, message, ##__VA_ARGS__);
+#define LOG_WARN(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_WARN, message __VA_OPT__(,) __VA_ARGS__);
 #else
 // Does nothing when LOG_WARN_ENABLED != 1
 #define LOG_WARN(message, ...)
@@ -54,7 +54,7 @@ namespace Gecko { namespace Logger
 
 #if LOG_INFO_ENABLED == 1
 // Logs a info-level message.
-#define LOG_INFO(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_INFO, message, ##__VA_ARGS__);
+#define LOG_INFO(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_INFO, message __VA_OPT__(,) __VA_ARGS__);
 #else
 // Does nothing when LOG_INFO_ENABLED != 1
 #define LOG_INFO(message, ...)
@@ -62,7 +62,7 @@ namespace Gecko { namespace Logger
 
 #if LOG_DEBUG_ENABLED == 1
 // Logs a debug-level message.
-#define LOG_DEBUG(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_DEBUG, message, ##__VA_ARGS__);
+#define LOG_DEBUG(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_DEBUG, message __VA_OPT__(,) __VA_ARGS__);
 #else
 // Does nothing when LOG_DEBUG_ENABLED != 1
 #define LOG_DEBUG(message, ...)
@@ -70,7 +70,7 @@ namespace Gecko { namespace Logger
 
 #if LOG_TRACE_ENABLED == 1
 // Logs a trace-level message.
-#define LOG_TRACE(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_TRACE, message, ##__VA_ARGS__);
+#define LOG_TRACE(message, ...) Gecko::Logger::LogOutput(Gecko::Logger::eLogLevel::LOG_LEVEL_TRACE, message __VA_OPT__(,) __VA_ARGS__);
 #else
 // Does nothing when LOG_TRACE_ENABLED != 1
 #define LOG_TRACE(message, ...)

@@ -110,7 +110,7 @@ namespace Gecko::DX12
     CommandBuffer->CommandList->RSSetViewports(1, &renderTargetDX12->ViewPort);
     CommandBuffer->CommandList->RSSetScissorRects(1, &renderTargetDX12->Rect);
 
-    D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetCpuHandles[8]{ 0 };
+    D3D12_CPU_DESCRIPTOR_HANDLE RenderTargetCpuHandles[8] = { };
     for (u32 i = 0; i < renderTarget.Desc.NumRenderTargets; i++)
     {
       RenderTargetCpuHandles[i] = renderTargetDX12->RenderTargetViews[i].CPU;

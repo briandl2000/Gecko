@@ -33,7 +33,7 @@ namespace Gecko::DX12
 
     DIRECTX12_ASSERT(m_Device->GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_Heap)));
 
-    m_FreeHandles = std::move(CreateScope<u32[]>(capacity));
+    m_FreeHandles = CreateScope<u32[]>(capacity);
     m_Capacity = capacity;
     m_Size = 0;
 
