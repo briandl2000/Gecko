@@ -60,9 +60,8 @@ endforeach()
 file(GLOB_RECURSE MY_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 target_sources("${GECKO}" PRIVATE ${MY_SOURCES})
 
-target_include_directories(Gecko PUBLIC "./Include")
+target_include_directories(Gecko PUBLIC "./include")
 target_include_directories(Gecko PRIVATE "./src")
-target_include_directories(Gecko PUBLIC "./ThirdParty/glm")
 target_include_directories(Gecko PUBLIC "./ThirdParty/stb_image")
 
-add_subdirectory(Example)
+add_subdirectory(examples)
