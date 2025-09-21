@@ -1,2 +1,0 @@
-add_executable(gecko_example_platform_min main.cpp)
-target_link_libraries(gecko_example_platform_min PRIVATE Gecko::Platform)

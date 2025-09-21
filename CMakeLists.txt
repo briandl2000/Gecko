@@ -21,9 +21,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 add_subdirectory(src/core)
 add_subdirectory(src/platform)
+add_subdirectory(src/runtime)
 
 if (GECKO_BUILD_EXAMPLES)
-  add_subdirectory(examples/platform_min)
+  add_subdirectory(examples/core_example)
+  add_subdirectory(examples/platform_example)
 endif()
 
 include(CMakePackageConfigHelpers)

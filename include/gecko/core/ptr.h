@@ -1,45 +1,48 @@
 #pragma once
-
 #include <memory>
 
-namespace gecko
-{
+namespace gecko {
   template<typename T>
-  using Scope = std::unique_ptr<T>;
+  using Unique = std::unique_ptr<T>;
+ 
+  template<typename T>
+  using Shared = std::shared_ptr<T>;
+  
+  template<typename T>
+  using Weak = std::weak_ptr<T>;
 
   template<typename T, typename ... Args>
-  constexpr Scope<T> CreateScope(Args&& ... args)
+  [[nodiscard]]
+  constexpr Unique<T> CreateUnique(Args&& ... args)
   {
     return std::make_unique<T>(std::forward<Args>(args)...);
-  }
-
-  template<typename T>
-  constexpr Scope<T> CreateScopeFromRaw(T* t)
-  {
-    return std::unique_ptr<T>(t);
-  }
-
-  template<typename T>
-  using Ref = std::shared_ptr<T>;
+  } 
 
   template<typename T, typename ... Args>
-  constexpr Ref<T> CreateRef(Args&& ... args)
+  [[nodiscard]]
+  constexpr Shared<T> CreateShared(Args&& ... args)
   {
     return std::make_shared<T>(std::forward<Args>(args)...);
   }
 
   template<typename T>
-  constexpr Ref<T> CreateRefFromRaw(T* t)
+  [[nodiscard]]
+  constexpr Unique<T> CreateUniqueFromRaw(T* t)
+  {
+    return std::unique_ptr<T>(t);
+  }
+
+  template<typename T>
+  [[nodiscard]]
+  constexpr Shared<T> CreateSharedFromRaw(T* t)
   {
     return std::shared_ptr<T>(t);
   }
 
   template<typename T>
-  using WeakRef = std::weak_ptr<T>;
-
-  template<typename T>
-  constexpr WeakRef<T> CreateWeakRef(Ref<T> ref)
+  [[nodiscard]]
+  constexpr Weak<T> CreateWeakFromShared(Shared<T> shared)
   {
-    return std::weak_ptr<T>(ref);
+    return std::weak_ptr<T>(shared);
   }
 }
