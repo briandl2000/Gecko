@@ -1,4 +1,5 @@
 #include "gecko/runtime/trace_writer.h"
+
 #include <corecrt_share.h>
 #include <cstdio>
 

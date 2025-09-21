@@ -2,8 +2,6 @@
 
 #include <cstdio>
 
-#include "gecko/core/profiler.h"
-
 #include "categories.h"
 
 namespace gecko::platform 

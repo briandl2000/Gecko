@@ -3,7 +3,7 @@
 #include <vector>
 #include <functional>
 
-#include "gecko/core/profiler.h"
+#include "gecko/core/core.h"
 
 namespace gecko::runtime {
 

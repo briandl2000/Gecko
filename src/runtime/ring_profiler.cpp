@@ -1,4 +1,5 @@
 #include "gecko/runtime/ring_profiler.h"
+
 #include <chrono>
 #include <thread>
 

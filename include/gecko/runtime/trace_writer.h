@@ -1,6 +1,7 @@
 #pragma once
-#include "gecko/core/profiler.h"
 #include <cstdio>
+
+#include "gecko/core/core.h"
 
 namespace gecko::runtime {
 
