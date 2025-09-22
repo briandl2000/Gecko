@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "gecko/core/core.h"
+#include "gecko/core/profiler.h"
 
 namespace gecko::runtime {
 
@@ -18,7 +19,7 @@ namespace gecko::runtime {
     void Emit(const ProfEvent& event) noexcept override;
     u64 NowNs() const noexcept override;
 
-    bool TryPop(ProfEvent& outEvent) noexcept;
+    bool TryPop(ProfEvent& event) noexcept;
 
   private:
     struct Slot {

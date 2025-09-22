@@ -5,9 +5,9 @@ namespace gecko {
 
   struct Category
   {
-    u32 id { 0 };
-    const char* name { nullptr };
-    constexpr explicit operator u32() const noexcept { return id; }
+    u32 Id { 0 };
+    const char* Name { nullptr };
+    constexpr explicit operator u32() const noexcept { return Id; }
   };
 
   constexpr u32 FNV1a(const char* s) 

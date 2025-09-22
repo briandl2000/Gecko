@@ -6,6 +6,7 @@
 #include "boot.h"
 #include "category.h"
 #include "memory.h"
+#include "optional.h"
 #include "profiler.h"
 #include "ptr.h"
 #include "services.h"

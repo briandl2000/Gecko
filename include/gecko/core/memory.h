@@ -11,9 +11,9 @@ namespace gecko {
   {
     GECKO_API virtual ~IAllocator() = default;
 
-    GECKO_API virtual void* alloc(u64 size, u32 alignment, Category category) noexcept = 0;
+    GECKO_API virtual void* Alloc(u64 size, u32 alignment, Category category) noexcept = 0;
 
-    GECKO_API virtual void free(void* ptr, u64 size, u32 alignment, Category category) noexcept = 0;
+    GECKO_API virtual void Free(void* ptr, u64 size, u32 alignment, Category category) noexcept = 0;
   };
 
   IAllocator* GetAllocator() noexcept;
@@ -21,12 +21,12 @@ namespace gecko {
   [[nodiscard]]
   GECKO_API inline void* AllocBytes(u64 size, u32 alignment, Category category) noexcept 
   {
-    return GetAllocator()->alloc(size, alignment, category);
+    return GetAllocator()->Alloc(size, alignment, category);
   }
 
   GECKO_API inline void DeallocBytes(void* ptr, u64 size, u32 alignment, Category category) noexcept
   {
-    GetAllocator()->free(ptr, size, alignment, category);
+    GetAllocator()->Free(ptr, size, alignment, category);
   }
 
   template<class T>

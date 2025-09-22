@@ -6,6 +6,7 @@ target_sources(GeckoRuntime
     override_new.cpp
     ring_profiler.cpp
     trace_writer.cpp
+    tracker_allocator.cpp
 )
 
 target_include_directories(GeckoPlatform

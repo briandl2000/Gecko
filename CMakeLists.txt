@@ -7,6 +7,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) #link time optimization
 
+# Enable all warnings and treat warnings as errors
+if(MSVC)
+    add_compile_options(/W4 /WX -Wno-unused-parameter)
+else()
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
+endif()
+
 set(_OUT ${CMAKE_BINARY_DIR}/out)
 foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
   string(TOUPPER ${cfg} CFGU)

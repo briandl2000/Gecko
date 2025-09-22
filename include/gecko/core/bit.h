@@ -28,8 +28,7 @@ namespace gecko {
   }
   
   template <EnumFlag E>
-  GECKO_API constexpr E operator&(E a, E b) noexcept 
-  {
+  GECKO_API constexpr E operator&(E a, E b) noexcept {
     using U = std::underlying_type_t<E>;
     return static_cast<E>(static_cast<U>(a) & static_cast<U>(b));
   }

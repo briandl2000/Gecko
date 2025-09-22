@@ -11,7 +11,7 @@ namespace gecko {
   
   struct SystemAllocator final : IAllocator 
   {
-    virtual void* alloc(u64 size, u32 alignment, Category category) noexcept override
+    virtual void* Alloc(u64 size, u32 alignment, Category category) noexcept override
     {
       if (alignment <= alignof(std::max_align_t)) return std::malloc(static_cast<size_t>(size));
 #if defined(_MSC_VER)
@@ -23,7 +23,7 @@ namespace gecko {
 #endif
     }
     
-    virtual void free(void* ptr, u64 size, u32 alignment, Category category) noexcept override
+    virtual void Free(void* ptr, u64 size, u32 alignment, Category category) noexcept override
     {
       if (!ptr) return;
 #if defined (_MSC_VER)
