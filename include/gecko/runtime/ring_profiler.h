@@ -1,17 +1,14 @@
 #pragma once
 #include <atomic>
 #include <vector>
-#include <functional>
 
 #include "gecko/core/core.h"
-#include "gecko/core/profiler.h"
 
 namespace gecko::runtime {
 
   class RingProfiler final : public IProfiler
   {
   public:
-    // TODO: remove using ConsumerFn = std::function<void(const ProfEvent*)>;
 
     explicit RingProfiler(size_t capacityPow2 = 1u << 20);
     ~RingProfiler();

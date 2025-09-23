@@ -23,6 +23,13 @@ namespace gecko {
 
   bool ValidateServices(bool fatalOnFail) noexcept;
 
+  struct SystemAllocator final : IAllocator 
+  {
+    virtual void* Alloc(u64 size, u32 alignment, Category category) noexcept override; 
+    
+    virtual void Free(void* ptr, u64 size, u32 alignment, Category category) noexcept override;
+  };
+
 }
 #ifndef GECKO_REQUIRE_INSTALL
   #define GECKO_REQUIRE_INSTALL 1

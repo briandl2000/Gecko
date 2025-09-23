@@ -59,7 +59,7 @@ namespace gecko {
       __func__                   \
     }
 
-  #define GECKO_PROF_ZONE(cat, name)   \
+  #define GECKO_PROF_SCOPE(cat, name)  \
     ::gecko::ProfScope _g_scope{       \
       (cat),                           \
       ::gecko::FNV1a(name),            \

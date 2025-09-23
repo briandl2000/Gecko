@@ -1,3 +1,4 @@
+#include "gecko/core/services.h"
 #include <atomic>
 #include <cstddef>
 #include <cstdio>
@@ -9,33 +10,31 @@ namespace gecko {
 
 #pragma region(minimal defaults) // ------------------------------------------------
   
-  struct SystemAllocator final : IAllocator 
+  
+  void* SystemAllocator::Alloc(u64 size, u32 alignment, Category category) noexcept
   {
-    virtual void* Alloc(u64 size, u32 alignment, Category category) noexcept override
-    {
-      if (alignment <= alignof(std::max_align_t)) return std::malloc(static_cast<size_t>(size));
+    if (alignment <= alignof(std::max_align_t)) return std::malloc(static_cast<size_t>(size));
 #if defined(_MSC_VER)
-      return _aligned_malloc(static_cast<size_t>(size), alignment);
+    return _aligned_malloc(static_cast<size_t>(size), alignment);
 #else
-      void* ptr = nullptr;
-      if (posix_memalign(&ptr, align, static_cast<size_t>(size))!=0) return nullptr;
-      return ptr;
+    void* ptr = nullptr;
+    if (posix_memalign(&ptr, align, static_cast<size_t>(size))!=0) return nullptr;
+    return ptr;
 #endif
-    }
+  }
     
-    virtual void Free(void* ptr, u64 size, u32 alignment, Category category) noexcept override
-    {
-      if (!ptr) return;
+  void SystemAllocator::Free(void* ptr, u64 size, u32 alignment, Category category) noexcept
+  {
+    if (!ptr) return;
 #if defined (_MSC_VER)
-      if (alignment > alignof(std::max_align_t))
-      {
-        _aligned_free(ptr);
-        return;
-      }
-#endif
-      std::free(ptr);
+    if (alignment > alignof(std::max_align_t))
+    {
+      _aligned_free(ptr);
+      return;
     }
-  };
+#endif
+    std::free(ptr);
+  } 
 
   struct NullProfiler final : IProfiler
   {
@@ -77,7 +76,7 @@ namespace gecko {
     if (!GetAllocator()) ok = false;
     if (!GetProfiler()) ok = false;
     
-#if GECKO_REQUIRE_INTALL
+#if GECKO_REQUIRE_INSTALL
     if (!IsServicesInstalled()) ok = false; 
 #endif
 
