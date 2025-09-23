@@ -1,8 +1,9 @@
 #include "gecko/runtime/ring_profiler.h"
-#include "gecko/core/profiler.h"
 
 #include <chrono>
 #include <thread>
+
+#include "categories.h"
 
 namespace gecko {
 

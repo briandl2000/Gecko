@@ -51,14 +51,14 @@ namespace gecko::runtime {
       case ProfEventKind::ZoneBegin:
         WriteSep(m_File, m_First);
           std::fprintf(m_File,
-            "{\"name\":\"%s\",\"cat\":\"%u\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-          name, ev.Cat.Id, timeUs, ev.ThreadId);
+            "{\"name\":\"%s\",\"cat\":\"%s (%u)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+          name, ev.Cat.Name ? ev.Cat.Name : "Unknown", ev.Cat.Id, timeUs, ev.ThreadId);
         break;
       case ProfEventKind::ZoneEnd:
         WriteSep(m_File, m_First);
         std::fprintf(m_File,
-          "{\"name\":\"%s\",\"cat\":\"%u\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-          name, ev.Cat.Id, timeUs, ev.ThreadId);
+          "{\"name\":\"%s\",\"cat\":\"%s (%u)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+          name, ev.Cat.Name ? ev.Cat.Name : "Unknown", ev.Cat.Id, timeUs, ev.ThreadId);
         break;
       case ProfEventKind::FrameMark:
         WriteSep(m_File, m_First);
@@ -69,8 +69,8 @@ namespace gecko::runtime {
       case ProfEventKind::Counter:
         WriteSep(m_File, m_First);
         std::fprintf(m_File,
-          "{\"name\":\"%s\",\"cat\":\"%u\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-          name, ev.Cat.Id, timeUs, (unsigned long long)ev.Value);
+          "{\"name\":\"%s\",\"cat\":\"%s (%u)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
+          name, ev.Cat.Name ? ev.Cat.Name : "Unknown", ev.Cat.Id, timeUs, (unsigned long long)ev.Value);
         break;
     }
   }

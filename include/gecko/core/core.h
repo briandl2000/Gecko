@@ -5,7 +5,7 @@
 #include "bit.h"
 #include "boot.h"
 #include "category.h"
-#include "logger.h"
+#include "log.h"
 #include "memory.h"
 #include "optional.h"
 #include "profiler.h"
