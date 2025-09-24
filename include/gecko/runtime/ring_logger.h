@@ -20,6 +20,9 @@ namespace gecko::runtime {
 
     virtual void LogV(LogLevel level, Category category, const char* fmt, va_list) noexcept override;
 
+    virtual bool Init() noexcept override; 
+    virtual void Shutdown() noexcept override; 
+
     virtual void AddSink(ILogSink* sink) noexcept override; 
     virtual void SetLevel(LogLevel level) noexcept override { m_Level.store(level, std::memory_order_relaxed); }
     virtual LogLevel Level() const noexcept override {return m_Level.load(std::memory_order_relaxed); }

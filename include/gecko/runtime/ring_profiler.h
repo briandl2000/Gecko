@@ -16,6 +16,9 @@ namespace gecko::runtime {
     void Emit(const ProfEvent& event) noexcept override;
     u64 NowNs() const noexcept override;
 
+    virtual bool Init() noexcept override; 
+    virtual void Shutdown() noexcept override; 
+
     bool TryPop(ProfEvent& event) noexcept;
 
   private:

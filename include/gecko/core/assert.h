@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cassert>
 
 #ifndef GECKO_ASSERT

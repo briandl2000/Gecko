@@ -4,6 +4,7 @@
 #include <thread>
 
 #include "categories.h"
+#include "gecko/core/assert.h"
 
 namespace gecko {
 
@@ -30,7 +31,10 @@ namespace gecko::runtime {
     , m_Head(0)
     , m_Tail(0)
   {
-    if((capacityPow2 & (capacityPow2 - 1)) != 0) 
+    GECKO_ASSERT(capacityPow2 > 0 && "Ring buffer capacity must be greater than 0");
+    
+    // Ensure capacity is power of 2
+    if ((capacityPow2 & (capacityPow2 - 1)) != 0) 
     {
       m_Mask = (Bit(20)) - 1;
       m_Ring = std::vector<Slot>(Bit(20));
@@ -74,6 +78,16 @@ namespace gecko::runtime {
       return true;
     }
     return false;
+  }
+
+  bool RingProfiler::Init() noexcept 
+  {
+    return true;
+  }
+
+  void RingProfiler::Shutdown() noexcept 
+  {
+
   }
 
 }

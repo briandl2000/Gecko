@@ -1,7 +1,10 @@
 #pragma once
+
 #include <cstddef>
+#include <climits>
 
 #include "api.h"
+#include "assert.h"
 #include "category.h"
 #include "types.h"
 
@@ -14,25 +17,37 @@ namespace gecko {
     GECKO_API virtual void* Alloc(u64 size, u32 alignment, Category category) noexcept = 0;
 
     GECKO_API virtual void Free(void* ptr, u64 size, u32 alignment, Category category) noexcept = 0;
+
+    GECKO_API virtual bool Init() noexcept = 0;
+    GECKO_API virtual void Shutdown() noexcept = 0;
   };
 
-  IAllocator* GetAllocator() noexcept;
+  GECKO_API IAllocator* GetAllocator() noexcept;
 
   [[nodiscard]]
   GECKO_API inline void* AllocBytes(u64 size, u32 alignment, Category category) noexcept 
   {
-    return GetAllocator()->Alloc(size, alignment, category);
+    GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
+    GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
+    auto* allocator = GetAllocator();
+    GECKO_ASSERT(allocator && "No allocator available");
+    return allocator->Alloc(size, alignment, category);
   }
 
   GECKO_API inline void DeallocBytes(void* ptr, u64 size, u32 alignment, Category category) noexcept
   {
-    GetAllocator()->Free(ptr, size, alignment, category);
+    GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
+    auto* allocator = GetAllocator();
+    GECKO_ASSERT(allocator && "No allocator available");
+    allocator->Free(ptr, size, alignment, category);
   }
 
   template<class T>
   [[nodiscard]]
   GECKO_API inline T* AllocArray(u64 count, Category category, u32 alignment = alignof(T)) noexcept
   {
+    GECKO_ASSERT(count > 0 && "Cannot allocate zero elements");
+    GECKO_ASSERT(count <= (SIZE_MAX / sizeof(T)) && "Count would overflow");
     return static_cast<T*>(AllocBytes(sizeof(T) * count, alignment, category));
   }
 

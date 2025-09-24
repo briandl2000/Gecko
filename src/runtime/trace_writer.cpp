@@ -1,7 +1,11 @@
 #include "gecko/runtime/trace_writer.h"
 
-#include <corecrt_share.h>
 #include <cstdio>
+#if defined(_WIN32)
+#include <corecrt_share.h>
+#endif
+
+#include "gecko/core/assert.h"
 
 namespace gecko::runtime {
   
@@ -12,12 +16,14 @@ namespace gecko::runtime {
 
   bool TraceWriter::Open(const char* path)
   {
+    GECKO_ASSERT(path && "Trace file path cannot be null");
+    
     Close();
-    #if defined(_WIN32)
-      m_File = _fsopen(path, "wb", _SH_DENYNO);
-    #else
-      m_File = std::fopen(path, "wb");
-    #endif
+#if defined(_WIN32)
+    m_File = _fsopen(path, "wb", _SH_DENYNO);
+#else
+    m_File = std::fopen(path, "wb");
+#endif
     if (!m_File) return false;
     std::fputs("{\"traceEvents\":[", m_File);
     m_First = true;
@@ -27,7 +33,7 @@ namespace gecko::runtime {
   
   void TraceWriter::Close()
   {
-    if(!m_File) return;
+    if (!m_File) return;
     std::fputs("]}\n", m_File);
     std::fclose(m_File);
     m_File = nullptr;
@@ -35,7 +41,7 @@ namespace gecko::runtime {
 
   static void WriteSep(FILE* file, bool& first) 
   {
-    if(!first) std::fputc(',', file);
+    if (!first) std::fputc(',', file);
     first = false;
   }
 

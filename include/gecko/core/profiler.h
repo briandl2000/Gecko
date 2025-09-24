@@ -1,6 +1,7 @@
 #pragma once
-#include <cstdint>
+
 #include <atomic>
+#include <cstdint>
 
 #include "api.h"
 #include "category.h"
@@ -28,6 +29,9 @@ namespace gecko {
 
     GECKO_API virtual void Emit(const ProfEvent& ev) noexcept = 0;
     GECKO_API virtual u64 NowNs() const noexcept = 0;
+
+    GECKO_API virtual bool Init() noexcept = 0;
+    GECKO_API virtual void Shutdown() noexcept = 0;
   };
 
   GECKO_API IProfiler* GetProfiler() noexcept; 

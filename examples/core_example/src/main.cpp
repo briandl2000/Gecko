@@ -12,6 +12,7 @@
 #include "gecko/core/log.h"
 #include "gecko/core/boot.h"
 #include "gecko/runtime/console_sink.h"
+#include "gecko/runtime/file_sink.h"
 #include "gecko/runtime/immediate_logger.h"
 #include "gecko/runtime/ring_logger.h"
 #include "gecko/runtime/ring_profiler.h"
@@ -285,8 +286,9 @@ int main() {
   // Create logging system with ring buffer and console output
   runtime::RingLogger ringLogger(1024); // 1024 log entries in ring buffer
   runtime::ConsoleSink consoleSink;
-  
+  runtime::FileSink fileSink("log.txt"); 
   // Set up the logger with console sink
+  ringLogger.AddSink(&fileSink);
   ringLogger.AddSink(&consoleSink);
   ringLogger.SetLevel(LogLevel::Info); // Filter out Trace and Debug messages initially
   
@@ -316,10 +318,7 @@ int main() {
     }
     
     // Perform memory stress test
-    {
-      GECKO_PROF_SCOPE(MAIN_CAT, "MemoryStressTest");
-      MemoryStressTest();
-    }
+    MemoryStressTest();
     
     // Launch worker threads for simulation
     std::vector<std::thread> workers;

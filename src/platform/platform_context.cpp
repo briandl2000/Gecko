@@ -7,10 +7,10 @@
 namespace gecko::platform 
 {
 
-  Unique<PlatformContext> PlatformContext::Create(const PlatformConfig &cfg)
+  Unique<PlatformContext> PlatformContext::Create(const PlatformConfig& cfg)
   {
     GECKO_PROF_FUNC(categories::General);
-    std::printf("PlatformContext::Create was called!");
+    std::printf("PlatformContext::Create was called!\n");
     return CreateUnique<PlatformContext>();   
   }
 

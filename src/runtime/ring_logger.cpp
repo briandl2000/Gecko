@@ -2,14 +2,15 @@
 
 #include <atomic>
 #include <chrono>
-#include <cstdio>
 #include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <functional>
 #include <mutex>
 #include <thread>
 
 #include "categories.h"
+#include "gecko/core/assert.h"
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
 
@@ -30,7 +31,11 @@ namespace gecko::runtime {
 
   RingLogger::RingLogger(size_t capacity)
   {
+    GECKO_ASSERT(capacity > 0 && "Ring buffer capacity must be greater than 0");
+    
+    // Ensure capacity is power of 2
     if ((capacity & (capacity - 1)) != 0) capacity = 4096;
+    
     m_Ring = std::vector<Entry>(capacity);
     m_Mask = capacity - 1;
     for (u64 i = 0; i < capacity; ++i)
@@ -52,12 +57,16 @@ namespace gecko::runtime {
 
   void RingLogger::AddSink(ILogSink* sink) noexcept
   {
+    GECKO_ASSERT(sink && "Cannot add null sink");
+    
     std::lock_guard<std::mutex> lk(m_SinkMu);
     m_Sinks.push_back(sink);
   }
 
   void RingLogger::LogV(LogLevel level, Category category, const char* fmt, va_list apIn) noexcept
   {
+    GECKO_ASSERT(fmt && "Format string cannot be null");
+    
     if (static_cast<int>(level) < static_cast<int>(m_Level.load(std::memory_order_relaxed))) return;
 
     char buffer[512];
@@ -173,6 +182,16 @@ namespace gecko::runtime {
         again = true;
       }
     }
+  }
+
+  bool RingLogger::Init() noexcept 
+  {
+    return true;
+  }
+
+  void RingLogger::Shutdown() noexcept 
+  {
+
   }
 
 }

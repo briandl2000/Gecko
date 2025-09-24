@@ -41,10 +41,10 @@ namespace gecko::runtime {
     }
   };
 
-// Custom allocator template that bypasses tracking for internal containers
-template<typename T>
-class UpstreamAllocator {
-public:
+  // Custom allocator template that bypasses tracking for internal containers
+  template<typename T>
+  class UpstreamAllocator {
+  public:
     using value_type = T;
     
     explicit UpstreamAllocator(IAllocator* upstream) noexcept : m_Upstream(upstream) {}
@@ -76,9 +76,9 @@ public:
     
     template<typename U> friend class UpstreamAllocator;
     
-private:
+  private:
     IAllocator* m_Upstream;
-};
+  };
 
   class TrackingAllocator final : public IAllocator
   {
@@ -101,6 +101,10 @@ private:
     void EmitCounters() noexcept;
     
     void ResetCounters() noexcept;
+
+    virtual bool Init() noexcept override; 
+    virtual void Shutdown() noexcept override;
+
   private:
 
     IAllocator* m_Upstream { nullptr };
