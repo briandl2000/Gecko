@@ -1,6 +1,7 @@
 {
   "version": 6,
   "cmakeMinimumRequired": { "major": 3, "minor": 22 },
+
   "configurePresets": [
     {
       "name": "base",
@@ -8,10 +9,9 @@
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-
-        "CMAKE_C_COMPILER": "C:/Program Files/LLVM/bin/clang-cl.exe",
-        "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang-cl.exe"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
       }
     },
     {
@@ -25,6 +25,7 @@
       "inherits": "base"
     }
   ],
+
   "buildPresets": [
     {
       "name": "debug",
@@ -36,5 +37,6 @@
       "configurePreset": "release",
       "configuration": "Release"
     }
-  ]
+  ] 
 }
+

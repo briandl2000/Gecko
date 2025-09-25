@@ -14,7 +14,7 @@ namespace gecko::runtime {
     std::atomic<u64> LiveBytes { 0 };
     std::atomic<u64> Allocs { 0 };
     std::atomic<u64> Frees { 0 };
-    Category Category { }; 
+    Category Cat { }; 
 
     MemCategoryStats() = default;
     
@@ -27,7 +27,7 @@ namespace gecko::runtime {
       : LiveBytes(other.LiveBytes.load())
       , Allocs(other.Allocs.load())
       , Frees(other.Frees.load())
-      , Category(other.Category)
+      , Cat(other.Cat)
     {}
     
     MemCategoryStats& operator=(MemCategoryStats&& other) noexcept {
@@ -35,7 +35,7 @@ namespace gecko::runtime {
         LiveBytes.store(other.LiveBytes.load());
         Allocs.store(other.Allocs.load());
         Frees.store(other.Frees.load());
-        Category = other.Category;
+        Cat = other.Cat;
       }
       return *this;
     }

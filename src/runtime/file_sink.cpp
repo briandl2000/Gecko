@@ -35,7 +35,7 @@ namespace gecko::runtime {
     std::fprintf(m_File,
                 "[%s][%s][t%u] %s\n",
                 LevelName(message.Level),
-                message.Category.Name ? message.Category.Name : "cat",
+                message.Cat.Name ? message.Cat.Name : "cat",
                 message.ThreadId,
                 message.Text ? message.Text : "");
     std::fflush(m_File);

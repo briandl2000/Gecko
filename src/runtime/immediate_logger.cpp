@@ -58,7 +58,7 @@ namespace gecko::runtime {
     // Create log message
     LogMessage message;
     message.Level = level;
-    message.Category = category;
+    message.Cat = category;
     message.TimeNs = NowNs();
     message.ThreadId = ThreadId();
     message.Text = buffer;

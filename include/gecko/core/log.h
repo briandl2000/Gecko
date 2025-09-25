@@ -30,6 +30,7 @@ namespace gecko {
     case LogLevel::Error: return "ERROR";
     case LogLevel::Fatal: return "FATAL";
     default:
+      break;
     }
     return "?";
   }
@@ -37,7 +38,7 @@ namespace gecko {
   struct LogMessage
   {
     LogLevel Level { LogLevel::Trace };
-    Category Category { };
+    Category Cat { };
     u64 TimeNs { 0 };
     u32 ThreadId { 0 };
     const char* Text { nullptr };

@@ -228,11 +228,11 @@ void PrintMemoryStats(const runtime::TrackingAllocator& tracker) {
       if (allocs > 0) {
         double percentFreed = (double)frees / allocs * 100.0;
         GECKO_INFO(MAIN_CAT, "Category '%s': Live=%llu bytes, Allocs=%llu, Frees=%llu (%.1f%% freed)",
-                  stats.Category.Name ? stats.Category.Name : "Unknown",
+                  stats.Cat.Name ? stats.Cat.Name : "Unknown",
                   live, allocs, frees, percentFreed);
       } else {
         GECKO_INFO(MAIN_CAT, "Category '%s': Live=%llu bytes, Allocs=%llu, Frees=%llu",
-                  stats.Category.Name ? stats.Category.Name : "Unknown",
+                  stats.Cat.Name ? stats.Cat.Name : "Unknown",
                   live, allocs, frees);
       }
     }

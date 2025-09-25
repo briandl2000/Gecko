@@ -11,11 +11,11 @@ namespace gecko {
     return h; 
   }
 
-  constexpr u32 FNV1a(const void* data, size_t size) noexcept
+ constexpr u32 FNV1a(const void* data, std::size_t size) noexcept
   {
     const u8* bytes = static_cast<const u8*>(data);
     u32 h = 2166136261u;
-    for (size_t i = 0; i < size; ++i)
+    for (std::size_t i = 0; i < size; ++i)
     {
       h ^= bytes[i];
       h *= 16777619u;

@@ -15,7 +15,7 @@ namespace gecko::runtime {
     auto result = m_ByCat.try_emplace(category.Id);
     auto& stats = result.first->second;
     if (result.second) { // new element was inserted
-      stats.Category = category;
+      stats.Cat = category;
     }
     return stats;
   }
@@ -66,7 +66,7 @@ namespace gecko::runtime {
     auto it = m_ByCat.find(category.Id);
     if (it == m_ByCat.end()) return false;
 
-    outStats.Category = it->second.Category;
+    outStats.Cat = it->second.Cat;
     outStats.LiveBytes.store(it->second.LiveBytes.load(std::memory_order_relaxed), std::memory_order_relaxed);
     outStats.Allocs.store(it->second.Allocs.load(std::memory_order_relaxed), std::memory_order_relaxed);
     outStats.Frees.store(it->second.Frees.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -83,7 +83,7 @@ namespace gecko::runtime {
     {
       auto result = out.try_emplace(id);
       auto& snap = result.first->second;
-      snap.Category = st.Category;
+      snap.Cat = st.Cat;
       snap.LiveBytes.store(st.LiveBytes.load(std::memory_order_relaxed), std::memory_order_relaxed);
       snap.Allocs.store(st.Allocs.load(std::memory_order_relaxed), std::memory_order_relaxed);
       snap.Frees.store(st.Frees.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -100,9 +100,9 @@ namespace gecko::runtime {
     Snapshot(snap);
     for (auto& [id, st] : snap)
     {
-      const char* name = st.Category.Name ? st.Category.Name : "mem";
+      const char* name = st.Cat.Name ? st.Cat.Name : "mem";
 
-      GECKO_PROF_COUNTER(st.Category, name, st.LiveBytes.load(std::memory_order_relaxed));
+      GECKO_PROF_COUNTER(st.Cat, name, st.LiveBytes.load(std::memory_order_relaxed));
     }
   }
 

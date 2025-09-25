@@ -35,7 +35,7 @@ namespace gecko::runtime {
     {
       std::atomic<u64> Sequence;
       LogLevel Level;
-      Category Category;
+      Category Cat;
       u64 TimeNs;
       u32 ThreadId;
       char Text[512];

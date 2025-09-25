@@ -56,4 +56,13 @@ void operator delete(void* ptr, std::align_val_t align) noexcept
   }
 }
 
+void operator delete(void* ptr, std::size_t size) noexcept
+{
+  if (!ptr) return;
+  if (auto* Allocator = gecko::GetAllocator())
+  {
+    Allocator->Free(ptr, size, alignof(std::max_align_t), gecko::runtime::categories::OperatorNew);
+  }
+}
+
 #endif

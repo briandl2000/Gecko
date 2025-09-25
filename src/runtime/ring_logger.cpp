@@ -76,7 +76,7 @@ namespace gecko::runtime {
     }
 
     entry.Level = level;
-    entry.Category = category;
+    entry.Cat = category;
     entry.TimeNs = NowNs();
     entry.ThreadId = ThreadId();
     std::size_t maxLen = sizeof(entry.Text) - 1;
@@ -107,7 +107,7 @@ namespace gecko::runtime {
       if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0) break;
 
       message.Level = entry.Level;
-      message.Category = entry.Category;
+      message.Cat = entry.Cat;
       message.TimeNs = entry.TimeNs;
       message.ThreadId = entry.ThreadId;
       message.Text = entry.Text;
@@ -119,7 +119,7 @@ namespace gecko::runtime {
 
       if (m_Profiler && (message.Level == LogLevel::Error || message.Level == LogLevel::Fatal))
       {
-        GECKO_PROF_COUNTER(message.Category, "LogErrorCount", 1);
+        GECKO_PROF_COUNTER(message.Cat, "LogErrorCount", 1);
       }
 
       entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
@@ -207,7 +207,7 @@ namespace gecko::runtime {
         u64 sequence = entry.Sequence.load(std::memory_order_acquire);
         if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0) break;
 
-        LogMessage message { entry.Level, entry.Category, entry.TimeNs, entry.ThreadId, entry.Text };
+        LogMessage message { entry.Level, entry.Cat, entry.TimeNs, entry.ThreadId, entry.Text };
         {
           std::lock_guard<std::mutex> lk(m_SinkMu);
           for (auto* sink : m_Sinks) sink->Write(message);

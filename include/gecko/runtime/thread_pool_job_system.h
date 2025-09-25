@@ -16,7 +16,7 @@ namespace gecko::runtime {
   {
     JobFunction Function;
     JobPriority Priority;
-    Category Category;
+    Category Cat;
     JobHandle Handle;
     std::vector<JobHandle> Dependencies;
     std::atomic<bool> Completed { false };
@@ -25,7 +25,7 @@ namespace gecko::runtime {
     Job(JobFunction func, JobPriority prio, gecko::Category cat, JobHandle handle) noexcept
       : Function(std::move(func))
       , Priority(prio)
-      , Category(cat)
+      , Cat(cat)
       , Handle(handle)
     {}
     
@@ -37,7 +37,7 @@ namespace gecko::runtime {
     Job(Job&& other) noexcept
       : Function(std::move(other.Function))
       , Priority(other.Priority)
-      , Category(other.Category)
+      , Cat(other.Cat)
       , Handle(other.Handle)
       , Dependencies(std::move(other.Dependencies))
       , Completed(other.Completed.load())
@@ -49,7 +49,7 @@ namespace gecko::runtime {
       {
         Function = std::move(other.Function);
         Priority = other.Priority;
-        Category = other.Category;
+        Cat = other.Cat;
         Handle = other.Handle;
         Dependencies = std::move(other.Dependencies);
         Completed.store(other.Completed.load());
