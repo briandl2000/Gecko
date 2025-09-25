@@ -55,7 +55,8 @@ namespace gecko {
 - **Types**: PascalCase (`LogLevel`, `IAllocator`, `PlatformContext`)
 - **Functions**: PascalCase (`GetAllocator()`, `InstallServices()`)
 - **Variables**: camelCase (`timeNs`, `threadId`)
-- **Member Variables**: m_ prefix (`m_File`, `m_ThreadSafe`, `m_Level`)
+- **Public Member Variables**: PascalCase (`Level`, `Category`, `TimeNs`)
+- **Private Member Variables**: m_ prefix (`m_File`, `m_ThreadSafe`, `m_Level`)
 - **Static/Global Variables**: g_ or s_ prefix (`g_Allocator`, `s_SystemAllocator`)
 - **Constants**: PascalCase or ALL_CAPS (`LogLevel::Info`, `GECKO_API`)
 - **Namespaces**: lowercase (`gecko`, `runtime`, `platform`)
@@ -105,6 +106,97 @@ void Function(const char* str, size_t size)
 }
 ```
 
+#### Initialization Patterns
+Use brace initialization `{}` for struct/class initialization:
+
+```cpp
+// Struct member initialization with explicit logical defaults
+struct LogMessage
+{
+  LogLevel Level { LogLevel::Trace };  // Explicit enum value
+  Category Category { };               // Default-constructed (struct/class)
+  u64 TimeNs { 0 };                   // Explicit zero
+  u32 ThreadId { 0 };                 // Explicit zero
+  const char* Text { nullptr };       // Explicit nullptr
+};
+
+// Variable initialization within scopes (use = assignment)
+void Function()
+{
+  LogMessage message = { };          // Struct initialization with =
+  bool initialized = false;          // Explicit false with =
+  int count = 0;                    // Explicit zero with =
+  float ratio = 0.0f;               // Explicit zero with =
+  const char* name = nullptr;       // Explicit nullptr with =
+}
+
+// Member initialization in constructors (use { } in member initializer list)
+class MyClass
+{
+public:
+  MyClass() : m_Value(0), m_Initialized(false) { }
+  
+private:
+  int m_Value { 0 };           // Member initialization with { }
+  bool m_Initialized { false }; // Member initialization with { }
+};
+```
+
+**Important**: Use different initialization syntax based on context:
+
+**Member Variables (in class/struct declarations)**:
+- Syntax: `varname { value };` with space before opening brace
+- Examples: `int m_Count { 0 };`, `bool m_Active { false };`
+
+**Local Variables (within function scopes)**:
+- Syntax: `varname = value;` using assignment operator
+- Examples: `int count = 0;`, `bool active = false;`, `MyStruct data = { };`
+
+**Constructor Member Initializer Lists**:
+- Syntax: `varname { value }` in initializer list
+- Example: `MyClass() : m_Value { 0 }, m_Name { nullptr } { }`
+
+**Default Values by Type**:
+- **Numeric types**: `0` - Explicit zero
+- **Pointers**: `nullptr` - Explicit nullptr  
+- **Booleans**: `false` - Explicit false (or `true` if appropriate)
+- **Enums**: `EnumType::DefaultValue` - Explicit enum value
+- **Structs/Classes**: `{ }` - Default/aggregate initialization
+
+#### Enum Design Guidelines
+
+```cpp
+// Regular enums: logical safe default first
+enum class LogLevel : u8
+{
+  Trace,    // Safest default - maximum information
+  Debug,
+  Info,
+  Warn,
+  Error,
+  Fatal
+};
+
+// Bit flag enums: use power-of-2 values
+enum class FileAccess : u32
+{
+  None  = 0,
+  Read  = gecko::Bit(0),  // 1
+  Write = gecko::Bit(1),  // 2
+  Exec  = gecko::Bit(2),  // 4
+};
+
+// Usage with gecko::bit.h utilities
+FileAccess combined = FileAccess::Read | FileAccess::Write;
+bool canRead = gecko::Any(combined & FileAccess::Read);
+u32 underlying = gecko::ToUnderlying(combined);
+```
+
+**Guidelines:**
+- **Regular enums**: Use logical safe default first (e.g., `Trace` for logging, `Headless` for renderers)
+- **Bit flag enums**: Use `gecko::Bit(n)` for values, enable operators via `gecko::bit.h`
+- **Naming**: Use context-appropriate names (`Headless`, `Disconnected`, `Pending`) instead of generic `None`
+
 ### Platform-Specific Code
 ```cpp
 #if defined(_WIN32)
@@ -121,7 +213,17 @@ void Function(const char* str, size_t size)
 
 ### Service Management
 
-The Gecko framework uses a centralized service system for core functionality:
+The Gecko framework uses a centralized service system for core functionality with a strict dependency hierarchy to prevent circular dependencies:
+
+#### Service Dependency Hierarchy
+```
+Level 0: Allocator    - No dependencies
+Level 1: JobSystem    - May use allocator for job storage and worker threads
+Level 2: Profiler     - May use allocator and job system for background processing
+Level 3: Logger       - May use allocator, job system, and profiler for performance tracking
+```
+
+**Important:** Services are initialized in dependency order (0→3) and shut down in reverse order (3→0). Services at each level can only depend on services from lower levels during initialization. This order ensures that JobSystem is available early for background processing by Profiler and Logger components.
 
 #### Basic Setup
 ```cpp
@@ -339,6 +441,67 @@ public:
 };
 ```
 
+### Bit Utilities
+
+Gecko provides utilities for bit manipulation and enum flag operations:
+
+```cpp
+#include "gecko/core/bit.h"
+
+// Bit flag enum definition
+enum class RenderFlags : u32
+{
+  None     = 0,
+  Shadows  = gecko::Bit(0),  // 1
+  Lighting = gecko::Bit(1),  // 2
+  PostFX   = gecko::Bit(2),  // 4
+  Debug    = gecko::Bit(3),  // 8
+};
+
+// Usage examples
+void SetupRenderer()
+{
+  // Combine flags
+  RenderFlags flags = RenderFlags::Shadows | RenderFlags::Lighting;
+  
+  // Check if any flags are set
+  if (gecko::Any(flags))
+  {
+    // Enable rendering
+  }
+  
+  // Check specific flag
+  if (gecko::Any(flags & RenderFlags::Shadows))
+  {
+    // Setup shadow mapping
+  }
+  
+  // Add flag
+  flags |= RenderFlags::PostFX;
+  
+  // Get underlying value
+  u32 value = gecko::ToUnderlying(flags);  // For serialization, etc.
+}
+
+// Modern enum iteration (replaces Count pattern)
+template<typename E>
+constexpr size_t EnumCount(E maxValue)
+{
+  return static_cast<size_t>(gecko::ToUnderlying(maxValue)) + 1;
+}
+
+// Example usage
+enum class GameState : u8 { Menu, Playing, Paused, GameOver };
+constexpr size_t stateCount = EnumCount(GameState::GameOver);  // 4
+
+// For flag enums, count set bits
+template<typename E>
+constexpr size_t CountSetFlags(E flags)
+{
+  return std::popcount(gecko::ToUnderlying(flags));
+}
+```
+
 ### Categories System
 
 Categories are used for organizing and filtering logs/profiling data:
@@ -412,6 +575,145 @@ auto sharedFromRaw = gecko::CreateSharedFromRaw(rawPtr);
 
 // Weak pointers
 auto weakPtr = gecko::CreateWeakFromShared(sharedPtr);
+```
+
+### Threading Utilities
+
+Gecko provides cross-platform threading utilities:
+
+```cpp
+#include "gecko/core/thread.h"
+
+// Thread identification
+u32 threadId = gecko::ThisThreadId();    // Also available from profiler.h
+u32 hashedId = gecko::HashThreadId();    // Consistent thread ID hash
+u32 coreCount = gecko::HardwareThreadCount();
+
+// Sleep functions
+gecko::SleepMs(100);    // Sleep for 100 milliseconds
+gecko::SleepUs(500);    // Sleep for 500 microseconds  
+gecko::SleepNs(1000);   // Sleep for 1000 nanoseconds
+
+// Thread cooperation
+gecko::YieldThread();   // Yield current thread's time slice
+
+// High-precision timing
+gecko::SpinWaitNs(1000);        // Busy-wait for precise timing
+gecko::PreciseSleepNs(50000);   // High-precision sleep using sleep + spin
+
+// Using macros
+GECKO_SLEEP_MS(10);
+GECKO_YIELD();
+GECKO_PRECISE_SLEEP_NS(1000000);
+u32 tid = GECKO_THREAD_HASH();  // Thread ID hash
+```
+
+### Time Utilities
+
+Gecko provides centralized time functions to ensure consistency across all services:
+
+```cpp
+#include "gecko/core/time.h"
+
+// Get current time in nanoseconds (different clocks for different purposes)
+u64 monotonic = gecko::MonotonicTimeNs();    // For profiling and time measurements
+u64 highRes = gecko::HighResTimeNs();        // For high precision timing
+u64 system = gecko::SystemTimeNs();          // For timestamps that correlate with system time
+
+// Time conversion utilities
+using namespace gecko::time;
+u64 nsFromMs = MillisecondsToNs(100);        // Convert 100ms to nanoseconds
+u64 msFromNs = NsToMilliseconds(1000000);    // Convert nanoseconds to milliseconds
+double secondsF = NsToSecondsF(nanoTime);    // Convert to floating point seconds
+
+// Using macros for common operations
+u64 now = GECKO_TIME_NOW_NS();               // Monotonic time
+u64 hiRes = GECKO_HIRES_TIME_NOW_NS();       // High resolution time
+```
+
+### Random Number Generation
+
+Gecko provides thread-safe random number generation with consistent API:
+
+```cpp
+#include "gecko/core/random.h"
+
+// Generate random integers
+u32 randomU32 = gecko::RandomU32(1, 100);       // Random u32 in range [1, 100]
+i32 randomI32 = gecko::RandomI32(-50, 50);      // Random i32 in range [-50, 50]
+u64 randomU64 = gecko::RandomU64();             // Random u64 (full range)
+
+// Generate random floating point numbers
+float randomFloat = gecko::RandomFloat(0.0f, 1.0f);  // Random float in [0, 1)
+double randomDouble = gecko::RandomDouble(-1.0, 1.0); // Random double in [-1, 1)
+
+// Generate random bytes
+u8 buffer[256];
+gecko::RandomBytes(buffer, sizeof(buffer));
+
+// Utility functions for common patterns
+size_t randomIndex = gecko::random::Index(arraySize);  // Random index for array
+float normalized = gecko::random::Normalized();        // Random float in [0, 1)
+float signed = gecko::random::Signed();                // Random float in [-1, 1)
+bool choice = gecko::RandomBool();                      // 50/50 chance
+auto& chosen = gecko::random::Choose(option1, option2); // Randomly pick one
+
+// Seed the random generator (optional - auto-seeded by default)
+gecko::SeedRandom(12345);  // Use specific seed for reproducible results
+
+// Using macros
+u32 rand = GECKO_RANDOM_U32(1, 10);
+float norm = GECKO_RANDOM_NORMALIZED();
+bool flip = GECKO_RANDOM_BOOL();
+```
+
+### Job System
+
+Gecko provides a flexible job system for multithreading:
+
+```cpp
+#include "gecko/core/jobs.h"
+#include "gecko/runtime/thread_pool_job_system.h"
+
+// Setup (typically in main)
+gecko::runtime::ThreadPoolJobSystem jobSystem;
+jobSystem.SetWorkerThreadCount(4);  // 0 = auto-detect
+
+gecko::Services services{
+  .JobSystem = &jobSystem
+  // ... other services
+};
+GECKO_BOOT(services);
+
+// Basic job submission
+auto category = gecko::MakeCategory("compute");
+auto job = []() {
+  // Do work here
+  GECKO_INFO(category, "Job executed");
+};
+
+auto handle = gecko::SubmitJob(job, gecko::JobPriority::Normal, category);
+gecko::WaitForJob(handle);
+
+// Job dependencies (pipeline pattern)
+auto job1 = gecko::SubmitJob([]() { /* Stage 1 */ }, gecko::JobPriority::High, category);
+gecko::JobHandle deps[] = { job1 };
+auto job2 = gecko::SubmitJob([]() { /* Stage 2 */ }, deps, 1, gecko::JobPriority::Normal, category);
+gecko::WaitForJob(job2);
+
+// Batch operations
+std::vector<gecko::JobHandle> handles;
+for (int i = 0; i < 10; ++i) {
+  handles.push_back(gecko::SubmitJob([i]() { /* Work */ }, gecko::JobPriority::Normal, category));
+}
+gecko::WaitForJobs(handles.data(), static_cast<u32>(handles.size()));
+
+// Main thread job processing
+gecko::GetJobSystem()->ProcessJobs(5);  // Process up to 5 jobs on current thread
+
+// Using function calls directly
+auto handle = gecko::SubmitJob(job, gecko::JobPriority::Normal, category);
+gecko::WaitForJob(handle);
 ```
 
 ## Best Practices

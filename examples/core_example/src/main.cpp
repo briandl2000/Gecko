@@ -1,21 +1,24 @@
 #include <iostream>
-#include <thread>
-#include <chrono>
 #include <vector>
-#include <random>
 #include <cstdio>
+#include <cstring>
 
 #include "gecko/core/core.h"
 #include "gecko/core/services.h"
 #include "gecko/core/memory.h"
 #include "gecko/core/profiler.h"
 #include "gecko/core/log.h"
+#include "gecko/core/jobs.h"
+#include "gecko/core/thread.h"
 #include "gecko/core/boot.h"
+#include "gecko/core/hash.h"
+#include "gecko/core/random.h"
 #include "gecko/runtime/console_sink.h"
 #include "gecko/runtime/file_sink.h"
 #include "gecko/runtime/immediate_logger.h"
 #include "gecko/runtime/ring_logger.h"
 #include "gecko/runtime/ring_profiler.h"
+#include "gecko/runtime/thread_pool_job_system.h"
 #include "gecko/runtime/trace_writer.h"
 #include "gecko/runtime/tracking_allocator.h"
 
@@ -57,40 +60,43 @@ void WorkerTask(int workerId, int numParticles) {
     // Initialize particles
     {
       GECKO_PROF_SCOPE(COMPUTE_CAT, "InitializeParticles");
-      std::random_device rd;
-      std::mt19937 gen(rd());
-      std::uniform_real_distribution<float> pos(-100.0f, 100.0f);
-      std::uniform_real_distribution<float> vel(-10.0f, 10.0f);
-      std::uniform_real_distribution<float> mass(1.0f, 5.0f);
+      // Seed random generator differently per worker to avoid identical patterns
+      gecko::SeedRandom(workerId * 12345);
       
       for (int i = 0; i < numParticles; ++i) {
         particles[i] = {
-          pos(gen), pos(gen), pos(gen),
-          vel(gen), vel(gen), vel(gen),
-          mass(gen)
+          gecko::RandomFloat(-100.0f, 100.0f), gecko::RandomFloat(-100.0f, 100.0f), gecko::RandomFloat(-100.0f, 100.0f),
+          gecko::RandomFloat(-10.0f, 10.0f), gecko::RandomFloat(-10.0f, 10.0f), gecko::RandomFloat(-10.0f, 10.0f),
+          gecko::RandomFloat(1.0f, 5.0f)
         };
       }
     }
     
     // Simulate physics steps
     const int numSteps = 100;
+    const float deltaTime = 0.016f; // Cache constant
+    const float damping = 0.999f;   // Cache constant
+    
     for (int step = 0; step < numSteps; ++step) {
       GECKO_PROF_SCOPE(COMPUTE_CAT, "PhysicsStep");
       
-      // Simple physics update
+      // Optimized physics update with better cache usage
       for (int i = 0; i < numParticles; ++i) {
-        particles[i].x += particles[i].vx * 0.016f; // 16ms timestep
-        particles[i].y += particles[i].vy * 0.016f;
-        particles[i].z += particles[i].vz * 0.016f;
+        Particle& p = particles[i]; // Reference for better cache usage
         
-        // Apply some damping
-        particles[i].vx *= 0.999f;
-        particles[i].vy *= 0.999f;
-        particles[i].vz *= 0.999f;
+        // Update position
+        p.x += p.vx * deltaTime;
+        p.y += p.vy * deltaTime;
+        p.z += p.vz * deltaTime;
+        
+        // Apply damping
+        p.vx *= damping;
+        p.vy *= damping;
+        p.vz *= damping;
       }
       
-      // Emit progress counter
-      if (step % 10 == 0) {
+      // Emit progress counter (reduce frequency to minimize profiling overhead)
+      if (step % 20 == 0) {
         GECKO_PROF_COUNTER(WORKER_CAT, "SimulationProgress", step);
       }
     }
@@ -114,9 +120,6 @@ void MemoryStressTest() {
   GECKO_INFO(MEMORY_CAT, "Starting memory stress test");
   
   std::vector<std::pair<void*, size_t>> allocations; // Store pointer and size
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<size_t> sizeDist(64, 4096);
   
   // Get the tracking allocator to emit counters
   auto* trackingAlloc = static_cast<runtime::TrackingAllocator*>(GetAllocator());
@@ -125,7 +128,7 @@ void MemoryStressTest() {
   
   // Allocate random sized blocks
   for (int i = 0; i < 50; ++i) {
-    size_t size = sizeDist(gen);
+    size_t size = gecko::random::Size(64, 4096);
     void* ptr = AllocBytes(size, 16, MEMORY_CAT);
     if (ptr) {
       allocations.push_back({ptr, size});
@@ -143,8 +146,12 @@ void MemoryStressTest() {
   
   GECKO_DEBUG(MEMORY_CAT, "Freeing half of the allocations randomly");
   
-  // Free half randomly
-  std::shuffle(allocations.begin(), allocations.end(), gen);
+  // Free half randomly - shuffle by swapping random elements
+  for (size_t i = 0; i < allocations.size(); ++i) {
+    size_t swapIndex = gecko::random::Index(allocations.size());
+    std::swap(allocations[i], allocations[swapIndex]);
+  }
+  
   size_t freedCount = 0;
   for (size_t i = 0; i < allocations.size() / 2; ++i) {
     if (allocations[i].first) {
@@ -165,7 +172,7 @@ void MemoryStressTest() {
   
   // Allocate some more
   for (int i = 0; i < 25; ++i) {
-    size_t size = sizeDist(gen);
+    size_t size = gecko::random::Size(64, 4096);
     void* ptr = AllocBytes(size, 32, MEMORY_CAT);
     if (ptr) {
       allocations.push_back({ptr, size});
@@ -292,9 +299,15 @@ int main() {
   ringLogger.AddSink(&consoleSink);
   ringLogger.SetLevel(LogLevel::Info); // Filter out Trace and Debug messages initially
   
+  // Create job system with 4 worker threads
+  runtime::ThreadPoolJobSystem jobSystem;
+  jobSystem.SetWorkerThreadCount(4);
+  
   // Use GECKO_BOOT system for proper service installation and validation
+  // Services are in dependency order: Allocator -> JobSystem -> Profiler -> Logger
   GECKO_BOOT((Services{ 
     .Allocator = &trackingAlloc, 
+    .JobSystem = &jobSystem,
     .Profiler = &ringProfiler, 
     .Logger = &ringLogger
   }));
@@ -317,42 +330,80 @@ int main() {
       logger->SetLevel(LogLevel::Trace);
     }
     
-    // Perform memory stress test
+    // 1. Memory Test
+    GECKO_INFO(MAIN_CAT, "=== 1. Memory Management Demo ===");
     MemoryStressTest();
+    PrintMemoryStats(trackingAlloc);
     
-    // Launch worker threads for simulation
-    std::vector<std::thread> workers;
+    // 2. Threading Utilities Demo
+    GECKO_INFO(MAIN_CAT, "=== 2. Threading Utilities Demo ===");
+    {
+      GECKO_PROF_SCOPE(MAIN_CAT, "ThreadingUtilitiesDemo");
+      
+      u32 threadId = ThisThreadId();
+      u32 coreCount = HardwareThreadCount();
+      GECKO_INFO(MAIN_CAT, "Current thread ID: %u, Hardware threads: %u", threadId, coreCount);
+      
+      // Test precise timing
+      u64 start = HighResTimeNs();
+      PreciseSleepNs(1000000); // 1 millisecond
+      u64 end = HighResTimeNs();
+      u64 elapsed = end - start;
+      GECKO_INFO(MAIN_CAT, "PreciseSleepNs(1ms) took %llu ns", elapsed);
+      
+      // Test thread yielding
+      GECKO_INFO(MAIN_CAT, "Testing thread yield...");
+      YieldThread();
+      GECKO_INFO(MAIN_CAT, "Thread yield completed");
+      
+      // Test different sleep functions
+      GECKO_TRACE(MAIN_CAT, "Testing SleepMs(10)...");
+      start = HighResTimeNs();
+      SleepMs(10);
+      end = HighResTimeNs();
+      u64 elapsedMs = time::NsToMilliseconds(end - start);
+      GECKO_INFO(MAIN_CAT, "SleepMs(10) took approximately %llu ms", elapsedMs);
+    }
+    
+    // 3. Profiling Demo (particle simulation using job system)
+    GECKO_INFO(MAIN_CAT, "=== 3. Profiling Demo with Job System ===");
     const int numWorkers = 3;
+    std::vector<JobHandle> simulationJobs;
     
-    GECKO_INFO(MAIN_CAT, "Launching %d worker threads for particle simulation", numWorkers);
+    GECKO_INFO(MAIN_CAT, "Submitting %d particle simulation jobs to job system", numWorkers);
     
     {
-      GECKO_PROF_SCOPE(MAIN_CAT, "LaunchWorkers");
+      GECKO_PROF_SCOPE(MAIN_CAT, "SubmitSimulationJobs");
       for (int i = 0; i < numWorkers; ++i) {
         int particleCount = 1000 + i * 500;
-        GECKO_DEBUG(MAIN_CAT, "Launching worker %d with %d particles", i, particleCount);
-        workers.emplace_back(WorkerTask, i, particleCount);
+        GECKO_DEBUG(MAIN_CAT, "Submitting simulation job %d with %d particles", i, particleCount);
+        
+        auto job = [i, particleCount]() {
+          WorkerTask(i, particleCount);
+        };
+        
+        auto handle = SubmitJob(job, JobPriority::Normal, WORKER_CAT);
+        simulationJobs.push_back(handle);
       }
     }
     
-    // Wait for workers to complete
-    GECKO_INFO(MAIN_CAT, "Waiting for all workers to complete...");
+    // Wait for all simulation jobs to complete
+    GECKO_INFO(MAIN_CAT, "Waiting for all simulation jobs to complete...");
     {
-      GECKO_PROF_SCOPE(MAIN_CAT, "WaitForWorkers");
-      for (auto& worker : workers) {
-        worker.join();
-      }
+      GECKO_PROF_SCOPE(MAIN_CAT, "WaitForSimulationJobs");
+      WaitForJobs(simulationJobs.data(), static_cast<u32>(simulationJobs.size()));
     }
     
-    GECKO_INFO(MAIN_CAT, "All workers completed successfully");
+    GECKO_INFO(MAIN_CAT, "All simulation jobs completed successfully");
     
-    // Print memory statistics
+    // Print updated memory statistics after simulation
     PrintMemoryStats(trackingAlloc);
     
     // Emit final counters to profiler
     trackingAlloc.EmitCounters();
     
-    // Test different log levels
+    // 4. Logging Demo
+    GECKO_INFO(MAIN_CAT, "=== 4. Logging System Demo ===");
     GECKO_TRACE(MAIN_CAT, "This is a trace message - very detailed info");
     GECKO_DEBUG(MAIN_CAT, "This is a debug message - development info");
     GECKO_INFO(MAIN_CAT, "This is an info message - general information");
@@ -360,6 +411,78 @@ int main() {
     GECKO_ERROR(MAIN_CAT, "This is an error - something went wrong (but this is just a test!)");
     // Note: GECKO_FATAL would be for critical errors
     
+    // Job System Example
+    GECKO_INFO(MAIN_CAT, "Testing Job System with %u worker threads...", GetJobSystem()->WorkerThreadCount());
+    {
+      GECKO_PROF_SCOPE(MAIN_CAT, "JobSystemDemo");
+      
+      std::vector<JobHandle> jobHandles;
+      const int numJobs = 8;
+      
+      // Submit some parallel jobs
+      GECKO_INFO(MAIN_CAT, "Submitting %d parallel jobs...", numJobs);
+      for (int i = 0; i < numJobs; ++i) {
+        auto job = [i]() {
+          GECKO_INFO(COMPUTE_CAT, "Executing parallel job %d on thread", i);
+          // Simulate some computational work
+          SleepMs(50 + i * 10);
+          GECKO_PROF_COUNTER(COMPUTE_CAT, "parallel_jobs_completed", 1);
+        };
+        
+        auto handle = SubmitJob(job, JobPriority::Normal, COMPUTE_CAT);
+        jobHandles.push_back(handle);
+      }
+      
+      // Wait for all parallel jobs to complete
+      GECKO_INFO(MAIN_CAT, "Waiting for all parallel jobs to complete...");
+      WaitForJobs(jobHandles.data(), static_cast<u32>(jobHandles.size()));
+      GECKO_INFO(MAIN_CAT, "All parallel jobs completed!");
+      
+      // Example with job dependencies - pipeline pattern
+      GECKO_INFO(MAIN_CAT, "Testing job dependencies (pipeline pattern)...");
+      
+      auto dataPreparationJob = SubmitJob([]() {
+        GECKO_INFO(COMPUTE_CAT, "Stage 1: Preparing data...");
+        SleepMs(100);
+        GECKO_INFO(COMPUTE_CAT, "Stage 1: Data preparation complete");
+      }, JobPriority::High, COMPUTE_CAT);
+      
+      JobHandle stage1Deps[] = { dataPreparationJob };
+      auto dataProcessingJob = SubmitJob([]() {
+        GECKO_INFO(COMPUTE_CAT, "Stage 2: Processing data...");
+        SleepMs(150);
+        GECKO_INFO(COMPUTE_CAT, "Stage 2: Data processing complete");
+      }, stage1Deps, 1, JobPriority::Normal, COMPUTE_CAT);
+      
+      JobHandle stage2Deps[] = { dataProcessingJob };
+      auto dataFinalizationJob = SubmitJob([]() {
+        GECKO_INFO(COMPUTE_CAT, "Stage 3: Finalizing results...");
+        SleepMs(75);
+        GECKO_INFO(COMPUTE_CAT, "Stage 3: Results finalized");
+      }, stage2Deps, 1, JobPriority::Normal, COMPUTE_CAT);
+      
+      WaitForJob(dataFinalizationJob);
+      GECKO_INFO(MAIN_CAT, "Job dependency pipeline completed successfully!");
+      
+      // Example of main thread job processing
+      GECKO_INFO(MAIN_CAT, "Testing main thread job processing...");
+      std::vector<JobHandle> mainThreadJobs;
+      for (int i = 0; i < 3; ++i) {
+        auto job = [i]() {
+          GECKO_INFO(COMPUTE_CAT, "Main thread job %d", i);
+        };
+        auto handle = SubmitJob(job, JobPriority::Low, COMPUTE_CAT);
+        mainThreadJobs.push_back(handle);
+      }
+      
+      // Process some jobs on the main thread
+      GetJobSystem()->ProcessJobs(2);
+      
+      // Wait for any remaining jobs
+      WaitForJobs(mainThreadJobs.data(), static_cast<u32>(mainThreadJobs.size()));
+      GECKO_INFO(MAIN_CAT, "Main thread job processing complete!");
+    }
+
     // Add a frame mark to separate the main work from cleanup
     if (auto* profiler = GetProfiler()) {
       ProfEvent frameEvent{

@@ -4,6 +4,9 @@ add_library(Gecko::Core ALIAS GeckoCore)
 target_sources(GeckoCore
   PRIVATE
     services.cpp
+    thread.cpp
+    time.cpp
+    random.cpp
 )
 
 target_include_directories(GeckoCore

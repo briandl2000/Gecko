@@ -2,11 +2,10 @@
 
 #include <atomic>
 #include <vector>
-#include <thread>
-#include <condition_variable>
 #include <mutex>
 
-#include "gecko/core/core.h"
+#include "gecko/core/jobs.h"
+#include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
 #include "gecko/core/types.h"
 
@@ -52,15 +51,17 @@ namespace gecko::runtime {
 
     std::atomic<LogLevel> m_Level { LogLevel::Info };
     std::atomic<bool> m_Run { true };
-    std::thread m_Consumer;
-    std::condition_variable m_ConsumerVariable;
-    std::mutex m_ConsumerVariableMutex;
-
     std::atomic<u64> m_Dropped { 0 };
+    
+    JobHandle m_ConsumerJob;
+    Category m_LoggerCategory;
 
     IProfiler* m_Profiler;
 
-    void ConsumerLoop() noexcept;
+    void ProcessLogEntries() noexcept;
+    void TryScheduleConsumerJob() noexcept;
+    void ScheduleNextConsumerJob() noexcept;
+    bool HasPendingEntries() const noexcept;
     static u64 NowNs() noexcept;
     static u32 ThreadId() noexcept;
 

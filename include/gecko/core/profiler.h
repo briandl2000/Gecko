@@ -5,6 +5,7 @@
 
 #include "api.h"
 #include "category.h"
+#include "hash.h"
 #include "types.h"
 
 

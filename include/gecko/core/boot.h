@@ -1,10 +1,14 @@
 #pragma once
 
+#include <cstdlib>
+
 #include "services.h"
 
 #define GECKO_BOOT(servicesExpr)              \
   do {                                        \
-    ::gecko::InstallServices(servicesExpr);  \
+    if (!::gecko::InstallServices(servicesExpr)) { \
+      std::exit(EXIT_FAILURE);               \
+    }                                         \
     ::gecko::ValidateServices(true);         \
   } while (0)
 

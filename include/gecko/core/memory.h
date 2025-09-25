@@ -29,17 +29,16 @@ namespace gecko {
   {
     GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
     GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
-    auto* allocator = GetAllocator();
-    GECKO_ASSERT(allocator && "No allocator available");
-    return allocator->Alloc(size, alignment, category);
+    if (auto* allocator = GetAllocator())
+      return allocator->Alloc(size, alignment, category);
+    return nullptr;
   }
 
   GECKO_API inline void DeallocBytes(void* ptr, u64 size, u32 alignment, Category category) noexcept
   {
     GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
-    auto* allocator = GetAllocator();
-    GECKO_ASSERT(allocator && "No allocator available");
-    allocator->Free(ptr, size, alignment, category);
+    if (auto* allocator = GetAllocator())
+      allocator->Free(ptr, size, alignment, category);
   }
 
   template<class T>

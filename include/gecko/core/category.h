@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hash.h"
 #include "types.h"
 
 namespace gecko {
@@ -9,14 +10,10 @@ namespace gecko {
     u32 Id { 0 };
     const char* Name { nullptr };
     constexpr explicit operator u32() const noexcept { return Id; }
-  };
-
-  constexpr u32 FNV1a(const char* s) 
-  {
-    u32 h = 2166136261u; 
-    while(*s) { h^=(u8)*s++; h*=16777619u; }
-    return h; 
-  }
+    
+    constexpr bool operator==(const Category& other) const noexcept { return Id == other.Id; }
+    constexpr bool operator!=(const Category& other) const noexcept { return Id != other.Id; }
+  }; 
 
   constexpr Category MakeCategory(const char* name) 
   {

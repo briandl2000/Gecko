@@ -1,9 +1,11 @@
 #pragma once
 
+// System includes first (alphabetical order)
 #include <type_traits>
 
-#include "api.h"
-#include "types.h"
+// Project includes second (alphabetical order)
+#include "gecko/core/api.h"
+#include "gecko/core/types.h"
 
 namespace gecko {
 

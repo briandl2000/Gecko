@@ -1,28 +1,19 @@
 #include "gecko/runtime/ring_profiler.h"
 
-#include <chrono>
-#include <thread>
-
 #include "categories.h"
 #include "gecko/core/assert.h"
+#include "gecko/core/thread.h"
 
 namespace gecko {
 
-  static inline u32 HashTid() 
-  {
-    auto id = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    return (u32)(id ^ (id >> 32));
-  }
-
-  u32 ThisThreadId() noexcept { return HashTid(); }
+  u32 ThisThreadId() noexcept { return HashThreadId(); }
 }
 
 namespace gecko::runtime {
 
   u64 RingProfiler::MonotonicNowNs() noexcept 
   {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::steady_clock::now().time_since_epoch()).count();
+    return MonotonicTimeNs();
   }
 
   RingProfiler::RingProfiler(size_t capacityPow2)

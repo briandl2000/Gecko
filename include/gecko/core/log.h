@@ -1,16 +1,18 @@
 #pragma once
 
+// System includes first (alphabetical order)
 #include <cstdarg>
 
-#include "api.h"
-#include "types.h"
-#include "category.h"
+// Project includes second (alphabetical order)
+#include "gecko/core/api.h"
+#include "gecko/core/category.h"
+#include "gecko/core/types.h"
 
 namespace gecko {
 
   enum class LogLevel : u8
   {
-    Trace,
+    Trace,    // Default: most verbose level ensures maximum information
     Debug,
     Info,
     Warn,
@@ -34,11 +36,11 @@ namespace gecko {
 
   struct LogMessage
   {
-    LogLevel Level;
-    Category Category;
-    u64 TimeNs;
-    u32 ThreadId;
-    const char* Text;
+    LogLevel Level { LogLevel::Trace };
+    Category Category { };
+    u64 TimeNs { 0 };
+    u32 ThreadId { 0 };
+    const char* Text { nullptr };
   };
 
   struct ILogSink

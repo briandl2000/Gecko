@@ -1,32 +1,25 @@
 #include "gecko/runtime/immediate_logger.h"
 
 #include <atomic>
-#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
-#include <functional>
 #include <mutex>
-#include <thread>
 
 #include "gecko/core/assert.h"
+#include "gecko/core/thread.h"
+#include "gecko/core/time.h"
 
 namespace gecko::runtime {
 
-  static inline u32 HashId()
-  {
-    auto id = std::hash<std::thread::id>{}(std::this_thread::get_id());
-    return (u32)(id ^ (id >> 32));
-  }
-
   u64 NowNs() noexcept 
   {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    return MonotonicTimeNs();
   }
 
   u32 ThreadId() noexcept 
   { 
-    return HashId(); 
+    return HashThreadId(); 
   }
 
   void ImmediateLogger::AddSink(ILogSink* sink) noexcept

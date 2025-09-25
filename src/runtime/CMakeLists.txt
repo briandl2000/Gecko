@@ -9,6 +9,7 @@ target_sources(GeckoRuntime
     override_new.cpp
     ring_logger.cpp
     ring_profiler.cpp
+    thread_pool_job_system.cpp
     trace_writer.cpp
     tracking_allocator.cpp
 )
