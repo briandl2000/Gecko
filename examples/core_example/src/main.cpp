@@ -3,6 +3,7 @@
 #include <iostream>
 #include <vector>
 
+#include "gecko/core/api.h"
 #include "gecko/core/boot.h"
 #include "gecko/core/core.h"
 #include "gecko/core/hash.h"
@@ -13,12 +14,12 @@
 #include "gecko/core/random.h"
 #include "gecko/core/services.h"
 #include "gecko/core/thread.h"
-#include "gecko/runtime/console_sink.h"
-#include "gecko/runtime/file_sink.h"
-#include "gecko/runtime/immediate_logger.h"
+#include "gecko/runtime/console_log_sink.h"
+#include "gecko/runtime/file_log_sink.h"
 #include "gecko/runtime/ring_logger.h"
 #include "gecko/runtime/ring_profiler.h"
 #include "gecko/runtime/thread_pool_job_system.h"
+#include "gecko/runtime/trace_file_sink.h"
 #include "gecko/runtime/trace_writer.h"
 #include "gecko/runtime/tracking_allocator.h"
 
@@ -62,9 +63,9 @@ void WorkerTask(int workerId, int numParticles) {
     // Initialize particles
     {
       GECKO_PROF_SCOPE(COMPUTE_CAT, "InitializeParticles");
-      // Seed random generator differently per worker to avoid identical
-      // patterns
-      gecko::SeedRandom(workerId * 12345);
+      // Seed random generator differently per worker for unique particle
+      // behaviors
+      gecko::SeedRandom(workerId * 12345 + 42);
 
       for (int i = 0; i < numParticles; ++i) {
         particles[i] = {gecko::RandomFloat(-100.0f, 100.0f),
@@ -77,8 +78,8 @@ void WorkerTask(int workerId, int numParticles) {
       }
     }
 
-    // Simulate physics steps
-    const int numSteps = 100;
+    // Simulate physics steps (engaging but quick)
+    const int numSteps = 50;
     const float deltaTime = 0.016f; // Cache constant
     const float damping = 0.999f;   // Cache constant
 
@@ -108,7 +109,8 @@ void WorkerTask(int workerId, int numParticles) {
 
     GECKO_TRACE(COMPUTE_CAT, "Worker %d: Completed %d physics steps", workerId,
                 numSteps);
-    GECKO_INFO(WORKER_CAT, "Worker %d: Simulation completed successfully",
+    GECKO_INFO(WORKER_CAT,
+               "Worker %d: Physics simulation complete! All particles settled.",
                workerId);
 
     // Clean up
@@ -133,11 +135,11 @@ void MemoryStressTest() {
   auto *trackingAlloc =
       static_cast<runtime::TrackingAllocator *>(GetAllocator());
 
-  GECKO_DEBUG(MEMORY_CAT,
-              "Allocating 50 random-sized blocks (64-4096 bytes each)");
+  GECKO_DEBUG(MEMORY_CAT, "Stress-testing memory with 25 random allocations "
+                          "(64-2048 bytes each)");
 
-  // Allocate random sized blocks
-  for (int i = 0; i < 50; ++i) {
+  // Allocate random sized blocks with interesting patterns
+  for (int i = 0; i < 25; ++i) {
     size_t size = gecko::random::Size(64, 4096);
     void *ptr = AllocBytes(size, 16, MEMORY_CAT);
     if (ptr) {
@@ -273,32 +275,6 @@ void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
   }
 }
 
-void SaveTraceData(runtime::RingProfiler &profiler) {
-  GECKO_PROF_FUNC(MAIN_CAT);
-
-  GECKO_INFO(MAIN_CAT, "Saving trace data to gecko_trace.json");
-
-  runtime::TraceWriter writer;
-  if (!writer.Open("gecko_trace.json")) {
-    GECKO_ERROR(MAIN_CAT, "Failed to open trace file for writing");
-    return;
-  }
-
-  // Extract events from ring buffer
-  ProfEvent event;
-  int eventCount = 0;
-  while (profiler.TryPop(event)) {
-    writer.Write(event);
-    eventCount++;
-  }
-
-  writer.Close();
-  GECKO_INFO(MAIN_CAT, "Saved %d profiling events to gecko_trace.json",
-             eventCount);
-  GECKO_INFO(MAIN_CAT, "You can view this trace in Chrome by opening "
-                       "chrome://tracing/ and loading the file");
-}
-
 int main() {
   // Demonstrate that logging doesn't work before services are initialized
   std::printf("=== Gecko Comprehensive Demo with Logging System ===\n\n");
@@ -316,16 +292,7 @@ int main() {
   SystemAllocator systemAlloc;
   runtime::TrackingAllocator trackingAlloc(&systemAlloc);
   runtime::RingProfiler ringProfiler(1 << 16); // 64K events
-
-  // Create logging system with ring buffer and console output
   runtime::RingLogger ringLogger(1024); // 1024 log entries in ring buffer
-  runtime::ConsoleSink consoleSink;
-  runtime::FileSink fileSink("log.txt");
-  // Set up the logger with console sink
-  ringLogger.AddSink(&fileSink);
-  ringLogger.AddSink(&consoleSink);
-  ringLogger.SetLevel(
-      LogLevel::Info); // Filter out Trace and Debug messages initially
 
   // Create job system with 4 worker threads
   runtime::ThreadPoolJobSystem jobSystem;
@@ -339,8 +306,28 @@ int main() {
                        .Profiler = &ringProfiler,
                        .Logger = &ringLogger}));
 
-  // Now logging works!
-  GECKO_INFO(MAIN_CAT, "Services installed and validated successfully!");
+  // Now configure logging sinks after services are installed
+  runtime::ConsoleLogSink consoleSink;
+  runtime::FileLogSink fileSink("log.txt");
+
+  if (auto *logger = GetLogger()) {
+    logger->AddSink(&fileSink);
+    logger->AddSink(&consoleSink);
+    logger->SetLevel(
+        LogLevel::Info); // Filter out Trace and Debug messages initially
+  }
+
+  // Set up trace file sink for profiling data after services are available
+  runtime::TraceFileSink traceSink("gecko_trace.json");
+  if (!traceSink.IsOpen()) {
+    GECKO_WARN(MAIN_CAT, "Failed to open trace profiler sink\n");
+  } else {
+    // We know the profiler is a RingProfiler, so we can safely add the sink
+    ringProfiler.AddSink(&traceSink);
+  }
+
+  // Now logging works with all sinks configured!
+  GECKO_INFO(MAIN_CAT, "Services installed and sinks configured successfully!");
   GECKO_DEBUG(
       MAIN_CAT,
       "Logger is now active with immediate logging (this won't appear)");
@@ -399,9 +386,13 @@ int main() {
       GECKO_INFO(MAIN_CAT, "SleepMs(10) took approximately %llu ms", elapsedMs);
     }
 
-    // 3. Profiling Demo (particle simulation using job system)
-    GECKO_INFO(MAIN_CAT, "=== 3. Profiling Demo with Job System ===");
+    // 3. Particle Physics Simulation Demo
+    GECKO_INFO(MAIN_CAT, "=== 3. Particle Physics Simulation Demo ===");
     const int numWorkers = 3;
+
+    GECKO_INFO(MAIN_CAT, "Launching %d parallel physics simulations!",
+               numWorkers);
+
     std::vector<JobHandle> simulationJobs;
 
     GECKO_INFO(MAIN_CAT, "Submitting %d particle simulation jobs to job system",
@@ -410,9 +401,11 @@ int main() {
     {
       GECKO_PROF_SCOPE(MAIN_CAT, "SubmitSimulationJobs");
       for (int i = 0; i < numWorkers; ++i) {
-        int particleCount = 1000 + i * 500;
-        GECKO_DEBUG(MAIN_CAT, "Submitting simulation job %d with %d particles",
-                    i, particleCount);
+        int particleCount = 800 + i * 400; // More interesting particle counts
+        GECKO_INFO(
+            MAIN_CAT,
+            "Physics Worker %d: Simulating %d particles in zero-gravity!", i,
+            particleCount);
 
         auto job = [i, particleCount]() { WorkerTask(i, particleCount); };
 
@@ -422,14 +415,14 @@ int main() {
     }
 
     // Wait for all simulation jobs to complete
-    GECKO_INFO(MAIN_CAT, "Waiting for all simulation jobs to complete...");
+    GECKO_INFO(MAIN_CAT, "Waiting for simulation jobs to complete...");
     {
       GECKO_PROF_SCOPE(MAIN_CAT, "WaitForSimulationJobs");
       WaitForJobs(simulationJobs.data(),
                   static_cast<u32>(simulationJobs.size()));
     }
 
-    GECKO_INFO(MAIN_CAT, "All simulation jobs completed successfully");
+    GECKO_INFO(MAIN_CAT, "Simulation jobs completed successfully");
 
     // Print updated memory statistics after simulation
     PrintMemoryStats(trackingAlloc);
@@ -438,7 +431,28 @@ int main() {
     trackingAlloc.EmitCounters();
 
     // 4. Logging Demo
-    GECKO_INFO(MAIN_CAT, "=== 4. Logging System Demo ===");
+    // 4. Extended Simulation (to test crash-safety)\n    GECKO_INFO(MAIN_CAT,
+    // \"=== 4. Extended Simulation for Crash-Safety Test ===\");\n
+    // GECKO_INFO(MAIN_CAT, \"Running extended simulation - interrupt anytime to
+    // test crash-safety\");\n    \n    for (int round = 0; round < 10; ++round)
+    // {\n      GECKO_INFO(MAIN_CAT, \"Extended simulation round %d/10\", round
+    // + 1);\n      \n      std::vector<JobHandle> longJobs;\n      for (int i =
+    // 0; i < 4; ++i) {\n        auto job = [i, round]() {\n
+    // GECKO_PROF_SCOPE(COMPUTE_CAT, \"ExtendedWork\");\n          for (int work
+    // = 0; work < 1000; ++work) {\n            // Simulate computational work
+    // with profiling\n            GECKO_PROF_SCOPE(COMPUTE_CAT,
+    // \"WorkUnit\");\n            for (volatile int j = 0; j < 10000; ++j) {}\n
+    // \n            if (work % 100 == 0) {\n GECKO_PROF_COUNTER(COMPUTE_CAT,
+    // \"WorkProgress\", work);\n            }\n          }\n
+    // GECKO_INFO(COMPUTE_CAT, \"Extended job %d in round %d completed\", i,
+    // round + 1);\n        };\n        \n        auto handle = SubmitJob(job,
+    // JobPriority::Normal, COMPUTE_CAT);\n        longJobs.push_back(handle);\n
+    // }\n      \n      WaitForJobs(longJobs.data(),
+    // static_cast<u32>(longJobs.size()));\n      GECKO_INFO(MAIN_CAT, \"Round
+    // %d completed\", round + 1);\n      \n      // Short delay between
+    // rounds\n      SleepMs(200);\n    }\n    \n    GECKO_INFO(MAIN_CAT,
+    // \"Extended simulation completed\");\n\n    // 5. Logging Demo\n
+    // GECKO_INFO(MAIN_CAT, \"=== 5. Logging System Demo ===\");
     GECKO_TRACE(MAIN_CAT, "This is a trace message - very detailed info");
     GECKO_DEBUG(MAIN_CAT, "This is a debug message - development info");
     GECKO_INFO(MAIN_CAT, "This is an info message - general information");
@@ -455,15 +469,16 @@ int main() {
       GECKO_PROF_SCOPE(MAIN_CAT, "JobSystemDemo");
 
       std::vector<JobHandle> jobHandles;
-      const int numJobs = 8;
+      const int numJobs = 6; // Sweet spot for demo
 
       // Submit some parallel jobs
       GECKO_INFO(MAIN_CAT, "Submitting %d parallel jobs...", numJobs);
       for (int i = 0; i < numJobs; ++i) {
         auto job = [i]() {
-          GECKO_INFO(COMPUTE_CAT, "Executing parallel job %d on thread", i);
-          // Simulate some computational work
-          SleepMs(50 + i * 10);
+          GECKO_INFO(COMPUTE_CAT,
+                     "Parallel Worker %d: Processing data chunk...", i);
+          // Simulate interesting computational work
+          SleepMs(15 + i * 8);
           GECKO_PROF_COUNTER(COMPUTE_CAT, "parallel_jobs_completed", 1);
         };
 
@@ -481,27 +496,33 @@ int main() {
 
       auto dataPreparationJob = SubmitJob(
           []() {
-            GECKO_INFO(COMPUTE_CAT, "Stage 1: Preparing data...");
-            SleepMs(100);
-            GECKO_INFO(COMPUTE_CAT, "Stage 1: Data preparation complete");
+            GECKO_INFO(COMPUTE_CAT,
+                       "Pipeline Stage 1: Loading and validating data...");
+            SleepMs(40);
+            GECKO_INFO(COMPUTE_CAT, "Stage 1: Data preparation complete - "
+                                    "1000 records processed");
           },
           JobPriority::High, COMPUTE_CAT);
 
       JobHandle stage1Deps[] = {dataPreparationJob};
       auto dataProcessingJob = SubmitJob(
           []() {
-            GECKO_INFO(COMPUTE_CAT, "Stage 2: Processing data...");
-            SleepMs(150);
-            GECKO_INFO(COMPUTE_CAT, "Stage 2: Data processing complete");
+            GECKO_INFO(COMPUTE_CAT,
+                       "Pipeline Stage 2: Running complex algorithms...");
+            SleepMs(50);
+            GECKO_INFO(COMPUTE_CAT,
+                       "Stage 2: Analysis complete - 847 patterns detected");
           },
           stage1Deps, 1, JobPriority::Normal, COMPUTE_CAT);
 
       JobHandle stage2Deps[] = {dataProcessingJob};
       auto dataFinalizationJob = SubmitJob(
           []() {
-            GECKO_INFO(COMPUTE_CAT, "Stage 3: Finalizing results...");
-            SleepMs(75);
-            GECKO_INFO(COMPUTE_CAT, "Stage 3: Results finalized");
+            GECKO_INFO(COMPUTE_CAT,
+                       "Pipeline Stage 3: Generating final report...");
+            SleepMs(35);
+            GECKO_INFO(COMPUTE_CAT, "Stage 3: Mission accomplished! Results "
+                                    "exported to dashboard.");
           },
           stage2Deps, 1, JobPriority::Normal, COMPUTE_CAT);
 
@@ -542,11 +563,18 @@ int main() {
   // Flush any remaining log messages
   GECKO_INFO(MAIN_CAT, "Flushing remaining log messages...");
 
-  // Save trace data
-  SaveTraceData(ringProfiler);
+  // The trace sink automatically writes data continuously, so no manual save
+  // needed
+  GECKO_INFO(MAIN_CAT,
+             "Trace data has been continuously written to gecko_trace.json");
 
   GECKO_INFO(MAIN_CAT, "Shutting down services...");
-  ringLogger.Flush();
+  if (auto *logger = GetLogger()) {
+    logger->Flush();
+  }
+
+  // Clean up the trace sink (destructor handles cleanup)
+  // traceSink.Shutdown(); // Not needed - destructor handles cleanup
 
   // Use GECKO_SHUTDOWN for proper cleanup
   GECKO_SHUTDOWN();

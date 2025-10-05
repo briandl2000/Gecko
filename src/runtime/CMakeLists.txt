@@ -3,13 +3,15 @@ add_library(Gecko::Runtime ALIAS GeckoRuntime)
 
 target_sources(GeckoRuntime
   PRIVATE
-    console_sink.cpp
-    file_sink.cpp
+    console_log_sink.cpp
+    crash_safe_trace_profiler_sink.cpp
+    file_log_sink.cpp
     immediate_logger.cpp
     override_new.cpp
     ring_logger.cpp
     ring_profiler.cpp
     thread_pool_job_system.cpp
+    trace_file_sink.cpp
     trace_writer.cpp
     tracking_allocator.cpp
 )

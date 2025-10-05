@@ -1,4 +1,4 @@
-#include "gecko/runtime/console_sink.h"
+#include "gecko/runtime/console_log_sink.h"
 
 #include <cstdio>
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <mutex>
 #include <vector>
 
 #include "gecko/core/core.h"
@@ -19,6 +20,10 @@ public:
 
   bool TryPop(ProfEvent &event) noexcept;
 
+  // Sink management
+  void AddSink(IProfilerSink *sink) noexcept;
+  void RemoveSink(IProfilerSink *sink) noexcept;
+
 private:
   struct Slot {
     std::atomic<u64> Sequence{0};
@@ -28,6 +33,20 @@ private:
   size_t m_Mask{0};
   std::atomic<u64> m_Head{0};
   std::atomic<u64> m_Tail{0};
+
+  // Sink storage with thread safety
+  std::vector<IProfilerSink *> m_Sinks{};
+  std::mutex m_SinkMu{};
+
+  // Async consumer system
+  std::atomic<bool> m_Run{true};
+  JobHandle m_ConsumerJob{};
+  Category m_ProfilerCategory{};
+
+  void ProcessProfEvents() noexcept;
+  void TryScheduleConsumerJob() noexcept;
+  void ScheduleNextConsumerJob() noexcept;
+  bool HasPendingEvents() const noexcept;
 
   static u64 MonotonicNowNs() noexcept;
 };

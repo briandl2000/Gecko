@@ -1,4 +1,4 @@
-#include "gecko/runtime/file_sink.h"
+#include "gecko/runtime/file_log_sink.h"
 
 #include <cstdio>
 #if defined(_WIN32)

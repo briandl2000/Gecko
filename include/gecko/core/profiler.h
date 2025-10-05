@@ -22,6 +22,20 @@ struct ProfEvent {
   u64 Value{0};
 };
 
+struct IProfilerSink {
+  GECKO_API virtual ~IProfilerSink() = default;
+
+  /// Write a single profiling event
+  GECKO_API virtual void Write(const ProfEvent &event) noexcept = 0;
+
+  /// Write a batch of profiling events for better performance
+  GECKO_API virtual void WriteBatch(const ProfEvent *events,
+                                    size_t count) noexcept = 0;
+
+  /// Flush any buffered data to ensure it's persisted
+  GECKO_API virtual void Flush() noexcept = 0;
+};
+
 struct IProfiler {
   GECKO_API virtual ~IProfiler() = default;
 

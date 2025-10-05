@@ -100,8 +100,6 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
 
   // Don't trace logger jobs to avoid feedback loops
   if (category != categories::Logger) {
-    GECKO_TRACE(categories::Runtime, "Submitted job %llu with priority %d",
-                handle.Id, static_cast<int>(priority));
   }
   return handle;
 }
@@ -137,8 +135,6 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
 
   // Don't trace logger jobs to avoid feedback loops
   if (category != categories::Logger) {
-    GECKO_TRACE(categories::Runtime, "Submitted job %llu with %u dependencies",
-                handle.Id, dependencyCount);
   }
   return handle;
 }
@@ -209,11 +205,7 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept {
       job->Function();
       job->Completed.store(true, std::memory_order_release);
 
-      GECKO_TRACE(categories::Runtime, "Completed job %llu on main thread",
-                  job->Handle.Id);
     } catch (...) {
-      GECKO_ERROR(categories::Runtime, "Job %llu threw an exception",
-                  job->Handle.Id);
       job->Completed.store(true, std::memory_order_release);
     }
 
@@ -225,7 +217,6 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
   GECKO_PROF_SCOPE(categories::Runtime, "WorkerThread");
 
   const u32 threadId = ThisThreadId();
-  GECKO_TRACE(categories::Runtime, "Worker thread %u started", threadId);
 
   while (!m_Shutdown.load(std::memory_order_acquire)) {
     auto job = GetNextReadyJob();
@@ -246,8 +237,6 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
       job->Function();
       job->Completed.store(true, std::memory_order_release);
 
-      GECKO_TRACE(categories::Runtime, "Completed job %llu on worker thread %u",
-                  job->Handle.Id, threadId);
     } catch (...) {
       GECKO_ERROR(categories::Runtime,
                   "Job %llu threw an exception on worker thread %u",
