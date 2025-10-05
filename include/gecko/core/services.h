@@ -3,86 +3,90 @@
 #include "api.h"
 #include "jobs.h"
 #include "log.h"
-#include "memory.h" 
+#include "memory.h"
 #include "profiler.h"
 
 namespace gecko {
-  
-  struct Services
-  {
-    IAllocator* Allocator = nullptr;
-    IJobSystem* JobSystem = nullptr;
-    IProfiler* Profiler = nullptr;
-    ILogger* Logger = nullptr;
-  };
 
-  [[nodiscard]]
-  GECKO_API bool InstallServices(const Services& service) noexcept;
+struct Services {
+  IAllocator *Allocator = nullptr;
+  IJobSystem *JobSystem = nullptr;
+  IProfiler *Profiler = nullptr;
+  ILogger *Logger = nullptr;
+};
 
-  GECKO_API void UninstallServices() noexcept;
+[[nodiscard]]
+GECKO_API bool InstallServices(const Services &service) noexcept;
 
-  GECKO_API IAllocator* GetAllocator() noexcept;
-  GECKO_API IJobSystem* GetJobSystem() noexcept;
-  GECKO_API IProfiler* GetProfiler() noexcept;
-  GECKO_API ILogger* GetLogger() noexcept;
+GECKO_API void UninstallServices() noexcept;
 
-  GECKO_API bool IsServicesInstalled() noexcept;
+GECKO_API IAllocator *GetAllocator() noexcept;
+GECKO_API IJobSystem *GetJobSystem() noexcept;
+GECKO_API IProfiler *GetProfiler() noexcept;
+GECKO_API ILogger *GetLogger() noexcept;
 
-  GECKO_API bool ValidateServices(bool fatalOnFail) noexcept;
+GECKO_API bool IsServicesInstalled() noexcept;
 
-  // Default service structs (in dependency order)
-  
-  // Level 0: Allocator (no dependencies)
-  struct SystemAllocator final : IAllocator 
-  {
-    GECKO_API virtual void* Alloc(u64 size, u32 alignment, Category category) noexcept override; 
-    
-    GECKO_API virtual void Free(void* ptr, u64 size, u32 alignment, Category category) noexcept override;
+GECKO_API bool ValidateServices(bool fatalOnFail) noexcept;
 
-    GECKO_API virtual bool Init() noexcept override;
-    GECKO_API virtual void Shutdown() noexcept override;
-  };
+// Default service structs (in dependency order)
 
-  // Level 1: JobSystem (may use allocator)
-  struct NullJobSystem final : IJobSystem
-  {
-    GECKO_API virtual JobHandle Submit(JobFunction job, JobPriority priority = JobPriority::Normal, Category category = Category{0}) noexcept override;
-    GECKO_API virtual JobHandle Submit(JobFunction job, const JobHandle* dependencies, u32 dependencyCount, JobPriority priority = JobPriority::Normal, Category category = Category{0}) noexcept override;
-    GECKO_API virtual void Wait(JobHandle handle) noexcept override;
-    GECKO_API virtual void WaitAll(const JobHandle* handles, u32 count) noexcept override;
-    GECKO_API virtual bool IsComplete(JobHandle handle) noexcept override;
-    GECKO_API virtual u32 WorkerThreadCount() const noexcept override;
-    GECKO_API virtual void ProcessJobs(u32 maxJobs = 1) noexcept override;
+// Level 0: Allocator (no dependencies)
+struct SystemAllocator final : IAllocator {
+  GECKO_API virtual void *Alloc(u64 size, u32 alignment,
+                                Category category) noexcept override;
 
-    GECKO_API virtual bool Init() noexcept override;
-    GECKO_API virtual void Shutdown() noexcept override;
-  };
+  GECKO_API virtual void Free(void *ptr, u64 size, u32 alignment,
+                              Category category) noexcept override;
 
-  // Level 2: Profiler (may use allocator and job system)
-  struct NullProfiler final : IProfiler
-  {
-    GECKO_API virtual void Emit(const ProfEvent& event) noexcept override;
-    GECKO_API virtual u64 NowNs() const noexcept override;
- 
-    GECKO_API virtual bool Init() noexcept override;
-    GECKO_API virtual void Shutdown() noexcept override;
-  };
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
 
-  // Level 3: Logger (may use allocator, job system, and profiler)
-  struct NullLogger final : ILogger
-  {
-    GECKO_API virtual void LogV(LogLevel level, Category category, const char* fmt, va_list) noexcept override;
-    GECKO_API virtual void AddSink(ILogSink* sink) noexcept override;
-    GECKO_API virtual void SetLevel(LogLevel level) noexcept override; 
-    GECKO_API virtual LogLevel Level() const noexcept override; 
+// Level 1: JobSystem (may use allocator)
+struct NullJobSystem final : IJobSystem {
+  GECKO_API virtual JobHandle
+  Submit(JobFunction job, JobPriority priority = JobPriority::Normal,
+         Category category = Category{0}) noexcept override;
+  GECKO_API virtual JobHandle
+  Submit(JobFunction job, const JobHandle *dependencies, u32 dependencyCount,
+         JobPriority priority = JobPriority::Normal,
+         Category category = Category{0}) noexcept override;
+  GECKO_API virtual void Wait(JobHandle handle) noexcept override;
+  GECKO_API virtual void WaitAll(const JobHandle *handles,
+                                 u32 count) noexcept override;
+  GECKO_API virtual bool IsComplete(JobHandle handle) noexcept override;
+  GECKO_API virtual u32 WorkerThreadCount() const noexcept override;
+  GECKO_API virtual void ProcessJobs(u32 maxJobs = 1) noexcept override;
 
-    GECKO_API virtual void Flush() noexcept override; 
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
 
-    GECKO_API virtual bool Init() noexcept override;
-    GECKO_API virtual void Shutdown() noexcept override;
-  };
+// Level 2: Profiler (may use allocator and job system)
+struct NullProfiler final : IProfiler {
+  GECKO_API virtual void Emit(const ProfEvent &event) noexcept override;
+  GECKO_API virtual u64 NowNs() const noexcept override;
 
-}
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
+
+// Level 3: Logger (may use allocator, job system, and profiler)
+struct NullLogger final : ILogger {
+  GECKO_API virtual void LogV(LogLevel level, Category category,
+                              const char *fmt, va_list) noexcept override;
+  GECKO_API virtual void AddSink(ILogSink *sink) noexcept override;
+  GECKO_API virtual void SetLevel(LogLevel level) noexcept override;
+  GECKO_API virtual LogLevel Level() const noexcept override;
+
+  GECKO_API virtual void Flush() noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
+
+} // namespace gecko
 #ifndef GECKO_REQUIRE_INSTALL
-  #define GECKO_REQUIRE_INSTALL 1
+#define GECKO_REQUIRE_INSTALL 1
 #endif

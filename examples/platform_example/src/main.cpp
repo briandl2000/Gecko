@@ -5,7 +5,7 @@ using namespace gecko::platform;
 
 int main() {
   PlatformConfig cfg = {};
-  
+
   Unique<PlatformContext> ctx = PlatformContext::Create(cfg);
   return 0;
 }

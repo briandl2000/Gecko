@@ -3,8 +3,7 @@
 #include <optional>
 
 namespace gecko {
-  
-  template<class T>
-  using Optional = std::optional<T>;
+
+template <class T> using Optional = std::optional<T>;
 
 }

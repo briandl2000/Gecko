@@ -6,15 +6,14 @@
 
 namespace gecko::runtime {
 
-  class FileSink final : public ILogSink
-  {
-  public:
-    explicit FileSink(const char* path);
-    ~FileSink();
-    virtual void Write(const LogMessage& message) noexcept override;
+class FileSink final : public ILogSink {
+public:
+  explicit FileSink(const char *path);
+  ~FileSink();
+  virtual void Write(const LogMessage &message) noexcept override;
 
-  private:
-    std::FILE* m_File { nullptr };
-  };
+private:
+  std::FILE *m_File{nullptr};
+};
 
-}
+} // namespace gecko::runtime

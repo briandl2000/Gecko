@@ -16,232 +16,223 @@
 
 namespace gecko::runtime {
 
-  u64 RingLogger::NowNs() noexcept 
-  {
-    return MonotonicTimeNs();
+u64 RingLogger::NowNs() noexcept { return MonotonicTimeNs(); }
+
+u32 RingLogger::ThreadId() noexcept { return HashThreadId(); }
+
+RingLogger::RingLogger(size_t capacity) : m_LoggerCategory(categories::Logger) {
+  GECKO_ASSERT(capacity > 0 && "Ring buffer capacity must be greater than 0");
+
+  // Ensure capacity is power of 2
+  if ((capacity & (capacity - 1)) != 0)
+    capacity = 4096;
+
+  m_Ring = std::vector<Entry>(capacity);
+  m_Mask = capacity - 1;
+  for (u64 i = 0; i < capacity; ++i) {
+    m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
+  }
+}
+
+RingLogger::~RingLogger() { Shutdown(); }
+
+void RingLogger::AddSink(ILogSink *sink) noexcept {
+  GECKO_ASSERT(sink && "Cannot add null sink");
+
+  std::lock_guard<std::mutex> lk(m_SinkMu);
+  m_Sinks.push_back(sink);
+}
+
+void RingLogger::LogV(LogLevel level, Category category, const char *fmt,
+                      va_list apIn) noexcept {
+  GECKO_ASSERT(fmt && "Format string cannot be null");
+
+  if (static_cast<int>(level) <
+      static_cast<int>(m_Level.load(std::memory_order_relaxed)))
+    return;
+
+  char buffer[512];
+  va_list ap;
+  va_copy(ap, apIn);
+  int n = std::vsnprintf(buffer, sizeof(buffer), fmt, ap);
+  va_end(ap);
+  if (n < 0) {
+    buffer[0] = '\0';
   }
 
-  u32 RingLogger::ThreadId() noexcept { return HashThreadId(); }
+  u64 position = m_Head.fetch_add(1, std::memory_order_acq_rel);
+  Entry &entry = m_Ring[position & m_Mask];
 
-  RingLogger::RingLogger(size_t capacity)
-    : m_LoggerCategory(categories::Logger)
-  {
-    GECKO_ASSERT(capacity > 0 && "Ring buffer capacity must be greater than 0");
-    
-    // Ensure capacity is power of 2
-    if ((capacity & (capacity - 1)) != 0) capacity = 4096;
-    
-    m_Ring = std::vector<Entry>(capacity);
-    m_Mask = capacity - 1;
-    for (u64 i = 0; i < capacity; ++i)
-    {
-      m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
-    }
+  u64 sequence = entry.Sequence.load(std::memory_order_acquire);
+  if (static_cast<i64>(sequence) - static_cast<i64>(position) != 0) {
+    m_Dropped.fetch_add(1, std::memory_order_relaxed);
+    return;
   }
 
-  RingLogger::~RingLogger()
-  {
-    Shutdown();
-  }
+  entry.Level = level;
+  entry.Cat = category;
+  entry.TimeNs = NowNs();
+  entry.ThreadId = ThreadId();
+  std::size_t maxLen = sizeof(entry.Text) - 1;
+  std::size_t len = std::min(std::strlen(buffer), maxLen);
 
-  void RingLogger::AddSink(ILogSink* sink) noexcept
-  {
-    GECKO_ASSERT(sink && "Cannot add null sink");
-    
-    std::lock_guard<std::mutex> lk(m_SinkMu);
-    m_Sinks.push_back(sink);
-  }
+  std::copy_n(buffer, len, entry.Text);
+  entry.Text[sizeof(entry.Text) - 1] = '\n';
 
-  void RingLogger::LogV(LogLevel level, Category category, const char* fmt, va_list apIn) noexcept
-  {
-    GECKO_ASSERT(fmt && "Format string cannot be null");
-    
-    if (static_cast<int>(level) < static_cast<int>(m_Level.load(std::memory_order_relaxed))) return;
+  entry.Sequence.store(position + 1, std::memory_order_release);
 
-    char buffer[512];
-    va_list ap;
-    va_copy(ap, apIn);
-    int n = std::vsnprintf(buffer, sizeof(buffer), fmt, ap);
-    va_end(ap);
-    if (n < 0) { buffer[0] = '\0'; }
+  // Try to schedule processing, but don't wait if job system is busy
+  TryScheduleConsumerJob();
+}
 
-    u64 position = m_Head.fetch_add(1, std::memory_order_acq_rel);
-    Entry& entry = m_Ring[position & m_Mask];
+void RingLogger::ProcessLogEntries() noexcept {
+  if (!m_Run.load(std::memory_order_relaxed))
+    return;
+
+  LogMessage message{};
+  const int maxBatchSize =
+      128; // Process more entries per job to reduce job overhead
+
+  for (int batch = 0; batch < maxBatchSize; ++batch) {
+    u64 position = m_Tail.load(std::memory_order_relaxed);
+    Entry &entry = m_Ring[position & m_Mask];
 
     u64 sequence = entry.Sequence.load(std::memory_order_acquire);
-    if (static_cast<i64>(sequence) - static_cast<i64>(position) != 0)
+    if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0)
+      break;
+
+    message.Level = entry.Level;
+    message.Cat = entry.Cat;
+    message.TimeNs = entry.TimeNs;
+    message.ThreadId = entry.ThreadId;
+    message.Text = entry.Text;
+
     {
-      m_Dropped.fetch_add(1, std::memory_order_relaxed) ;
-      return;
+      std::lock_guard<std::mutex> lk(m_SinkMu);
+      for (auto *sink : m_Sinks)
+        sink->Write(message);
     }
 
-    entry.Level = level;
-    entry.Cat = category;
-    entry.TimeNs = NowNs();
-    entry.ThreadId = ThreadId();
-    std::size_t maxLen = sizeof(entry.Text) - 1;
-    std::size_t len = std::min(std::strlen(buffer), maxLen);
+    if (m_Profiler && (message.Level == LogLevel::Error ||
+                       message.Level == LogLevel::Fatal)) {
+      GECKO_PROF_COUNTER(message.Cat, "LogErrorCount", 1);
+    }
 
-    std::copy_n(buffer, len, entry.Text);
-    entry.Text[sizeof(entry.Text)-1] = '\n';
-
-    entry.Sequence.store(position + 1, std::memory_order_release);
-
-    // Try to schedule processing, but don't wait if job system is busy
-    TryScheduleConsumerJob();
+    entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
+    m_Tail.store(position + 1, std::memory_order_relaxed);
   }
 
-  void RingLogger::ProcessLogEntries() noexcept
+  // Handle dropped message reporting
+  u64 dropped = m_Dropped.exchange(0, std::memory_order_relaxed);
+  if (dropped) {
+    LogMessage dropMessage{LogLevel::Warn, m_LoggerCategory, NowNs(),
+                           ThreadId(), nullptr};
+    char temp[128];
+    std::snprintf(temp, sizeof(temp), "[Logger] dropped %llu messages",
+                  static_cast<unsigned long long>(dropped));
+    dropMessage.Text = temp;
+    std::lock_guard<std::mutex> lk(m_SinkMu);
+    for (auto *sink : m_Sinks)
+      sink->Write(dropMessage);
+  }
+
+  // Always check if there are more entries to process
+  if (HasPendingEntries()) {
+    ScheduleNextConsumerJob();
+  }
+}
+
+void RingLogger::TryScheduleConsumerJob() noexcept {
+  if (!m_Run.load(std::memory_order_relaxed))
+    return;
+
+  // Only schedule if there's no active consumer job
+  if (m_ConsumerJob.IsValid() && !IsJobComplete(m_ConsumerJob))
+    return;
+
+  auto *jobSystem = GetJobSystem();
+  if (!jobSystem) {
+    // No job system available, process immediately on current thread
+    ProcessLogEntries();
+    return;
+  }
+
+  // Use normal priority for logger jobs and limit how often we schedule
+  static std::atomic<u64> lastScheduleTime{0};
+  u64 now = NowNs();
+  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
+
+  // Don't schedule too frequently (at most every 100µs) to avoid job spam
+  if (now - lastTime < 100000) // 100 microseconds
   {
-    if (!m_Run.load(std::memory_order_relaxed)) return;
+    return;
+  }
 
-    LogMessage message {};
-    const int maxBatchSize = 128; // Process more entries per job to reduce job overhead
-    
-    for (int batch = 0; batch < maxBatchSize; ++batch)
-    {
+  if (lastScheduleTime.compare_exchange_weak(lastTime, now,
+                                             std::memory_order_relaxed)) {
+    m_ConsumerJob = jobSystem->Submit([this]() { ProcessLogEntries(); },
+                                      JobPriority::Normal, m_LoggerCategory);
+  }
+}
+
+void RingLogger::ScheduleNextConsumerJob() noexcept {
+  TryScheduleConsumerJob();
+}
+
+bool RingLogger::HasPendingEntries() const noexcept {
+  u64 position = m_Tail.load(std::memory_order_relaxed);
+  const Entry &entry = m_Ring[position & m_Mask];
+  u64 sequence = entry.Sequence.load(std::memory_order_acquire);
+  return static_cast<i64>(sequence) - static_cast<i64>(position + 1) == 0;
+}
+
+void RingLogger::Flush() noexcept {
+  bool again = false;
+
+  while (again) {
+    again = false;
+    while (true) {
       u64 position = m_Tail.load(std::memory_order_relaxed);
-      Entry& entry = m_Ring[position & m_Mask];
-      
+      Entry &entry = m_Ring[position & m_Mask];
       u64 sequence = entry.Sequence.load(std::memory_order_acquire);
-      if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0) break;
+      if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0)
+        break;
 
-      message.Level = entry.Level;
-      message.Cat = entry.Cat;
-      message.TimeNs = entry.TimeNs;
-      message.ThreadId = entry.ThreadId;
-      message.Text = entry.Text;
-
+      LogMessage message{entry.Level, entry.Cat, entry.TimeNs, entry.ThreadId,
+                         entry.Text};
       {
         std::lock_guard<std::mutex> lk(m_SinkMu);
-        for (auto* sink : m_Sinks) sink->Write(message);
+        for (auto *sink : m_Sinks)
+          sink->Write(message);
       }
-
-      if (m_Profiler && (message.Level == LogLevel::Error || message.Level == LogLevel::Fatal))
-      {
-        GECKO_PROF_COUNTER(message.Cat, "LogErrorCount", 1);
-      }
-
       entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
       m_Tail.store(position + 1, std::memory_order_relaxed);
-    }
-
-    // Handle dropped message reporting
-    u64 dropped = m_Dropped.exchange(0, std::memory_order_relaxed);
-    if (dropped)
-    {
-      LogMessage dropMessage { LogLevel::Warn, m_LoggerCategory, NowNs(), ThreadId(), nullptr };
-      char temp[128];
-      std::snprintf(temp, sizeof(temp), "[Logger] dropped %llu messages", static_cast<unsigned long long>(dropped));
-      dropMessage.Text = temp;
-      std::lock_guard<std::mutex> lk(m_SinkMu);
-      for (auto* sink : m_Sinks) sink->Write(dropMessage);
-    }
-
-    // Always check if there are more entries to process
-    if (HasPendingEntries())
-    {
-      ScheduleNextConsumerJob();
+      again = true;
     }
   }
-
-  void RingLogger::TryScheduleConsumerJob() noexcept
-  {
-    if (!m_Run.load(std::memory_order_relaxed)) return;
-    
-    // Only schedule if there's no active consumer job
-    if (m_ConsumerJob.IsValid() && !IsJobComplete(m_ConsumerJob)) return;
-    
-    auto* jobSystem = GetJobSystem();
-    if (!jobSystem) 
-    {
-      // No job system available, process immediately on current thread
-      ProcessLogEntries();
-      return;
-    }
-
-    // Use normal priority for logger jobs and limit how often we schedule
-    static std::atomic<u64> lastScheduleTime{0};
-    u64 now = NowNs();
-    u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
-    
-    // Don't schedule too frequently (at most every 100µs) to avoid job spam
-    if (now - lastTime < 100000) // 100 microseconds
-    {
-      return;
-    }
-    
-    if (lastScheduleTime.compare_exchange_weak(lastTime, now, std::memory_order_relaxed))
-    {
-      m_ConsumerJob = jobSystem->Submit([this]() {
-        ProcessLogEntries();
-      }, JobPriority::Normal, m_LoggerCategory);
-    }
-  }
-
-  void RingLogger::ScheduleNextConsumerJob() noexcept
-  {
-    TryScheduleConsumerJob();
-  }
-
-  bool RingLogger::HasPendingEntries() const noexcept
-  {
-    u64 position = m_Tail.load(std::memory_order_relaxed);
-    const Entry& entry = m_Ring[position & m_Mask];
-    u64 sequence = entry.Sequence.load(std::memory_order_acquire);
-    return static_cast<i64>(sequence) - static_cast<i64>(position + 1) == 0;
-  }
-
-
-  void RingLogger::Flush() noexcept
-  {
-    bool again = false;
-
-    while (again)
-    {
-      again = false;
-      while (true)
-      {
-        u64 position = m_Tail.load(std::memory_order_relaxed);
-        Entry& entry = m_Ring[position & m_Mask];
-        u64 sequence = entry.Sequence.load(std::memory_order_acquire);
-        if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0) break;
-
-        LogMessage message { entry.Level, entry.Cat, entry.TimeNs, entry.ThreadId, entry.Text };
-        {
-          std::lock_guard<std::mutex> lk(m_SinkMu);
-          for (auto* sink : m_Sinks) sink->Write(message);
-        }
-        entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
-        m_Tail.store(position + 1, std::memory_order_relaxed);
-        again = true;
-      }
-    }
-  }
-
-  bool RingLogger::Init() noexcept 
-  {
-    m_Run.store(true, std::memory_order_relaxed);
-    
-    // JobSystem is now available during Logger initialization (Allocator -> JobSystem -> Profiler -> Logger order)
-    // Start the initial consumer job immediately
-    ScheduleNextConsumerJob();
-    
-    return true;
-  }
-
-  void RingLogger::Shutdown() noexcept 
-  {
-    m_Run.store(false, std::memory_order_relaxed);
-    
-    // Wait for any running consumer job to complete
-    if (m_ConsumerJob.IsValid())
-    {
-      WaitForJob(m_ConsumerJob);
-    }
-    
-    // Process any remaining entries
-    Flush();
-  }
-
 }
+
+bool RingLogger::Init() noexcept {
+  m_Run.store(true, std::memory_order_relaxed);
+
+  // JobSystem is now available during Logger initialization (Allocator ->
+  // JobSystem -> Profiler -> Logger order) Start the initial consumer job
+  // immediately
+  ScheduleNextConsumerJob();
+
+  return true;
+}
+
+void RingLogger::Shutdown() noexcept {
+  m_Run.store(false, std::memory_order_relaxed);
+
+  // Wait for any running consumer job to complete
+  if (m_ConsumerJob.IsValid()) {
+    WaitForJob(m_ConsumerJob);
+  }
+
+  // Process any remaining entries
+  Flush();
+}
+
+} // namespace gecko::runtime

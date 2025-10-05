@@ -4,14 +4,12 @@
 
 #include "categories.h"
 
-namespace gecko::platform 
-{
+namespace gecko::platform {
 
-  Unique<PlatformContext> PlatformContext::Create(const PlatformConfig& cfg)
-  {
-    GECKO_PROF_FUNC(categories::General);
-    std::printf("PlatformContext::Create was called!\n");
-    return CreateUnique<PlatformContext>();   
-  }
-
+Unique<PlatformContext> PlatformContext::Create(const PlatformConfig &cfg) {
+  GECKO_PROF_FUNC(categories::General);
+  std::printf("PlatformContext::Create was called!\n");
+  return CreateUnique<PlatformContext>();
 }
+
+} // namespace gecko::platform

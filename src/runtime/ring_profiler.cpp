@@ -6,79 +6,63 @@
 
 namespace gecko {
 
-  u32 ThisThreadId() noexcept { return HashThreadId(); }
-}
+u32 ThisThreadId() noexcept { return HashThreadId(); }
+} // namespace gecko
 
 namespace gecko::runtime {
 
-  u64 RingProfiler::MonotonicNowNs() noexcept 
-  {
-    return MonotonicTimeNs();
+u64 RingProfiler::MonotonicNowNs() noexcept { return MonotonicTimeNs(); }
+
+RingProfiler::RingProfiler(size_t capacityPow2)
+    : m_Ring(capacityPow2), m_Mask(capacityPow2 - 1), m_Head(0), m_Tail(0) {
+  GECKO_ASSERT(capacityPow2 > 0 &&
+               "Ring buffer capacity must be greater than 0");
+
+  // Ensure capacity is power of 2
+  if ((capacityPow2 & (capacityPow2 - 1)) != 0) {
+    m_Mask = (Bit(20)) - 1;
+    m_Ring = std::vector<Slot>(Bit(20));
   }
-
-  RingProfiler::RingProfiler(size_t capacityPow2)
-    : m_Ring(capacityPow2)
-    , m_Mask(capacityPow2 - 1)
-    , m_Head(0)
-    , m_Tail(0)
-  {
-    GECKO_ASSERT(capacityPow2 > 0 && "Ring buffer capacity must be greater than 0");
-    
-    // Ensure capacity is power of 2
-    if ((capacityPow2 & (capacityPow2 - 1)) != 0) 
-    {
-      m_Mask = (Bit(20)) - 1;
-      m_Ring = std::vector<Slot>(Bit(20));
-    }
-    for (u64 i = 0; i < m_Ring.size(); ++i)
-    {
-      m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
-    }
+  for (u64 i = 0; i < m_Ring.size(); ++i) {
+    m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
   }
+}
 
-  RingProfiler::~RingProfiler() = default;
+RingProfiler::~RingProfiler() = default;
 
-  u64 RingProfiler::NowNs() const noexcept { return MonotonicNowNs(); }
+u64 RingProfiler::NowNs() const noexcept { return MonotonicNowNs(); }
 
-  void RingProfiler::Emit(const ProfEvent& event) noexcept
-  {
-    u64 pos = m_Head.fetch_add(1, std::memory_order_acq_rel);
-    Slot& slot = m_Ring[pos & m_Mask];
+void RingProfiler::Emit(const ProfEvent &event) noexcept {
+  u64 pos = m_Head.fetch_add(1, std::memory_order_acq_rel);
+  Slot &slot = m_Ring[pos & m_Mask];
 
-    u64 sequence = slot.Sequence.load(std::memory_order_acquire);
-    i64 diff = (i64)sequence - (i64)pos;
-    if (diff == 0) {
-      slot.ProfileEvent = event; // copy event
-      slot.Sequence.store(pos + 1, std::memory_order_release);
-    } else {
-      // overflow — drop event (cheap fallback)
-      // Optionally: back off or count drops.
-    }
+  u64 sequence = slot.Sequence.load(std::memory_order_acquire);
+  i64 diff = (i64)sequence - (i64)pos;
+  if (diff == 0) {
+    slot.ProfileEvent = event; // copy event
+    slot.Sequence.store(pos + 1, std::memory_order_release);
+  } else {
+    // overflow — drop event (cheap fallback)
+    // Optionally: back off or count drops.
   }
+}
 
-  bool RingProfiler::TryPop(ProfEvent& event) noexcept
-  {
-    u64 pos = m_Tail.load(std::memory_order_relaxed);
-    Slot& slot = m_Ring[pos & m_Mask];
-    u64 sequence = slot.Sequence.load(std::memory_order_acquire);
-    i64 diff = (i64)sequence - (i64)(pos + 1);
-    if (diff == 0) {
-      event = slot.ProfileEvent;
-      slot.Sequence.store(pos + m_Ring.size(), std::memory_order_release);
-      m_Tail.store(pos + 1, std::memory_order_relaxed);
-      return true;
-    }
-    return false;
-  }
-
-  bool RingProfiler::Init() noexcept 
-  {
+bool RingProfiler::TryPop(ProfEvent &event) noexcept {
+  u64 pos = m_Tail.load(std::memory_order_relaxed);
+  Slot &slot = m_Ring[pos & m_Mask];
+  u64 sequence = slot.Sequence.load(std::memory_order_acquire);
+  i64 diff = (i64)sequence - (i64)(pos + 1);
+  if (diff == 0) {
+    event = slot.ProfileEvent;
+    slot.Sequence.store(pos + m_Ring.size(), std::memory_order_release);
+    m_Tail.store(pos + 1, std::memory_order_relaxed);
     return true;
   }
-
-  void RingProfiler::Shutdown() noexcept 
-  {
-
-  }
-
+  return false;
 }
+
+bool RingProfiler::Init() noexcept { return true; }
+
+void RingProfiler::Shutdown() noexcept {}
+
+} // namespace gecko::runtime

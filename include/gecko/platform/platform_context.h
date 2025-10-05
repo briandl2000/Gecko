@@ -4,21 +4,16 @@
 
 namespace gecko::platform {
 
-  struct PlatformConfig 
-  {
-  };
+struct PlatformConfig {};
 
-  class PlatformContext
-  {
-  public:
-    GECKO_API virtual ~PlatformContext() = default;
- 
-    [[nodiscard]]
-    GECKO_API static Unique<PlatformContext> Create(const PlatformConfig& cfg); 
+class PlatformContext {
+public:
+  GECKO_API virtual ~PlatformContext() = default;
 
-  private:
-    
+  [[nodiscard]]
+  GECKO_API static Unique<PlatformContext> Create(const PlatformConfig &cfg);
 
-  };
+private:
+};
 
-}
+} // namespace gecko::platform
