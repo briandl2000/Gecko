@@ -1,61 +1,112 @@
-# Gecko
-Gecko is a C++ rendering engine that I am developing as my graduation project.
+# Gecko Game Engine
 
-![](Images/2024-06-11_22h53_13.png)
+A modular, high-performance C++ game engine designed as a collection of interconnected systems rather than a monolithic framework.
 
-## Intro
-For my graduation year at [BUAS](https://www.buas.nl/) I am working on a personal project where I am developing a rendering engine called Gecko. The goal is to create a cross platform rendering engine that runs of Windows and the PS5. However, Due to following NDA, the PS5 code is not on this repo. 
+## About This Project
 
-## Features
-- PBR rendering with IBL.
-- GLTF scene loading.
-- An easy to use API that can render 3D PBR scenes.
-- Loading HDR environment maps.
-- Shadow maps.
-- Raytraced shadows.
-- Post processing.
-- Bloom.
-- FXAA.
-- Tone mapping.
-- Deferred rendering.
-- Render API abstraction.
+Gecko began as a graphics rendering engine during my graduation project at [BUAS](https://www.buas.nl/), but has evolved into a comprehensive game engine ecosystem. The original graphics engine (preserved in the `archive/graphics-engine-v1` branch) focused on PBR rendering and cross-platform graphics, but this version represents a complete architectural redesign with a focus on modularity, performance, and developer experience.
 
-## How to use
+## Architecture Overview
 
-### Build and running
+Gecko is built around three core modules that work together:
 
-Gecko uses CMake. So make sure CMake is installed on your machine
+### **Core** - Foundation Systems
+- **Memory Management**: Custom allocators with tracking and profiling
+- **Service Architecture**: Dependency-ordered service initialization  
+- **Job System**: Multi-threaded task scheduling with dependencies
+- **Logging**: High-performance ring-buffer logging with multiple sinks
+- **Profiling**: Low-overhead profiling with Chrome tracing output
+- **Utilities**: Threading, timing, random generation, and bit manipulation
 
-IMPORTANT:
-when building on windows make sure you have MSVC installed with the latest Windows SDK for DX12
+### **Platform** - System Abstraction
+- **Platform Context**: Cross-platform system integration
+- **Window Management**: (Coming soon)
+- **Input Handling**: (Coming soon)
+- **File System**: (Coming soon)
 
-#### Visual Studio
-Make sure visual studio is installed with the latest Windows SDK
-1. Clone the repo in the folder you want using the command 
-```git clone https://github.com/briandl2000/Gecko.git --recurse```
-2. Open the Gecko folder that you just cloned.
-3. Right click on the folder and select "Open with Visual Studio"
+### **Runtime** - Advanced Components
+- **Thread Pool Job System**: Production-ready multithreading
+- **Ring Logger/Profiler**: Lock-free, high-performance data collection
+- **Tracking Allocator**: Memory usage analytics
+- **Crash-Safe Tracing**: Reliable profiling data even during crashes
+- **Multiple Sink Types**: Console, file, and custom output targets
 
-![](Images/OpenWithVisualStudio.png)
+## Design Philosophy
 
-4. Visual Studio should open up and an out folder should have been created in the Gecko directory.
-5. At the top in Visual Studio you should be able to click the drop down that and select Debug or Releas
-6. To the right of that you can select the "Select Startup Item" drop down.
-7. Select "GeckoExample.exe" 
+- **Modular**: Each system can be used independently or together
+- **Performance-First**: Lock-free data structures, cache-friendly design
+- **Developer-Friendly**: Comprehensive logging, profiling, and debugging tools
+- **Cross-Platform**: Designed for Windows, Linux, and console platforms
+- **Service-Oriented**: Clear dependency management and initialization order
 
-![](Images/StartUpSelect.png)
+## Quick Start
 
-8. If everything went correctly you should be able to run the program through Visual Studio.
+```cpp
+#include "gecko/core/core.h"
 
-#### Visual Studio Code
-1. Clone the repo in the folder you want using the command 
-```git clone https://github.com/briandl2000/Gecko.git --recurse```
-2. Open the Gecko folder that you just cloned inside of VS Code.
-3. Press ```Ctrl+Shift+B``` To start the build task at the top it will ask release or debug
+int main() {
+    // Set up core services
+    gecko::Services services{};
+    GECKO_BOOT(services);  // Installs default services
+    
+    // Your game code here
+    GECKO_INFO(gecko::MakeCategory("main"), "Hello from Gecko!");
+    
+    GECKO_SHUTDOWN();
+    return 0;
+}
+```
 
-![](Images/BuildTargetVSC.png)
+## Examples
 
-4. Select the target you want to build.
-5. To run the program go to the Run and Debug tab to the right and select the target you want to run. You can also press F5 and it will run the selected target.
+- **`core_example`**: Demonstrates memory management, job system, logging, and profiling
+- **`platform_example`**: Shows platform abstraction usage
 
-![](Images/RunTargetVSC.png)
+## Building
+
+Gecko uses CMake and requires C++23:
+
+```bash
+git clone https://github.com/briandl2000/Gecko.git
+cd Gecko
+cmake --preset debug    # or release
+cmake --build build --config Debug
+```
+
+### Prerequisites
+- **CMake 3.22+**
+- **C++23 compatible compiler** (GCC 13+, Clang 16+, MSVC 2022)
+- **Ninja** (recommended)
+
+### Platform-Specific Notes
+- **Windows**: Requires MSVC with latest Windows SDK
+- **Linux**: GCC or Clang with C++23 support
+
+## Documentation
+
+- [**Coding Standards & API Guide**](CODING_STANDARDS.md): Comprehensive development guidelines
+- **Examples**: See `examples/` directory for usage patterns
+- **Headers**: Extensive inline documentation in `include/gecko/`
+
+## Project Status
+
+**In Active Development** - This represents a complete rewrite and redesign of the original graphics engine. Current focus areas:
+
+- **Complete**: Core foundation systems
+- **Complete**: Service architecture 
+- **Complete**: Memory management
+- **Complete**: Multithreading & job system
+- **Complete**: Logging & profiling
+- **In Progress**: Platform abstraction layer
+- **Planned**: Graphics/rendering systems (integration of original engine)
+- **Planned**: Audio systems
+- **Planned**: Physics integration
+- **Planned**: Asset pipeline
+
+## Repository History
+
+The original graphics engine version is preserved in the `archive/graphics-engine-v1` branch. This `graphics-to-game-engine` branch represents the new direction with completely rewritten architecture and expanded scope.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
