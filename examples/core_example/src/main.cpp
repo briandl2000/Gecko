@@ -11,6 +11,7 @@
 #include "gecko/core/random.h"
 #include "gecko/core/services.h"
 #include "gecko/core/thread.h"
+#include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
 #include "gecko/runtime/file_log_sink.h"
 #include "gecko/runtime/ring_logger.h"
@@ -330,6 +331,7 @@ int main() {
 
   // Now logging works with all sinks configured!
   GECKO_INFO(MAIN_CAT, "Services installed and sinks configured successfully!");
+  gecko::LogVersion(MAIN_CAT);
   GECKO_DEBUG(
       MAIN_CAT,
       "Logger is now active with immediate logging (this won't appear)");

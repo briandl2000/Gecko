@@ -1,7 +1,7 @@
-add_library(GeckoRuntime)
-add_library(Gecko::Runtime ALIAS GeckoRuntime)
+add_library(Runtime)
+add_library(Gecko::Runtime ALIAS Runtime)
 
-target_sources(GeckoRuntime
+target_sources(Runtime
   PRIVATE
     console_log_sink.cpp
     crash_safe_trace_profiler_sink.cpp
@@ -16,20 +16,20 @@ target_sources(GeckoRuntime
     tracking_allocator.cpp
 )
 
-target_include_directories(GeckoRuntime
+target_include_directories(Runtime
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
-target_compile_definitions(GeckoRuntime PRIVATE GECKO_OVERRIDE_NEW)
+target_compile_definitions(Runtime PRIVATE GECKO_OVERRIDE_NEW)
 
-target_compile_definitions(GeckoRuntime PUBLIC GECKO_PLATFORM_API)
+target_compile_definitions(Runtime PUBLIC GECKO_PLATFORM_API)
 
-target_link_libraries(GeckoRuntime PUBLIC Gecko::Core)
+target_link_libraries(Runtime PUBLIC Gecko::Core)
 
-install(TARGETS GeckoRuntime
-  EXPORT GeckoTargets
+install(TARGETS Runtime
+  EXPORT ${GECKO_EXPORT_SET_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

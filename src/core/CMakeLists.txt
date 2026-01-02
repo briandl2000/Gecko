@@ -1,7 +1,7 @@
-add_library(GeckoCore)
-add_library(Gecko::Core ALIAS GeckoCore)
+add_library(Core)
+add_library(Gecko::Core ALIAS Core)
 
-target_sources(GeckoCore
+target_sources(Core
   PRIVATE
     services.cpp
     thread.cpp
@@ -9,13 +9,22 @@ target_sources(GeckoCore
     random.cpp
 )
 
-target_include_directories(GeckoCore
+target_include_directories(Core
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>)
 
-install(TARGETS GeckoCore
-  EXPORT GeckoTargets
+target_compile_definitions(Core
+  PUBLIC
+    GECKO_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    GECKO_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    GECKO_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    GECKO_VERSION_STRING="${PROJECT_VERSION}"
+    GECKO_VERSION_PRERELEASE="${GECKO_VERSION_PRERELEASE}"
+    GECKO_VERSION_FULL_STRING="${GECKO_VERSION_FULL}")
+
+install(TARGETS Core
+  EXPORT ${GECKO_EXPORT_SET_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)

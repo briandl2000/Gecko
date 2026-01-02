@@ -23,14 +23,6 @@ bool ThreadPoolJobSystem::Init() noexcept {
     workerCount = std::max(1u, std::thread::hardware_concurrency());
   }
 
-  // Note: Logger may not be available yet during JobSystem initialization
-  // (JobSystem comes before Logger) Use direct fprintf for initialization
-  // messages to avoid dependency issues
-  std::fprintf(
-      stderr,
-      "[Gecko] Initializing ThreadPoolJobSystem with %u worker threads\n",
-      workerCount);
-
   try {
     m_WorkerThreads.reserve(workerCount);
     for (u32 i = 0; i < workerCount; ++i) {
@@ -53,10 +45,6 @@ bool ThreadPoolJobSystem::Init() noexcept {
 void ThreadPoolJobSystem::Shutdown() noexcept {
   if (!m_Initialized)
     return;
-
-  // Use direct fprintf during shutdown since logger will be shut down after job
-  // system
-  std::fprintf(stderr, "[Gecko] Shutting down ThreadPoolJobSystem\n");
 
   m_Shutdown.store(true, std::memory_order_release);
   m_JobAvailable.notify_all();

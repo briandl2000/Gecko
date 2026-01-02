@@ -1,6 +1,16 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(GECKO VERSION 1.0.0 LANGUAGES C CXX)
+project(Gecko VERSION 0.1.0 LANGUAGES C CXX)
+
+# Optional SemVer prerelease identifier (repo-controlled).
+# Examples: "alpha.1", "beta.2", "rc.1". Set to "" for a normal release.
+set(GECKO_VERSION_PRERELEASE "alpha.0")
+
+if(GECKO_VERSION_PRERELEASE STREQUAL "")
+  set(GECKO_VERSION_FULL "${PROJECT_VERSION}")
+else()
+  set(GECKO_VERSION_FULL "${PROJECT_VERSION}-${GECKO_VERSION_PRERELEASE}")
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,6 +33,9 @@ foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
 endforeach()
 
 option(GECKO_BUILD_EXAMPLES "Build examples" ON)
+
+# CMake package/export naming (kept consistent with the project name).
+set(GECKO_EXPORT_SET_NAME "${PROJECT_NAME}Targets")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 

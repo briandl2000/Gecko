@@ -9,6 +9,7 @@
 #include <gecko/runtime/thread_pool_job_system.h>
 #include <gecko/runtime/trace_file_sink.h>
 #include <gecko/runtime/tracking_allocator.h>
+#include <gecko/core/version.h>
 
 using namespace gecko;
 using namespace gecko::platform;
@@ -44,6 +45,8 @@ int main() {
         LogLevel::Info); // Filter out Trace and Debug messages initially
   }
 
+  gecko::LogVersion(MAIN_CAT);
+
   // Set up trace file sink for profiling data after services are available
   runtime::TraceFileSink traceSink("gecko_trace.json");
   if (!traceSink.IsOpen()) {
@@ -62,7 +65,7 @@ int main() {
   windowDesc.Title = "Gecko Platform Example";
   windowDesc.Size = Extent2D{1280, 720};
   windowDesc.Visible = true;
-  windowDesc.Resizable = false;
+  windowDesc.Resizable = true;
   windowDesc.Mode = WindowMode::Windowed;
 
   WindowHandle window;

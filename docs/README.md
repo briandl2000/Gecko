@@ -4,6 +4,7 @@ This folder contains Gecko’s project documentation.
 
 ## Start Here
 - [Architecture Overview](architecture/overview.md)
+- [Data & Storage (paths, config, saves)](architecture/data-storage.md)
 - [Build & Install](build.md)
 - [Modules](modules/README.md)
 - [Coding Standards & API Guide](CODING_STANDARDS.md)

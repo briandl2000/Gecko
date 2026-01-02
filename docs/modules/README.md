@@ -1,6 +1,6 @@
 # Modules
 
-## Core (`gecko::Core`)
+## Core (`Gecko::Core`)
 Owns foundational interfaces and utilities:
 - services install/access
 - allocator interface + helpers

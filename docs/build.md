@@ -24,7 +24,7 @@ Examples are enabled by default:
 Output binaries land under `build/out/bin/<Config>/`.
 
 ## Install / Package
-Gecko exports CMake targets (e.g. `gecko::Core`, `gecko::Runtime`).
+Gecko exports CMake targets (e.g. `Gecko::Core`, `Gecko::Runtime`).
 
 - Install (example):
   - `cmake --install build --config Release --prefix <install-dir>`

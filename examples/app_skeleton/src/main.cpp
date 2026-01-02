@@ -7,6 +7,7 @@
 #include <gecko/core/memory.h>
 #include <gecko/core/services.h>
 #include <gecko/core/thread.h>
+#include <gecko/core/version.h>
 #include <gecko/platform/platform_context.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/file_log_sink.h>
@@ -36,8 +37,7 @@ static void PrintUsage(const char *exe) {
       "  --no-window           Run without creating a window\n"
       "  --frames=N            Run N frames then exit (windowed only)\n"
       "  --title=TEXT          Window title (windowed only)\n"
-      "  --backend=auto|null|xlib  Window backend (Linux only supports "
-      "xlib/auto today)\n"
+      "  --backend=auto|null|xlib  Window backend (Linux only supports xlib/auto today)\n"
       "  --help                Show this help\n",
       exe ? exe : "app_skeleton");
 }
@@ -117,9 +117,9 @@ static bool ParseArgs(int argc, char **argv, AppConfig &cfg) {
 }
 
 static Services CreateServices(runtime::TrackingAllocator &trackingAlloc,
-                               runtime::ThreadPoolJobSystem &jobSystem,
-                               runtime::RingProfiler &ringProfiler,
-                               runtime::RingLogger &ringLogger) {
+                              runtime::ThreadPoolJobSystem &jobSystem,
+                              runtime::RingProfiler &ringProfiler,
+                              runtime::RingLogger &ringLogger) {
   Services services{};
   services.Allocator = &trackingAlloc;
   services.JobSystem = &jobSystem;
@@ -146,8 +146,7 @@ static int AppMain(int argc, char **argv) {
   runtime::RingLogger ringLogger(1024);
 
   // 2) Install services (Allocator -> JobSystem -> Profiler -> Logger).
-  GECKO_BOOT(
-      (CreateServices(trackingAlloc, jobSystem, ringProfiler, ringLogger)));
+  GECKO_BOOT((CreateServices(trackingAlloc, jobSystem, ringProfiler, ringLogger)));
 
   // 3) Configure sinks AFTER services are installed.
   runtime::ConsoleLogSink consoleSink;
@@ -157,6 +156,8 @@ static int AppMain(int argc, char **argv) {
     logger->AddSink(&fileSink);
     logger->SetLevel(LogLevel::Info);
   }
+
+  gecko::LogVersion(APP_CAT);
 
   runtime::TraceFileSink traceSink("gecko_trace.json");
   if (traceSink.IsOpen()) {
@@ -233,8 +234,7 @@ static int AppMain(int argc, char **argv) {
 // - main(int,char**) for a console subsystem app
 // - wmain(int,wchar_t**) to preserve Unicode arguments
 // - WinMain/wWinMain for a GUI subsystem app
-// Gecko does not currently provide an entrypoint abstraction; route into
-// AppMain.
+// Gecko does not currently provide an entrypoint abstraction; route into AppMain.
 int main(int argc, char **argv) { return AppMain(argc, argv); }
 #else
 int main(int argc, char **argv) { return AppMain(argc, argv); }
