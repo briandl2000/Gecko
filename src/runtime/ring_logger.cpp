@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <mutex>
+#include <thread>
 
 #include "categories.h"
 #include "gecko/core/assert.h"
@@ -64,20 +65,24 @@ void RingLogger::LogV(LogLevel level, Category category, const char *fmt,
   Entry &entry = m_Ring[position & m_Mask];
 
   u64 sequence = entry.Sequence.load(std::memory_order_acquire);
-  if (static_cast<i64>(sequence) - static_cast<i64>(position) != 0) {
-    m_Dropped.fetch_add(1, std::memory_order_relaxed);
-    return;
+  while (static_cast<i64>(sequence) - static_cast<i64>(position) != 0) {
+    // The ring is full for this slot. We must not "skip" positions, otherwise
+    // the single consumer can get stuck waiting for an unpublished entry.
+    // Try to drain a bit on the current thread to ensure forward progress.
+    ProcessLogEntries();
+    std::this_thread::yield();
+    sequence = entry.Sequence.load(std::memory_order_acquire);
   }
 
   entry.Level = level;
   entry.Cat = category;
   entry.TimeNs = NowNs();
   entry.ThreadId = ThreadId();
-  std::size_t maxLen = sizeof(entry.Text) - 1;
-  std::size_t len = std::min(std::strlen(buffer), maxLen);
+  const std::size_t maxLen = sizeof(entry.Text);
+  std::size_t len = std::min(std::strlen(buffer), maxLen - 1);
 
   std::copy_n(buffer, len, entry.Text);
-  entry.Text[sizeof(entry.Text) - 1] = '\n';
+  entry.Text[len] = '\0';
 
   entry.Sequence.store(position + 1, std::memory_order_release);
 
@@ -187,10 +192,9 @@ bool RingLogger::HasPendingEntries() const noexcept {
 }
 
 void RingLogger::Flush() noexcept {
-  bool again = false;
+  while (true) {
+    bool processedAny = false;
 
-  while (again) {
-    again = false;
     while (true) {
       u64 position = m_Tail.load(std::memory_order_relaxed);
       Entry &entry = m_Ring[position & m_Mask];
@@ -207,8 +211,11 @@ void RingLogger::Flush() noexcept {
       }
       entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
       m_Tail.store(position + 1, std::memory_order_relaxed);
-      again = true;
+      processedAny = true;
     }
+
+    if (!processedAny)
+      break;
   }
 }
 

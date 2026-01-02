@@ -16,7 +16,7 @@ target_sources(GeckoRuntime
     tracking_allocator.cpp
 )
 
-target_include_directories(GeckoPlatform
+target_include_directories(GeckoRuntime
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>

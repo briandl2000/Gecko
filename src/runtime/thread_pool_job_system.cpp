@@ -209,6 +209,11 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept {
       job->Completed.store(true, std::memory_order_release);
     }
 
+    {
+      std::lock_guard<std::mutex> lock(m_Mutex);
+      m_ActiveJobs.erase(job->Handle.Id);
+    }
+
     m_JobCompleted.notify_all();
   }
 }
@@ -242,6 +247,11 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
                   "Job %llu threw an exception on worker thread %u",
                   job->Handle.Id, threadId);
       job->Completed.store(true, std::memory_order_release);
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(m_Mutex);
+      m_ActiveJobs.erase(job->Handle.Id);
     }
 
     m_JobCompleted.notify_all();

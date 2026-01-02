@@ -47,9 +47,10 @@ void WorkerTask(int workerId, int numParticles) {
              workerId, numParticles);
 
   // Allocate particles
+  Particle *particles = nullptr;
   {
     GECKO_PROF_SCOPE(MEMORY_CAT, "AllocateParticles");
-    auto *particles = AllocArray<Particle>(numParticles, SIMULATION_CAT);
+    particles = AllocArray<Particle>(numParticles, SIMULATION_CAT);
 
     if (!particles) {
       GECKO_ERROR(WORKER_CAT, "Worker %d: Failed to allocate particles",
@@ -77,6 +78,10 @@ void WorkerTask(int workerId, int numParticles) {
                         gecko::RandomFloat(1.0f, 5.0f)};
       }
     }
+  }
+
+  {
+    GECKO_PROF_SCOPE(COMPUTE_CAT, "PHysicsUpdate");
 
     // Simulate physics steps (engaging but quick)
     const int numSteps = 50;
@@ -112,14 +117,14 @@ void WorkerTask(int workerId, int numParticles) {
     GECKO_INFO(WORKER_CAT,
                "Worker %d: Physics simulation complete! All particles settled.",
                workerId);
+  }
 
-    // Clean up
-    {
-      GECKO_PROF_SCOPE(MEMORY_CAT, "DeallocateParticles");
-      DeallocBytes(particles, numParticles * sizeof(Particle),
-                   alignof(Particle), SIMULATION_CAT);
-      GECKO_DEBUG(MEMORY_CAT, "Worker %d: Freed particle memory", workerId);
-    }
+  // Clean up
+  {
+    GECKO_PROF_SCOPE(MEMORY_CAT, "DeallocateParticles");
+    DeallocBytes(particles, numParticles * sizeof(Particle), alignof(Particle),
+                 SIMULATION_CAT);
+    GECKO_DEBUG(MEMORY_CAT, "Worker %d: Freed particle memory", workerId);
   }
 }
 

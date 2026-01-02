@@ -36,3 +36,5 @@ if (GECKO_BUILD_EXAMPLES)
 endif()
 
 include(CMakePackageConfigHelpers)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/install.cmake)

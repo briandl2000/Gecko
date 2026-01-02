@@ -84,7 +84,8 @@ cmake --build build --config Debug
 
 ## Documentation
 
-- [**Coding Standards & API Guide**](CODING_STANDARDS.md): Comprehensive development guidelines
+- [**Documentation Index**](docs/README.md)
+- [**Coding Standards & API Guide**](docs/CODING_STANDARDS.md): Comprehensive development guidelines
 - **Examples**: See `examples/` directory for usage patterns
 - **Headers**: Extensive inline documentation in `include/gecko/`
 
