@@ -1,11 +1,8 @@
 #include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <vector>
 
-#include "gecko/core/api.h"
 #include "gecko/core/boot.h"
-#include "gecko/core/core.h"
 #include "gecko/core/hash.h"
 #include "gecko/core/jobs.h"
 #include "gecko/core/log.h"
@@ -20,7 +17,6 @@
 #include "gecko/runtime/ring_profiler.h"
 #include "gecko/runtime/thread_pool_job_system.h"
 #include "gecko/runtime/trace_file_sink.h"
-#include "gecko/runtime/trace_writer.h"
 #include "gecko/runtime/tracking_allocator.h"
 
 using namespace gecko;
@@ -51,7 +47,8 @@ void WorkerTask(int workerId, int numParticles) {
   {
     GECKO_PROF_SCOPE(MEMORY_CAT, "AllocateParticles");
     particles = AllocArray<Particle>(numParticles, SIMULATION_CAT);
-
+  }
+  {
     if (!particles) {
       GECKO_ERROR(WORKER_CAT, "Worker %d: Failed to allocate particles",
                   workerId);

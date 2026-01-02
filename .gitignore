@@ -189,6 +189,8 @@ cython_debug/
 .vscode/
 .vs/
 
+working_dir/
+
 # Ruff stuff:
 .ruff_cache/
 
