@@ -33,6 +33,7 @@ add_subdirectory(src/runtime)
 if (GECKO_BUILD_EXAMPLES)
   add_subdirectory(examples/core_example)
   add_subdirectory(examples/platform_example)
+  add_subdirectory(examples/app_skeleton)
 endif()
 
 include(CMakePackageConfigHelpers)

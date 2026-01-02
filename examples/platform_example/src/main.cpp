@@ -1,5 +1,6 @@
 #include <gecko/core/memory.h>
 #include <gecko/core/services.h>
+#include <gecko/core/thread.h>
 #include <gecko/platform/platform_context.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/file_log_sink.h>
@@ -53,8 +54,50 @@ int main() {
   }
 
   PlatformConfig cfg = {};
+  cfg.WindowBackend = WindowBackendKind::Auto;
 
   Unique<PlatformContext> ctx = PlatformContext::Create(cfg);
+
+  WindowDesc windowDesc;
+  windowDesc.Title = "Gecko Platform Example";
+  windowDesc.Size = Extent2D{1280, 720};
+  windowDesc.Visible = true;
+  windowDesc.Resizable = false;
+  windowDesc.Mode = WindowMode::Windowed;
+
+  WindowHandle window;
+  if (!ctx->CreateWindow(windowDesc, window)) {
+    GECKO_ERROR(MAIN_CAT, "Failed to create window\n");
+    GECKO_SHUTDOWN();
+    return 1;
+  }
+
+  bool running = true;
+  // Avoid hanging forever in headless/Null-backend runs.
+  // Run up to ~10 seconds unless a close is requested.
+  u32 frameCount = 0;
+  while (running && ctx->IsWindowAlive(window) && frameCount < 600) {
+    GECKO_PROF_SCOPE(MAIN_CAT, "Main Loop");
+    ctx->PumpEvents();
+
+    WindowEvent ev{};
+    while (ctx->PollEvent(ev)) {
+      if (ev.Kind == WindowEventKind::CloseRequested) {
+        running = false;
+        break;
+      }
+    }
+
+    GECKO_SLEEP_MS(16);
+    ++frameCount;
+  }
+
+  if (running) {
+    // Headless/timeout fallback: request a clean shutdown.
+    ctx->RequestClose(window);
+  }
+
+  ctx->DestroyWindow(window);
 
   GECKO_SHUTDOWN();
 

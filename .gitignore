@@ -191,6 +191,10 @@ cython_debug/
 
 working_dir/
 
+# Gecko runtime artifacts
+log.txt
+gecko_trace.json
+
 # Ruff stuff:
 .ruff_cache/
 
@@ -204,3 +208,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+log.txt
+gecko_trace.json
