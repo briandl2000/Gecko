@@ -15,7 +15,8 @@ Owns OS abstraction and handles that must be implemented per-platform.
 Near-term targets:
 - window creation + event pump
 - input (keyboard/mouse)
-- filesystem where platform differences matter
+- platform IO / filesystem where platform differences matter
+- monitor enumeration / selection
 
 ## Runtime (`Gecko::Runtime`)
 Owns concrete implementations that depend on Core:

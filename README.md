@@ -20,9 +20,10 @@ Gecko is built around three core modules that work together:
 
 ### **Platform** - System Abstraction
 - **Platform Context**: Cross-platform system integration
-- **Window Management**: (Coming soon)
-- **Input Handling**: (Coming soon)
-- **File System**: (Coming soon)
+- **Window Management**: In progress (target: v0.0.0-alpha.0)
+- **Input Handling**: In progress (target: v0.0.0-alpha.0)
+- **Platform IO / File System**: In progress (target: v0.0.0-alpha.0)
+- **Monitor System**: In progress (target: v0.0.0-alpha.0)
 
 ### **Runtime** - Advanced Components
 - **Thread Pool Job System**: Production-ready multithreading
@@ -88,24 +89,16 @@ cmake --build build --config Debug
 ## Documentation
 
 - [**Documentation Index**](docs/README.md)
-- [**Coding Standards & API Guide**](docs/CODING_STANDARDS.md): Comprehensive development guidelines
+- [**Project Guide / Roadmap**](docs/project-guide.md)
+- [**Coding Standards (reference)**](docs/CODING_STANDARDS.md)
 - **Examples**: See `examples/` directory for usage patterns
 - **Headers**: Extensive inline documentation in `include/gecko/`
 
 ## Project Status
 
-**In Active Development** - This represents a complete rewrite and redesign of the original graphics engine. Current focus areas:
-
-- **Complete**: Core foundation systems
-- **Complete**: Service architecture 
-- **Complete**: Memory management
-- **Complete**: Multithreading & job system
-- **Complete**: Logging & profiling
-- **In Progress**: Platform abstraction layer
-- **Planned**: Graphics/rendering systems (integration of original engine)
-- **Planned**: Audio systems
-- **Planned**: Physics integration
-- **Planned**: Asset pipeline
+**In Active Development.** v0.0.0-alpha.0 is intended to cover Platform MVP + a minimal app skeleton loop + install/docs sanity.
+Current priorities and next steps are tracked in the single canonical roadmap:
+- [docs/project-guide.md](docs/project-guide.md)
 
 ## Repository History
 

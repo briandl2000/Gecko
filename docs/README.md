@@ -3,15 +3,17 @@
 This folder contains Gecko’s project documentation.
 
 ## Start Here
-- [Architecture Overview](architecture/overview.md)
-- [Data & Storage (paths, config, saves)](architecture/data-storage.md)
+- [Architecture](architecture.md)
 - [Build & Install](build.md)
 - [Modules](modules/README.md)
-- [Coding Standards & API Guide](CODING_STANDARDS.md)
 
-## Roadmaps
-- [Documentation Roadmap](roadmaps/documentation.md)
-- [Engine Roadmap (high-level)](roadmaps/engine.md)
+## Project Guide
+- [Project Guide / Roadmap](project-guide.md)
+- [Contributing / Workflow](contributing.md)
 
-## Planning / Trello
-- [Trello Board Template](trello/board.md)
+## Release Target
+- v0.0.0-alpha.0 scope: see the “v0.0.0-alpha.0 release target” section in [project-guide.md](project-guide.md)
+
+## Reference
+- [Coding Standards (reference)](CODING_STANDARDS.md)
+

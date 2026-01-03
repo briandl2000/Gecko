@@ -1,5 +1,13 @@
 # Gecko Framework - Coding Standards & API Guide
 
+This document is a **reference** (style + patterns + examples).
+
+For the canonical, non-scattered overview of how Gecko is structured and how to plan work, start here:
+
+- [Architecture](architecture.md)
+- [Project Guide / Roadmap](project-guide.md)
+- [Contributing / Workflow](contributing.md)
+
 ## Table of Contents
 - [Coding Standards](#coding-standards)
 - [API Usage Guide](#api-usage-guide)
