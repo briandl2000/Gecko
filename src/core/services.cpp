@@ -5,8 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "gecko/core/core.h"
-#include "gecko/runtime/ring_logger.h"
+#include "gecko/core/assert.h"
 
 namespace gecko {
 

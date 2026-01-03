@@ -3,14 +3,14 @@
 #include <vector>
 
 #include "gecko/core/boot.h"
-#include "gecko/core/hash.h"
-#include "gecko/core/jobs.h"
+#include "gecko/core/category.h"
 #include "gecko/core/log.h"
 #include "gecko/core/memory.h"
 #include "gecko/core/profiler.h"
 #include "gecko/core/random.h"
 #include "gecko/core/services.h"
 #include "gecko/core/thread.h"
+#include "gecko/core/time.h"
 #include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
 #include "gecko/runtime/file_log_sink.h"

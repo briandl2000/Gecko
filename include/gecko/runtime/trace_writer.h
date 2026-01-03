@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-#include "gecko/core/core.h"
+#include "gecko/core/profiler.h"
 
 namespace gecko::runtime {
 

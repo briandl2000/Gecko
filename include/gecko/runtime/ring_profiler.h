@@ -3,7 +3,8 @@
 #include <mutex>
 #include <vector>
 
-#include "gecko/core/core.h"
+#include "gecko/core/jobs.h"
+#include "gecko/core/profiler.h"
 
 namespace gecko::runtime {
 

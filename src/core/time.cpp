@@ -1,8 +1,6 @@
 #include "gecko/core/time.h"
 
 #include <chrono>
-#include <functional>
-#include <thread>
 
 namespace gecko {
 

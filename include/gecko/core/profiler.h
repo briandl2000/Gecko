@@ -1,11 +1,7 @@
 #pragma once
 
-#include <atomic>
-#include <cstdint>
-
 #include "api.h"
 #include "category.h"
-#include "hash.h"
 #include "types.h"
 
 namespace gecko {
@@ -30,7 +26,7 @@ struct IProfilerSink {
 
   /// Write a batch of profiling events for better performance
   GECKO_API virtual void WriteBatch(const ProfEvent *events,
-                                    size_t count) noexcept = 0;
+                                    std::size_t count) noexcept = 0;
 
   /// Flush any buffered data to ensure it's persisted
   GECKO_API virtual void Flush() noexcept = 0;

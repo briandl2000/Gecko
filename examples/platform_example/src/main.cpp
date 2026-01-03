@@ -1,6 +1,11 @@
-#include <gecko/core/memory.h>
+#include <gecko/core/boot.h>
+#include <gecko/core/category.h>
+#include <gecko/core/log.h>
+#include <gecko/core/profiler.h>
+#include <gecko/core/ptr.h>
 #include <gecko/core/services.h>
 #include <gecko/core/thread.h>
+#include <gecko/core/version.h>
 #include <gecko/platform/platform_context.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/file_log_sink.h>
@@ -9,7 +14,6 @@
 #include <gecko/runtime/thread_pool_job_system.h>
 #include <gecko/runtime/trace_file_sink.h>
 #include <gecko/runtime/tracking_allocator.h>
-#include <gecko/core/version.h>
 
 using namespace gecko;
 using namespace gecko::platform;
@@ -65,7 +69,7 @@ int main() {
   windowDesc.Title = "Gecko Platform Example";
   windowDesc.Size = Extent2D{1280, 720};
   windowDesc.Visible = true;
-  windowDesc.Resizable = true;
+  windowDesc.Resizable = false;
   windowDesc.Mode = WindowMode::Windowed;
 
   WindowHandle window;

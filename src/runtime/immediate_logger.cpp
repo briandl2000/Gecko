@@ -1,9 +1,7 @@
 #include "gecko/runtime/immediate_logger.h"
 
-#include <atomic>
 #include <cstdarg>
 #include <cstdio>
-#include <cstring>
 #include <mutex>
 
 #include "gecko/core/assert.h"

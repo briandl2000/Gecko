@@ -3,7 +3,6 @@
 #include "gecko/core/api.h"
 #include "gecko/core/category.h"
 #include "gecko/core/log.h"
-#include "gecko/version.h"
 
 namespace gecko {
 

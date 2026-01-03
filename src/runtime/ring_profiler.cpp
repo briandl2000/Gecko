@@ -2,7 +2,9 @@
 
 #include "categories.h"
 #include "gecko/core/assert.h"
+#include "gecko/core/bit.h"
 #include "gecko/core/thread.h"
+#include "gecko/core/time.h"
 #include <algorithm>
 #include <vector>
 

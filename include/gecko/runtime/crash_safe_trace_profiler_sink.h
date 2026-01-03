@@ -2,7 +2,6 @@
 
 #include <atomic>
 #include <cstdio>
-#include <mutex>
 
 #include "gecko/core/profiler.h"
 

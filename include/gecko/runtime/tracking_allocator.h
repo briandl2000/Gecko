@@ -1,10 +1,15 @@
 #pragma once
 
-#include "gecko/core/core.h"
-
 #include <atomic>
+#include <cstddef>
 #include <mutex>
 #include <unordered_map>
+#include <utility>
+
+#include "gecko/core/category.h"
+#include "gecko/core/memory.h"
+#include "gecko/core/profiler.h"
+#include "gecko/core/types.h"
 
 namespace gecko::runtime {
 

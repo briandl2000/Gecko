@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Gecko is organized as three modules with clear layering:
+Gecko is organized as modules with clear layering:
 
 - **Core**: foundational services and utilities (allocator, jobs, profiler, logger, time/thread/random, etc.)
 - **Platform**: OS abstraction boundary (platform context; windowing/input/filesystem planned)

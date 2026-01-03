@@ -42,7 +42,10 @@ Gecko is built around three core modules that work together:
 ## Quick Start
 
 ```cpp
-#include "gecko/core/core.h"
+#include "gecko/core/boot.h"
+#include "gecko/core/category.h"
+#include "gecko/core/log.h"
+#include "gecko/core/services.h"
 
 int main() {
     // Set up core services

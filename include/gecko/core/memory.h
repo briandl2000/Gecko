@@ -1,8 +1,5 @@
 #pragma once
 
-#include <climits>
-#include <cstddef>
-
 #include "api.h"
 #include "assert.h"
 #include "category.h"

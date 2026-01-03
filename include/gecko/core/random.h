@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <random>
 
 #include "api.h"
 #include "types.h"
@@ -25,7 +24,7 @@ GECKO_API double RandomDouble(double min = 0.0, double max = 1.0) noexcept;
 GECKO_API bool RandomBool() noexcept;
 
 // Generate random bytes
-GECKO_API void RandomBytes(void *buffer, size_t size) noexcept;
+GECKO_API void RandomBytes(void *buffer, std::size_t size) noexcept;
 
 // Seed the thread-local random generator with a specific value
 // If not called, the generator will be seeded automatically with a
@@ -35,14 +34,14 @@ GECKO_API void SeedRandom(u64 seed) noexcept;
 // Utility functions for common patterns
 namespace random {
 
-// Generate random size_t in range [min, max] (inclusive)
-inline size_t Size(size_t min, size_t max) noexcept {
-  return static_cast<size_t>(RandomU64(min, max));
+// Generate random std::size_t in range [min, max] (inclusive)
+inline std::size_t Size(std::size_t min, std::size_t max) noexcept {
+  return static_cast<std::size_t>(RandomU64(min, max));
 }
 
 // Generate random index for array/vector of given size [0, size-1]
-inline size_t Index(size_t size) noexcept {
-  return size > 0 ? static_cast<size_t>(RandomU64(0, size - 1)) : 0;
+inline std::size_t Index(std::size_t size) noexcept {
+  return size > 0 ? static_cast<std::size_t>(RandomU64(0, size - 1)) : 0;
 }
 
 // Generate random normalized float in range [0, 1)

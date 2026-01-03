@@ -4,7 +4,6 @@
 #include <thread>
 
 #include "api.h"
-#include "profiler.h"
 #include "types.h"
 
 namespace gecko {

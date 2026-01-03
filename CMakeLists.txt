@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(Gecko VERSION 0.1.0 LANGUAGES C CXX)
+project(Gecko VERSION 0.0.0 LANGUAGES C CXX)
 
 # Optional SemVer prerelease identifier (repo-controlled).
 # Examples: "alpha.1", "beta.2", "rc.1". Set to "" for a normal release.

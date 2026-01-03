@@ -8,7 +8,6 @@
 #include "gecko/core/assert.h"
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
-#include "gecko/core/time.h"
 
 #include "categories.h"
 

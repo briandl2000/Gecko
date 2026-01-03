@@ -9,15 +9,15 @@ Owns foundational interfaces and utilities:
 
 Design intent: Core stays usable even without Platform/Runtime.
 
-## Platform (`gecko::Platform`)
+## Platform (`Gecko::Platform`)
 Owns OS abstraction and handles that must be implemented per-platform.
 
 Near-term targets:
 - window creation + event pump
 - input (keyboard/mouse)
-- timers/filesystem where platform differences matter
+- filesystem where platform differences matter
 
-## Runtime (`gecko::Runtime`)
+## Runtime (`Gecko::Runtime`)
 Owns concrete implementations that depend on Core:
 - thread-pool job system
 - ring logger/profiler

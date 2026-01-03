@@ -40,7 +40,7 @@ namespace gecko {
 
 // Project includes (alphabetical order)
 #include "gecko/core/assert.h"
-#include "gecko/core/core.h"
+#include "gecko/core/log.h"
 
 // Local includes last
 #include "categories.h"
@@ -227,7 +227,8 @@ Level 3: Logger       - May use allocator, job system, and profiler for performa
 
 #### Basic Setup
 ```cpp
-#include "gecko/core/core.h"
+#include "gecko/core/boot.h"
+#include "gecko/core/services.h"
 
 int main()
 {

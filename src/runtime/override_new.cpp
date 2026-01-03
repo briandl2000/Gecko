@@ -1,11 +1,9 @@
-#include "gecko/core/profiler.h"
-
 #if GECKO_OVERRIDE_NEW
 #include <cstddef>
 #include <new>
 
 #include "gecko/core/assert.h"
-#include "gecko/core/core.h"
+#include "gecko/core/memory.h"
 
 #include "categories.h"
 
