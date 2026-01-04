@@ -11,8 +11,8 @@ void ConsoleLogSink::Write(const LogMessage &message) noexcept {
   GECKO_ASSERT(message.Text && "Log message text cannot be null");
 
   std::fprintf((message.Level >= LogLevel::Warn) ? stderr : stdout,
-               "[%s][%s][t%u] %s\n", LevelName(message.Level),
-               message.Cat.Name ? message.Cat.Name : "cat", message.ThreadId,
+               "[%s][%s] %s\n", LevelName(message.Level),
+               message.Cat.Name ? message.Cat.Name : "cat",
                message.Text ? message.Text : "");
 }
 
