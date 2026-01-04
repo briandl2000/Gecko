@@ -32,18 +32,18 @@ Policy:
 
 ## Development workflow (repeatable)
 
-1) Pick a ticket from the target milestone (e.g. `v0.0.0-alpha.0`).
-2) Create feature branch from `develop`:
-   - `git checkout develop`
+1) Pick a feature/ticket for the next release
+2) Create feature branch from `dev`:
+   - `git checkout dev`
    - `git pull`
    - `git checkout -b feature/<name>`
 3) Implement in small commits.
 4) Verify locally:
    - `cmake --preset debug && cmake --build build --config Debug`
    - run an example affected by the change.
-5) Merge into `develop` (fast-forward or merge commit is fine; be consistent).
+5) Merge into `dev` (fast-forward or merge commit is fine; be consistent).
 6) When milestone scope is complete, cut a stabilization branch *only if needed*:
-   - `git checkout develop && git checkout -b release/v0.0.0-alpha.0`
+   - `git checkout dev && git checkout -b release/v0.0.0-alpha.0`
    - allow bugfix-only changes
 7) Finalize release:
    - merge `release/...` into `main`
