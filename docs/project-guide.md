@@ -189,6 +189,103 @@ This repo is in active development. For the first tagged alpha, treat this as th
 - **Docs sanity**
 	- build/run commands are accurate and there is one canary example kept runnable
 
+### Ticket specs (recommended)
+
+These are sized to be trackable as separate cards/issues. If a ticket grows beyond ~1–2 evenings, split it.
+
+#### Ticket: Platform windowing
+
+**Description**
+- Provide a minimal window API through `gecko::platform::PlatformContext` that works end-to-end on Linux.
+
+**Checklist**
+- Create/destroy window.
+- `PumpEvents()` + `PollEvent()` produce window lifecycle events.
+- `CloseRequested` event and `RequestClose()` work.
+- `GetClientSize`, `SetTitle`, `GetDpi`, `GetNativeWindowHandle` behave consistently.
+- Backend selection (`WindowBackendKind::Auto`) chooses a working backend or fails cleanly.
+
+**Definition of Done**
+- `platform_example` opens a window, pumps events, and exits cleanly.
+- Failure paths return `false` (no crashes) and log a useful message.
+
+#### Ticket: Platform IO
+
+**Description**
+- Provide a minimal IO API suitable for tools and games (read/write whole files + basic path helpers).
+
+**Checklist**
+- Read whole file (binary + text) with explicit error result.
+- Write whole file (binary + text) with explicit error result.
+- Path helpers: join/normalize + exists/is-file/is-dir.
+- At least one “special directory” query (executable dir OR user data dir).
+
+**Definition of Done**
+- Linux implementation works and has a small example usage path.
+- Ownership rules are clear (allocator/buffer lifetime is explicit).
+
+#### Ticket: Platform input
+
+**Description**
+- Deliver keyboard/mouse input via the same event loop as window events.
+
+**Checklist**
+- Keyboard key down/up.
+- Mouse move, button down/up, wheel.
+- Events are associated with a window (or document why not).
+
+**Definition of Done**
+- `platform_example` can log input events.
+- Event delivery is stable under normal usage.
+
+#### Ticket: Decide on event system
+
+**Description**
+- Pick the engine-wide “event system” shape so Platform events integrate cleanly with future engine/game systems.
+
+**Checklist**
+- Decision recorded: queue vs callbacks vs pull-based polling.
+- Threading rules decided (main-thread only vs cross-thread enqueue).
+- Lifetime/ownership decided for payloads.
+- Minimal types defined (tag + payload) without allocations in the hot path.
+
+**Definition of Done**
+- There’s a clear written decision.
+- Platform events either route through it, or it’s explicitly deferred with rationale.
+
+#### Ticket: Platform Monitor System
+
+**Description**
+- Provide monitor enumeration for sane defaults (DPI, fullscreen selection, window placement).
+
+**Checklist**
+- Enumerate monitors.
+- Primary monitor query.
+- DPI/scale info where available.
+- Work area and/or current mode where available.
+
+**Definition of Done**
+- Linux implementation works for at least one backend.
+- API clearly indicates what can be unavailable.
+
+#### Ticket: Release system / pipeline
+
+**Description**
+- Make releases repeatable: tag → CI builds → SDK artifacts attached to a GitHub Release.
+
+**Checklist**
+- `cmake --install` produces a complete SDK (headers + libs + CMake config).
+- Decide artifact layout (include/lib/lib/cmake/Gecko).
+- Add CI that builds + installs + packages artifacts for at least Linux.
+- Add release checklist (what to verify before tagging).
+- Document the workflow: branching, version bump, tagging.
+
+**Definition of Done**
+- Tag `v0.0.0-alpha.0` produces downloadable artifacts.
+- A tiny external consumer can `find_package(Gecko CONFIG)` and link successfully.
+
+See the detailed workflow doc: [docs/release-workflow.md](release-workflow.md)
+
 ### Out of scope (unless you explicitly pull it in)
 
 - Graphics abstraction work

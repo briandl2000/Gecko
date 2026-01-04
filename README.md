@@ -4,7 +4,7 @@ A modular, high-performance C++ game engine designed as a collection of intercon
 
 ## About This Project
 
-Gecko began as a graphics rendering engine during my graduation project at [BUAS](https://www.buas.nl/), but has evolved into a comprehensive game engine ecosystem. The original graphics engine (preserved in the `archive/graphics-engine-v1` branch) focused on PBR rendering and cross-platform graphics, but this version represents a complete architectural redesign with a focus on modularity, performance, and developer experience.
+Gecko began as a graphics rendering engine during my graduation project at [BUAS](https://www.buas.nl/), but has evolved into a comprehensive game engine ecosystem. The original graphics engine (preserved in the `archive/graphics-engine-v1` branch) focused on PBR rendering and cross-platform graphics, but the current `main` branch represents a complete architectural redesign with a focus on modularity, performance, and developer experience.
 
 ## Architecture Overview
 
@@ -102,7 +102,7 @@ Current priorities and next steps are tracked in the single canonical roadmap:
 
 ## Repository History
 
-The original graphics engine version is preserved in the `archive/graphics-engine-v1` branch. This `graphics-to-game-engine` branch represents the new direction with completely rewritten architecture and expanded scope.
+The original graphics engine version is preserved in the `archive/graphics-engine-v1` branch. The current `main` branch represents the new direction with completely rewritten architecture and expanded scope.
 
 ## License
 
