@@ -10,14 +10,6 @@ namespace gecko {
 
 using EventCode = u32;
 
-constexpr inline EventCode MakeEvent(u8 domain, u32 local24);
-
-namespace core_events {
-
-constexpr u8 kDomain = 0x00;
-
-} // namespace core_events
-
 constexpr inline EventCode MakeEvent(u8 domain, u32 local24) {
   return (static_cast<u32>(domain) << 24) | (local24 & 0x00FF'FFFFu);
 }
@@ -30,6 +22,10 @@ constexpr inline u32 EventLocal(EventCode code) {
   return static_cast<u32>(code & 0x00FF'FFFFu);
 }
 
+namespace core_events {
+constexpr u8 kCoreDomain = 0x00;
+} // namespace core_events
+
 struct EventView {
   const void *data = nullptr;
   u32 size = 0;
@@ -41,7 +37,14 @@ struct EventMeta {
   u64 seq{0};
 };
 
+struct EventEmitter {
+  u8 domain{0};
+  u64 sender{0};
+  u64 capability{0};
+};
+
 class IEventBus;
+
 class EventSubscription {
 public:
   EventSubscription() = default;
@@ -49,15 +52,18 @@ public:
   EventSubscription &operator=(const EventSubscription &) = delete;
 
   EventSubscription(EventSubscription &&other) noexcept
-      : bus_(std::move(other.bus_)), id_(std::move(other.id_)) {}
+      : m_Bus(other.m_Bus), m_Id(other.m_Id) {
+    other.m_Bus = nullptr;
+    other.m_Id = 0;
+  }
 
   EventSubscription &operator=(EventSubscription &&other) {
     if (this != &other) {
       Reset();
-      bus_ = other.bus_;
-      id_ = other.id_;
-      other.bus_ = nullptr;
-      other.id_ = 0;
+      m_Bus = other.m_Bus;
+      m_Id = other.m_Id;
+      other.m_Bus = nullptr;
+      other.m_Id = 0;
     }
     return *this;
   }
@@ -68,14 +74,8 @@ public:
 
 private:
   friend class IEventBus;
-  IEventBus *bus_ = nullptr;
-  u64 id_ = 0;
-};
-
-struct EventEmitter {
-  u8 domain{0};
-  u64 sender{0};
-  u64 capability{0};
+  IEventBus *m_Bus = nullptr;
+  u64 m_Id = 0;
 };
 
 class IEventBus {
@@ -89,15 +89,13 @@ public:
   GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn,
                                                 void *user) = 0;
 
-  GECKO_API virtual void Unsubscribe(u64 id) = 0;
-
-  GECKO_API virtual void PublishImmediate(const EventEmitter *emitter,
+  GECKO_API virtual void PublishImmediate(const EventEmitter &emitter,
                                           EventCode code,
                                           EventView payload) = 0;
 
   template <class T>
-  GECKO_API void PublishImmediate(const EventEmitter &emitter, EventCode code,
-                                  const T &payload) {
+  void PublishImmediate(const EventEmitter &emitter, EventCode code,
+                        const T &payload) {
     PublishImmediate(emitter, code,
                      EventView{&payload, static_cast<u32>(sizeof(T))});
   }
@@ -106,20 +104,24 @@ public:
                                  EventView payload) = 0;
 
   template <class T>
-  GECKO_API void Enqueue(const EventEmitter &emitter, EventCode code,
-                         const T &payload) {
+  void Enqueue(const EventEmitter &emitter, EventCode code, const T &payload) {
     Enqueue(emitter, code, EventView{&payload, static_cast<u32>(sizeof(T))});
   }
 
   GECKO_API virtual std::size_t
   DispatchQueued(std::size_t maxCount = static_cast<std::size_t>(-1)) = 0;
 
+  GECKO_API virtual EventEmitter CreateEmitter(u8 domain, u64 sender = 0) = 0;
+
   GECKO_API virtual bool ValidateEmitter(const EventEmitter &emitter,
-                                         std::uint8_t expectedDomain) const = 0;
+                                         u8 expectedDomain) const = 0;
+
+protected:
+  friend class EventSubscription;
+  GECKO_API virtual void Unsubscribe(u64 id) = 0;
 };
 
 IEventBus *GetEventBus();
-
 void InstallEventBusService(IEventBus *bus);
 
 [[nodiscard]]
@@ -131,22 +133,8 @@ SubscribeEvent(EventCode code, IEventBus::CallbackFn fn, void *user) {
   return {};
 }
 
-GECKO_API inline void PublishImmediateEvent(const EventEmitter *emitter,
-                                            EventCode code, EventView payload) {
-  if (auto *eventBus = GetEventBus())
-    eventBus->PublishImmediate(emitter, code, payload);
-  else
-    GECKO_ASSERT(false && "No event bus detected!");
-}
-
-template <class T>
-GECKO_API void PublishImmediateEvent(const EventEmitter &emitter,
-                                     EventCode code, const T &payload) {
-  PublishImmediateEvent(emitter, code,
-                        EventView{&payload, static_cast<u32>(sizeof(T))});
-}
-
-GECKO_API inline void EnqueueEvent(const EventEmitter &emitter, EventCode code,
+// Delayed publish (preferred).
+GECKO_API inline void PublishEvent(const EventEmitter &emitter, EventCode code,
                                    EventView payload) {
   if (auto *eventBus = GetEventBus())
     eventBus->Enqueue(emitter, code, payload);
@@ -155,13 +143,30 @@ GECKO_API inline void EnqueueEvent(const EventEmitter &emitter, EventCode code,
 }
 
 template <class T>
-GECKO_API void EnqueueEvent(const EventEmitter &emitter, EventCode code,
-                            const T &payload) {
-  EnqueueEvent(emitter, code, EventView{&payload, static_cast<u32>(sizeof(T))});
+inline void PublishEvent(const EventEmitter &emitter, EventCode code,
+                         const T &payload) {
+  PublishEvent(emitter, code, EventView{&payload, static_cast<u32>(sizeof(T))});
+}
+
+// Immediate publish (use sparingly).
+inline void PublishImmediateEvent(const EventEmitter &emitter, EventCode code,
+                                  EventView payload) {
+  if (auto *eventBus = GetEventBus())
+    eventBus->PublishImmediate(emitter, code, payload);
+  else
+    GECKO_ASSERT(false && "No event bus detected!");
+}
+
+template <class T>
+inline void PublishImmediateEvent(const EventEmitter &emitter, EventCode code,
+                                  const T &payload) {
+  PublishImmediateEvent(emitter, code,
+                        EventView{&payload, static_cast<u32>(sizeof(T))});
 }
 
 [[nodiscard]]
-GECKO_API inline std::size_t DispatchQueued(std::size_t maxCount) {
+GECKO_API inline std::size_t
+DispatchQueuedEvents(std::size_t maxCount = static_cast<std::size_t>(-1)) {
   if (auto *eventBus = GetEventBus())
     return eventBus->DispatchQueued(maxCount);
   GECKO_ASSERT(false && "No event bus detected!");
