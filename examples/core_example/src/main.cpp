@@ -4,6 +4,7 @@
 
 #include "gecko/core/boot.h"
 #include "gecko/core/category.h"
+#include "gecko/core/events.h"
 #include "gecko/core/log.h"
 #include "gecko/core/memory.h"
 #include "gecko/core/profiler.h"
@@ -13,6 +14,7 @@
 #include "gecko/core/time.h"
 #include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
+#include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/file_log_sink.h"
 #include "gecko/runtime/ring_logger.h"
 #include "gecko/runtime/ring_profiler.h"
@@ -28,6 +30,24 @@ const auto WORKER_CAT = MakeCategory("Worker");
 const auto MEMORY_CAT = MakeCategory("Memory");
 const auto COMPUTE_CAT = MakeCategory("Compute");
 const auto SIMULATION_CAT = MakeCategory("Simulation");
+const auto EVENT_CAT = MakeCategory("Event");
+
+// Demo event domain and codes
+namespace demo_events {
+constexpr u8 kDemoDomain = 0x42;
+constexpr EventCode DataProcessed = MakeEvent(kDemoDomain, 0x0001);
+constexpr EventCode TaskComplete = MakeEvent(kDemoDomain, 0x0002);
+
+struct DataProcessedPayload {
+  u32 itemsProcessed{0};
+  float processingTimeMs{0.0f};
+};
+
+struct TaskCompletePayload {
+  u32 taskId{0};
+  bool success{false};
+};
+} // namespace demo_events
 
 // Simple data structure for our simulation
 struct Particle {
@@ -225,6 +245,143 @@ void MemoryStressTest() {
   GECKO_INFO(MEMORY_CAT, "Memory stress test completed successfully");
 }
 
+void EventSystemTest() {
+  GECKO_PROF_FUNC(EVENT_CAT);
+
+  GECKO_INFO(EVENT_CAT, "Starting event system test");
+
+  // Create emitter for demo events
+  EventEmitter emitter = CreateEmitter(demo_events::kDemoDomain);
+
+  // Test 1: Immediate event
+  GECKO_INFO(EVENT_CAT, "Test 1: Immediate event publishing");
+
+  struct TestContext {
+    int immediateCallCount = 0;
+    int queuedCallCount = 0;
+  };
+  TestContext ctx;
+
+  auto immediateSub = SubscribeEvent(
+      demo_events::DataProcessed,
+      [](void *user, const EventMeta &meta, EventView payload) {
+        auto *context = static_cast<TestContext *>(user);
+        auto *data = static_cast<const demo_events::DataProcessedPayload *>(
+            payload.Data());
+        context->immediateCallCount++;
+        GECKO_INFO(EVENT_CAT,
+                   "  [Immediate] DataProcessed received: %u items in %.2fms "
+                   "(seq=%llu)",
+                   data->itemsProcessed, data->processingTimeMs, meta.seq);
+      },
+      &ctx);
+
+  demo_events::DataProcessedPayload immediatePayload{100, 15.5f};
+  PublishImmediateEvent(emitter, demo_events::DataProcessed, immediatePayload);
+
+  GECKO_INFO(EVENT_CAT, "  Immediate callbacks executed: %d",
+             ctx.immediateCallCount);
+
+  // Test 2: Queued events
+  GECKO_INFO(EVENT_CAT, "Test 2: Queued event publishing");
+
+  auto queuedSub = SubscribeEvent(
+      demo_events::TaskComplete,
+      [](void *user, const EventMeta &meta, EventView payload) {
+        auto *context = static_cast<TestContext *>(user);
+        auto *data = static_cast<const demo_events::TaskCompletePayload *>(
+            payload.Data());
+        context->queuedCallCount++;
+        GECKO_INFO(EVENT_CAT,
+                   "  [Queued] TaskComplete received: task=%u success=%s "
+                   "(seq=%llu)",
+                   data->taskId, data->success ? "true" : "false", meta.seq);
+      },
+      &ctx);
+
+  // Enqueue several events
+  for (u32 i = 0; i < 5; ++i) {
+    demo_events::TaskCompletePayload payload{i, (i % 2 == 0)};
+    PublishEvent(emitter, demo_events::TaskComplete, payload);
+  }
+
+  GECKO_INFO(EVENT_CAT, "  Enqueued 5 events, dispatching...");
+  std::size_t dispatched = DispatchQueuedEvents();
+  GECKO_INFO(EVENT_CAT, "  Dispatched %zu events, callbacks executed: %d",
+             dispatched, ctx.queuedCallCount);
+
+  // Test 3: Multiple subscribers
+  GECKO_INFO(EVENT_CAT, "Test 3: Multiple subscribers");
+
+  int subscriber2Count = 0;
+  int subscriber3Count = 0;
+
+  auto sub2 = SubscribeEvent(
+      demo_events::DataProcessed,
+      [](void *user, const EventMeta &, EventView payload) {
+        auto *count = static_cast<int *>(user);
+        (*count)++;
+        auto *data = static_cast<const demo_events::DataProcessedPayload *>(
+            payload.Data());
+        GECKO_INFO(EVENT_CAT, "  [Subscriber 2] Received %u items",
+                   data->itemsProcessed);
+      },
+      &subscriber2Count);
+
+  auto sub3 = SubscribeEvent(
+      demo_events::DataProcessed,
+      [](void *user, const EventMeta &, EventView payload) {
+        auto *count = static_cast<int *>(user);
+        (*count)++;
+        auto *data = static_cast<const demo_events::DataProcessedPayload *>(
+            payload.Data());
+        GECKO_INFO(EVENT_CAT, "  [Subscriber 3] Received %u items",
+                   data->itemsProcessed);
+      },
+      &subscriber3Count);
+
+  demo_events::DataProcessedPayload multiPayload{250, 22.3f};
+  PublishEvent(emitter, demo_events::DataProcessed, multiPayload);
+  std::size_t multiDispatched = DispatchQueuedEvents();
+
+  GECKO_INFO(EVENT_CAT,
+             "  Dispatched %zu events - Subscriber 1: %d, Subscriber 2: %d, "
+             "Subscriber 3: %d",
+             multiDispatched, ctx.queuedCallCount, subscriber2Count,
+             subscriber3Count);
+
+  // Test 4: Unsubscribe via RAII
+  GECKO_INFO(EVENT_CAT, "Test 4: RAII unsubscribe");
+  {
+    int tempCount = 0;
+    auto tempSub = SubscribeEvent(
+        demo_events::TaskComplete,
+        [](void *user, const EventMeta &, EventView) {
+          auto *count = static_cast<int *>(user);
+          (*count)++;
+          GECKO_INFO(EVENT_CAT, "  [Temp subscriber] Received event");
+        },
+        &tempCount);
+
+    demo_events::TaskCompletePayload payload{99, true};
+    PublishEvent(emitter, demo_events::TaskComplete, payload);
+    std::size_t tempDispatched = DispatchQueuedEvents();
+    GECKO_INFO(EVENT_CAT, "  Dispatched %zu events, temp subscriber count: %d",
+               tempDispatched, tempCount);
+
+    // tempSub goes out of scope here and auto-unsubscribes
+  }
+
+  GECKO_INFO(EVENT_CAT, "  Temp subscription destroyed, publishing again...");
+  demo_events::TaskCompletePayload payload{100, true};
+  PublishEvent(emitter, demo_events::TaskComplete, payload);
+  std::size_t dispatchedAfter = DispatchQueuedEvents();
+  GECKO_INFO(EVENT_CAT, "  Events dispatched after unsubscribe: %zu",
+             dispatchedAfter);
+
+  GECKO_INFO(EVENT_CAT, "Event system test completed successfully!");
+}
+
 void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
   GECKO_PROF_FUNC(MAIN_CAT);
 
@@ -301,13 +458,17 @@ int main() {
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
+  // Create event bus
+  runtime::EventBus eventBus;
+
   // Use GECKO_BOOT system for proper service installation and validation
   // Services are in dependency order: Allocator -> JobSystem -> Profiler ->
-  // Logger
+  // Logger -> EventBus
   GECKO_BOOT((Services{.Allocator = &trackingAlloc,
                        .JobSystem = &jobSystem,
                        .Profiler = &ringProfiler,
-                       .Logger = &ringLogger}));
+                       .Logger = &ringLogger,
+                       .EventBus = &eventBus}));
 
   // Now configure logging sinks after services are installed
   runtime::ConsoleLogSink consoleSink;
@@ -359,8 +520,12 @@ int main() {
     MemoryStressTest();
     PrintMemoryStats(trackingAlloc);
 
-    // 2. Threading Utilities Demo
-    GECKO_INFO(MAIN_CAT, "=== 2. Threading Utilities Demo ===");
+    // 2. Event System Test
+    GECKO_INFO(MAIN_CAT, "=== 2. Event System Demo ===");
+    EventSystemTest();
+
+    // 3. Threading Utilities Demo
+    GECKO_INFO(MAIN_CAT, "=== 3. Threading Utilities Demo ===");
     {
       GECKO_PROF_SCOPE(MAIN_CAT, "ThreadingUtilitiesDemo");
 
@@ -391,7 +556,7 @@ int main() {
     }
 
     // 3. Particle Physics Simulation Demo
-    GECKO_INFO(MAIN_CAT, "=== 3. Particle Physics Simulation Demo ===");
+    GECKO_INFO(MAIN_CAT, "=== 4. Particle Physics Simulation Demo ===");
     const int numWorkers = 3;
 
     GECKO_INFO(MAIN_CAT, "Launching %d parallel physics simulations!",

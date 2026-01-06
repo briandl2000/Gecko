@@ -1,6 +1,7 @@
 #pragma once
 
 #include "api.h"
+#include "events.h"
 #include "jobs.h"
 #include "log.h"
 #include "memory.h"
@@ -13,6 +14,7 @@ struct Services {
   IJobSystem *JobSystem = nullptr;
   IProfiler *Profiler = nullptr;
   ILogger *Logger = nullptr;
+  IEventBus *EventBus = nullptr;
 };
 
 [[nodiscard]]
@@ -24,6 +26,7 @@ GECKO_API IAllocator *GetAllocator() noexcept;
 GECKO_API IJobSystem *GetJobSystem() noexcept;
 GECKO_API IProfiler *GetProfiler() noexcept;
 GECKO_API ILogger *GetLogger() noexcept;
+GECKO_API IEventBus *GetEventBus() noexcept;
 
 GECKO_API bool IsServicesInstalled() noexcept;
 
@@ -84,6 +87,52 @@ struct NullLogger final : ILogger {
 
   GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;
+};
+
+// Level 4: EventBus (may use allocator and profiler)
+// NullEventBus: Works synchronously without thread safety (like NullJobSystem)
+// Events are dispatched immediately or queued and dispatched on next
+// DispatchQueued call
+struct NullEventBus final : IEventBus {
+  GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn,
+                                                void *user) noexcept override;
+  GECKO_API virtual void PublishImmediate(const EventEmitter &emitter,
+                                          EventCode code,
+                                          EventView payload) noexcept override;
+  GECKO_API virtual void Enqueue(const EventEmitter &emitter, EventCode code,
+                                 EventView payload) noexcept override;
+  GECKO_API virtual std::size_t
+  DispatchQueued(std::size_t maxCount) noexcept override;
+  GECKO_API virtual EventEmitter CreateEmitter(u8 domain,
+                                               u64 sender) noexcept override;
+  GECKO_API virtual bool
+  ValidateEmitter(const EventEmitter &emitter,
+                  u8 expectedDomain) const noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+
+protected:
+  GECKO_API virtual void Unsubscribe(u64 id) noexcept override;
+
+private:
+  struct Subscriber {
+    u64 id;
+    CallbackFn callback;
+    void *user;
+  };
+
+  struct QueuedEvent {
+    EventMeta meta;
+    u8 payloadStorage[64]; // Larger than EventBus queue storage since no thread
+                           // contention
+    u32 payloadSize;
+  };
+
+  std::unordered_map<EventCode, std::vector<Subscriber>> m_Subscribers;
+  std::vector<QueuedEvent> m_EventQueue;
+  u64 m_NextSubscriptionId = 1;
+  u64 m_NextSequence = 0;
 };
 
 } // namespace gecko

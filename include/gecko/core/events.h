@@ -27,8 +27,20 @@ constexpr u8 kCoreDomain = 0x00;
 } // namespace core_events
 
 struct EventView {
-  const void *data = nullptr;
+  union {
+    const void *ptr;
+    u8 inlineData[16];
+  };
   u32 size = 0;
+  bool isInline = false;
+
+  EventView() : ptr(nullptr) {}
+
+  // Construct from pointer
+  EventView(const void *p, u32 s) : ptr(p), size(s), isInline(false) {}
+
+  // Get data pointer (works for both inline and pointer)
+  const void *Data() const { return isInline ? inlineData : ptr; }
 };
 
 struct EventMeta {
@@ -72,8 +84,12 @@ public:
 
   GECKO_API void Reset();
 
+  void SetSubscriptionData(IEventBus *bus, u64 id) {
+    m_Bus = bus;
+    m_Id = id;
+  }
+
 private:
-  friend class IEventBus;
   IEventBus *m_Bus = nullptr;
   u64 m_Id = 0;
 };
@@ -84,6 +100,9 @@ public:
                               EventView payload);
 
   GECKO_API virtual ~IEventBus() = default;
+
+  GECKO_API virtual bool Init() noexcept = 0;
+  GECKO_API virtual void Shutdown() noexcept = 0;
 
   [[nodiscard]]
   GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn,
@@ -121,8 +140,16 @@ protected:
   GECKO_API virtual void Unsubscribe(u64 id) = 0;
 };
 
-IEventBus *GetEventBus();
-void InstallEventBusService(IEventBus *bus);
+// Forward declaration for inline helper functions below
+IEventBus *GetEventBus() noexcept;
+
+[[nodiscard]]
+GECKO_API inline EventEmitter CreateEmitter(u8 domain, u64 sender = 0) {
+  if (auto *eventBus = GetEventBus())
+    return eventBus->CreateEmitter(domain, sender);
+  GECKO_ASSERT(false && "No event bus detected!");
+  return {};
+}
 
 [[nodiscard]]
 GECKO_API inline EventSubscription

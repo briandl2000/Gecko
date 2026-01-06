@@ -1,9 +1,11 @@
 #include "gecko/core/services.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "gecko/core/assert.h"
 
@@ -111,10 +113,124 @@ void NullJobSystem::ProcessJobs(u32 maxJobs) noexcept {}
 bool NullJobSystem::Init() noexcept { return true; }
 void NullJobSystem::Shutdown() noexcept {}
 
+// NullEventBus implementation - works synchronously without thread safety
+EventSubscription NullEventBus::Subscribe(EventCode code, CallbackFn fn,
+                                          void *user) noexcept {
+  if (!fn)
+    return {};
+
+  u64 id = m_NextSubscriptionId++;
+
+  Subscriber sub{};
+  sub.id = id;
+  sub.callback = fn;
+  sub.user = user;
+
+  m_Subscribers[code].push_back(sub);
+
+  EventSubscription subscription{};
+  subscription.SetSubscriptionData(this, id);
+  return subscription;
+}
+
+void NullEventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
+                                    EventView payload) noexcept {
+  EventMeta meta{};
+  meta.code = code;
+  meta.sender = emitter.sender;
+  meta.seq = m_NextSequence++;
+
+  auto it = m_Subscribers.find(code);
+  if (it == m_Subscribers.end())
+    return;
+
+  for (const auto &sub : it->second) {
+    if (sub.callback)
+      sub.callback(sub.user, meta, payload);
+  }
+}
+
+void NullEventBus::Enqueue(const EventEmitter &emitter, EventCode code,
+                           EventView payload) noexcept {
+  QueuedEvent qEvent{};
+  qEvent.meta.code = code;
+  qEvent.meta.sender = emitter.sender;
+  qEvent.meta.seq = m_NextSequence++;
+  qEvent.payloadSize = payload.size;
+
+  const void *data = payload.Data();
+  if (data && payload.size > 0 &&
+      payload.size <= sizeof(qEvent.payloadStorage)) {
+    std::memcpy(qEvent.payloadStorage, data, payload.size);
+  }
+
+  m_EventQueue.push_back(qEvent);
+}
+
+std::size_t NullEventBus::DispatchQueued(std::size_t maxCount) noexcept {
+  std::size_t count = std::min(maxCount, m_EventQueue.size());
+  if (count == 0)
+    return 0;
+
+  for (std::size_t i = 0; i < count; ++i) {
+    const auto &qEvent = m_EventQueue[i];
+
+    EventView view{};
+    view.ptr = qEvent.payloadStorage;
+    view.size = qEvent.payloadSize;
+    view.isInline = false;
+
+    auto it = m_Subscribers.find(qEvent.meta.code);
+    if (it != m_Subscribers.end()) {
+      for (const auto &sub : it->second) {
+        if (sub.callback)
+          sub.callback(sub.user, qEvent.meta, view);
+      }
+    }
+  }
+
+  m_EventQueue.erase(m_EventQueue.begin(), m_EventQueue.begin() + count);
+  return count;
+}
+
+EventEmitter NullEventBus::CreateEmitter(u8 domain, u64 sender) noexcept {
+  EventEmitter e{};
+  e.domain = domain;
+  e.sender = sender;
+  e.capability = 0; // No validation in null implementation
+  return e;
+}
+
+bool NullEventBus::ValidateEmitter(const EventEmitter &, u8) const noexcept {
+  return true; // Always valid in null implementation
+}
+
+void NullEventBus::Unsubscribe(u64 id) noexcept {
+  if (id == 0)
+    return;
+
+  for (auto &[code, subscribers] : m_Subscribers) {
+    auto it = std::find_if(subscribers.begin(), subscribers.end(),
+                           [id](const Subscriber &s) { return s.id == id; });
+    if (it != subscribers.end()) {
+      subscribers.erase(it);
+      return;
+    }
+  }
+}
+
+bool NullEventBus::Init() noexcept { return true; }
+
+void NullEventBus::Shutdown() noexcept {
+  m_Subscribers.clear();
+  m_EventQueue.clear();
+}
+
 static SystemAllocator s_SystemAllocator;
 static NullJobSystem s_NullJobSystem;
 static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
+static NullEventBus s_NullEventBus;
 
 #pragma endregion //----------------------------------------------------------------
 
@@ -122,6 +238,7 @@ static std::atomic<IAllocator *> g_Allocator{&s_SystemAllocator};
 static std::atomic<IJobSystem *> g_JobSystem{&s_NullJobSystem};
 static std::atomic<IProfiler *> g_Profiler{&s_NullProfiler};
 static std::atomic<ILogger *> g_Logger{&s_NullLogger};
+static std::atomic<IEventBus *> g_EventBus{&s_NullEventBus};
 static std::atomic<bool> g_Installed{false};
 
 bool InstallServices(const Services &service) noexcept {
@@ -198,16 +315,44 @@ bool InstallServices(const Services &service) noexcept {
     g_Logger.store(service.Logger, std::memory_order_release);
   }
 
+  // Level 4: EventBus (may use allocator and profiler)
+  if (service.EventBus) {
+    if (!service.EventBus->Init()) {
+      GECKO_ASSERT(false && "EventBus failed to initialize!");
+      // Rollback all previous services in reverse order
+      if (service.Logger) {
+        service.Logger->Shutdown();
+        g_Logger.store(&s_NullLogger, std::memory_order_release);
+      }
+      if (service.Profiler) {
+        service.Profiler->Shutdown();
+        g_Profiler.store(&s_NullProfiler, std::memory_order_release);
+      }
+      if (service.JobSystem) {
+        service.JobSystem->Shutdown();
+        g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
+      }
+      if (service.Allocator) {
+        service.Allocator->Shutdown();
+        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
+      }
+      return false;
+    }
+    g_EventBus.store(service.EventBus, std::memory_order_release);
+  }
+
   g_Installed.store(true, std::memory_order_release);
 
   return true;
 }
 
 void UninstallServices() noexcept {
-  // Shutdown services in reverse dependency order: Logger -> Profiler ->
-  // JobSystem -> Allocator This ensures that higher-level services are shut
-  // down before the services they depend on
+  // Shutdown services in reverse dependency order: EventBus -> Logger ->
+  // Profiler -> JobSystem -> Allocator This ensures that higher-level services
+  // are shut down before the services they depend on
 
+  g_EventBus.load(std::memory_order_relaxed)
+      ->Shutdown(); // Level 4: May use profiler, allocator
   g_Logger.load(std::memory_order_relaxed)
       ->Shutdown(); // Level 3: May use profiler, job system, allocator
   g_Profiler.load(std::memory_order_relaxed)
@@ -222,6 +367,7 @@ void UninstallServices() noexcept {
   g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
   g_Profiler.store(&s_NullProfiler, std::memory_order_release);
   g_Logger.store(&s_NullLogger, std::memory_order_release);
+  g_EventBus.store(&s_NullEventBus, std::memory_order_release);
   g_Installed.store(false, std::memory_order_release);
 }
 
@@ -254,6 +400,14 @@ ILogger *GetLogger() noexcept {
   GECKO_ASSERT(logger &&
                "Logger not available - services may not be properly installed");
   return logger;
+}
+
+IEventBus *GetEventBus() noexcept {
+  auto *eventBus = g_EventBus.load(std::memory_order_acquire);
+  GECKO_ASSERT(
+      eventBus &&
+      "EventBus not available - services may not be properly installed");
+  return eventBus;
 }
 
 bool IsServicesInstalled() noexcept {
