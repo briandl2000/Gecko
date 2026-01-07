@@ -23,7 +23,7 @@ constexpr inline u32 EventLocal(EventCode code) {
 }
 
 namespace core_events {
-constexpr u8 kCoreDomain = 0x00;
+constexpr u8 CoreDomain = 0x00;
 } // namespace core_events
 
 struct EventView {

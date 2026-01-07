@@ -5,10 +5,10 @@
 
 namespace gecko::platform_events {
 
-constexpr u8 kPlatformDomain = 0x01;
+constexpr u8 PlatformDomain = 0x01;
 
-constexpr EventCode WindowResized = MakeEvent(kPlatformDomain, 0x0001);
-constexpr EventCode WindowClosed = MakeEvent(kPlatformDomain, 0x0002);
+constexpr EventCode WindowResized = MakeEvent(PlatformDomain, 0x0001);
+constexpr EventCode WindowClosed = MakeEvent(PlatformDomain, 0x0002);
 
 struct WindowResizedPayload {
   u32 width{0};
