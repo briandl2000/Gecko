@@ -115,7 +115,8 @@ void NullJobSystem::Shutdown() noexcept {}
 
 // NullEventBus implementation - works synchronously without thread safety
 EventSubscription NullEventBus::Subscribe(EventCode code, CallbackFn fn,
-                                          void *user) noexcept {
+                                          void *user,
+                                          SubscriptionOptions options) noexcept {
   if (!fn)
     return {};
 
@@ -125,6 +126,7 @@ EventSubscription NullEventBus::Subscribe(EventCode code, CallbackFn fn,
   sub.id = id;
   sub.callback = fn;
   sub.user = user;
+  sub.delivery = options.delivery;
 
   m_Subscribers[code].push_back(sub);
 
@@ -164,6 +166,24 @@ void NullEventBus::Enqueue(const EventEmitter &emitter, EventCode code,
     std::memcpy(qEvent.payloadStorage, data, payload.size);
   }
 
+  // Notify OnPublish subscribers immediately.
+  {
+    EventView view{};
+    view.ptr = qEvent.payloadStorage;
+    view.size = qEvent.payloadSize;
+    view.isInline = false;
+
+    auto it = m_Subscribers.find(code);
+    if (it != m_Subscribers.end()) {
+      for (const auto &sub : it->second) {
+        if (sub.delivery != SubscriptionDelivery::OnPublish)
+          continue;
+        if (sub.callback)
+          sub.callback(sub.user, qEvent.meta, view);
+      }
+    }
+  }
+
   m_EventQueue.push_back(qEvent);
 }
 
@@ -183,6 +203,8 @@ std::size_t NullEventBus::DispatchQueued(std::size_t maxCount) noexcept {
     auto it = m_Subscribers.find(qEvent.meta.code);
     if (it != m_Subscribers.end()) {
       for (const auto &sub : it->second) {
+        if (sub.delivery != SubscriptionDelivery::Queued)
+          continue;
         if (sub.callback)
           sub.callback(sub.user, qEvent.meta, view);
       }

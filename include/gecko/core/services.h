@@ -95,7 +95,8 @@ struct NullLogger final : ILogger {
 // DispatchQueued call
 struct NullEventBus final : IEventBus {
   GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn,
-                                                void *user) noexcept override;
+                                                void *user,
+                                                SubscriptionOptions options = {}) noexcept override;
   GECKO_API virtual void PublishImmediate(const EventEmitter &emitter,
                                           EventCode code,
                                           EventView payload) noexcept override;
@@ -120,6 +121,7 @@ private:
     u64 id;
     CallbackFn callback;
     void *user;
+    SubscriptionDelivery delivery{SubscriptionDelivery::Queued};
   };
 
   struct QueuedEvent {

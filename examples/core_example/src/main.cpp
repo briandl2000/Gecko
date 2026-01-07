@@ -34,9 +34,9 @@ const auto EVENT_CAT = MakeCategory("Event");
 
 // Demo event domain and codes
 namespace demo_events {
-constexpr u8 kDemoDomain = 0x42;
-constexpr EventCode DataProcessed = MakeEvent(kDemoDomain, 0x0001);
-constexpr EventCode TaskComplete = MakeEvent(kDemoDomain, 0x0002);
+constexpr u8 DemoDomain = 0x42;
+constexpr EventCode DataProcessed = MakeEvent(DemoDomain, 0x0001);
+constexpr EventCode TaskComplete = MakeEvent(DemoDomain, 0x0002);
 
 struct DataProcessedPayload {
   u32 itemsProcessed{0};
@@ -251,7 +251,7 @@ void EventSystemTest() {
   GECKO_INFO(EVENT_CAT, "Starting event system test");
 
   // Create emitter for demo events
-  EventEmitter emitter = CreateEmitter(demo_events::kDemoDomain);
+  EventEmitter emitter = CreateEmitter(demo_events::DemoDomain);
 
   // Test 1: Immediate event
   GECKO_INFO(EVENT_CAT, "Test 1: Immediate event publishing");
@@ -259,6 +259,7 @@ void EventSystemTest() {
   struct TestContext {
     int immediateCallCount = 0;
     int queuedCallCount = 0;
+    int onPublishCallCount = 0;
   };
   TestContext ctx;
 
@@ -299,11 +300,30 @@ void EventSystemTest() {
       },
       &ctx);
 
+  auto onPublishSub = SubscribeEvent(
+      demo_events::TaskComplete,
+      [](void *user, const EventMeta &meta, EventView payload) {
+        auto *context = static_cast<TestContext *>(user);
+        auto *data = static_cast<const demo_events::TaskCompletePayload *>(
+            payload.Data());
+        context->onPublishCallCount++;
+        GECKO_INFO(EVENT_CAT,
+                   "  [OnPublish] TaskComplete received ASAP: task=%u success=%s "
+                   "(seq=%llu)",
+                   data->taskId, data->success ? "true" : "false", meta.seq);
+      },
+      &ctx,
+      SubscriptionOptions{SubscriptionDelivery::OnPublish});
+
   // Enqueue several events
   for (u32 i = 0; i < 5; ++i) {
     demo_events::TaskCompletePayload payload{i, (i % 2 == 0)};
     PublishEvent(emitter, demo_events::TaskComplete, payload);
   }
+
+  GECKO_INFO(EVENT_CAT,
+             "  After PublishEvent() calls, OnPublish callbacks executed: %d",
+             ctx.onPublishCallCount);
 
   GECKO_INFO(EVENT_CAT, "  Enqueued 5 events, dispatching...");
   std::size_t dispatched = DispatchQueuedEvents();

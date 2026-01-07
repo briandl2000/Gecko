@@ -14,7 +14,8 @@ public:
   ~EventBus() override;
 
   EventSubscription Subscribe(EventCode code, CallbackFn fn,
-                              void *user) noexcept override;
+                              void *user,
+                              SubscriptionOptions options = {}) noexcept override;
   void PublishImmediate(const EventEmitter &emitter, EventCode code,
                         EventView payload) noexcept override;
   void Enqueue(const EventEmitter &emitter, EventCode code,
@@ -34,6 +35,7 @@ private:
     u64 id{0};
     CallbackFn callback{nullptr};
     void *user{nullptr};
+    SubscriptionDelivery delivery{SubscriptionDelivery::Queued};
   };
 
   struct QueuedEvent {
@@ -44,6 +46,9 @@ private:
 
   void PublishToSubscribers(EventCode code, const EventMeta &meta,
                             EventView payload);
+  void PublishToSubscribers(EventCode code, const EventMeta &meta,
+                            EventView payload,
+                            SubscriptionDelivery deliveryFilter);
 
   std::unordered_map<EventCode, std::vector<Subscriber>> m_Subscribers;
   std::vector<QueuedEvent> m_EventQueue;

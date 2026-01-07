@@ -19,7 +19,8 @@ void EventBus::Shutdown() noexcept {
 }
 
 EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn,
-                                      void *user) noexcept {
+                                      void *user,
+                                      SubscriptionOptions options) noexcept {
   GECKO_ASSERT(fn && "Callback cannot be null");
 
   u64 id = m_NextSubscriptionId.fetch_add(1, std::memory_order_relaxed);
@@ -28,6 +29,7 @@ EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn,
   sub.id = id;
   sub.callback = fn;
   sub.user = user;
+  sub.delivery = options.delivery;
 
   m_Subscribers[code].push_back(sub);
 
@@ -83,6 +85,15 @@ void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
     std::memcpy(qEvent.payloadStorage, data, payload.size);
   }
 
+  // Notify OnPublish subscribers immediately on the caller's stack.
+  {
+    EventView view{};
+    view.ptr = qEvent.payloadStorage;
+    view.size = qEvent.payloadSize;
+    view.isInline = false;
+    PublishToSubscribers(code, qEvent.meta, view, SubscriptionDelivery::OnPublish);
+  }
+
   std::lock_guard<std::mutex> lock(m_QueueMutex);
   m_EventQueue.push_back(qEvent);
 }
@@ -107,7 +118,8 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
     view.ptr = qEvent.payloadStorage;
     view.size = qEvent.payloadSize;
     view.isInline = false;
-    PublishToSubscribers(qEvent.meta.code, qEvent.meta, view);
+    PublishToSubscribers(qEvent.meta.code, qEvent.meta, view,
+                         SubscriptionDelivery::Queued);
   }
 
   return events.size();
@@ -129,6 +141,22 @@ bool EventBus::ValidateEmitter(const EventEmitter &emitter,
   u64 expectedCapability =
       m_CapabilitySecret ^ static_cast<u64>(emitter.domain);
   return emitter.capability == expectedCapability;
+}
+
+void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
+                                    EventView payload,
+                                    SubscriptionDelivery deliveryFilter) {
+  auto it = m_Subscribers.find(code);
+  if (it == m_Subscribers.end())
+    return;
+
+  for (const auto &sub : it->second) {
+    if (sub.delivery != deliveryFilter)
+      continue;
+    if (sub.callback) {
+      sub.callback(sub.user, meta, payload);
+    }
+  }
 }
 
 void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,

@@ -55,6 +55,15 @@ struct EventEmitter {
   u64 capability{0};
 };
 
+enum class SubscriptionDelivery : u8 {
+  Queued = 0,   // Delivered when DispatchQueuedEvents() is called.
+  OnPublish = 1 // Delivered immediately during PublishEvent()/Enqueue().
+};
+
+struct SubscriptionOptions {
+  SubscriptionDelivery delivery{SubscriptionDelivery::Queued};
+};
+
 class IEventBus;
 
 class EventSubscription {
@@ -105,8 +114,9 @@ public:
   GECKO_API virtual void Shutdown() noexcept = 0;
 
   [[nodiscard]]
-  GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn,
-                                                void *user) = 0;
+  GECKO_API virtual EventSubscription
+  Subscribe(EventCode code, CallbackFn fn, void *user,
+            SubscriptionOptions options = {}) = 0;
 
   GECKO_API virtual void PublishImmediate(const EventEmitter &emitter,
                                           EventCode code,
@@ -153,9 +163,10 @@ GECKO_API inline EventEmitter CreateEmitter(u8 domain, u64 sender = 0) {
 
 [[nodiscard]]
 GECKO_API inline EventSubscription
-SubscribeEvent(EventCode code, IEventBus::CallbackFn fn, void *user) {
+SubscribeEvent(EventCode code, IEventBus::CallbackFn fn, void *user,
+               SubscriptionOptions options = {}) {
   if (auto *eventBus = GetEventBus())
-    return eventBus->Subscribe(code, fn, user);
+    return eventBus->Subscribe(code, fn, user, options);
   GECKO_ASSERT(false && "No event bus detected!");
   return {};
 }
