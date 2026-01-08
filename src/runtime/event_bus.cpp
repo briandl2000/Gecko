@@ -54,8 +54,7 @@ void EventBus::Unsubscribe(u64 id) noexcept {
 
 void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
                                 EventView payload) noexcept {
-  u8 expectedDomain = EventDomain(code);
-  GECKO_ASSERT(ValidateEmitter(emitter, expectedDomain) &&
+  GECKO_ASSERT(ValidateEmitter(emitter, EventDomain(code)) &&
                "Invalid emitter for event domain");
 
   EventMeta meta{};
@@ -68,8 +67,7 @@ void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
 
 void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
                        EventView payload) noexcept {
-  u8 expectedDomain = EventDomain(code);
-  GECKO_ASSERT(ValidateEmitter(emitter, expectedDomain) &&
+  GECKO_ASSERT(ValidateEmitter(emitter, EventDomain(code)) &&
                "Invalid emitter for event domain");
   GECKO_ASSERT(payload.size <= sizeof(QueuedEvent::payloadStorage) &&
                "Payload too large for queue");
