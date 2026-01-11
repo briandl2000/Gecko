@@ -31,7 +31,8 @@ void FileLogSink::Write(const LogMessage &message) noexcept {
 
   GECKO_ASSERT(message.Text && "Log message text cannot be null");
 
-  const char *label = message.label.Name ? message.label.Name : "label";
+  const char *label =
+      message.MessageLabel.Name ? message.MessageLabel.Name : "label";
 
   std::fprintf(m_File, "[%s][%s][t%u] %s\n", LevelName(message.Level), label,
                message.ThreadId, message.Text ? message.Text : "");

@@ -52,7 +52,7 @@ void TraceWriter::Write(const ProfEvent &ev) {
 
   const double timeUs = (double)(ev.TimestampNs - m_Time0Ns) / 1000.0;
   const char *name = ev.Name ? ev.Name : "Z";
-  const char *label = ev.label.Name ? ev.label.Name : "label";
+  const char *label = ev.EventLabel.Name ? ev.EventLabel.Name : "label";
 
   switch (ev.Kind) {
   case ProfEventKind::ZoneBegin:
@@ -60,7 +60,7 @@ void TraceWriter::Write(const ProfEvent &ev) {
     std::fprintf(m_File,
                  "{\"name\":\"%s\",\"cat\":\"%s "
                  "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, label, (unsigned long long)ev.label.Id, timeUs,
+                 name, label, (unsigned long long)ev.EventLabel.Id, timeUs,
                  ev.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
@@ -68,7 +68,7 @@ void TraceWriter::Write(const ProfEvent &ev) {
     std::fprintf(m_File,
                  "{\"name\":\"%s\",\"cat\":\"%s "
                  "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, label, (unsigned long long)ev.label.Id, timeUs,
+                 name, label, (unsigned long long)ev.EventLabel.Id, timeUs,
                  ev.ThreadId);
     break;
   case ProfEventKind::FrameMark:
@@ -84,7 +84,7 @@ void TraceWriter::Write(const ProfEvent &ev) {
         m_File,
         "{\"name\":\"%s\",\"cat\":\"%s "
         "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, label, (unsigned long long)ev.label.Id, timeUs,
+        name, label, (unsigned long long)ev.EventLabel.Id, timeUs,
         (unsigned long long)ev.Value);
     break;
   }

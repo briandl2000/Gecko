@@ -38,7 +38,7 @@ private:
   struct Entry {
     std::atomic<u64> Sequence;
     LogLevel Level;
-    Label label;
+    Label EntryLabel;
     u64 TimeNs;
     u32 ThreadId;
     char Text[512];

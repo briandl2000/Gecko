@@ -12,7 +12,7 @@ struct ProfEvent {
   ProfEventKind Kind{ProfEventKind::ZoneBegin};
   u64 TimestampNs{0};
   u32 ThreadId{0};
-  Label label{};
+  Label EventLabel{};
   u32 NameHash{0};
   const char *Name{nullptr};
   u64 Value{0};
@@ -47,7 +47,7 @@ GECKO_API IProfiler *GetProfiler() noexcept;
 GECKO_API u32 ThisThreadId() noexcept;
 
 struct ProfScope {
-  Label label{};
+  Label ScopeLabel{};
   u32 NameHash{0};
   const char *Name{nullptr};
   u32 TimeId{0};
@@ -108,12 +108,13 @@ namespace gecko {
 
 inline ProfScope::ProfScope(Label labelIn, u32 nameHash,
                             const char *namePtr) noexcept
-    : label(labelIn), NameHash(nameHash), Name(namePtr), TimeId(ThisThreadId()),
+    : ScopeLabel(labelIn), NameHash(nameHash), Name(namePtr),
+      TimeId(ThisThreadId()),
       Time0(0) {
   if (auto *profiler = GetProfiler()) {
     Time0 = profiler->NowNs();
     ProfEvent event{
-        ProfEventKind::ZoneBegin, Time0, TimeId, label, NameHash, Name, 0};
+        ProfEventKind::ZoneBegin, Time0, TimeId, ScopeLabel, NameHash, Name, 0};
     profiler->Emit(event);
   }
 }
@@ -123,7 +124,7 @@ inline ProfScope::~ProfScope() noexcept {
     ProfEvent event{ProfEventKind::ZoneEnd,
                     profiler->NowNs(),
                     TimeId,
-                    label,
+                    ScopeLabel,
                     NameHash,
                     Name,
                     0};

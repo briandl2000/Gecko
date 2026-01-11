@@ -41,7 +41,7 @@ GECKO_API inline const char *LevelName(LogLevel level) {
 
 struct LogMessage {
   LogLevel Level{LogLevel::Trace};
-  Label label{};
+  Label MessageLabel{};
   u64 TimeNs{0};
   u32 ThreadId{0};
   const char *Text{nullptr};

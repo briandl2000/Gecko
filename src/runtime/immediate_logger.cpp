@@ -47,7 +47,7 @@ void ImmediateLogger::LogV(LogLevel level, Label label, const char *fmt,
   // Create log message
   LogMessage message;
   message.Level = level;
-  message.label = label;
+  message.MessageLabel = label;
   message.TimeNs = NowNs();
   message.ThreadId = ThreadId();
   message.Text = buffer;

@@ -15,7 +15,7 @@ MemLabelStats &TrackingAllocator::EnsureLabelLocked(Label label) {
   auto result = m_ByLabel.try_emplace(label.Id);
   auto &stats = result.first->second;
   if (result.second) { // new element was inserted
-    stats.label = label;
+    stats.StatsLabel = label;
   }
   return stats;
 }
@@ -68,7 +68,7 @@ bool TrackingAllocator::StatsFor(Label label, MemLabelStats &outStats) const {
   if (it == m_ByLabel.end())
     return false;
 
-  outStats.label = it->second.label;
+  outStats.StatsLabel = it->second.StatsLabel;
   outStats.LiveBytes.store(it->second.LiveBytes.load(std::memory_order_relaxed),
                            std::memory_order_relaxed);
   outStats.Allocs.store(it->second.Allocs.load(std::memory_order_relaxed),
@@ -87,7 +87,7 @@ void TrackingAllocator::Snapshot(
   for (auto &[id, st] : m_ByLabel) {
     auto result = out.try_emplace(id);
     auto &snap = result.first->second;
-    snap.label = st.label;
+    snap.StatsLabel = st.StatsLabel;
     snap.LiveBytes.store(st.LiveBytes.load(std::memory_order_relaxed),
                          std::memory_order_relaxed);
     snap.Allocs.store(st.Allocs.load(std::memory_order_relaxed),
@@ -107,8 +107,8 @@ void TrackingAllocator::EmitCounters() noexcept {
   std::unordered_map<u64, MemLabelStats> snap;
   Snapshot(snap);
   for (auto &[id, st] : snap) {
-    const char *name = st.label.Name ? st.label.Name : "mem";
-    GECKO_PROF_COUNTER(st.label, name,
+    const char *name = st.StatsLabel.Name ? st.StatsLabel.Name : "mem";
+    GECKO_PROF_COUNTER(st.StatsLabel, name,
                        st.LiveBytes.load(std::memory_order_relaxed));
   }
 }

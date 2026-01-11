@@ -299,17 +299,16 @@ void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
         double percentFreed = (double)frees / allocs * 100.0;
         GECKO_INFO(
             app::core_example::labels::Main,
-            "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu "
-            "(%.1f%% freed)",
-            stats.label.Name ? stats.label.Name : "(unnamed)",
-            static_cast<unsigned long long>(stats.label.Id), live, allocs,
+            "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu (%.1f%% freed)",
+            stats.StatsLabel.Name ? stats.StatsLabel.Name : "(unnamed)",
+            static_cast<unsigned long long>(stats.StatsLabel.Id), live, allocs,
             frees, percentFreed);
       } else {
         GECKO_INFO(
             app::core_example::labels::Main,
             "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu",
-            stats.label.Name ? stats.label.Name : "(unnamed)",
-            static_cast<unsigned long long>(stats.label.Id), live, allocs,
+            stats.StatsLabel.Name ? stats.StatsLabel.Name : "(unnamed)",
+            static_cast<unsigned long long>(stats.StatsLabel.Id), live, allocs,
             frees);
       }
     }

@@ -88,7 +88,7 @@ void RingLogger::LogV(LogLevel level, Label label, const char *fmt,
   }
 
   entry.Level = level;
-  entry.label = label;
+  entry.EntryLabel = label;
   entry.TimeNs = NowNs();
   entry.ThreadId = ThreadId();
   const std::size_t maxLen = sizeof(entry.Text);
@@ -117,7 +117,7 @@ void RingLogger::ProcessLogEntries() noexcept {
       break;
 
     message.Level = entry.Level;
-    message.label = entry.label;
+    message.MessageLabel = entry.EntryLabel;
     message.TimeNs = entry.TimeNs;
     message.ThreadId = entry.ThreadId;
     message.Text = entry.Text;
@@ -130,7 +130,7 @@ void RingLogger::ProcessLogEntries() noexcept {
 
     if (m_Profiler && (message.Level == LogLevel::Error ||
                        message.Level == LogLevel::Fatal)) {
-      GECKO_PROF_COUNTER(message.label, "LogErrorCount", 1);
+      GECKO_PROF_COUNTER(message.MessageLabel, "LogErrorCount", 1);
     }
 
     entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
@@ -213,7 +213,8 @@ void RingLogger::Flush() noexcept {
       if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0)
         break;
 
-      LogMessage message{entry.Level, entry.label, entry.TimeNs, entry.ThreadId,
+      LogMessage message{entry.Level, entry.EntryLabel, entry.TimeNs,
+             entry.ThreadId,
                          entry.Text};
       {
         std::lock_guard<std::mutex> lk(m_SinkMu);

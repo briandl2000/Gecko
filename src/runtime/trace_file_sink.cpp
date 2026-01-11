@@ -72,7 +72,8 @@ void TraceFileSink::Flush() noexcept {
 void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
   const double timeUs = (double)(event.TimestampNs - m_Time0Ns) / 1000.0;
   const char *name = event.Name ? event.Name : "Unknown";
-  const char *label = event.label.Name ? event.label.Name : "label";
+  const char *label =
+      event.EventLabel.Name ? event.EventLabel.Name : "label";
 
   // Add comma separator if not first event
   if (!m_First) {
@@ -85,14 +86,14 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
     std::fprintf(m_File,
                  "  {\"name\":\"%s\",\"cat\":\"%s "
                  "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, label, (unsigned long long)event.label.Id, timeUs,
+                 name, label, (unsigned long long)event.EventLabel.Id, timeUs,
                  event.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
     std::fprintf(m_File,
                  "  {\"name\":\"%s\",\"cat\":\"%s "
                  "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, label, (unsigned long long)event.label.Id, timeUs,
+                 name, label, (unsigned long long)event.EventLabel.Id, timeUs,
                  event.ThreadId);
     break;
   case ProfEventKind::FrameMark:
@@ -107,7 +108,7 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
         m_File,
         "  {\"name\":\"%s\",\"cat\":\"%s "
         "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, label, (unsigned long long)event.label.Id, timeUs,
+        name, label, (unsigned long long)event.EventLabel.Id, timeUs,
         (unsigned long long)event.Value);
     break;
   }

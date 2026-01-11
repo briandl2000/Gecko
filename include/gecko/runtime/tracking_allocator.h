@@ -16,7 +16,7 @@ struct MemLabelStats {
   std::atomic<u64> LiveBytes{0};
   std::atomic<u64> Allocs{0};
   std::atomic<u64> Frees{0};
-  Label label{};
+  Label StatsLabel{};
 
   MemLabelStats() = default;
 
@@ -25,14 +25,14 @@ struct MemLabelStats {
 
   MemLabelStats(MemLabelStats &&other) noexcept
       : LiveBytes(other.LiveBytes.load()), Allocs(other.Allocs.load()),
-        Frees(other.Frees.load()), label(other.label) {}
+        Frees(other.Frees.load()), StatsLabel(other.StatsLabel) {}
 
   MemLabelStats &operator=(MemLabelStats &&other) noexcept {
     if (this != &other) {
       LiveBytes.store(other.LiveBytes.load());
       Allocs.store(other.Allocs.load());
       Frees.store(other.Frees.load());
-      label = other.label;
+      StatsLabel = other.StatsLabel;
     }
     return *this;
   }

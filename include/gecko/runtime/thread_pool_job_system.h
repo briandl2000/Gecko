@@ -15,7 +15,7 @@ namespace gecko::runtime {
 struct Job {
   JobFunction Function;
   JobPriority Priority;
-  Label label;
+  Label JobLabel;
   JobHandle Handle;
   std::vector<JobHandle> Dependencies;
   std::atomic<bool> Completed{false};
@@ -23,7 +23,7 @@ struct Job {
   Job() = default;
   Job(JobFunction func, JobPriority prio, gecko::Label label,
       JobHandle handle) noexcept
-      : Function(std::move(func)), Priority(prio), label(label),
+      : Function(std::move(func)), Priority(prio), JobLabel(label),
         Handle(handle) {}
 
   // Make non-copyable to avoid atomic copy issues
@@ -33,7 +33,7 @@ struct Job {
   // Allow move operations
   Job(Job &&other) noexcept
       : Function(std::move(other.Function)), Priority(other.Priority),
-        label(other.label), Handle(other.Handle),
+        JobLabel(other.JobLabel), Handle(other.Handle),
         Dependencies(std::move(other.Dependencies)),
         Completed(other.Completed.load()) {}
 
@@ -41,7 +41,7 @@ struct Job {
     if (this != &other) {
       Function = std::move(other.Function);
       Priority = other.Priority;
-      label = other.label;
+      JobLabel = other.JobLabel;
       Handle = other.Handle;
       Dependencies = std::move(other.Dependencies);
       Completed.store(other.Completed.load());
