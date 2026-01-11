@@ -7,6 +7,7 @@ target_sources(Runtime
     crash_safe_trace_profiler_sink.cpp
     file_log_sink.cpp
     immediate_logger.cpp
+    module_registry.cpp
     override_new.cpp
     ring_logger.cpp
     ring_profiler.cpp
@@ -14,6 +15,7 @@ target_sources(Runtime
     trace_file_sink.cpp
     trace_writer.cpp
     tracking_allocator.cpp
+    runtime_module.cpp
 )
 
 target_include_directories(Runtime

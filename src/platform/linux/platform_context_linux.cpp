@@ -2,10 +2,11 @@
 
 #if defined(__linux__)
 
-#include "../categories.h"
-#include "../window_backend.h"
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
+
+#include "../labels.h"
+#include "../window_backend.h"
 
 namespace gecko::platform {
 
@@ -61,8 +62,8 @@ private:
 } // namespace
 
 Unique<PlatformContext> PlatformContext::Create(const PlatformConfig &cfg) {
-  GECKO_PROF_FUNC(categories::General);
-  GECKO_INFO(categories::General, "PlatformContext::Create (Linux)\n");
+  GECKO_PROF_FUNC(labels::General);
+  GECKO_INFO(labels::General, "PlatformContext::Create (Linux)\n");
 
   IWindowBackend &backend = ResolveWindowBackend(cfg.WindowBackend);
   return CreateUnique<LinuxPlatformContext>(backend);

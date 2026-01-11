@@ -3,9 +3,10 @@
 #include <deque>
 #include <unordered_map>
 
-#include "categories.h"
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
+
+#include "labels.h"
 #include "window_backend.h"
 
 namespace gecko::platform {
@@ -23,7 +24,7 @@ class NullWindowBackend final : public IWindowBackend {
 public:
   bool CreateWindow(const WindowDesc &desc,
                     WindowHandle &outWindow) noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
 
     const u64 id = ++m_NextId;
     outWindow = WindowHandle{id};
@@ -35,13 +36,13 @@ public:
 
     m_Windows.emplace(id, st);
 
-    GECKO_INFO(categories::General, "Created null window id=%llu\n",
+    GECKO_INFO(labels::General, "Created null window id=%llu\n",
                static_cast<unsigned long long>(id));
     return true;
   }
 
   void DestroyWindow(WindowHandle window) noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
     if (!window.IsValid())
       return;
 
@@ -67,7 +68,7 @@ public:
   }
 
   bool RequestClose(WindowHandle window) noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
     if (!window.IsValid())
       return false;
     if (!IsWindowAlive(window))
@@ -82,7 +83,7 @@ public:
   }
 
   void PumpEvents() noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
     // Null backend: no OS events.
   }
 
@@ -173,12 +174,12 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
       return GetXlibWindowBackend();
 #endif
     }
-    GECKO_WARN(categories::General, "Requested Xlib window backend, but it's "
-                                    "not available; using Null backend\n");
+    GECKO_WARN(labels::General, "Requested Xlib window backend, but it's "
+                                "not available; using Null backend\n");
     return nullBackend;
 
   case WindowBackendKind::Wayland:
-    GECKO_WARN(categories::General,
+    GECKO_WARN(labels::General,
                "Requested Wayland window backend, but it's not implemented "
                "yet; using Null backend\n");
     return nullBackend;
@@ -187,7 +188,7 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
     if (hasWin32) {
       return nullBackend;
     }
-    GECKO_WARN(categories::General,
+    GECKO_WARN(labels::General,
                "Requested Win32 window backend, but it's not implemented yet; "
                "using Null backend\n");
     return nullBackend;
@@ -196,7 +197,7 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
     if (hasCocoa) {
       return nullBackend;
     }
-    GECKO_WARN(categories::General,
+    GECKO_WARN(labels::General,
                "Requested Cocoa window backend, but it's not implemented yet; "
                "using Null backend\n");
     return nullBackend;

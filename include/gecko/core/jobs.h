@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "api.h"
-#include "category.h"
+#include "labels.h"
 #include "types.h"
 
 namespace gecko {
@@ -32,14 +32,15 @@ enum class JobPriority : u8 { Low, Normal, High };
 struct IJobSystem {
   GECKO_API virtual ~IJobSystem() = default;
 
-  GECKO_API virtual JobHandle
-  Submit(JobFunction job, JobPriority priority = JobPriority::Normal,
-         Category category = Category{0}) noexcept = 0;
+  GECKO_API virtual JobHandle Submit(JobFunction job,
+                                     JobPriority priority = JobPriority::Normal,
+                                     Label label = Label{}) noexcept = 0;
 
-  GECKO_API virtual JobHandle
-  Submit(JobFunction job, const JobHandle *dependencies, u32 dependencyCount,
-         JobPriority priority = JobPriority::Normal,
-         Category category = Category{0}) noexcept = 0;
+  GECKO_API virtual JobHandle Submit(JobFunction job,
+                                     const JobHandle *dependencies,
+                                     u32 dependencyCount,
+                                     JobPriority priority = JobPriority::Normal,
+                                     Label label = Label{}) noexcept = 0;
 
   GECKO_API virtual void Wait(JobHandle handle) noexcept = 0;
 
@@ -60,9 +61,9 @@ GECKO_API IJobSystem *GetJobSystem() noexcept;
 
 GECKO_API inline JobHandle SubmitJob(JobFunction job,
                                      JobPriority priority = JobPriority::Normal,
-                                     Category category = Category{0}) noexcept {
+                                     Label label = Label{}) noexcept {
   if (auto *jobSystem = GetJobSystem())
-    return jobSystem->Submit(std::move(job), priority, category);
+    return jobSystem->Submit(std::move(job), priority, label);
   return JobHandle{};
 }
 
@@ -70,10 +71,10 @@ GECKO_API inline JobHandle SubmitJob(JobFunction job,
                                      const JobHandle *dependencies,
                                      u32 dependencyCount,
                                      JobPriority priority = JobPriority::Normal,
-                                     Category category = Category{0}) noexcept {
+                                     Label label = Label{}) noexcept {
   if (auto *jobSystem = GetJobSystem())
     return jobSystem->Submit(std::move(job), dependencies, dependencyCount,
-                             priority, category);
+                             priority, label);
   return JobHandle{};
 }
 

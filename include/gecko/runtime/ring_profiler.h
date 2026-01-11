@@ -1,4 +1,5 @@
 #pragma once
+
 #include <atomic>
 #include <mutex>
 #include <vector>
@@ -42,7 +43,7 @@ private:
   // Async consumer system
   std::atomic<bool> m_Run{true};
   JobHandle m_ConsumerJob{};
-  Category m_ProfilerCategory{};
+  Label m_ProfilerLabel{};
 
   void ProcessProfEvents() noexcept;
   void TryScheduleConsumerJob() noexcept;

@@ -94,20 +94,23 @@ void CrashSafeTraceProfilerSink::WriteJsonEvent(std::FILE *file,
                                                 u64 time0Ns) noexcept {
   const double timeUs = (double)(event.TimestampNs - time0Ns) / 1000.0;
   const char *name = event.Name ? event.Name : "Unknown";
-  const char *catName = event.Cat.Name ? event.Cat.Name : "Unknown";
+  const char *label =
+      event.EventLabel.Name ? event.EventLabel.Name : "label";
 
   switch (event.Kind) {
   case ProfEventKind::ZoneBegin:
     std::fprintf(file,
                  "{\"name\":\"%s\",\"cat\":\"%s "
-                 "(%u)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, catName, event.Cat.Id, timeUs, event.ThreadId);
+                 "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+                 name, label, (unsigned long long)event.EventLabel.Id, timeUs,
+                 event.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
     std::fprintf(file,
                  "{\"name\":\"%s\",\"cat\":\"%s "
-                 "(%u)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, catName, event.Cat.Id, timeUs, event.ThreadId);
+                 "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+                 name, label, (unsigned long long)event.EventLabel.Id, timeUs,
+                 event.ThreadId);
     break;
   case ProfEventKind::FrameMark:
     std::fprintf(file,
@@ -119,8 +122,9 @@ void CrashSafeTraceProfilerSink::WriteJsonEvent(std::FILE *file,
     std::fprintf(
         file,
         "{\"name\":\"%s\",\"cat\":\"%s "
-        "(%u)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, catName, event.Cat.Id, timeUs, (unsigned long long)event.Value);
+        "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
+        name, label, (unsigned long long)event.EventLabel.Id, timeUs,
+        (unsigned long long)event.Value);
     break;
   }
 }

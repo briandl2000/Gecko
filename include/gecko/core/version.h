@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gecko/core/api.h"
-#include "gecko/core/category.h"
+#include "gecko/core/labels.h"
 #include "gecko/core/log.h"
 
 namespace gecko {
@@ -36,8 +36,8 @@ GECKO_API inline constexpr const char *VersionFullString() noexcept {
   return GECKO_VERSION_FULL_STRING;
 }
 
-GECKO_API inline void LogVersion(Category category = MakeCategory("boot")) {
-  GECKO_INFO(category, "Gecko %s", VersionFullString());
+GECKO_API inline void LogVersion(Label label = MakeLabel("gecko.core.boot")) {
+  GECKO_INFO(label, "Gecko %s", VersionFullString());
 }
 
 } // namespace gecko

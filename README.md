@@ -44,9 +44,13 @@ Gecko is built around three core modules that work together:
 
 ```cpp
 #include "gecko/core/boot.h"
-#include "gecko/core/category.h"
 #include "gecko/core/log.h"
+#include "gecko/core/labels.h"
 #include "gecko/core/services.h"
+
+namespace app::my_game::labels {
+inline constexpr gecko::Label Game = gecko::MakeLabel("app.my_game");
+}
 
 int main() {
     // Set up core services
@@ -54,7 +58,7 @@ int main() {
     GECKO_BOOT(services);  // Installs default services
     
     // Your game code here
-    GECKO_INFO(gecko::MakeCategory("main"), "Hello from Gecko!");
+    GECKO_INFO(app::my_game::labels::Game, "Hello from Gecko!");
     
     GECKO_SHUTDOWN();
     return 0;
