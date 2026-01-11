@@ -23,7 +23,7 @@ constexpr u32 FNV1a(const void *data, std::size_t size) noexcept {
   return h;
 }
 
-// 64-bit FNV-1a (for more percision).
+// 64-bit FNV-1a (for more precision).
 constexpr u64 FNV1a64(const char *s) noexcept {
   if (!s) {
     return 0;
