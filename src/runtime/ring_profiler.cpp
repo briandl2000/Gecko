@@ -1,12 +1,14 @@
 #include "gecko/runtime/ring_profiler.h"
 
-#include "categories.h"
+#include <algorithm>
+#include <vector>
+
 #include "gecko/core/assert.h"
 #include "gecko/core/bit.h"
 #include "gecko/core/thread.h"
 #include "gecko/core/time.h"
-#include <algorithm>
-#include <vector>
+
+#include "labels.h"
 
 namespace gecko {
 
@@ -19,7 +21,7 @@ u64 RingProfiler::MonotonicNowNs() noexcept { return MonotonicTimeNs(); }
 
 RingProfiler::RingProfiler(size_t capacityPow2)
     : m_Ring(capacityPow2), m_Mask(capacityPow2 - 1), m_Head(0), m_Tail(0),
-      m_Run(true), m_ProfilerCategory(categories::Profiler) {
+  m_Run(true), m_ProfilerLabel(labels::Profiler) {
   GECKO_ASSERT(capacityPow2 > 0 &&
                "Ring buffer capacity must be greater than 0");
 
@@ -158,7 +160,7 @@ void RingProfiler::TryScheduleConsumerJob() noexcept {
   if (lastScheduleTime.compare_exchange_weak(lastTime, now,
                                              std::memory_order_relaxed)) {
     m_ConsumerJob = jobSystem->Submit([this]() { ProcessProfEvents(); },
-                                      JobPriority::Low, m_ProfilerCategory);
+                                      JobPriority::Low, m_ProfilerLabel);
   }
 }
 

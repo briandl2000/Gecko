@@ -72,7 +72,7 @@ void TraceFileSink::Flush() noexcept {
 void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
   const double timeUs = (double)(event.TimestampNs - m_Time0Ns) / 1000.0;
   const char *name = event.Name ? event.Name : "Unknown";
-  const char *catName = event.Cat.Name ? event.Cat.Name : "Unknown";
+  const char *label = event.label.Name ? event.label.Name : "label";
 
   // Add comma separator if not first event
   if (!m_First) {
@@ -84,14 +84,16 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
   case ProfEventKind::ZoneBegin:
     std::fprintf(m_File,
                  "  {\"name\":\"%s\",\"cat\":\"%s "
-                 "(%u)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, catName, event.Cat.Id, timeUs, event.ThreadId);
+                 "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+                 name, label, (unsigned long long)event.label.Id, timeUs,
+                 event.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
     std::fprintf(m_File,
                  "  {\"name\":\"%s\",\"cat\":\"%s "
-                 "(%u)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, catName, event.Cat.Id, timeUs, event.ThreadId);
+                 "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+                 name, label, (unsigned long long)event.label.Id, timeUs,
+                 event.ThreadId);
     break;
   case ProfEventKind::FrameMark:
     std::fprintf(m_File,
@@ -104,8 +106,9 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
     std::fprintf(
         m_File,
         "  {\"name\":\"%s\",\"cat\":\"%s "
-        "(%u)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, catName, event.Cat.Id, timeUs, (unsigned long long)event.Value);
+        "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
+        name, label, (unsigned long long)event.label.Id, timeUs,
+        (unsigned long long)event.Value);
     break;
   }
 }

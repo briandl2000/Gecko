@@ -15,15 +15,16 @@ namespace gecko::runtime {
 struct Job {
   JobFunction Function;
   JobPriority Priority;
-  Category Cat;
+  Label label;
   JobHandle Handle;
   std::vector<JobHandle> Dependencies;
   std::atomic<bool> Completed{false};
 
   Job() = default;
-  Job(JobFunction func, JobPriority prio, gecko::Category cat,
+  Job(JobFunction func, JobPriority prio, gecko::Label label,
       JobHandle handle) noexcept
-      : Function(std::move(func)), Priority(prio), Cat(cat), Handle(handle) {}
+      : Function(std::move(func)), Priority(prio), label(label),
+        Handle(handle) {}
 
   // Make non-copyable to avoid atomic copy issues
   Job(const Job &) = delete;
@@ -32,7 +33,7 @@ struct Job {
   // Allow move operations
   Job(Job &&other) noexcept
       : Function(std::move(other.Function)), Priority(other.Priority),
-        Cat(other.Cat), Handle(other.Handle),
+        label(other.label), Handle(other.Handle),
         Dependencies(std::move(other.Dependencies)),
         Completed(other.Completed.load()) {}
 
@@ -40,7 +41,7 @@ struct Job {
     if (this != &other) {
       Function = std::move(other.Function);
       Priority = other.Priority;
-      Cat = other.Cat;
+      label = other.label;
       Handle = other.Handle;
       Dependencies = std::move(other.Dependencies);
       Completed.store(other.Completed.load());
@@ -56,11 +57,11 @@ public:
 
   virtual JobHandle Submit(JobFunction job,
                            JobPriority priority = JobPriority::Normal,
-                           Category category = Category{0}) noexcept override;
+                           Label label = Label{}) noexcept override;
   virtual JobHandle Submit(JobFunction job, const JobHandle *dependencies,
                            u32 dependencyCount,
                            JobPriority priority = JobPriority::Normal,
-                           Category category = Category{0}) noexcept override;
+                           Label label = Label{}) noexcept override;
   virtual void Wait(JobHandle handle) noexcept override;
   virtual void WaitAll(const JobHandle *handles, u32 count) noexcept override;
   virtual bool IsComplete(JobHandle handle) noexcept override;

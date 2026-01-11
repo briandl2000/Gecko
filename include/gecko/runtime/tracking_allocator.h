@@ -6,36 +6,33 @@
 #include <unordered_map>
 #include <utility>
 
-#include "gecko/core/category.h"
 #include "gecko/core/memory.h"
 #include "gecko/core/profiler.h"
 #include "gecko/core/types.h"
 
 namespace gecko::runtime {
 
-struct MemCategoryStats {
+struct MemLabelStats {
   std::atomic<u64> LiveBytes{0};
   std::atomic<u64> Allocs{0};
   std::atomic<u64> Frees{0};
-  Category Cat{};
+  Label label{};
 
-  MemCategoryStats() = default;
+  MemLabelStats() = default;
 
-  // Make non-copyable to avoid atomic copy issues
-  MemCategoryStats(const MemCategoryStats &) = delete;
-  MemCategoryStats &operator=(const MemCategoryStats &) = delete;
+  MemLabelStats(const MemLabelStats &) = delete;
+  MemLabelStats &operator=(const MemLabelStats &) = delete;
 
-  // Allow move operations
-  MemCategoryStats(MemCategoryStats &&other) noexcept
+  MemLabelStats(MemLabelStats &&other) noexcept
       : LiveBytes(other.LiveBytes.load()), Allocs(other.Allocs.load()),
-        Frees(other.Frees.load()), Cat(other.Cat) {}
+        Frees(other.Frees.load()), label(other.label) {}
 
-  MemCategoryStats &operator=(MemCategoryStats &&other) noexcept {
+  MemLabelStats &operator=(MemLabelStats &&other) noexcept {
     if (this != &other) {
       LiveBytes.store(other.LiveBytes.load());
       Allocs.store(other.Allocs.load());
       Frees.store(other.Frees.load());
-      Cat = other.Cat;
+      label = other.label;
     }
     return *this;
   }
@@ -86,13 +83,12 @@ class TrackingAllocator final : public IAllocator {
 public:
   explicit TrackingAllocator(IAllocator *upstream) noexcept
       : m_Upstream(upstream),
-        m_ByCat(UpstreamAllocator<std::pair<const u32, MemCategoryStats>>(
-            upstream)) {}
+        m_ByLabel(
+            UpstreamAllocator<std::pair<const u64, MemLabelStats>>(upstream)) {}
 
-  virtual void *Alloc(u64 size, u32 alignment,
-                      Category category) noexcept override;
+  virtual void *Alloc(u64 size, u32 alignment, Label label) noexcept override;
   virtual void Free(void *ptr, u64 size, u32 alignment,
-                    Category category) noexcept override;
+                    Label label) noexcept override;
 
   void SetProfiler(IProfiler *profiler) noexcept { m_Profiler = profiler; }
 
@@ -100,9 +96,9 @@ public:
     return m_TotalLive.load(std::memory_order_relaxed);
   }
 
-  bool StatsFor(Category category, MemCategoryStats &outStats) const;
+  bool StatsFor(Label label, MemLabelStats &outStats) const;
 
-  void Snapshot(std::unordered_map<u32, MemCategoryStats> &out) const;
+  void Snapshot(std::unordered_map<u64, MemLabelStats> &out) const;
 
   void EmitCounters() noexcept;
 
@@ -116,15 +112,15 @@ private:
 
   mutable std::mutex m_Mutex;
 
-  std::unordered_map<u32, MemCategoryStats, std::hash<u32>, std::equal_to<u32>,
-                     UpstreamAllocator<std::pair<const u32, MemCategoryStats>>>
-      m_ByCat;
+  std::unordered_map<u64, MemLabelStats, std::hash<u64>, std::equal_to<u64>,
+                     UpstreamAllocator<std::pair<const u64, MemLabelStats>>>
+      m_ByLabel;
 
   std::atomic<u64> m_TotalLive{0};
 
   IProfiler *m_Profiler{nullptr};
 
-  MemCategoryStats &EnsureCategoryLocked(Category category);
+  MemLabelStats &EnsureLabelLocked(Label label);
 };
 
 } // namespace gecko::runtime

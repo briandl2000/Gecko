@@ -5,7 +5,7 @@
 
 // Project includes second (alphabetical order)
 #include "gecko/core/api.h"
-#include "gecko/core/category.h"
+#include "gecko/core/labels.h"
 #include "gecko/core/types.h"
 
 namespace gecko {
@@ -41,7 +41,7 @@ GECKO_API inline const char *LevelName(LogLevel level) {
 
 struct LogMessage {
   LogLevel Level{LogLevel::Trace};
-  Category Cat{};
+  Label label{};
   u64 TimeNs{0};
   u32 ThreadId{0};
   const char *Text{nullptr};
@@ -55,14 +55,13 @@ struct ILogSink {
 struct ILogger {
   GECKO_API virtual ~ILogger() = default;
 
-  GECKO_API virtual void LogV(LogLevel level, Category category,
-                              const char *fmt, va_list) noexcept = 0;
+  GECKO_API virtual void LogV(LogLevel level, Label label, const char *fmt,
+                              va_list) noexcept = 0;
 
-  GECKO_API inline void Log(LogLevel level, Category category, const char *fmt,
-                            ...) {
+  GECKO_API inline void Log(LogLevel level, Label label, const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    LogV(level, category, fmt, ap);
+    LogV(level, label, fmt, ap);
     va_end(ap);
   }
 
@@ -85,24 +84,24 @@ GECKO_API ILogger *GetLogger() noexcept;
 #endif
 
 #if GECKO_LOGGING
-#define GECKO_LOG(lvl, cat, ...)                                               \
+#define GECKO_LOG(lvl, label, ...)                                             \
   do {                                                                         \
     if (auto *logger = ::gecko::GetLogger())                                   \
-      logger->Log((lvl), (cat), __VA_ARGS__);                                  \
+      logger->Log((lvl), (label), __VA_ARGS__);                                \
   } while (0)
 
-#define GECKO_TRACE(cat, ...)                                                  \
-  GECKO_LOG(::gecko::LogLevel::Trace, (cat), __VA_ARGS__)
-#define GECKO_DEBUG(cat, ...)                                                  \
-  GECKO_LOG(::gecko::LogLevel::Debug, (cat), __VA_ARGS__)
-#define GECKO_INFO(cat, ...)                                                   \
-  GECKO_LOG(::gecko::LogLevel::Info, (cat), __VA_ARGS__)
-#define GECKO_WARN(cat, ...)                                                   \
-  GECKO_LOG(::gecko::LogLevel::Warn, (cat), __VA_ARGS__)
-#define GECKO_ERROR(cat, ...)                                                  \
-  GECKO_LOG(::gecko::LogLevel::Error, (cat), __VA_ARGS__)
-#define GECKO_FATAL(cat, ...)                                                  \
-  GECKO_LOG(::gecko::LogLevel::Fatal, (cat), __VA_ARGS__)
+#define GECKO_TRACE(label, ...)                                                \
+  GECKO_LOG(::gecko::LogLevel::Trace, (label), __VA_ARGS__)
+#define GECKO_DEBUG(label, ...)                                                \
+  GECKO_LOG(::gecko::LogLevel::Debug, (label), __VA_ARGS__)
+#define GECKO_INFO(label, ...)                                                 \
+  GECKO_LOG(::gecko::LogLevel::Info, (label), __VA_ARGS__)
+#define GECKO_WARN(label, ...)                                                 \
+  GECKO_LOG(::gecko::LogLevel::Warn, (label), __VA_ARGS__)
+#define GECKO_ERROR(label, ...)                                                \
+  GECKO_LOG(::gecko::LogLevel::Error, (label), __VA_ARGS__)
+#define GECKO_FATAL(label, ...)                                                \
+  GECKO_LOG(::gecko::LogLevel::Fatal, (label), __VA_ARGS__)
 #else
 #define GECKO_TRACE(cat, ...)
 #define GECKO_DEBUG(cat, ...)

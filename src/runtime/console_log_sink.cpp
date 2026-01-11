@@ -10,9 +10,10 @@ namespace gecko::runtime {
 void ConsoleLogSink::Write(const LogMessage &message) noexcept {
   GECKO_ASSERT(message.Text && "Log message text cannot be null");
 
+  const char *label = message.label.Name ? message.label.Name : "label";
+
   std::fprintf((message.Level >= LogLevel::Warn) ? stderr : stdout,
-               "[%s][%s] %s\n", LevelName(message.Level),
-               message.Cat.Name ? message.Cat.Name : "cat",
+               "[%s][%s] %s\n", LevelName(message.Level), label,
                message.Text ? message.Text : "");
 }
 

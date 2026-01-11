@@ -9,7 +9,7 @@
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
 
-#include "categories.h"
+#include "labels.h"
 
 namespace gecko::runtime {
 
@@ -69,13 +69,12 @@ void ThreadPoolJobSystem::Shutdown() noexcept {
 }
 
 JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
-                                      Category category) noexcept {
+                                      Label label) noexcept {
   if (!m_Initialized || !job)
     return JobHandle{};
 
   JobHandle handle = GenerateJobHandle();
-  auto jobPtr =
-      std::make_shared<Job>(std::move(job), priority, category, handle);
+  auto jobPtr = std::make_shared<Job>(std::move(job), priority, label, handle);
 
   {
     std::lock_guard<std::mutex> lock(m_Mutex);
@@ -84,23 +83,18 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
   }
 
   m_JobAvailable.notify_one();
-
-  // Don't trace logger jobs to avoid feedback loops
-  if (category != categories::Logger) {
-  }
   return handle;
 }
 
 JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
                                       const JobHandle *dependencies,
                                       u32 dependencyCount, JobPriority priority,
-                                      Category category) noexcept {
+                                      Label label) noexcept {
   if (!m_Initialized || !job)
     return JobHandle{};
 
   JobHandle handle = GenerateJobHandle();
-  auto jobPtr =
-      std::make_shared<Job>(std::move(job), priority, category, handle);
+  auto jobPtr = std::make_shared<Job>(std::move(job), priority, label, handle);
 
   // Copy dependencies
   if (dependencies && dependencyCount > 0) {
@@ -119,10 +113,6 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
   }
 
   m_JobAvailable.notify_one();
-
-  // Don't trace logger jobs to avoid feedback loops
-  if (category != categories::Logger) {
-  }
   return handle;
 }
 
@@ -130,7 +120,7 @@ void ThreadPoolJobSystem::Wait(JobHandle handle) noexcept {
   if (!handle.IsValid())
     return;
 
-  GECKO_PROF_SCOPE(categories::Runtime, "ThreadPoolJobSystem::Wait");
+  GECKO_PROF_SCOPE(labels::JobSystem, "ThreadPoolJobSystem::Wait");
 
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handle]() {
@@ -145,7 +135,7 @@ void ThreadPoolJobSystem::WaitAll(const JobHandle *handles,
   if (!handles || count == 0)
     return;
 
-  GECKO_PROF_SCOPE(categories::Runtime, "ThreadPoolJobSystem::WaitAll");
+  GECKO_PROF_SCOPE(labels::JobSystem, "ThreadPoolJobSystem::WaitAll");
 
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handles, count]() {
@@ -178,7 +168,7 @@ u32 ThreadPoolJobSystem::WorkerThreadCount() const noexcept {
 }
 
 void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept {
-  GECKO_PROF_SCOPE(categories::Runtime, "ThreadPoolJobSystem::ProcessJobs");
+  GECKO_PROF_SCOPE(labels::JobSystem, "ThreadPoolJobSystem::ProcessJobs");
 
   for (u32 processed = 0; processed < maxJobs; ++processed) {
     auto job = GetNextReadyJob();
@@ -186,8 +176,8 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept {
       break;
 
     try {
-      GECKO_PROF_SCOPE(categories::Runtime, "Job::Execute");
-      GECKO_PROF_COUNTER(categories::Runtime, "jobs_processed", 1);
+      GECKO_PROF_SCOPE(labels::JobSystem, "Job::Execute");
+      GECKO_PROF_COUNTER(labels::JobSystem, "jobs_processed", 1);
 
       job->Function();
       job->Completed.store(true, std::memory_order_release);
@@ -206,7 +196,7 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept {
 }
 
 void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
-  GECKO_PROF_SCOPE(categories::Runtime, "WorkerThread");
+  GECKO_PROF_SCOPE(labels::JobSystem, "WorkerThread");
 
   const u32 threadId = ThisThreadId();
 
@@ -223,14 +213,14 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
     }
 
     try {
-      GECKO_PROF_SCOPE(categories::Runtime, "Job::Execute");
-      GECKO_PROF_COUNTER(categories::Runtime, "jobs_processed", 1);
+      GECKO_PROF_SCOPE(labels::JobSystem, "Job::Execute");
+      GECKO_PROF_COUNTER(labels::JobSystem, "jobs_processed", 1);
 
       job->Function();
       job->Completed.store(true, std::memory_order_release);
 
     } catch (...) {
-      GECKO_ERROR(categories::Runtime,
+      GECKO_ERROR(labels::JobSystem,
                   "Job %llu threw an exception on worker thread %u",
                   job->Handle.Id, threadId);
       job->Completed.store(true, std::memory_order_release);
@@ -244,7 +234,7 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
     m_JobCompleted.notify_all();
   }
 
-  GECKO_TRACE(categories::Runtime, "Worker thread %u exiting", threadId);
+  GECKO_TRACE(labels::JobSystem, "Worker thread %u exiting", threadId);
 }
 
 std::shared_ptr<Job> ThreadPoolJobSystem::GetNextReadyJob() noexcept {

@@ -23,4 +23,16 @@ constexpr u32 FNV1a(const void *data, std::size_t size) noexcept {
   return h;
 }
 
+// 64-bit FNV-1a (for more percision).
+constexpr u64 FNV1a64(const char *s) noexcept {
+  if (!s) {
+    return 0;
+  }
+  u64 h = 14695981039346656037ull;
+  while (*s) {
+    h ^= static_cast<u8>(*s++);
+    h *= 1099511628211ull;
+  }
+  return h;
+}
 } // namespace gecko

@@ -3,8 +3,8 @@
 #include <string_view>
 
 #include <gecko/core/boot.h>
-#include <gecko/core/category.h>
 #include <gecko/core/log.h>
+#include <gecko/core/modules.h>
 #include <gecko/core/profiler.h>
 #include <gecko/core/ptr.h>
 #include <gecko/core/services.h>
@@ -12,10 +12,13 @@
 #include <gecko/core/types.h>
 #include <gecko/core/version.h>
 #include <gecko/platform/platform_context.h>
+#include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/file_log_sink.h>
+#include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_logger.h>
 #include <gecko/runtime/ring_profiler.h>
+#include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
 #include <gecko/runtime/trace_file_sink.h>
 #include <gecko/runtime/tracking_allocator.h>
@@ -23,7 +26,31 @@
 using namespace gecko;
 using namespace gecko::platform;
 
-const auto APP_CAT = MakeCategory("App");
+namespace {
+
+namespace app::app_skeleton::labels {
+inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.app_skeleton");
+inline constexpr ::gecko::Label Main =
+    ::gecko::MakeLabel("app.app_skeleton.main");
+} // namespace app::app_skeleton::labels
+
+class AppSkeletonModule final : public ::gecko::IModule {
+public:
+  [[nodiscard]] ::gecko::Label RootLabel() const noexcept override {
+    return app::app_skeleton::labels::App;
+  }
+
+  [[nodiscard]] bool
+  Startup(::gecko::IModuleRegistry &modules) noexcept override {
+    return true;
+  }
+
+  void Shutdown(::gecko::IModuleRegistry &modules) noexcept override {}
+};
+
+AppSkeletonModule g_AppModule;
+
+} // namespace
 
 struct AppConfig {
   const char *title = "Gecko App";
@@ -123,12 +150,14 @@ static bool ParseArgs(int argc, char **argv, AppConfig &cfg) {
 static Services CreateServices(runtime::TrackingAllocator &trackingAlloc,
                                runtime::ThreadPoolJobSystem &jobSystem,
                                runtime::RingProfiler &ringProfiler,
-                               runtime::RingLogger &ringLogger) {
+                               runtime::RingLogger &ringLogger,
+                               runtime::ModuleRegistry &moduleRegistry) {
   Services services{};
   services.Allocator = &trackingAlloc;
   services.JobSystem = &jobSystem;
   services.Profiler = &ringProfiler;
   services.Logger = &ringLogger;
+  services.Modules = &moduleRegistry;
   return services;
 }
 
@@ -149,9 +178,11 @@ static int AppMain(int argc, char **argv) {
   runtime::RingProfiler ringProfiler(1 << 16);
   runtime::RingLogger ringLogger(1024);
 
+  runtime::ModuleRegistry moduleRegistry;
+
   // 2) Install services (Allocator -> JobSystem -> Profiler -> Logger).
-  GECKO_BOOT(
-      (CreateServices(trackingAlloc, jobSystem, ringProfiler, ringLogger)));
+  GECKO_BOOT((CreateServices(trackingAlloc, jobSystem, ringProfiler, ringLogger,
+                             moduleRegistry)));
 
   // 3) Configure sinks AFTER services are installed.
   runtime::ConsoleLogSink consoleSink;
@@ -162,20 +193,26 @@ static int AppMain(int argc, char **argv) {
     logger->SetLevel(LogLevel::Info);
   }
 
-  gecko::LogVersion(APP_CAT);
+  gecko::LogVersion(app::app_skeleton::labels::Main);
+
+  // Register library modules after boot (now that logging is configured).
+  (void)InstallModule(runtime::GetModule());
+  (void)InstallModule(platform::GetModule());
+  (void)InstallModule(g_AppModule);
 
   runtime::TraceFileSink traceSink("gecko_trace.json");
   if (traceSink.IsOpen()) {
     ringProfiler.AddSink(&traceSink);
   } else {
-    GECKO_WARN(APP_CAT, "Failed to open trace file sink");
+    GECKO_WARN(app::app_skeleton::labels::Main,
+               "Failed to open trace file sink");
   }
 
   // 4) Run either headless or windowed.
   int result = 0;
 
   if (!cfg.windowed) {
-    GECKO_INFO(APP_CAT, "Running headless");
+    GECKO_INFO(app::app_skeleton::labels::Main, "Running headless");
     // Your headless work goes here.
     GECKO_SLEEP_MS(10);
   } else {
@@ -184,7 +221,8 @@ static int AppMain(int argc, char **argv) {
 
     Unique<PlatformContext> ctx = PlatformContext::Create(platformCfg);
     if (!ctx) {
-      GECKO_ERROR(APP_CAT, "Failed to create PlatformContext");
+      GECKO_ERROR(app::app_skeleton::labels::Main,
+                  "Failed to create PlatformContext");
       GECKO_SHUTDOWN();
       return 1;
     }
@@ -197,7 +235,7 @@ static int AppMain(int argc, char **argv) {
 
     WindowHandle window{};
     if (!ctx->CreateWindow(windowDesc, window)) {
-      GECKO_ERROR(APP_CAT, "Failed to create window");
+      GECKO_ERROR(app::app_skeleton::labels::Main, "Failed to create window");
       GECKO_SHUTDOWN();
       return 1;
     }
@@ -206,7 +244,7 @@ static int AppMain(int argc, char **argv) {
     u32 frames = 0;
 
     while (running && ctx->IsWindowAlive(window)) {
-      GECKO_PROF_SCOPE(APP_CAT, "Frame");
+      GECKO_PROF_SCOPE(app::app_skeleton::labels::Main, "Frame");
 
       ctx->PumpEvents();
       WindowEvent ev{};

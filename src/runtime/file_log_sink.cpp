@@ -31,9 +31,10 @@ void FileLogSink::Write(const LogMessage &message) noexcept {
 
   GECKO_ASSERT(message.Text && "Log message text cannot be null");
 
-  std::fprintf(m_File, "[%s][%s][t%u] %s\n", LevelName(message.Level),
-               message.Cat.Name ? message.Cat.Name : "cat", message.ThreadId,
-               message.Text ? message.Text : "");
+  const char *label = message.label.Name ? message.label.Name : "label";
+
+  std::fprintf(m_File, "[%s][%s][t%u] %s\n", LevelName(message.Level), label,
+               message.ThreadId, message.Text ? message.Text : "");
   std::fflush(m_File);
 }
 } // namespace gecko::runtime

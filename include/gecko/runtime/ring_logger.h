@@ -16,7 +16,7 @@ public:
   explicit RingLogger(size_t capacity = 4096);
   virtual ~RingLogger();
 
-  virtual void LogV(LogLevel level, Category category, const char *fmt,
+  virtual void LogV(LogLevel level, Label label, const char *fmt,
                     va_list) noexcept override;
 
   virtual bool Init() noexcept override;
@@ -38,7 +38,7 @@ private:
   struct Entry {
     std::atomic<u64> Sequence;
     LogLevel Level;
-    Category Cat;
+    Label label;
     u64 TimeNs;
     u32 ThreadId;
     char Text[512];
@@ -57,7 +57,7 @@ private:
   std::atomic<u64> m_Dropped{0};
 
   JobHandle m_ConsumerJob;
-  Category m_LoggerCategory;
+  Label m_LoggerLabel;
 
   IProfiler *m_Profiler;
 

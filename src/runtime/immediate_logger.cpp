@@ -25,7 +25,7 @@ void ImmediateLogger::AddSink(ILogSink *sink) noexcept {
   }
 }
 
-void ImmediateLogger::LogV(LogLevel level, Category category, const char *fmt,
+void ImmediateLogger::LogV(LogLevel level, Label label, const char *fmt,
                            va_list apIn) noexcept {
   GECKO_ASSERT(fmt && "Format string cannot be null");
 
@@ -47,7 +47,7 @@ void ImmediateLogger::LogV(LogLevel level, Category category, const char *fmt,
   // Create log message
   LogMessage message;
   message.Level = level;
-  message.Cat = category;
+  message.label = label;
   message.TimeNs = NowNs();
   message.ThreadId = ThreadId();
   message.Text = buffer;
