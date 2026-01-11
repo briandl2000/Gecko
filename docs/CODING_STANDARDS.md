@@ -811,16 +811,16 @@ void ExpensiveFunction()
   
   // Function implementation
   {
-    GECKO_PROF_SCOPE(labels::System, "initialization");
+    GECKO_PROF_SCOPE(labels::Main, "initialization");
     // Initialization phase
   }
   
   {
-    GECKO_PROF_SCOPE(labels::System, "processing");
+    GECKO_PROF_SCOPE(labels::Main, "processing");
     // Processing phase
   }
   
-  GECKO_PROF_COUNTER(labels::System, "items_processed", itemCount);
+  GECKO_PROF_COUNTER(labels::Main, "items_processed", itemCount);
 }
 ```
 
