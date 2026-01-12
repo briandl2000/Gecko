@@ -116,13 +116,12 @@ struct NullModuleRegistry final : IModuleRegistry {
 };
 
 // Level 4: EventBus (may use allocator and profiler)
-// NullEventBus: Works synchronously without thread safety (like NullJobSystem)
-// Events are dispatched immediately or queued and dispatched on next
-// DispatchQueued call
+// NullEventBus: True no-op event bus (like NullLogger, NullProfiler)
+// All events are silently discarded. Use runtime::EventBus for working events.
 struct NullEventBus final : IEventBus {
-  GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn,
-                                                void *user,
-                                                SubscriptionOptions options = {}) noexcept override;
+  GECKO_API virtual EventSubscription
+  Subscribe(EventCode code, CallbackFn fn, void *user,
+            SubscriptionOptions options = {}) noexcept override;
   GECKO_API virtual void PublishImmediate(const EventEmitter &emitter,
                                           EventCode code,
                                           EventView payload) noexcept override;
@@ -130,37 +129,20 @@ struct NullEventBus final : IEventBus {
                                  EventView payload) noexcept override;
   GECKO_API virtual std::size_t
   DispatchQueued(std::size_t maxCount) noexcept override;
-  GECKO_API virtual EventEmitter CreateEmitter(u8 domain,
+
+  GECKO_API virtual bool RegisterModule(u64 moduleId) noexcept override;
+  GECKO_API virtual void UnregisterModule(u64 moduleId) noexcept override;
+  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId,
                                                u64 sender) noexcept override;
   GECKO_API virtual bool
   ValidateEmitter(const EventEmitter &emitter,
-                  u8 expectedDomain) const noexcept override;
+                  u64 expectedModuleId) const noexcept override;
 
   GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;
 
 protected:
   GECKO_API virtual void Unsubscribe(u64 id) noexcept override;
-
-private:
-  struct Subscriber {
-    u64 id;
-    CallbackFn callback;
-    void *user;
-    SubscriptionDelivery delivery{SubscriptionDelivery::Queued};
-  };
-
-  struct QueuedEvent {
-    EventMeta meta;
-    u8 payloadStorage[64]; // Larger than EventBus queue storage since no thread
-                           // contention
-    u32 payloadSize;
-  };
-
-  std::unordered_map<EventCode, std::vector<Subscriber>> m_Subscribers;
-  std::vector<QueuedEvent> m_EventQueue;
-  u64 m_NextSubscriptionId = 1;
-  u64 m_NextSequence = 0;
 };
 
 } // namespace gecko

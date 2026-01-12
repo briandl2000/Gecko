@@ -1,6 +1,5 @@
 #include "gecko/core/services.h"
 
-#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdio>
@@ -162,138 +161,55 @@ bool NullJobSystem::Init() noexcept { return true; }
 void NullJobSystem::Shutdown() noexcept {}
 
 // NullEventBus implementation - works synchronously without thread safety
-EventSubscription NullEventBus::Subscribe(EventCode code, CallbackFn fn,
-                                          void *user,
-                                          SubscriptionOptions options) noexcept {
-  if (!fn)
-    return {};
-
-  u64 id = m_NextSubscriptionId++;
-
-  Subscriber sub{};
-  sub.id = id;
-  sub.callback = fn;
-  sub.user = user;
-  sub.delivery = options.delivery;
-
-  m_Subscribers[code].push_back(sub);
-
-  EventSubscription subscription{};
-  subscription.SetSubscriptionData(this, id);
-  return subscription;
+EventSubscription NullEventBus::Subscribe(EventCode, CallbackFn, void *,
+                                          SubscriptionOptions) noexcept {
+  // Null implementation: subscriptions are silently discarded
+  return {};
 }
 
-void NullEventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
-                                    EventView payload) noexcept {
-  EventMeta meta{};
-  meta.code = code;
-  meta.sender = emitter.sender;
-  meta.seq = m_NextSequence++;
-
-  auto it = m_Subscribers.find(code);
-  if (it == m_Subscribers.end())
-    return;
-
-  for (const auto &sub : it->second) {
-    if (sub.callback)
-      sub.callback(sub.user, meta, payload);
-  }
+void NullEventBus::PublishImmediate(const EventEmitter &, EventCode,
+                                    EventView) noexcept {
+  // Null implementation: events are silently discarded
 }
 
-void NullEventBus::Enqueue(const EventEmitter &emitter, EventCode code,
-                           EventView payload) noexcept {
-  QueuedEvent qEvent{};
-  qEvent.meta.code = code;
-  qEvent.meta.sender = emitter.sender;
-  qEvent.meta.seq = m_NextSequence++;
-  qEvent.payloadSize = payload.size;
-
-  const void *data = payload.Data();
-  if (data && payload.size > 0 &&
-      payload.size <= sizeof(qEvent.payloadStorage)) {
-    std::memcpy(qEvent.payloadStorage, data, payload.size);
-  }
-
-  // Notify OnPublish subscribers immediately.
-  {
-    EventView view{};
-    view.ptr = qEvent.payloadStorage;
-    view.size = qEvent.payloadSize;
-    view.isInline = false;
-
-    auto it = m_Subscribers.find(code);
-    if (it != m_Subscribers.end()) {
-      for (const auto &sub : it->second) {
-        if (sub.delivery != SubscriptionDelivery::OnPublish)
-          continue;
-        if (sub.callback)
-          sub.callback(sub.user, qEvent.meta, view);
-      }
-    }
-  }
-
-  m_EventQueue.push_back(qEvent);
+void NullEventBus::Enqueue(const EventEmitter &, EventCode,
+                           EventView) noexcept {
+  // Null implementation: events are silently discarded
 }
 
-std::size_t NullEventBus::DispatchQueued(std::size_t maxCount) noexcept {
-  std::size_t count = std::min(maxCount, m_EventQueue.size());
-  if (count == 0)
-    return 0;
-
-  for (std::size_t i = 0; i < count; ++i) {
-    const auto &qEvent = m_EventQueue[i];
-
-    EventView view{};
-    view.ptr = qEvent.payloadStorage;
-    view.size = qEvent.payloadSize;
-    view.isInline = false;
-
-    auto it = m_Subscribers.find(qEvent.meta.code);
-    if (it != m_Subscribers.end()) {
-      for (const auto &sub : it->second) {
-        if (sub.delivery != SubscriptionDelivery::Queued)
-          continue;
-        if (sub.callback)
-          sub.callback(sub.user, qEvent.meta, view);
-      }
-    }
-  }
-
-  m_EventQueue.erase(m_EventQueue.begin(), m_EventQueue.begin() + count);
-  return count;
+std::size_t NullEventBus::DispatchQueued(std::size_t) noexcept {
+  // Null implementation: no events to dispatch
+  return 0;
 }
 
-EventEmitter NullEventBus::CreateEmitter(u8 domain, u64 sender) noexcept {
+bool NullEventBus::RegisterModule(u64) noexcept {
+  return true; // Always succeeds in null implementation
+}
+
+void NullEventBus::UnregisterModule(u64) noexcept {
+  // No-op in null implementation
+}
+
+EventEmitter NullEventBus::CreateEmitter(u64 moduleId, u64 sender) noexcept {
   EventEmitter e{};
-  e.domain = domain;
+  e.moduleId = moduleId;
   e.sender = sender;
   e.capability = 0; // No validation in null implementation
   return e;
 }
 
-bool NullEventBus::ValidateEmitter(const EventEmitter &, u8) const noexcept {
+bool NullEventBus::ValidateEmitter(const EventEmitter &, u64) const noexcept {
   return true; // Always valid in null implementation
 }
 
-void NullEventBus::Unsubscribe(u64 id) noexcept {
-  if (id == 0)
-    return;
-
-  for (auto &[code, subscribers] : m_Subscribers) {
-    auto it = std::find_if(subscribers.begin(), subscribers.end(),
-                           [id](const Subscriber &s) { return s.id == id; });
-    if (it != subscribers.end()) {
-      subscribers.erase(it);
-      return;
-    }
-  }
+void NullEventBus::Unsubscribe(u64) noexcept {
+  // Null implementation: nothing to unsubscribe
 }
 
 bool NullEventBus::Init() noexcept { return true; }
 
 void NullEventBus::Shutdown() noexcept {
-  m_Subscribers.clear();
-  m_EventQueue.clear();
+  // Null implementation: no state to clean up
 }
 
 static SystemAllocator s_SystemAllocator;
@@ -445,10 +361,10 @@ bool InstallServices(const Services &service) noexcept {
 }
 
 void UninstallServices() noexcept {
-  // Shutdown services in reverse dependency order: EventBus -> Modules -> Logger ->
-  // Profiler -> JobSystem -> Allocator This ensures that higher-level services
-  // are shut down before the services they depend on
-  // Modules shut down first so modules can still log during shutdown.
+  // Shutdown services in reverse dependency order: EventBus -> Modules ->
+  // Logger -> Profiler -> JobSystem -> Allocator This ensures that higher-level
+  // services are shut down before the services they depend on Modules shut down
+  // first so modules can still log during shutdown.
 
   static constexpr auto c_Services = ::gecko::MakeLabel("gecko.core.services");
 

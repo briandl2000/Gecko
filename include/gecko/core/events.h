@@ -4,14 +4,33 @@
 #include "gecko/core/assert.h"
 #include "types.h"
 #include <cstddef>
-#include <utility>
 
 namespace gecko {
 
-using EventCode = u32;
+struct Label;
 
+// EventCode is 64-bit: upper 32 bits from module's Label.Id hash,
+// lower 32 bits for module-local event code.
+using EventCode = u64;
+
+// Create a globally-unique event code from a module's Label ID and local code.
+constexpr inline EventCode MakeEventCode(u64 moduleId, u32 localCode) {
+  return ((moduleId >> 32) << 32) | static_cast<u64>(localCode);
+}
+
+// Extract the module hash portion (upper 32 bits of EventCode).
+constexpr inline u32 GetEventModule(EventCode code) {
+  return static_cast<u32>(code >> 32);
+}
+
+// Extract the module-local event code (lower 32 bits).
+constexpr inline u32 GetEventLocal(EventCode code) {
+  return static_cast<u32>(code & 0xFFFFFFFFu);
+}
+
+// Legacy compatibility helpers (deprecated - use MakeEventCode instead)
 constexpr inline EventCode MakeEvent(u8 domain, u32 local24) {
-  return (static_cast<u32>(domain) << 24) | (local24 & 0x00FF'FFFFu);
+  return (static_cast<u64>(domain) << 24) | (local24 & 0x00FF'FFFFu);
 }
 
 constexpr inline u8 EventDomain(EventCode code) {
@@ -21,10 +40,6 @@ constexpr inline u8 EventDomain(EventCode code) {
 constexpr inline u32 EventLocal(EventCode code) {
   return static_cast<u32>(code & 0x00FF'FFFFu);
 }
-
-namespace core_events {
-constexpr u8 CoreDomain = 0x00;
-} // namespace core_events
 
 struct EventView {
   union {
@@ -44,15 +59,16 @@ struct EventView {
 };
 
 struct EventMeta {
-  EventCode code{};
-  u64 sender{0};
-  u64 seq{0};
+  EventCode code{}; // Packed: module hash (upper 32) + local code (lower 32)
+  u64 moduleId{0};  // Full Label.Id of the module that sent this event
+  u64 sender{0};    // Optional sender identifier
+  u64 seq{0};       // Sequence number
 };
 
 struct EventEmitter {
-  u8 domain{0};
-  u64 sender{0};
-  u64 capability{0};
+  u64 moduleId{0};   // Full Label.Id of the owning module
+  u64 sender{0};     // Optional sender identifier
+  u64 capability{0}; // Secret capability for validation
 };
 
 enum class SubscriptionDelivery : u8 {
@@ -140,10 +156,21 @@ public:
   GECKO_API virtual std::size_t
   DispatchQueued(std::size_t maxCount = static_cast<std::size_t>(-1)) = 0;
 
-  GECKO_API virtual EventEmitter CreateEmitter(u8 domain, u64 sender = 0) = 0;
+  // Register a module ID with the event bus (called during module
+  // registration). Returns true if registered successfully, false if already
+  // registered.
+  GECKO_API virtual bool RegisterModule(u64 moduleId) = 0;
 
+  // Unregister a module ID from the event bus.
+  GECKO_API virtual void UnregisterModule(u64 moduleId) = 0;
+
+  // Create an emitter for a registered module.
+  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId,
+                                               u64 sender = 0) = 0;
+
+  // Validate that an emitter is authentic and matches the expected module.
   GECKO_API virtual bool ValidateEmitter(const EventEmitter &emitter,
-                                         u8 expectedDomain) const = 0;
+                                         u64 expectedModuleId) const = 0;
 
 protected:
   friend class EventSubscription;
@@ -153,13 +180,20 @@ protected:
 // Forward declaration for inline helper functions below
 IEventBus *GetEventBus() noexcept;
 
-[[nodiscard]]
-GECKO_API inline EventEmitter CreateEmitter(u8 domain, u64 sender = 0) {
+// Create emitter for a registered module using its Label ID.
+// This is the preferred way for modules to create emitters.
+[[nodiscard]] GECKO_API inline EventEmitter CreateEmitter(u64 moduleId,
+                                                          u64 sender = 0) {
   if (auto *eventBus = GetEventBus())
-    return eventBus->CreateEmitter(domain, sender);
+    return eventBus->CreateEmitter(moduleId, sender);
   GECKO_ASSERT(false && "No event bus detected!");
   return {};
 }
+
+// Create emitter for a module using its Label.
+// Looks up the module and uses its Label.Id.
+[[nodiscard]] GECKO_API EventEmitter CreateEmitterForModule(Label moduleLabel,
+                                                            u64 sender = 0);
 
 [[nodiscard]]
 GECKO_API inline EventSubscription

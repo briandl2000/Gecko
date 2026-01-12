@@ -14,12 +14,34 @@ bool EventBus::Init() noexcept { return true; }
 
 void EventBus::Shutdown() noexcept {
   m_Subscribers.clear();
-  std::lock_guard<std::mutex> lock(m_QueueMutex);
-  m_EventQueue.clear();
+  {
+    std::lock_guard<std::mutex> lock(m_QueueMutex);
+    m_EventQueue.clear();
+  }
+  {
+    std::lock_guard<std::mutex> lock(m_ModulesMutex);
+    m_RegisteredModules.clear();
+  }
 }
 
-EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn,
-                                      void *user,
+bool EventBus::RegisterModule(u64 moduleId) noexcept {
+  std::lock_guard<std::mutex> lock(m_ModulesMutex);
+
+  if (m_RegisteredModules.find(moduleId) != m_RegisteredModules.end()) {
+    // Module already registered - this is a warning condition
+    return false;
+  }
+
+  m_RegisteredModules.insert(moduleId);
+  return true;
+}
+
+void EventBus::UnregisterModule(u64 moduleId) noexcept {
+  std::lock_guard<std::mutex> lock(m_ModulesMutex);
+  m_RegisteredModules.erase(moduleId);
+}
+
+EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void *user,
                                       SubscriptionOptions options) noexcept {
   GECKO_ASSERT(fn && "Callback cannot be null");
 
@@ -54,11 +76,16 @@ void EventBus::Unsubscribe(u64 id) noexcept {
 
 void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
                                 EventView payload) noexcept {
-  GECKO_ASSERT(ValidateEmitter(emitter, EventDomain(code)) &&
-               "Invalid emitter for event domain");
+  const u32 codeModuleHash = GetEventModule(code);
+  const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
+  GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
+               "Event code module mismatch with emitter module");
+  GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
+               "Invalid emitter capability");
 
   EventMeta meta{};
   meta.code = code;
+  meta.moduleId = emitter.moduleId;
   meta.sender = emitter.sender;
   meta.seq = m_NextSequence.fetch_add(1, std::memory_order_relaxed);
 
@@ -67,13 +94,18 @@ void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
 
 void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
                        EventView payload) noexcept {
-  GECKO_ASSERT(ValidateEmitter(emitter, EventDomain(code)) &&
-               "Invalid emitter for event domain");
+  const u32 codeModuleHash = GetEventModule(code);
+  const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
+  GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
+               "Event code module mismatch with emitter module");
+  GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
+               "Invalid emitter capability");
   GECKO_ASSERT(payload.size <= sizeof(QueuedEvent::payloadStorage) &&
                "Payload too large for queue");
 
   QueuedEvent qEvent{};
   qEvent.meta.code = code;
+  qEvent.meta.moduleId = emitter.moduleId;
   qEvent.meta.sender = emitter.sender;
   qEvent.meta.seq = m_NextSequence.fetch_add(1, std::memory_order_relaxed);
   qEvent.payloadSize = payload.size;
@@ -89,7 +121,8 @@ void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
     view.ptr = qEvent.payloadStorage;
     view.size = qEvent.payloadSize;
     view.isInline = false;
-    PublishToSubscribers(code, qEvent.meta, view, SubscriptionDelivery::OnPublish);
+    PublishToSubscribers(code, qEvent.meta, view,
+                         SubscriptionDelivery::OnPublish);
   }
 
   std::lock_guard<std::mutex> lock(m_QueueMutex);
@@ -123,21 +156,20 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
   return events.size();
 }
 
-EventEmitter EventBus::CreateEmitter(u8 domain, u64 sender) noexcept {
+EventEmitter EventBus::CreateEmitter(u64 moduleId, u64 sender) noexcept {
   EventEmitter emitter{};
-  emitter.domain = domain;
+  emitter.moduleId = moduleId;
   emitter.sender = sender;
-  emitter.capability = m_CapabilitySecret ^ static_cast<u64>(domain);
+  emitter.capability = m_CapabilitySecret ^ moduleId;
   return emitter;
 }
 
 bool EventBus::ValidateEmitter(const EventEmitter &emitter,
-                               u8 expectedDomain) const noexcept {
-  if (emitter.domain != expectedDomain)
+                               u64 expectedModuleId) const noexcept {
+  if (emitter.moduleId != expectedModuleId)
     return false;
 
-  u64 expectedCapability =
-      m_CapabilitySecret ^ static_cast<u64>(emitter.domain);
+  u64 expectedCapability = m_CapabilitySecret ^ emitter.moduleId;
   return emitter.capability == expectedCapability;
 }
 

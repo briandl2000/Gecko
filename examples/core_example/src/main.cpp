@@ -1,6 +1,6 @@
+#include <atomic>
 #include <cstdio>
 #include <cstring>
-#include <atomic>
 #include <vector>
 
 #include "gecko/core/boot.h"
@@ -32,7 +32,7 @@ inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.core_example");
 inline constexpr ::gecko::Label Main =
     ::gecko::MakeLabel("app.core_example.main");
 inline constexpr ::gecko::Label Events =
-  ::gecko::MakeLabel("app.core_example.events");
+    ::gecko::MakeLabel("app.core_example.events");
 inline constexpr ::gecko::Label Worker =
     ::gecko::MakeLabel("app.core_example.worker");
 inline constexpr ::gecko::Label Memory =
@@ -72,8 +72,9 @@ struct Particle {
 };
 
 namespace app::core_example::events {
-constexpr u8 Domain = 0x42;
-constexpr EventCode TestEvent = MakeEvent(Domain, 0x0001);
+// Use the module's Label ID for event scoping
+constexpr ::gecko::Label ModuleLabel = app::core_example::labels::App;
+constexpr EventCode TestEvent = MakeEventCode(ModuleLabel.Id, 0x0001);
 
 struct TestEventPayload {
   u32 value{0};
@@ -92,8 +93,8 @@ void WorkerTask(int workerId, int numParticles) {
   Particle *particles = nullptr;
   {
     GECKO_PROF_SCOPE(app::core_example::labels::Memory, "AllocateParticles");
-    particles =
-        AllocArray<Particle>(numParticles, app::core_example::labels::Simulation);
+    particles = AllocArray<Particle>(numParticles,
+                                     app::core_example::labels::Simulation);
   }
   {
     if (!particles) {
@@ -108,7 +109,8 @@ void WorkerTask(int workerId, int numParticles) {
 
     // Initialize particles
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Compute, "InitializeParticles");
+      GECKO_PROF_SCOPE(app::core_example::labels::Compute,
+                       "InitializeParticles");
       // Seed random generator differently per worker for unique particle
       // behaviors
       gecko::SeedRandom(workerId * 12345 + 42);
@@ -153,8 +155,8 @@ void WorkerTask(int workerId, int numParticles) {
 
       // Emit progress counter (reduce frequency to minimize profiling overhead)
       if (step % 20 == 0) {
-        GECKO_PROF_COUNTER(app::core_example::labels::Worker, "SimulationProgress",
-                           step);
+        GECKO_PROF_COUNTER(app::core_example::labels::Worker,
+                           "SimulationProgress", step);
       }
     }
 
@@ -315,15 +317,14 @@ void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
             "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu "
             "(%.1f%% freed)",
             label.Name ? label.Name : "(unnamed)",
-            static_cast<unsigned long long>(label.Id), live, allocs,
-            frees, percentFreed);
+            static_cast<unsigned long long>(label.Id), live, allocs, frees,
+            percentFreed);
       } else {
         GECKO_INFO(
             app::core_example::labels::Main,
             "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu",
             label.Name ? label.Name : "(unnamed)",
-            static_cast<unsigned long long>(label.Id), live, allocs,
-            frees);
+            static_cast<unsigned long long>(label.Id), live, allocs, frees);
       }
     }
   }
@@ -353,22 +354,24 @@ struct EventSystemDemoState {
 };
 
 static void OnTestEventOnPublish(void *user, const EventMeta &meta,
-                                EventView payload) {
+                                 EventView payload) {
   (void)meta;
   auto *state = static_cast<EventSystemDemoState *>(user);
-  const auto *p = static_cast<const app::core_example::events::TestEventPayload *>(
-      payload.Data());
+  const auto *p =
+      static_cast<const app::core_example::events::TestEventPayload *>(
+          payload.Data());
   state->onPublishCount.fetch_add(1, std::memory_order_relaxed);
-  GECKO_INFO(app::core_example::labels::Events,
-             "OnPublish received: value=%u", p ? p->value : 0u);
+  GECKO_INFO(app::core_example::labels::Events, "OnPublish received: value=%u",
+             p ? p->value : 0u);
 }
 
 static void OnTestEventQueued(void *user, const EventMeta &meta,
                               EventView payload) {
   (void)meta;
   auto *state = static_cast<EventSystemDemoState *>(user);
-  const auto *p = static_cast<const app::core_example::events::TestEventPayload *>(
-      payload.Data());
+  const auto *p =
+      static_cast<const app::core_example::events::TestEventPayload *>(
+          payload.Data());
   state->queuedCount.fetch_add(1, std::memory_order_relaxed);
   GECKO_INFO(app::core_example::labels::Events,
              "Queued dispatch received: value=%u", p ? p->value : 0u);
@@ -382,20 +385,18 @@ static void EventSystemTest() {
 
   EventSystemDemoState state{};
 
-  state.onPublishSub =
-      SubscribeEvent(app::core_example::events::TestEvent, &OnTestEventOnPublish,
-                     &state,
-                     SubscriptionOptions{.delivery =
-                                             SubscriptionDelivery::OnPublish});
+  state.onPublishSub = SubscribeEvent(
+      app::core_example::events::TestEvent, &OnTestEventOnPublish, &state,
+      SubscriptionOptions{.delivery = SubscriptionDelivery::OnPublish});
 
-  state.queuedSub =
-      SubscribeEvent(app::core_example::events::TestEvent, &OnTestEventQueued,
-                     &state,
-                     SubscriptionOptions{.delivery =
-                                             SubscriptionDelivery::Queued});
+  state.queuedSub = SubscribeEvent(
+      app::core_example::events::TestEvent, &OnTestEventQueued, &state,
+      SubscriptionOptions{.delivery = SubscriptionDelivery::Queued});
 
-  const EventEmitter emitter = CreateEmitter(app::core_example::events::Domain,
-                                             /*sender=*/0xC0DE);
+  // Create emitter using the module's domain.
+  // This ensures events are properly scoped to this module.
+  const EventEmitter emitter =
+      CreateEmitterForModule(app::core_example::labels::App, /*sender=*/0xC0DE);
 
   // Publish from main thread.
   {
@@ -495,7 +496,7 @@ int main() {
               "Profiler has capacity for %d events (this won't appear either)",
               (1 << 16));
 
-    GECKO_INFO(
+  GECKO_INFO(
       app::core_example::labels::Main,
       "Log level is set to Info - Debug and Trace messages are filtered out");
 
@@ -526,7 +527,8 @@ int main() {
     GECKO_INFO(app::core_example::labels::Main,
                "=== 3. Threading Utilities Demo ===");
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Main, "ThreadingUtilitiesDemo");
+      GECKO_PROF_SCOPE(app::core_example::labels::Main,
+                       "ThreadingUtilitiesDemo");
 
       u32 threadId = ThisThreadId();
       u32 coreCount = HardwareThreadCount();
@@ -582,8 +584,8 @@ int main() {
 
         auto job = [i, particleCount]() { WorkerTask(i, particleCount); };
 
-        auto handle =
-            SubmitJob(job, JobPriority::Normal, app::core_example::labels::Worker);
+        auto handle = SubmitJob(job, JobPriority::Normal,
+                                app::core_example::labels::Worker);
         simulationJobs.push_back(handle);
       }
     }
@@ -592,7 +594,8 @@ int main() {
     GECKO_INFO(app::core_example::labels::Main,
                "Waiting for simulation jobs to complete...");
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Main, "WaitForSimulationJobs");
+      GECKO_PROF_SCOPE(app::core_example::labels::Main,
+                       "WaitForSimulationJobs");
       WaitForJobs(simulationJobs.data(),
                   static_cast<u32>(simulationJobs.size()));
     }
@@ -647,7 +650,7 @@ int main() {
     GECKO_WARN(app::core_example::labels::Main,
                "This is a warning - something might be wrong");
     GECKO_ERROR(
-      app::core_example::labels::Main,
+        app::core_example::labels::Main,
         "This is an error - something went wrong (but this is just a test!)");
     // Note: GECKO_FATAL would be for critical errors
 
@@ -662,8 +665,8 @@ int main() {
       const int numJobs = 6; // Sweet spot for demo
 
       // Submit some parallel jobs
-      GECKO_INFO(app::core_example::labels::Main, "Submitting %d parallel jobs...",
-                 numJobs);
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Submitting %d parallel jobs...", numJobs);
       for (int i = 0; i < numJobs; ++i) {
         auto job = [i]() {
           GECKO_INFO(app::core_example::labels::Compute,
@@ -683,7 +686,8 @@ int main() {
       GECKO_INFO(app::core_example::labels::Main,
                  "Waiting for all parallel jobs to complete...");
       WaitForJobs(jobHandles.data(), static_cast<u32>(jobHandles.size()));
-      GECKO_INFO(app::core_example::labels::Main, "All parallel jobs completed!");
+      GECKO_INFO(app::core_example::labels::Main,
+                 "All parallel jobs completed!");
 
       // Example with job dependencies - pipeline pattern
       GECKO_INFO(app::core_example::labels::Main,
@@ -709,7 +713,8 @@ int main() {
             GECKO_INFO(app::core_example::labels::Compute,
                        "Stage 2: Analysis complete - 847 patterns detected");
           },
-          stage1Deps, 1, JobPriority::Normal, app::core_example::labels::Compute);
+          stage1Deps, 1, JobPriority::Normal,
+          app::core_example::labels::Compute);
 
       JobHandle stage2Deps[] = {dataProcessingJob};
       auto dataFinalizationJob = SubmitJob(
@@ -721,7 +726,8 @@ int main() {
                        "Stage 3: Mission accomplished! Results "
                        "exported to dashboard.");
           },
-          stage2Deps, 1, JobPriority::Normal, app::core_example::labels::Compute);
+          stage2Deps, 1, JobPriority::Normal,
+          app::core_example::labels::Compute);
 
       WaitForJob(dataFinalizationJob);
       GECKO_INFO(app::core_example::labels::Main,
@@ -733,10 +739,11 @@ int main() {
       std::vector<JobHandle> mainThreadJobs;
       for (int i = 0; i < 3; ++i) {
         auto job = [i]() {
-          GECKO_INFO(app::core_example::labels::Compute, "Main thread job %d", i);
+          GECKO_INFO(app::core_example::labels::Compute, "Main thread job %d",
+                     i);
         };
-        auto handle =
-            SubmitJob(job, JobPriority::Low, app::core_example::labels::Compute);
+        auto handle = SubmitJob(job, JobPriority::Low,
+                                app::core_example::labels::Compute);
         mainThreadJobs.push_back(handle);
       }
 
