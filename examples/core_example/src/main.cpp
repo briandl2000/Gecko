@@ -31,6 +31,8 @@ namespace app::core_example::labels {
 inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.core_example");
 inline constexpr ::gecko::Label Main =
     ::gecko::MakeLabel("app.core_example.main");
+inline constexpr ::gecko::Label Events =
+  ::gecko::MakeLabel("app.core_example.events");
 inline constexpr ::gecko::Label Worker =
     ::gecko::MakeLabel("app.core_example.worker");
 inline constexpr ::gecko::Label Memory =
@@ -357,8 +359,8 @@ static void OnTestEventOnPublish(void *user, const EventMeta &meta,
   const auto *p = static_cast<const app::core_example::events::TestEventPayload *>(
       payload.Data());
   state->onPublishCount.fetch_add(1, std::memory_order_relaxed);
-  GECKO_INFO(app::core_example::labels::Main,
-             "[events] OnPublish received: value=%u", p ? p->value : 0u);
+  GECKO_INFO(app::core_example::labels::Events,
+             "OnPublish received: value=%u", p ? p->value : 0u);
 }
 
 static void OnTestEventQueued(void *user, const EventMeta &meta,
@@ -368,8 +370,8 @@ static void OnTestEventQueued(void *user, const EventMeta &meta,
   const auto *p = static_cast<const app::core_example::events::TestEventPayload *>(
       payload.Data());
   state->queuedCount.fetch_add(1, std::memory_order_relaxed);
-  GECKO_INFO(app::core_example::labels::Main,
-             "[events] Queued dispatch received: value=%u", p ? p->value : 0u);
+  GECKO_INFO(app::core_example::labels::Events,
+             "Queued dispatch received: value=%u", p ? p->value : 0u);
 }
 } // namespace
 
