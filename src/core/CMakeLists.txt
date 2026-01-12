@@ -4,6 +4,7 @@ add_library(Gecko::Core ALIAS Core)
 target_sources(Core
   PRIVATE
     events.cpp
+    modules.cpp
     services.cpp
     thread.cpp
     time.cpp

@@ -4,6 +4,7 @@ add_library(Gecko::Platform ALIAS Platform)
 target_sources(Platform
   PRIVATE
     window.cpp
+    platform_module.cpp
 )
 
 if(UNIX AND NOT APPLE)

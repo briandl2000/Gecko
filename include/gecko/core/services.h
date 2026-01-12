@@ -5,6 +5,7 @@
 #include "jobs.h"
 #include "log.h"
 #include "memory.h"
+#include "modules.h"
 #include "profiler.h"
 
 namespace gecko {
@@ -14,6 +15,7 @@ struct Services {
   IJobSystem *JobSystem = nullptr;
   IProfiler *Profiler = nullptr;
   ILogger *Logger = nullptr;
+  IModuleRegistry *Modules = nullptr;
   IEventBus *EventBus = nullptr;
 };
 
@@ -26,6 +28,7 @@ GECKO_API IAllocator *GetAllocator() noexcept;
 GECKO_API IJobSystem *GetJobSystem() noexcept;
 GECKO_API IProfiler *GetProfiler() noexcept;
 GECKO_API ILogger *GetLogger() noexcept;
+GECKO_API IModuleRegistry *GetModules() noexcept;
 GECKO_API IEventBus *GetEventBus() noexcept;
 
 GECKO_API bool IsServicesInstalled() noexcept;
@@ -37,10 +40,10 @@ GECKO_API bool ValidateServices(bool fatalOnFail) noexcept;
 // Level 0: Allocator (no dependencies)
 struct SystemAllocator final : IAllocator {
   GECKO_API virtual void *Alloc(u64 size, u32 alignment,
-                                Category category) noexcept override;
+                                Label label) noexcept override;
 
   GECKO_API virtual void Free(void *ptr, u64 size, u32 alignment,
-                              Category category) noexcept override;
+                              Label label) noexcept override;
 
   GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;
@@ -48,13 +51,14 @@ struct SystemAllocator final : IAllocator {
 
 // Level 1: JobSystem (may use allocator)
 struct NullJobSystem final : IJobSystem {
-  GECKO_API virtual JobHandle
-  Submit(JobFunction job, JobPriority priority = JobPriority::Normal,
-         Category category = Category{0}) noexcept override;
-  GECKO_API virtual JobHandle
-  Submit(JobFunction job, const JobHandle *dependencies, u32 dependencyCount,
-         JobPriority priority = JobPriority::Normal,
-         Category category = Category{0}) noexcept override;
+  GECKO_API virtual JobHandle Submit(JobFunction job,
+                                     JobPriority priority = JobPriority::Normal,
+                                     Label label = Label{}) noexcept override;
+  GECKO_API virtual JobHandle Submit(JobFunction job,
+                                     const JobHandle *dependencies,
+                                     u32 dependencyCount,
+                                     JobPriority priority = JobPriority::Normal,
+                                     Label label = Label{}) noexcept override;
   GECKO_API virtual void Wait(JobHandle handle) noexcept override;
   GECKO_API virtual void WaitAll(const JobHandle *handles,
                                  u32 count) noexcept override;
@@ -77,8 +81,8 @@ struct NullProfiler final : IProfiler {
 
 // Level 3: Logger (may use allocator, job system, and profiler)
 struct NullLogger final : ILogger {
-  GECKO_API virtual void LogV(LogLevel level, Category category,
-                              const char *fmt, va_list) noexcept override;
+  GECKO_API virtual void LogV(LogLevel level, Label label, const char *fmt,
+                              va_list) noexcept override;
   GECKO_API virtual void AddSink(ILogSink *sink) noexcept override;
   GECKO_API virtual void SetLevel(LogLevel level) noexcept override;
   GECKO_API virtual LogLevel Level() const noexcept override;
@@ -87,6 +91,28 @@ struct NullLogger final : ILogger {
 
   GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;
+};
+
+// Level 4: Modules (may use allocator, job system, profiler, and logger)
+struct NullModuleRegistry final : IModuleRegistry {
+  [[nodiscard]] GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+
+  [[nodiscard]] GECKO_API virtual ModuleRegistration
+  RegisterStatic(IModule &module) noexcept override;
+  [[nodiscard]] GECKO_API virtual ModuleResult
+  Unregister(Label module) noexcept override;
+
+  [[nodiscard]] GECKO_API virtual IModule *
+  GetModule(Label module) noexcept override;
+  [[nodiscard]] GECKO_API virtual const IModule *
+  GetModule(Label module) const noexcept override;
+
+  GECKO_API virtual void ForEachModule(ModuleVisitFn fn,
+                                       void *user) noexcept override;
+
+  [[nodiscard]] GECKO_API virtual bool StartupAllModules() noexcept override;
+  GECKO_API virtual void ShutdownAllModules() noexcept override;
 };
 
 // Level 4: EventBus (may use allocator and profiler)

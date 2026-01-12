@@ -11,10 +11,11 @@
 #include <deque>
 #include <unordered_map>
 
-#include "../categories.h"
-#include "../window_backend.h"
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
+
+#include "../labels.h"
+#include "../window_backend.h"
 
 namespace gecko::platform {
 
@@ -49,7 +50,7 @@ public:
 
   bool CreateWindow(const WindowDesc &desc,
                     WindowHandle &outWindow) noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
 
     if (!EnsureDisplay())
       return false;
@@ -68,7 +69,7 @@ public:
                                            0, BlackPixel(m_Display, screen),
                                            WhitePixel(m_Display, screen));
     if (w == 0) {
-      GECKO_ERROR(categories::General, "XCreateSimpleWindow failed\n");
+      GECKO_ERROR(labels::General, "XCreateSimpleWindow failed\n");
       return false;
     }
 
@@ -110,7 +111,7 @@ public:
   }
 
   void DestroyWindow(WindowHandle window) noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
 
     if (!window.IsValid())
       return;
@@ -141,7 +142,7 @@ public:
   }
 
   bool RequestClose(WindowHandle window) noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
 
     if (!IsWindowAlive(window))
       return false;
@@ -155,7 +156,7 @@ public:
   }
 
   void PumpEvents() noexcept override {
-    GECKO_PROF_FUNC(categories::General);
+    GECKO_PROF_FUNC(labels::General);
 
     if (!m_Display)
       return;
@@ -355,7 +356,7 @@ private:
 
     m_Display = XOpenDisplay(nullptr);
     if (!m_Display) {
-      GECKO_ERROR(categories::General, "XOpenDisplay failed (no X server?)\n");
+      GECKO_ERROR(labels::General, "XOpenDisplay failed (no X server?)\n");
       return false;
     }
 

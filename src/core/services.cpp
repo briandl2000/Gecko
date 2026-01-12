@@ -8,6 +8,7 @@
 #include <cstring>
 
 #include "gecko/core/assert.h"
+#include "gecko/core/log.h"
 
 namespace gecko {
 
@@ -22,12 +23,14 @@ namespace gecko {
  * Level 0: Allocator    - No dependencies on other services
  * Level 1: JobSystem    - May use allocator for job storage and worker threads
  * Level 2: Profiler     - May use allocator and job system for background
- * processing Level 3: Logger       - May use allocator, job system, and
- * profiler for performance tracking
+ * processing
+ * Level 3: Logger       - May use allocator, job system, and profiler for
+ * performance tracking
+ * Level 4: Modules      - May use allocator, job system, profiler, and logger
  *
  * SHUTDOWN ORDER (reverse of initialization):
- * Level 3: Logger -> Level 2: Profiler -> Level 1: JobSystem -> Level 0:
- * Allocator
+ * Level 4: Modules -> Level 3: Logger -> Level 2: Profiler -> Level 1:
+ * JobSystem -> Level 0: Allocator
  *
  * BENEFITS OF THIS ORDER:
  * - JobSystem is available early for background processing by Profiler and
@@ -39,11 +42,47 @@ namespace gecko {
 
 #pragma region(minimal defaults) // ------------------------------------------------
 
-void *SystemAllocator::Alloc(u64 size, u32 alignment,
-                             Category category) noexcept {
+bool NullModuleRegistry::Init() noexcept { return true; }
+void NullModuleRegistry::Shutdown() noexcept {}
+
+ModuleRegistration
+NullModuleRegistry::RegisterStatic(IModule &module) noexcept {
+  const Label id = module.RootLabel();
+  if (!id.IsValid()) {
+    return ModuleRegistration{ModuleHandle{}, ModuleResult::InvalidArgument};
+  }
+  return ModuleRegistration{MakeHandle(id), ModuleResult::Ok};
+}
+
+ModuleResult NullModuleRegistry::Unregister(Label id) noexcept {
+  (void)id;
+  return ModuleResult::Ok;
+}
+
+IModule *NullModuleRegistry::GetModule(Label id) noexcept {
+  (void)id;
+  return nullptr;
+}
+
+const IModule *NullModuleRegistry::GetModule(Label id) const noexcept {
+  (void)id;
+  return nullptr;
+}
+
+void NullModuleRegistry::ForEachModule(ModuleVisitFn fn, void *user) noexcept {
+  (void)fn;
+  (void)user;
+}
+
+bool NullModuleRegistry::StartupAllModules() noexcept { return true; }
+void NullModuleRegistry::ShutdownAllModules() noexcept {}
+
+void *SystemAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
+
+  (void)label;
 
   if (alignment <= alignof(std::max_align_t)) {
     return std::malloc(static_cast<size_t>(size));
@@ -60,9 +99,12 @@ void *SystemAllocator::Alloc(u64 size, u32 alignment,
 }
 
 void SystemAllocator::Free(void *ptr, u64 size, u32 alignment,
-                           Category category) noexcept {
+                           Label label) noexcept {
   if (!ptr)
     return;
+
+  (void)size;
+  (void)label;
 #if defined(_MSC_VER)
   if (alignment > alignof(std::max_align_t)) {
     _aligned_free(ptr);
@@ -79,7 +121,7 @@ u64 NullProfiler::NowNs() const noexcept { return 0; }
 bool NullProfiler::Init() noexcept { return true; }
 void NullProfiler::Shutdown() noexcept {}
 
-void NullLogger::LogV(LogLevel level, Category category, const char *fmt,
+void NullLogger::LogV(LogLevel level, Label label, const char *fmt,
                       va_list) noexcept {}
 void NullLogger::AddSink(ILogSink *sink) noexcept {}
 void NullLogger::SetLevel(LogLevel level) noexcept {}
@@ -89,7 +131,9 @@ bool NullLogger::Init() noexcept { return true; }
 void NullLogger::Shutdown() noexcept {}
 
 JobHandle NullJobSystem::Submit(JobFunction job, JobPriority priority,
-                                Category category) noexcept {
+                                Label label) noexcept {
+  (void)priority;
+  (void)label;
   // Execute job immediately in null implementation
   if (job)
     job();
@@ -98,7 +142,11 @@ JobHandle NullJobSystem::Submit(JobFunction job, JobPriority priority,
 
 JobHandle NullJobSystem::Submit(JobFunction job, const JobHandle *dependencies,
                                 u32 dependencyCount, JobPriority priority,
-                                Category category) noexcept {
+                                Label label) noexcept {
+  (void)dependencies;
+  (void)dependencyCount;
+  (void)priority;
+  (void)label;
   // Execute job immediately in null implementation (dependencies are ignored)
   if (job)
     job();
@@ -252,6 +300,7 @@ static SystemAllocator s_SystemAllocator;
 static NullJobSystem s_NullJobSystem;
 static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
+static NullModuleRegistry s_NullModules;
 static NullEventBus s_NullEventBus;
 
 #pragma endregion //----------------------------------------------------------------
@@ -260,6 +309,7 @@ static std::atomic<IAllocator *> g_Allocator{&s_SystemAllocator};
 static std::atomic<IJobSystem *> g_JobSystem{&s_NullJobSystem};
 static std::atomic<IProfiler *> g_Profiler{&s_NullProfiler};
 static std::atomic<ILogger *> g_Logger{&s_NullLogger};
+static std::atomic<IModuleRegistry *> g_Modules{&s_NullModules};
 static std::atomic<IEventBus *> g_EventBus{&s_NullEventBus};
 static std::atomic<bool> g_Installed{false};
 
@@ -337,6 +387,32 @@ bool InstallServices(const Services &service) noexcept {
     g_Logger.store(service.Logger, std::memory_order_release);
   }
 
+  // Level 4: Modules (may use allocator, job system, profiler, logger)
+  if (service.Modules) {
+    if (!service.Modules->Init()) {
+      GECKO_ASSERT(false && "ModuleRegistry failed to initialize!");
+      // Rollback previous services in reverse order
+      if (service.Logger) {
+        service.Logger->Shutdown();
+        g_Logger.store(&s_NullLogger, std::memory_order_release);
+      }
+      if (service.Profiler) {
+        service.Profiler->Shutdown();
+        g_Profiler.store(&s_NullProfiler, std::memory_order_release);
+      }
+      if (service.JobSystem) {
+        service.JobSystem->Shutdown();
+        g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
+      }
+      if (service.Allocator) {
+        service.Allocator->Shutdown();
+        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
+      }
+      return false;
+    }
+    g_Modules.store(service.Modules, std::memory_order_release);
+  }
+
   // Level 4: EventBus (may use allocator and profiler)
   if (service.EventBus) {
     if (!service.EventBus->Init()) {
@@ -369,9 +445,19 @@ bool InstallServices(const Services &service) noexcept {
 }
 
 void UninstallServices() noexcept {
-  // Shutdown services in reverse dependency order: EventBus -> Logger ->
+  // Shutdown services in reverse dependency order: EventBus -> Modules -> Logger ->
   // Profiler -> JobSystem -> Allocator This ensures that higher-level services
   // are shut down before the services they depend on
+  // Modules shut down first so modules can still log during shutdown.
+
+  static constexpr auto c_Services = ::gecko::MakeLabel("gecko.core.services");
+
+  auto *modules = g_Modules.load(std::memory_order_relaxed);
+  if (modules) {
+    GECKO_INFO(c_Services, "UninstallServices: shutting down modules");
+    modules->Shutdown();
+    GECKO_INFO(c_Services, "UninstallServices: modules shutdown complete");
+  }
 
   g_EventBus.load(std::memory_order_relaxed)
       ->Shutdown(); // Level 4: May use profiler, allocator
@@ -389,6 +475,7 @@ void UninstallServices() noexcept {
   g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
   g_Profiler.store(&s_NullProfiler, std::memory_order_release);
   g_Logger.store(&s_NullLogger, std::memory_order_release);
+  g_Modules.store(&s_NullModules, std::memory_order_release);
   g_EventBus.store(&s_NullEventBus, std::memory_order_release);
   g_Installed.store(false, std::memory_order_release);
 }
@@ -424,6 +511,14 @@ ILogger *GetLogger() noexcept {
   return logger;
 }
 
+IModuleRegistry *GetModules() noexcept {
+  auto *modules = g_Modules.load(std::memory_order_acquire);
+  GECKO_ASSERT(
+      modules &&
+      "Modules not available - services may not be properly installed");
+  return modules;
+}
+
 IEventBus *GetEventBus() noexcept {
   auto *eventBus = g_EventBus.load(std::memory_order_acquire);
   GECKO_ASSERT(
@@ -445,6 +540,8 @@ bool ValidateServices(bool fatalOnFail) noexcept {
   if (!GetLogger())
     ok = false;
   if (!GetJobSystem())
+    ok = false;
+  if (!GetModules())
     ok = false;
 
 #if GECKO_REQUIRE_INSTALL

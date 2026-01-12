@@ -51,7 +51,7 @@ namespace gecko {
 #include "gecko/core/log.h"
 
 // Local includes last
-#include "categories.h"
+#include "labels.h"
 
 namespace gecko {
   // Implementation here
@@ -63,11 +63,18 @@ namespace gecko {
 - **Types**: PascalCase (`LogLevel`, `IAllocator`, `PlatformContext`)
 - **Functions**: PascalCase (`GetAllocator()`, `InstallServices()`)
 - **Variables**: camelCase (`timeNs`, `threadId`)
-- **Public Member Variables**: PascalCase (`Level`, `Category`, `TimeNs`)
+- **Public Member Variables**: PascalCase (`Level`, `TimeNs`)
 - **Private Member Variables**: m_ prefix (`m_File`, `m_ThreadSafe`, `m_Level`)
 - **Static/Global Variables**: g_ or s_ prefix (`g_Allocator`, `s_SystemAllocator`)
-- **Constants**: PascalCase or ALL_CAPS (`LogLevel::Info`, `GECKO_API`)
+- **Constants**: Prefer descriptive PascalCase (`MaxSize`, `DefaultCapacity`)
+- **Labels**: Put them in a `::<scope>::labels` namespace and use PascalCase
+  (e.g. `app::my_game::labels::Main`; inside a module: `gecko::runtime::labels::Modules`)
+- **Macros**: ALL_CAPS (`GECKO_API`, `GECKO_ASSERT`)
 - **Namespaces**: lowercase (`gecko`, `runtime`, `platform`)
+
+**Prefix rule**:
+- Allowed prefixes are `m_`, `g_`, `s_`.
+- Do **not** use `k*` prefixes (e.g. `kRootLabel`, `kMaxSize`).
 
 ### Formatting Standards
 
@@ -122,7 +129,7 @@ Use brace initialization `{}` for struct/class initialization:
 struct LogMessage
 {
   LogLevel Level { LogLevel::Trace };  // Explicit enum value
-  Category Category { };               // Default-constructed (struct/class)
+  Label label { };                     // Default-constructed (struct/class)
   u64 TimeNs { 0 };                   // Explicit zero
   u32 ThreadId { 0 };                 // Explicit zero
   const char* Text { nullptr };       // Explicit nullptr
@@ -286,14 +293,14 @@ int main()
 #include "gecko/core/memory.h"
 
 // Basic byte allocation
-auto category = gecko::MakeCategory("my_system");
-void* ptr = gecko::AllocBytes(1024, 16, category);  // 1024 bytes, 16-byte aligned
-gecko::DeallocBytes(ptr, 1024, 16, category);
+auto label = gecko::MakeLabel("my_system");
+void* ptr = gecko::AllocBytes(1024, 16, label);  // 1024 bytes, 16-byte aligned
+gecko::DeallocBytes(ptr, 1024, 16, label);
 
 // Type-safe array allocation
-int* array = gecko::AllocArray<int>(100, category);  // 100 integers
+int* array = gecko::AllocArray<int>(100, label);  // 100 integers
 // Use array...
-gecko::DeallocBytes(array, sizeof(int) * 100, alignof(int), category);
+gecko::DeallocBytes(array, sizeof(int) * 100, alignof(int), label);
 ```
 
 #### Custom Allocators
@@ -301,7 +308,7 @@ gecko::DeallocBytes(array, sizeof(int) * 100, alignof(int), category);
 class MyAllocator : public gecko::IAllocator
 {
 public:
-  virtual void* Alloc(gecko::u64 size, gecko::u32 alignment, gecko::Category category) noexcept override
+  virtual void* Alloc(gecko::u64 size, gecko::u32 alignment, gecko::Label label) noexcept override
   {
     GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
     GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
@@ -310,7 +317,7 @@ public:
     return allocate_memory(size, alignment);
   }
   
-  virtual void Free(void* ptr, gecko::u64 size, gecko::u32 alignment, gecko::Category category) noexcept override
+  virtual void Free(void* ptr, gecko::u64 size, gecko::u32 alignment, gecko::Label label) noexcept override
   {
     if (!ptr) return;
     // Your deallocation logic here
@@ -328,19 +335,19 @@ public:
 ```cpp
 #include "gecko/core/log.h"
 
-auto category = gecko::MakeCategory("my_system");
+auto label = gecko::MakeLabel("my_system");
 
 // Using convenience macros
-GECKO_TRACE(category, "Detailed trace information: %d", value);
-GECKO_DEBUG(category, "Debug info: %s", debugString);
-GECKO_INFO(category, "General information");
-GECKO_WARN(category, "Warning message: %s", warning);
-GECKO_ERROR(category, "Error occurred: %d", errorCode);
-GECKO_FATAL(category, "Fatal error: %s", fatalMessage);
+GECKO_TRACE(label, "Detailed trace information: %d", value);
+GECKO_DEBUG(label, "Debug info: %s", debugString);
+GECKO_INFO(label, "General information");
+GECKO_WARN(label, "Warning message: %s", warning);
+GECKO_ERROR(label, "Error occurred: %d", errorCode);
+GECKO_FATAL(label, "Fatal error: %s", fatalMessage);
 
 // Direct logger access
 auto* logger = gecko::GetLogger();
-logger->Log(gecko::LogLevel::Info, category, "Message: %s", text);
+logger->Log(gecko::LogLevel::Info, label, "Message: %s", text);
 ```
 
 #### Custom Log Sinks
@@ -352,10 +359,10 @@ public:
   {
     GECKO_ASSERT(message.Text && "Log message text cannot be null");
     
-    // Format: [LEVEL][CATEGORY][THREAD] MESSAGE
+    // Format: [LEVEL][LABEL][THREAD] MESSAGE
     printf("[%s][%s][t%u] %s\n",
            gecko::LevelName(message.Level),
-           message.Category.Name ? message.Category.Name : "unknown",
+           message.label.Name ? message.label.Name : "unknown",
            message.ThreadId,
            message.Text);
   }
@@ -384,12 +391,12 @@ ringLogger.SetLevel(gecko::LogLevel::Trace);
 ```cpp
 #include "gecko/core/profiler.h"
 
-auto category = gecko::MakeCategory("my_system");
+auto label = gecko::MakeLabel("my_system");
 
 // Function profiling
 void MyFunction()
 {
-  GECKO_PROF_FUNC(category);  // Profiles entire function
+  GECKO_PROF_FUNC(label);  // Profiles entire function
   // Function body...
 }
 
@@ -397,19 +404,19 @@ void MyFunction()
 void ProcessData()
 {
   {
-    GECKO_PROF_SCOPE(category, "data_loading");
+    GECKO_PROF_SCOPE(label, "data_loading");
     // Load data...
   }
   
   {
-    GECKO_PROF_SCOPE(category, "data_processing");
+    GECKO_PROF_SCOPE(label, "data_processing");
     // Process data...
   }
 }
 
 // Counters and frame markers
-GECKO_PROF_COUNTER(category, "active_objects", objectCount);
-GECKO_PROF_FRAME(category, "main_loop");
+GECKO_PROF_COUNTER(label, "active_objects", objectCount);
+GECKO_PROF_FRAME(label, "main_loop");
 ```
 
 #### Custom Profilers
@@ -511,21 +518,30 @@ constexpr size_t CountSetFlags(E flags)
 }
 ```
 
-### Categories System
+### Labels System
 
-Categories are used for organizing and filtering logs/profiling data:
+Labels are used for organizing and filtering logs/profiling data:
 
 ```cpp
-// Create categories
-auto mySystemCategory = gecko::MakeCategory("my_system");
-auto networkCategory = gecko::MakeCategory("network");
-auto renderCategory = gecko::MakeCategory("renderer");
+// You can always create an ad-hoc label:
+gecko::Label mySystemLabel = gecko::MakeLabel("my_system");
 
-// Categories are compile-time constants when possible
-namespace categories {
-  inline constexpr auto MySystem = gecko::MakeCategory("my_system");
-  inline constexpr auto Network = gecko::MakeCategory("network");
-  inline constexpr auto Renderer = gecko::MakeCategory("renderer");
+// Prefer compile-time label constants in a `::<scope>::labels` namespace.
+//
+// Apps can define `app::<app_name>::labels` anywhere convenient (often in the
+// app's main .cpp or a small app header).
+//
+// Engine module labels are kept private per module:
+// - Define them in src/<module>/labels.h
+// - Include them via "labels.h" from that module's .cpp files
+namespace gecko::runtime::labels {
+  inline constexpr gecko::Label Runtime = gecko::MakeLabel("gecko.runtime");
+  inline constexpr gecko::Label Modules = gecko::MakeLabel("gecko.runtime.modules");
+}
+
+namespace app::my_game::labels {
+  inline constexpr gecko::Label App = gecko::MakeLabel("app.my_game");
+  inline constexpr gecko::Label Main = gecko::MakeLabel("app.my_game.main");
 }
 ```
 
@@ -539,8 +555,8 @@ tracker.SetProfiler(gecko::GetProfiler());  // For counter emission
 
 // Use as normal allocator - automatically tracks statistics
 // Get statistics
-gecko::runtime::MemCategoryStats stats;
-if (tracker.StatsFor(myCategory, stats))
+gecko::runtime::MemLabelStats stats;
+if (tracker.StatsFor(label, stats))
 {
   printf("Live bytes: %llu\n", stats.LiveBytes.load());
   printf("Total allocs: %llu\n", stats.Allocs.load());
@@ -695,25 +711,25 @@ gecko::Services services{
 GECKO_BOOT(services);
 
 // Basic job submission
-auto category = gecko::MakeCategory("compute");
+auto label = gecko::MakeLabel("compute");
 auto job = []() {
   // Do work here
-  GECKO_INFO(category, "Job executed");
+  GECKO_INFO(label, "Job executed");
 };
 
-auto handle = gecko::SubmitJob(job, gecko::JobPriority::Normal, category);
+auto handle = gecko::SubmitJob(job, gecko::JobPriority::Normal, label);
 gecko::WaitForJob(handle);
 
 // Job dependencies (pipeline pattern)
-auto job1 = gecko::SubmitJob([]() { /* Stage 1 */ }, gecko::JobPriority::High, category);
+auto job1 = gecko::SubmitJob([]() { /* Stage 1 */ }, gecko::JobPriority::High, label);
 gecko::JobHandle deps[] = { job1 };
-auto job2 = gecko::SubmitJob([]() { /* Stage 2 */ }, deps, 1, gecko::JobPriority::Normal, category);
+auto job2 = gecko::SubmitJob([]() { /* Stage 2 */ }, deps, 1, gecko::JobPriority::Normal, label);
 gecko::WaitForJob(job2);
 
 // Batch operations
 std::vector<gecko::JobHandle> handles;
 for (int i = 0; i < 10; ++i) {
-  handles.push_back(gecko::SubmitJob([i]() { /* Work */ }, gecko::JobPriority::Normal, category));
+  handles.push_back(gecko::SubmitJob([i]() { /* Work */ }, gecko::JobPriority::Normal, label));
 }
 gecko::WaitForJobs(handles.data(), static_cast<u32>(handles.size()));
 
@@ -721,7 +737,7 @@ gecko::WaitForJobs(handles.data(), static_cast<u32>(handles.size()));
 gecko::GetJobSystem()->ProcessJobs(5);  // Process up to 5 jobs on current thread
 
 // Using function calls directly
-auto handle = gecko::SubmitJob(job, gecko::JobPriority::Normal, category);
+auto handle = gecko::SubmitJob(job, gecko::JobPriority::Normal, label);
 gecko::WaitForJob(handle);
 ```
 
@@ -736,7 +752,7 @@ gecko::WaitForJob(handle);
 ### Performance
 - Use ring buffers for high-frequency operations (logging, profiling)
 - Prefer immediate mode for low-frequency, important operations
-- Category-based filtering for conditional operations
+- Label-based filtering for conditional operations
 - Memory alignment validation in debug builds
 
 ### Thread Safety
@@ -778,13 +794,11 @@ private:
 };
 ```
 
-### Category Declaration Pattern
+### Label Declaration Pattern
 ```cpp
-// In categories.h
-namespace my_project::categories {
-  inline constexpr auto System = gecko::MakeCategory("system");
-  inline constexpr auto Network = gecko::MakeCategory("network");
-  inline constexpr auto Renderer = gecko::MakeCategory("renderer");
+namespace app::my_game::labels {
+  inline constexpr gecko::Label App = gecko::MakeLabel("app.my_game");
+  inline constexpr gecko::Label Main = gecko::MakeLabel("app.my_game.main");
 }
 ```
 
@@ -792,20 +806,21 @@ namespace my_project::categories {
 ```cpp
 void ExpensiveFunction()
 {
-  GECKO_PROF_FUNC(categories::System);
+  namespace labels = app::my_game::labels;
+  GECKO_PROF_FUNC(labels::Main);
   
   // Function implementation
   {
-    GECKO_PROF_SCOPE(categories::System, "initialization");
+    GECKO_PROF_SCOPE(labels::Main, "initialization");
     // Initialization phase
   }
   
   {
-    GECKO_PROF_SCOPE(categories::System, "processing");
+    GECKO_PROF_SCOPE(labels::Main, "processing");
     // Processing phase
   }
   
-  GECKO_PROF_COUNTER(categories::System, "items_processed", itemCount);
+  GECKO_PROF_COUNTER(labels::Main, "items_processed", itemCount);
 }
 ```
 

@@ -1,12 +1,13 @@
 #include <cstdio>
 #include <cstring>
+#include <atomic>
 #include <vector>
 
 #include "gecko/core/boot.h"
-#include "gecko/core/category.h"
 #include "gecko/core/events.h"
 #include "gecko/core/log.h"
 #include "gecko/core/memory.h"
+#include "gecko/core/modules.h"
 #include "gecko/core/profiler.h"
 #include "gecko/core/random.h"
 #include "gecko/core/services.h"
@@ -16,39 +17,51 @@
 #include "gecko/runtime/console_log_sink.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/file_log_sink.h"
+#include "gecko/runtime/module_registry.h"
 #include "gecko/runtime/ring_logger.h"
 #include "gecko/runtime/ring_profiler.h"
+#include "gecko/runtime/runtime_module.h"
 #include "gecko/runtime/thread_pool_job_system.h"
 #include "gecko/runtime/trace_file_sink.h"
 #include "gecko/runtime/tracking_allocator.h"
 
 using namespace gecko;
 
-// Define categories for different subsystems
-const auto MAIN_CAT = MakeCategory("Main");
-const auto WORKER_CAT = MakeCategory("Worker");
-const auto MEMORY_CAT = MakeCategory("Memory");
-const auto COMPUTE_CAT = MakeCategory("Compute");
-const auto SIMULATION_CAT = MakeCategory("Simulation");
-const auto EVENT_CAT = MakeCategory("Event");
+namespace app::core_example::labels {
+inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.core_example");
+inline constexpr ::gecko::Label Main =
+    ::gecko::MakeLabel("app.core_example.main");
+inline constexpr ::gecko::Label Worker =
+    ::gecko::MakeLabel("app.core_example.worker");
+inline constexpr ::gecko::Label Memory =
+    ::gecko::MakeLabel("app.core_example.memory");
+inline constexpr ::gecko::Label Compute =
+    ::gecko::MakeLabel("app.core_example.compute");
+inline constexpr ::gecko::Label Simulation =
+    ::gecko::MakeLabel("app.core_example.simulation");
+} // namespace app::core_example::labels
 
-// Demo event domain and codes
-namespace demo_events {
-constexpr u8 DemoDomain = 0x42;
-constexpr EventCode DataProcessed = MakeEvent(DemoDomain, 0x0001);
-constexpr EventCode TaskComplete = MakeEvent(DemoDomain, 0x0002);
+namespace {
 
-struct DataProcessedPayload {
-  u32 itemsProcessed{0};
-  float processingTimeMs{0.0f};
+class CoreExampleAppModule final : public ::gecko::IModule {
+public:
+  [[nodiscard]] ::gecko::Label RootLabel() const noexcept override {
+    return app::core_example::labels::App;
+  }
+
+  [[nodiscard]] bool
+  Startup(::gecko::IModuleRegistry &modules) noexcept override {
+    return true;
+  }
+
+  void Shutdown(::gecko::IModuleRegistry &modules) noexcept override {}
 };
 
-struct TaskCompletePayload {
-  u32 taskId{0};
-  bool success{false};
-};
-} // namespace demo_events
+CoreExampleAppModule g_AppModule;
 
+} // namespace
+
+// Define labels for different subsystems
 // Simple data structure for our simulation
 struct Particle {
   float x, y, z;
@@ -56,32 +69,44 @@ struct Particle {
   float mass;
 };
 
+namespace app::core_example::events {
+constexpr u8 Domain = 0x42;
+constexpr EventCode TestEvent = MakeEvent(Domain, 0x0001);
+
+struct TestEventPayload {
+  u32 value{0};
+};
+} // namespace app::core_example::events
+
 // Worker function that simulates some computation
 void WorkerTask(int workerId, int numParticles) {
-  GECKO_PROF_FUNC(WORKER_CAT);
+  GECKO_PROF_FUNC(app::core_example::labels::Worker);
 
-  GECKO_INFO(WORKER_CAT, "Worker %d: Starting simulation with %d particles",
-             workerId, numParticles);
+  GECKO_INFO(app::core_example::labels::Worker,
+             "Worker %d: Starting simulation with %d particles", workerId,
+             numParticles);
 
   // Allocate particles
   Particle *particles = nullptr;
   {
-    GECKO_PROF_SCOPE(MEMORY_CAT, "AllocateParticles");
-    particles = AllocArray<Particle>(numParticles, SIMULATION_CAT);
+    GECKO_PROF_SCOPE(app::core_example::labels::Memory, "AllocateParticles");
+    particles =
+        AllocArray<Particle>(numParticles, app::core_example::labels::Simulation);
   }
   {
     if (!particles) {
-      GECKO_ERROR(WORKER_CAT, "Worker %d: Failed to allocate particles",
-                  workerId);
+      GECKO_ERROR(app::core_example::labels::Worker,
+                  "Worker %d: Failed to allocate particles", workerId);
       return;
     }
 
-    GECKO_DEBUG(MEMORY_CAT, "Worker %d: Allocated %zu bytes for %d particles",
-                workerId, numParticles * sizeof(Particle), numParticles);
+    GECKO_DEBUG(app::core_example::labels::Memory,
+                "Worker %d: Allocated %zu bytes for %d particles", workerId,
+                numParticles * sizeof(Particle), numParticles);
 
     // Initialize particles
     {
-      GECKO_PROF_SCOPE(COMPUTE_CAT, "InitializeParticles");
+      GECKO_PROF_SCOPE(app::core_example::labels::Compute, "InitializeParticles");
       // Seed random generator differently per worker for unique particle
       // behaviors
       gecko::SeedRandom(workerId * 12345 + 42);
@@ -99,7 +124,7 @@ void WorkerTask(int workerId, int numParticles) {
   }
 
   {
-    GECKO_PROF_SCOPE(COMPUTE_CAT, "PHysicsUpdate");
+    GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PHysicsUpdate");
 
     // Simulate physics steps (engaging but quick)
     const int numSteps = 50;
@@ -107,7 +132,7 @@ void WorkerTask(int workerId, int numParticles) {
     const float damping = 0.999f;   // Cache constant
 
     for (int step = 0; step < numSteps; ++step) {
-      GECKO_PROF_SCOPE(COMPUTE_CAT, "PhysicsStep");
+      GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PhysicsStep");
 
       // Optimized physics update with better cache usage
       for (int i = 0; i < numParticles; ++i) {
@@ -126,31 +151,33 @@ void WorkerTask(int workerId, int numParticles) {
 
       // Emit progress counter (reduce frequency to minimize profiling overhead)
       if (step % 20 == 0) {
-        GECKO_PROF_COUNTER(WORKER_CAT, "SimulationProgress", step);
+        GECKO_PROF_COUNTER(app::core_example::labels::Worker, "SimulationProgress",
+                           step);
       }
     }
 
-    GECKO_TRACE(COMPUTE_CAT, "Worker %d: Completed %d physics steps", workerId,
-                numSteps);
-    GECKO_INFO(WORKER_CAT,
+    GECKO_TRACE(app::core_example::labels::Compute,
+                "Worker %d: Completed %d physics steps", workerId, numSteps);
+    GECKO_INFO(app::core_example::labels::Worker,
                "Worker %d: Physics simulation complete! All particles settled.",
                workerId);
   }
 
   // Clean up
   {
-    GECKO_PROF_SCOPE(MEMORY_CAT, "DeallocateParticles");
+    GECKO_PROF_SCOPE(app::core_example::labels::Memory, "DeallocateParticles");
     DeallocBytes(particles, numParticles * sizeof(Particle), alignof(Particle),
-                 SIMULATION_CAT);
-    GECKO_DEBUG(MEMORY_CAT, "Worker %d: Freed particle memory", workerId);
+                 app::core_example::labels::Simulation);
+    GECKO_DEBUG(app::core_example::labels::Memory,
+                "Worker %d: Freed particle memory", workerId);
   }
 }
 
 // Function to perform some memory stress testing
 void MemoryStressTest() {
-  GECKO_PROF_FUNC(MEMORY_CAT);
+  GECKO_PROF_FUNC(app::core_example::labels::Memory);
 
-  GECKO_INFO(MEMORY_CAT, "Starting memory stress test");
+  GECKO_INFO(app::core_example::labels::Memory, "Starting memory stress test");
 
   std::vector<std::pair<void *, size_t>> allocations; // Store pointer and size
 
@@ -158,30 +185,32 @@ void MemoryStressTest() {
   auto *trackingAlloc =
       static_cast<runtime::TrackingAllocator *>(GetAllocator());
 
-  GECKO_DEBUG(MEMORY_CAT, "Stress-testing memory with 25 random allocations "
-                          "(64-2048 bytes each)");
+  GECKO_DEBUG(app::core_example::labels::Memory,
+              "Stress-testing memory with 25 random allocations "
+              "(64-2048 bytes each)");
 
   // Allocate random sized blocks with interesting patterns
   for (int i = 0; i < 25; ++i) {
     size_t size = gecko::random::Size(64, 4096);
-    void *ptr = AllocBytes(size, 16, MEMORY_CAT);
+    void *ptr = AllocBytes(size, 16, app::core_example::labels::Memory);
     if (ptr) {
       allocations.push_back({ptr, size});
       // Write some data to ensure it's valid
       std::memset(ptr, i & 0xFF, size);
     } else {
-      GECKO_WARN(MEMORY_CAT, "Failed to allocate %zu bytes in iteration %d",
-                 size, i);
+      GECKO_WARN(app::core_example::labels::Memory,
+                 "Failed to allocate %zu bytes in iteration %d", size, i);
     }
 
     // Use tracking allocator's live bytes count instead of manual counting
     if (trackingAlloc && (i % 10 == 0)) {
-      GECKO_PROF_COUNTER(MEMORY_CAT, "LiveBytes",
+      GECKO_PROF_COUNTER(app::core_example::labels::Memory, "LiveBytes",
                          trackingAlloc->TotalLiveBytes());
     }
   }
 
-  GECKO_DEBUG(MEMORY_CAT, "Freeing half of the allocations randomly");
+  GECKO_DEBUG(app::core_example::labels::Memory,
+              "Freeing half of the allocations randomly");
 
   // Free half randomly - shuffle by swapping random elements
   for (size_t i = 0; i < allocations.size(); ++i) {
@@ -192,231 +221,83 @@ void MemoryStressTest() {
   size_t freedCount = 0;
   for (size_t i = 0; i < allocations.size() / 2; ++i) {
     if (allocations[i].first) {
-      DeallocBytes(allocations[i].first, allocations[i].second, 16, MEMORY_CAT);
+      DeallocBytes(allocations[i].first, allocations[i].second, 16,
+                   app::core_example::labels::Memory);
       allocations[i].first = nullptr;
       freedCount++;
     }
   }
 
-  GECKO_INFO(MEMORY_CAT, "Freed %zu allocations", freedCount);
+  GECKO_INFO(app::core_example::labels::Memory, "Freed %zu allocations",
+             freedCount);
 
   // Emit counter after freeing
   if (trackingAlloc) {
-    GECKO_PROF_COUNTER(MEMORY_CAT, "LiveBytesAfterFree",
+    GECKO_PROF_COUNTER(app::core_example::labels::Memory, "LiveBytesAfterFree",
                        trackingAlloc->TotalLiveBytes());
   }
 
-  GECKO_DEBUG(MEMORY_CAT,
+  GECKO_DEBUG(app::core_example::labels::Memory,
               "Allocating 25 additional blocks with 32-byte alignment");
 
   // Allocate some more
   for (int i = 0; i < 25; ++i) {
     size_t size = gecko::random::Size(64, 4096);
-    void *ptr = AllocBytes(size, 32, MEMORY_CAT);
+    void *ptr = AllocBytes(size, 32, app::core_example::labels::Memory);
     if (ptr) {
       allocations.push_back({ptr, size});
       std::memset(ptr, (i + 100) & 0xFF, size);
     } else {
-      GECKO_WARN(MEMORY_CAT,
+      GECKO_WARN(app::core_example::labels::Memory,
                  "Failed to allocate %zu bytes in second phase, iteration %d",
                  size, i);
     }
   }
 
-  GECKO_DEBUG(MEMORY_CAT, "Cleaning up remaining allocations");
+  GECKO_DEBUG(app::core_example::labels::Memory,
+              "Cleaning up remaining allocations");
 
   // Clean up remaining allocations
   size_t cleanupCount = 0;
   for (const auto &alloc : allocations) {
     if (alloc.first) {
-      DeallocBytes(alloc.first, alloc.second, 16, MEMORY_CAT);
+      DeallocBytes(alloc.first, alloc.second, 16,
+                   app::core_example::labels::Memory);
       cleanupCount++;
     }
   }
 
-  GECKO_INFO(MEMORY_CAT, "Cleaned up %zu remaining allocations", cleanupCount);
+  GECKO_INFO(app::core_example::labels::Memory,
+             "Cleaned up %zu remaining allocations", cleanupCount);
 
   // Final counter after cleanup
   if (trackingAlloc) {
-    GECKO_PROF_COUNTER(MEMORY_CAT, "FinalLiveBytes",
+    GECKO_PROF_COUNTER(app::core_example::labels::Memory, "FinalLiveBytes",
                        trackingAlloc->TotalLiveBytes());
   }
 
-  GECKO_INFO(MEMORY_CAT, "Memory stress test completed successfully");
-}
-
-void EventSystemTest() {
-  GECKO_PROF_FUNC(EVENT_CAT);
-
-  GECKO_INFO(EVENT_CAT, "Starting event system test");
-
-  // Create emitter for demo events
-  EventEmitter emitter = CreateEmitter(demo_events::DemoDomain);
-
-  // Test 1: Immediate event
-  GECKO_INFO(EVENT_CAT, "Test 1: Immediate event publishing");
-
-  struct TestContext {
-    int immediateCallCount = 0;
-    int queuedCallCount = 0;
-    int onPublishCallCount = 0;
-  };
-  TestContext ctx;
-
-  auto immediateSub = SubscribeEvent(
-      demo_events::DataProcessed,
-      [](void *user, const EventMeta &meta, EventView payload) {
-        auto *context = static_cast<TestContext *>(user);
-        auto *data = static_cast<const demo_events::DataProcessedPayload *>(
-            payload.Data());
-        context->immediateCallCount++;
-        GECKO_INFO(EVENT_CAT,
-                   "  [Immediate] DataProcessed received: %u items in %.2fms "
-                   "(seq=%llu)",
-                   data->itemsProcessed, data->processingTimeMs, meta.seq);
-      },
-      &ctx);
-
-  demo_events::DataProcessedPayload immediatePayload{100, 15.5f};
-  PublishImmediateEvent(emitter, demo_events::DataProcessed, immediatePayload);
-
-  GECKO_INFO(EVENT_CAT, "  Immediate callbacks executed: %d",
-             ctx.immediateCallCount);
-
-  // Test 2: Queued events
-  GECKO_INFO(EVENT_CAT, "Test 2: Queued event publishing");
-
-  auto queuedSub = SubscribeEvent(
-      demo_events::TaskComplete,
-      [](void *user, const EventMeta &meta, EventView payload) {
-        auto *context = static_cast<TestContext *>(user);
-        auto *data = static_cast<const demo_events::TaskCompletePayload *>(
-            payload.Data());
-        context->queuedCallCount++;
-        GECKO_INFO(EVENT_CAT,
-                   "  [Queued] TaskComplete received: task=%u success=%s "
-                   "(seq=%llu)",
-                   data->taskId, data->success ? "true" : "false", meta.seq);
-      },
-      &ctx);
-
-  auto onPublishSub = SubscribeEvent(
-      demo_events::TaskComplete,
-      [](void *user, const EventMeta &meta, EventView payload) {
-        auto *context = static_cast<TestContext *>(user);
-        auto *data = static_cast<const demo_events::TaskCompletePayload *>(
-            payload.Data());
-        context->onPublishCallCount++;
-        GECKO_INFO(EVENT_CAT,
-                   "  [OnPublish] TaskComplete received ASAP: task=%u success=%s "
-                   "(seq=%llu)",
-                   data->taskId, data->success ? "true" : "false", meta.seq);
-      },
-      &ctx,
-      SubscriptionOptions{SubscriptionDelivery::OnPublish});
-
-  // Enqueue several events
-  for (u32 i = 0; i < 5; ++i) {
-    demo_events::TaskCompletePayload payload{i, (i % 2 == 0)};
-    PublishEvent(emitter, demo_events::TaskComplete, payload);
-  }
-
-  GECKO_INFO(EVENT_CAT,
-             "  After PublishEvent() calls, OnPublish callbacks executed: %d",
-             ctx.onPublishCallCount);
-
-  GECKO_INFO(EVENT_CAT, "  Enqueued 5 events, dispatching...");
-  std::size_t dispatched = DispatchQueuedEvents();
-  GECKO_INFO(EVENT_CAT, "  Dispatched %zu events, callbacks executed: %d",
-             dispatched, ctx.queuedCallCount);
-
-  // Test 3: Multiple subscribers
-  GECKO_INFO(EVENT_CAT, "Test 3: Multiple subscribers");
-
-  int subscriber2Count = 0;
-  int subscriber3Count = 0;
-
-  auto sub2 = SubscribeEvent(
-      demo_events::DataProcessed,
-      [](void *user, const EventMeta &, EventView payload) {
-        auto *count = static_cast<int *>(user);
-        (*count)++;
-        auto *data = static_cast<const demo_events::DataProcessedPayload *>(
-            payload.Data());
-        GECKO_INFO(EVENT_CAT, "  [Subscriber 2] Received %u items",
-                   data->itemsProcessed);
-      },
-      &subscriber2Count);
-
-  auto sub3 = SubscribeEvent(
-      demo_events::DataProcessed,
-      [](void *user, const EventMeta &, EventView payload) {
-        auto *count = static_cast<int *>(user);
-        (*count)++;
-        auto *data = static_cast<const demo_events::DataProcessedPayload *>(
-            payload.Data());
-        GECKO_INFO(EVENT_CAT, "  [Subscriber 3] Received %u items",
-                   data->itemsProcessed);
-      },
-      &subscriber3Count);
-
-  demo_events::DataProcessedPayload multiPayload{250, 22.3f};
-  PublishEvent(emitter, demo_events::DataProcessed, multiPayload);
-  std::size_t multiDispatched = DispatchQueuedEvents();
-
-  GECKO_INFO(EVENT_CAT,
-             "  Dispatched %zu events - Subscriber 1: %d, Subscriber 2: %d, "
-             "Subscriber 3: %d",
-             multiDispatched, ctx.queuedCallCount, subscriber2Count,
-             subscriber3Count);
-
-  // Test 4: Unsubscribe via RAII
-  GECKO_INFO(EVENT_CAT, "Test 4: RAII unsubscribe");
-  {
-    int tempCount = 0;
-    auto tempSub = SubscribeEvent(
-        demo_events::TaskComplete,
-        [](void *user, const EventMeta &, EventView) {
-          auto *count = static_cast<int *>(user);
-          (*count)++;
-          GECKO_INFO(EVENT_CAT, "  [Temp subscriber] Received event");
-        },
-        &tempCount);
-
-    demo_events::TaskCompletePayload payload{99, true};
-    PublishEvent(emitter, demo_events::TaskComplete, payload);
-    std::size_t tempDispatched = DispatchQueuedEvents();
-    GECKO_INFO(EVENT_CAT, "  Dispatched %zu events, temp subscriber count: %d",
-               tempDispatched, tempCount);
-
-    // tempSub goes out of scope here and auto-unsubscribes
-  }
-
-  GECKO_INFO(EVENT_CAT, "  Temp subscription destroyed, publishing again...");
-  demo_events::TaskCompletePayload payload{100, true};
-  PublishEvent(emitter, demo_events::TaskComplete, payload);
-  std::size_t dispatchedAfter = DispatchQueuedEvents();
-  GECKO_INFO(EVENT_CAT, "  Events dispatched after unsubscribe: %zu",
-             dispatchedAfter);
-
-  GECKO_INFO(EVENT_CAT, "Event system test completed successfully!");
+  GECKO_INFO(app::core_example::labels::Memory,
+             "Memory stress test completed successfully");
 }
 
 void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
-  GECKO_PROF_FUNC(MAIN_CAT);
+  GECKO_PROF_FUNC(app::core_example::labels::Main);
 
-  GECKO_INFO(MAIN_CAT, "=== Memory Statistics ===");
-  GECKO_INFO(MAIN_CAT, "Total Live Bytes: %llu", tracker.TotalLiveBytes());
+  GECKO_INFO(app::core_example::labels::Main, "=== Memory Statistics ===");
+  GECKO_INFO(app::core_example::labels::Main, "Total Live Bytes: %llu",
+             tracker.TotalLiveBytes());
 
-  // Print stats for each category we used
-  std::vector<Category> categories = {MAIN_CAT, WORKER_CAT, MEMORY_CAT,
-                                      COMPUTE_CAT, SIMULATION_CAT};
+  // Print stats for each label we used
+  std::vector<Label> labels = {
+      app::core_example::labels::Main, app::core_example::labels::Worker,
+      app::core_example::labels::Memory, app::core_example::labels::Compute,
+      app::core_example::labels::Simulation};
 
   u64 totalAllocs = 0, totalFrees = 0, totalLive = 0;
 
-  for (auto cat : categories) {
-    runtime::MemCategoryStats stats;
-    if (tracker.StatsFor(cat, stats)) {
+  for (auto label : labels) {
+    runtime::MemLabelStats stats;
+    if (tracker.StatsFor(label, stats)) {
       u64 live = stats.LiveBytes.load();
       u64 allocs = stats.Allocs.load();
       u64 frees = stats.Frees.load();
@@ -427,32 +308,117 @@ void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
 
       if (allocs > 0) {
         double percentFreed = (double)frees / allocs * 100.0;
-        GECKO_INFO(MAIN_CAT,
-                   "Category '%s': Live=%llu bytes, Allocs=%llu, Frees=%llu "
-                   "(%.1f%% freed)",
-                   stats.Cat.Name ? stats.Cat.Name : "Unknown", live, allocs,
-                   frees, percentFreed);
+        GECKO_INFO(
+            app::core_example::labels::Main,
+            "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu "
+            "(%.1f%% freed)",
+            label.Name ? label.Name : "(unnamed)",
+            static_cast<unsigned long long>(label.Id), live, allocs,
+            frees, percentFreed);
       } else {
         GECKO_INFO(
-            MAIN_CAT, "Category '%s': Live=%llu bytes, Allocs=%llu, Frees=%llu",
-            stats.Cat.Name ? stats.Cat.Name : "Unknown", live, allocs, frees);
+            app::core_example::labels::Main,
+            "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu",
+            label.Name ? label.Name : "(unnamed)",
+            static_cast<unsigned long long>(label.Id), live, allocs,
+            frees);
       }
     }
   }
 
   double totalPercentFreed =
       totalAllocs > 0 ? (double)totalFrees / totalAllocs * 100.0 : 0.0;
-  GECKO_INFO(MAIN_CAT,
+  GECKO_INFO(app::core_example::labels::Main,
              "Summary: %llu total allocations, %llu freed (%.1f%%), %llu bytes "
              "still allocated",
              totalAllocs, totalFrees, totalPercentFreed, totalLive);
 
   if (totalLive == 0) {
-    GECKO_INFO(MAIN_CAT, "Perfect! All memory was properly freed.");
+    GECKO_INFO(app::core_example::labels::Main,
+               "Perfect! All memory was properly freed.");
   } else {
-    GECKO_WARN(MAIN_CAT, "Memory leak detected: %llu bytes still allocated",
-               totalLive);
+    GECKO_WARN(app::core_example::labels::Main,
+               "Memory leak detected: %llu bytes still allocated", totalLive);
   }
+}
+
+namespace {
+struct EventSystemDemoState {
+  std::atomic<u32> onPublishCount{0};
+  std::atomic<u32> queuedCount{0};
+  EventSubscription onPublishSub{};
+  EventSubscription queuedSub{};
+};
+
+static void OnTestEventOnPublish(void *user, const EventMeta &meta,
+                                EventView payload) {
+  (void)meta;
+  auto *state = static_cast<EventSystemDemoState *>(user);
+  const auto *p = static_cast<const app::core_example::events::TestEventPayload *>(
+      payload.Data());
+  state->onPublishCount.fetch_add(1, std::memory_order_relaxed);
+  GECKO_INFO(app::core_example::labels::Main,
+             "[events] OnPublish received: value=%u", p ? p->value : 0u);
+}
+
+static void OnTestEventQueued(void *user, const EventMeta &meta,
+                              EventView payload) {
+  (void)meta;
+  auto *state = static_cast<EventSystemDemoState *>(user);
+  const auto *p = static_cast<const app::core_example::events::TestEventPayload *>(
+      payload.Data());
+  state->queuedCount.fetch_add(1, std::memory_order_relaxed);
+  GECKO_INFO(app::core_example::labels::Main,
+             "[events] Queued dispatch received: value=%u", p ? p->value : 0u);
+}
+} // namespace
+
+static void EventSystemTest() {
+  GECKO_PROF_FUNC(app::core_example::labels::Main);
+
+  GECKO_INFO(app::core_example::labels::Main, "Setting up event system demo");
+
+  EventSystemDemoState state{};
+
+  state.onPublishSub =
+      SubscribeEvent(app::core_example::events::TestEvent, &OnTestEventOnPublish,
+                     &state,
+                     SubscriptionOptions{.delivery =
+                                             SubscriptionDelivery::OnPublish});
+
+  state.queuedSub =
+      SubscribeEvent(app::core_example::events::TestEvent, &OnTestEventQueued,
+                     &state,
+                     SubscriptionOptions{.delivery =
+                                             SubscriptionDelivery::Queued});
+
+  const EventEmitter emitter = CreateEmitter(app::core_example::events::Domain,
+                                             /*sender=*/0xC0DE);
+
+  // Publish from main thread.
+  {
+    app::core_example::events::TestEventPayload payload{.value = 1};
+    PublishEvent(emitter, app::core_example::events::TestEvent, payload);
+  }
+
+  // Publish from a worker thread to demonstrate thread-safe enqueue.
+  JobHandle publishJob = SubmitJob(
+      [emitter]() {
+        app::core_example::events::TestEventPayload payload{.value = 2};
+        PublishEvent(emitter, app::core_example::events::TestEvent, payload);
+      },
+      JobPriority::Normal, app::core_example::labels::Worker);
+  WaitForJob(publishJob);
+
+  // Deliver queued events on the main thread.
+  const std::size_t dispatched = DispatchQueuedEvents();
+  GECKO_INFO(app::core_example::labels::Main,
+             "Event bus dispatched %zu queued events", dispatched);
+
+  GECKO_INFO(app::core_example::labels::Main,
+             "Event demo counts: OnPublish=%u, Queued=%u",
+             state.onPublishCount.load(std::memory_order_relaxed),
+             state.queuedCount.load(std::memory_order_relaxed));
 }
 
 int main() {
@@ -461,9 +427,9 @@ int main() {
   std::printf("Attempting to log before services are initialized...\n");
 
   // This won't produce any output because GetLogger() returns nullptr
-  GECKO_INFO(MAIN_CAT,
+  GECKO_INFO(app::core_example::labels::Main,
              "This message won't appear - services not initialized yet!");
-  GECKO_WARN(MAIN_CAT, "Neither will this warning!");
+  GECKO_WARN(app::core_example::labels::Main, "Neither will this warning!");
 
   std::printf("(As expected, no log output appeared above)\n\n");
 
@@ -473,21 +439,21 @@ int main() {
   runtime::TrackingAllocator trackingAlloc(&systemAlloc);
   runtime::RingProfiler ringProfiler(1 << 16); // 64K events
   runtime::RingLogger ringLogger(1024); // 1024 log entries in ring buffer
+  runtime::ModuleRegistry moduleRegistry;
+  runtime::EventBus eventBus;
 
   // Create job system with 4 worker threads
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  // Create event bus
-  runtime::EventBus eventBus;
-
   // Use GECKO_BOOT system for proper service installation and validation
   // Services are in dependency order: Allocator -> JobSystem -> Profiler ->
-  // Logger -> EventBus
+  // Logger
   GECKO_BOOT((Services{.Allocator = &trackingAlloc,
                        .JobSystem = &jobSystem,
                        .Profiler = &ringProfiler,
                        .Logger = &ringLogger,
+                       .Modules = &moduleRegistry,
                        .EventBus = &eventBus}));
 
   // Now configure logging sinks after services are installed
@@ -501,117 +467,136 @@ int main() {
         LogLevel::Info); // Filter out Trace and Debug messages initially
   }
 
+  gecko::LogVersion(app::core_example::labels::Main);
+
+  (void)InstallModule(runtime::GetModule());
+  (void)InstallModule(g_AppModule);
+
   // Set up trace file sink for profiling data after services are available
   runtime::TraceFileSink traceSink("gecko_trace.json");
   if (!traceSink.IsOpen()) {
-    GECKO_WARN(MAIN_CAT, "Failed to open trace profiler sink\n");
+    GECKO_WARN(app::core_example::labels::Main,
+               "Failed to open trace profiler sink\n");
   } else {
     // We know the profiler is a RingProfiler, so we can safely add the sink
     ringProfiler.AddSink(&traceSink);
   }
 
   // Now logging works with all sinks configured!
-  GECKO_INFO(MAIN_CAT, "Services installed and sinks configured successfully!");
-  gecko::LogVersion(MAIN_CAT);
+  GECKO_INFO(app::core_example::labels::Main,
+             "Services installed and sinks configured successfully!");
+
   GECKO_DEBUG(
-      MAIN_CAT,
+      app::core_example::labels::Main,
       "Logger is now active with immediate logging (this won't appear)");
-  GECKO_TRACE(MAIN_CAT,
+  GECKO_TRACE(app::core_example::labels::Main,
               "Profiler has capacity for %d events (this won't appear either)",
               (1 << 16));
 
-  GECKO_INFO(
-      MAIN_CAT,
+    GECKO_INFO(
+      app::core_example::labels::Main,
       "Log level is set to Info - Debug and Trace messages are filtered out");
 
   {
-    GECKO_PROF_FUNC(MAIN_CAT);
+    GECKO_PROF_FUNC(app::core_example::labels::Main);
 
-    GECKO_INFO(MAIN_CAT, "Starting comprehensive memory and profiling demo");
+    GECKO_INFO(app::core_example::labels::Main,
+               "Starting comprehensive memory and profiling demo");
 
     // Enable more detailed logging for the demo
-    GECKO_INFO(MAIN_CAT, "Changing log level to Trace to show all messages");
+    GECKO_INFO(app::core_example::labels::Main,
+               "Changing log level to Trace to show all messages");
     if (auto *logger = GetLogger()) {
       logger->SetLevel(LogLevel::Trace);
     }
 
     // 1. Memory Test
-    GECKO_INFO(MAIN_CAT, "=== 1. Memory Management Demo ===");
+    GECKO_INFO(app::core_example::labels::Main,
+               "=== 1. Memory Management Demo ===");
     MemoryStressTest();
     PrintMemoryStats(trackingAlloc);
 
     // 2. Event System Test
-    GECKO_INFO(MAIN_CAT, "=== 2. Event System Demo ===");
+    GECKO_INFO(app::core_example::labels::Main, "=== 2. Event System Demo ===");
     EventSystemTest();
 
     // 3. Threading Utilities Demo
-    GECKO_INFO(MAIN_CAT, "=== 3. Threading Utilities Demo ===");
+    GECKO_INFO(app::core_example::labels::Main,
+               "=== 3. Threading Utilities Demo ===");
     {
-      GECKO_PROF_SCOPE(MAIN_CAT, "ThreadingUtilitiesDemo");
+      GECKO_PROF_SCOPE(app::core_example::labels::Main, "ThreadingUtilitiesDemo");
 
       u32 threadId = ThisThreadId();
       u32 coreCount = HardwareThreadCount();
-      GECKO_INFO(MAIN_CAT, "Current thread ID: %u, Hardware threads: %u",
-                 threadId, coreCount);
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Current thread ID: %u, Hardware threads: %u", threadId,
+                 coreCount);
 
       // Test precise timing
       u64 start = HighResTimeNs();
       PreciseSleepNs(1000000); // 1 millisecond
       u64 end = HighResTimeNs();
       u64 elapsed = end - start;
-      GECKO_INFO(MAIN_CAT, "PreciseSleepNs(1ms) took %llu ns", elapsed);
+      GECKO_INFO(app::core_example::labels::Main,
+                 "PreciseSleepNs(1ms) took %llu ns", elapsed);
 
       // Test thread yielding
-      GECKO_INFO(MAIN_CAT, "Testing thread yield...");
+      GECKO_INFO(app::core_example::labels::Main, "Testing thread yield...");
       YieldThread();
-      GECKO_INFO(MAIN_CAT, "Thread yield completed");
+      GECKO_INFO(app::core_example::labels::Main, "Thread yield completed");
 
       // Test different sleep functions
-      GECKO_TRACE(MAIN_CAT, "Testing SleepMs(10)...");
+      GECKO_TRACE(app::core_example::labels::Main, "Testing SleepMs(10)...");
       start = HighResTimeNs();
       SleepMs(10);
       end = HighResTimeNs();
       u64 elapsedMs = time::NsToMilliseconds(end - start);
-      GECKO_INFO(MAIN_CAT, "SleepMs(10) took approximately %llu ms", elapsedMs);
+      GECKO_INFO(app::core_example::labels::Main,
+                 "SleepMs(10) took approximately %llu ms", elapsedMs);
     }
 
     // 3. Particle Physics Simulation Demo
-    GECKO_INFO(MAIN_CAT, "=== 4. Particle Physics Simulation Demo ===");
+    GECKO_INFO(app::core_example::labels::Main,
+               "=== 3. Particle Physics Simulation Demo ===");
     const int numWorkers = 3;
 
-    GECKO_INFO(MAIN_CAT, "Launching %d parallel physics simulations!",
-               numWorkers);
+    GECKO_INFO(app::core_example::labels::Main,
+               "Launching %d parallel physics simulations!", numWorkers);
 
     std::vector<JobHandle> simulationJobs;
 
-    GECKO_INFO(MAIN_CAT, "Submitting %d particle simulation jobs to job system",
+    GECKO_INFO(app::core_example::labels::Main,
+               "Submitting %d particle simulation jobs to job system",
                numWorkers);
 
     {
-      GECKO_PROF_SCOPE(MAIN_CAT, "SubmitSimulationJobs");
+      GECKO_PROF_SCOPE(app::core_example::labels::Main, "SubmitSimulationJobs");
       for (int i = 0; i < numWorkers; ++i) {
         int particleCount = 800 + i * 400; // More interesting particle counts
         GECKO_INFO(
-            MAIN_CAT,
+            app::core_example::labels::Main,
             "Physics Worker %d: Simulating %d particles in zero-gravity!", i,
             particleCount);
 
         auto job = [i, particleCount]() { WorkerTask(i, particleCount); };
 
-        auto handle = SubmitJob(job, JobPriority::Normal, WORKER_CAT);
+        auto handle =
+            SubmitJob(job, JobPriority::Normal, app::core_example::labels::Worker);
         simulationJobs.push_back(handle);
       }
     }
 
     // Wait for all simulation jobs to complete
-    GECKO_INFO(MAIN_CAT, "Waiting for simulation jobs to complete...");
+    GECKO_INFO(app::core_example::labels::Main,
+               "Waiting for simulation jobs to complete...");
     {
-      GECKO_PROF_SCOPE(MAIN_CAT, "WaitForSimulationJobs");
+      GECKO_PROF_SCOPE(app::core_example::labels::Main, "WaitForSimulationJobs");
       WaitForJobs(simulationJobs.data(),
                   static_cast<u32>(simulationJobs.size()));
     }
 
-    GECKO_INFO(MAIN_CAT, "Simulation jobs completed successfully");
+    GECKO_INFO(app::core_example::labels::Main,
+               "Simulation jobs completed successfully");
 
     // Print updated memory statistics after simulation
     PrintMemoryStats(trackingAlloc);
@@ -620,110 +605,136 @@ int main() {
     trackingAlloc.EmitCounters();
 
     // 4. Logging Demo
-    // 4. Extended Simulation (to test crash-safety)\n    GECKO_INFO(MAIN_CAT,
+    // 4. Extended Simulation (to test crash-safety)\n
+    // GECKO_INFO(CoreExampleAppModule::c_main,
     // \"=== 4. Extended Simulation for Crash-Safety Test ===\");\n
-    // GECKO_INFO(MAIN_CAT, \"Running extended simulation - interrupt anytime to
-    // test crash-safety\");\n    \n    for (int round = 0; round < 10; ++round)
-    // {\n      GECKO_INFO(MAIN_CAT, \"Extended simulation round %d/10\", round
+    // GECKO_INFO(CoreExampleAppModule::c_main, \"Running extended
+    // simulation - interrupt anytime to test crash-safety\");\n    \n    for
+    // (int round = 0; round < 10; ++round)
+    // {\n      GECKO_INFO(CoreExampleAppModule::c_main, \"Extended
+    // simulation round %d/10\", round
     // + 1);\n      \n      std::vector<JobHandle> longJobs;\n      for (int i =
     // 0; i < 4; ++i) {\n        auto job = [i, round]() {\n
-    // GECKO_PROF_SCOPE(COMPUTE_CAT, \"ExtendedWork\");\n          for (int work
-    // = 0; work < 1000; ++work) {\n            // Simulate computational work
-    // with profiling\n            GECKO_PROF_SCOPE(COMPUTE_CAT,
+    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute,
+    // \"ExtendedWork\");\n          for (int work = 0; work < 1000; ++work) {\n
+    // // Simulate computational work with profiling\n
+    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute,
     // \"WorkUnit\");\n            for (volatile int j = 0; j < 10000; ++j) {}\n
-    // \n            if (work % 100 == 0) {\n GECKO_PROF_COUNTER(COMPUTE_CAT,
+    // \n            if (work % 100 == 0) {\n
+    // GECKO_PROF_COUNTER(CoreExampleAppModule::c_compute,
     // \"WorkProgress\", work);\n            }\n          }\n
-    // GECKO_INFO(COMPUTE_CAT, \"Extended job %d in round %d completed\", i,
-    // round + 1);\n        };\n        \n        auto handle = SubmitJob(job,
-    // JobPriority::Normal, COMPUTE_CAT);\n        longJobs.push_back(handle);\n
+    // GECKO_INFO(CoreExampleAppModule::c_compute, \"Extended job %d in
+    // round %d completed\", i, round + 1);\n        };\n        \n        auto
+    // handle = SubmitJob(job, JobPriority::Normal,
+    // CoreExampleAppModule::c_compute);\n longJobs.push_back(handle);\n
     // }\n      \n      WaitForJobs(longJobs.data(),
-    // static_cast<u32>(longJobs.size()));\n      GECKO_INFO(MAIN_CAT, \"Round
-    // %d completed\", round + 1);\n      \n      // Short delay between
-    // rounds\n      SleepMs(200);\n    }\n    \n    GECKO_INFO(MAIN_CAT,
+    // static_cast<u32>(longJobs.size()));\n
+    // GECKO_INFO(CoreExampleAppModule::c_main,
+    // \"Round %d completed\", round + 1);\n      \n      // Short delay between
+    // rounds\n      SleepMs(200);\n    }\n    \n
+    // GECKO_INFO(CoreExampleAppModule::c_main,
     // \"Extended simulation completed\");\n\n    // 5. Logging Demo\n
-    // GECKO_INFO(MAIN_CAT, \"=== 5. Logging System Demo ===\");
-    GECKO_TRACE(MAIN_CAT, "This is a trace message - very detailed info");
-    GECKO_DEBUG(MAIN_CAT, "This is a debug message - development info");
-    GECKO_INFO(MAIN_CAT, "This is an info message - general information");
-    GECKO_WARN(MAIN_CAT, "This is a warning - something might be wrong");
+    // GECKO_INFO(CoreExampleAppModule::c_main, \"=== 5. Logging System
+    // Demo ===\");
+    GECKO_TRACE(app::core_example::labels::Main,
+                "This is a trace message - very detailed info");
+    GECKO_DEBUG(app::core_example::labels::Main,
+                "This is a debug message - development info");
+    GECKO_INFO(app::core_example::labels::Main,
+               "This is an info message - general information");
+    GECKO_WARN(app::core_example::labels::Main,
+               "This is a warning - something might be wrong");
     GECKO_ERROR(
-        MAIN_CAT,
+      app::core_example::labels::Main,
         "This is an error - something went wrong (but this is just a test!)");
     // Note: GECKO_FATAL would be for critical errors
 
     // Job System Example
-    GECKO_INFO(MAIN_CAT, "Testing Job System with %u worker threads...",
+    GECKO_INFO(app::core_example::labels::Main,
+               "Testing Job System with %u worker threads...",
                GetJobSystem()->WorkerThreadCount());
     {
-      GECKO_PROF_SCOPE(MAIN_CAT, "JobSystemDemo");
+      GECKO_PROF_SCOPE(app::core_example::labels::Main, "JobSystemDemo");
 
       std::vector<JobHandle> jobHandles;
       const int numJobs = 6; // Sweet spot for demo
 
       // Submit some parallel jobs
-      GECKO_INFO(MAIN_CAT, "Submitting %d parallel jobs...", numJobs);
+      GECKO_INFO(app::core_example::labels::Main, "Submitting %d parallel jobs...",
+                 numJobs);
       for (int i = 0; i < numJobs; ++i) {
         auto job = [i]() {
-          GECKO_INFO(COMPUTE_CAT,
+          GECKO_INFO(app::core_example::labels::Compute,
                      "Parallel Worker %d: Processing data chunk...", i);
           // Simulate interesting computational work
           SleepMs(15 + i * 8);
-          GECKO_PROF_COUNTER(COMPUTE_CAT, "parallel_jobs_completed", 1);
+          GECKO_PROF_COUNTER(app::core_example::labels::Compute,
+                             "parallel_jobs_completed", 1);
         };
 
-        auto handle = SubmitJob(job, JobPriority::Normal, COMPUTE_CAT);
+        auto handle = SubmitJob(job, JobPriority::Normal,
+                                app::core_example::labels::Compute);
         jobHandles.push_back(handle);
       }
 
       // Wait for all parallel jobs to complete
-      GECKO_INFO(MAIN_CAT, "Waiting for all parallel jobs to complete...");
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Waiting for all parallel jobs to complete...");
       WaitForJobs(jobHandles.data(), static_cast<u32>(jobHandles.size()));
-      GECKO_INFO(MAIN_CAT, "All parallel jobs completed!");
+      GECKO_INFO(app::core_example::labels::Main, "All parallel jobs completed!");
 
       // Example with job dependencies - pipeline pattern
-      GECKO_INFO(MAIN_CAT, "Testing job dependencies (pipeline pattern)...");
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Testing job dependencies (pipeline pattern)...");
 
       auto dataPreparationJob = SubmitJob(
           []() {
-            GECKO_INFO(COMPUTE_CAT,
+            GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 1: Loading and validating data...");
             SleepMs(40);
-            GECKO_INFO(COMPUTE_CAT, "Stage 1: Data preparation complete - "
-                                    "1000 records processed");
+            GECKO_INFO(app::core_example::labels::Compute,
+                       "Stage 1: Data preparation complete - "
+                       "1000 records processed");
           },
-          JobPriority::High, COMPUTE_CAT);
+          JobPriority::High, app::core_example::labels::Compute);
 
       JobHandle stage1Deps[] = {dataPreparationJob};
       auto dataProcessingJob = SubmitJob(
           []() {
-            GECKO_INFO(COMPUTE_CAT,
+            GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 2: Running complex algorithms...");
             SleepMs(50);
-            GECKO_INFO(COMPUTE_CAT,
+            GECKO_INFO(app::core_example::labels::Compute,
                        "Stage 2: Analysis complete - 847 patterns detected");
           },
-          stage1Deps, 1, JobPriority::Normal, COMPUTE_CAT);
+          stage1Deps, 1, JobPriority::Normal, app::core_example::labels::Compute);
 
       JobHandle stage2Deps[] = {dataProcessingJob};
       auto dataFinalizationJob = SubmitJob(
           []() {
-            GECKO_INFO(COMPUTE_CAT,
+            GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 3: Generating final report...");
             SleepMs(35);
-            GECKO_INFO(COMPUTE_CAT, "Stage 3: Mission accomplished! Results "
-                                    "exported to dashboard.");
+            GECKO_INFO(app::core_example::labels::Compute,
+                       "Stage 3: Mission accomplished! Results "
+                       "exported to dashboard.");
           },
-          stage2Deps, 1, JobPriority::Normal, COMPUTE_CAT);
+          stage2Deps, 1, JobPriority::Normal, app::core_example::labels::Compute);
 
       WaitForJob(dataFinalizationJob);
-      GECKO_INFO(MAIN_CAT, "Job dependency pipeline completed successfully!");
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Job dependency pipeline completed successfully!");
 
       // Example of main thread job processing
-      GECKO_INFO(MAIN_CAT, "Testing main thread job processing...");
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Testing main thread job processing...");
       std::vector<JobHandle> mainThreadJobs;
       for (int i = 0; i < 3; ++i) {
-        auto job = [i]() { GECKO_INFO(COMPUTE_CAT, "Main thread job %d", i); };
-        auto handle = SubmitJob(job, JobPriority::Low, COMPUTE_CAT);
+        auto job = [i]() {
+          GECKO_INFO(app::core_example::labels::Compute, "Main thread job %d", i);
+        };
+        auto handle =
+            SubmitJob(job, JobPriority::Low, app::core_example::labels::Compute);
         mainThreadJobs.push_back(handle);
       }
 
@@ -733,7 +744,8 @@ int main() {
       // Wait for any remaining jobs
       WaitForJobs(mainThreadJobs.data(),
                   static_cast<u32>(mainThreadJobs.size()));
-      GECKO_INFO(MAIN_CAT, "Main thread job processing complete!");
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Main thread job processing complete!");
     }
 
     // Add a frame mark to separate the main work from cleanup
@@ -741,7 +753,7 @@ int main() {
       ProfEvent frameEvent{ProfEventKind::FrameMark,
                            profiler->NowNs(),
                            ThisThreadId(),
-                           MAIN_CAT,
+                           app::core_example::labels::Main,
                            FNV1a("EndOfDemo"),
                            "EndOfDemo",
                            0};
@@ -750,14 +762,15 @@ int main() {
   }
 
   // Flush any remaining log messages
-  GECKO_INFO(MAIN_CAT, "Flushing remaining log messages...");
+  GECKO_INFO(app::core_example::labels::Main,
+             "Flushing remaining log messages...");
 
   // The trace sink automatically writes data continuously, so no manual save
   // needed
-  GECKO_INFO(MAIN_CAT,
+  GECKO_INFO(app::core_example::labels::Main,
              "Trace data has been continuously written to gecko_trace.json");
 
-  GECKO_INFO(MAIN_CAT, "Shutting down services...");
+  GECKO_INFO(app::core_example::labels::Main, "Shutting down services...");
   if (auto *logger = GetLogger()) {
     logger->Flush();
   }
