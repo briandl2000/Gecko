@@ -65,6 +65,56 @@ Personal rule that works well:
 
 ## 4) Roadmap (milestones)
 
+### Version scheme
+- **v0.0.0-alpha.N** - Alpha releases (N = 0, 1, 2, ...)
+- **v0.0.0-beta.N** - Beta releases
+- **v0.1.0** - First stable release
+
+### v0.0.0-alpha.0 (Core foundation)
+**Status:** In progress
+
+**Goals:**
+- Core refactor (organize by subsystem)
+- Math module (header-only, no IModule)
+- Event system ✅
+
+### v0.0.0-alpha.1 (Platform layer)
+**Status:** Planned
+
+**Goals:**
+- Platform: windowing, input, file I/O
+- Platform threading interface (Thread, Mutex primitives)
+- Runtime: refactor job system to use platform threading
+- Platform capabilities/info system
+
+**Key decision:** Single-threaded rendering is fine for 2D - no render thread needed yet.
+
+### v0.0.0-alpha.2 (Graphics)
+**Status:** Planned
+
+**Goals:**
+- Graphics module with Vulkan backend
+- Simple 2D renderer (sprite batching, immediate submission)
+- Resource loading using existing job system
+
+### v0.0.0-beta.0 (Production validation)
+**Status:** Planned
+
+**Goals:**
+- Build simple 2D game (clone existing game for validation)
+- Box2D physics wrapper (abstracted interface)
+- Iterate based on real usage feedback
+
+### v0.1.0 (First stable release)
+
+**Status:** Future
+
+**Goals:**
+- Add render thread when 3D complexity demands it
+- 3D rendering features
+- Physics, audio modules
+
+---
 ## v0.0.0-alpha.0 release target (what “done” means)
 
 This repo is in active development. For the first tagged alpha, treat this as the intended scope.
