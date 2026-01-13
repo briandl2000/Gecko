@@ -622,25 +622,38 @@ int main() {
     // 0; i < 4; ++i) {\n        auto job = [i, round]() {\n
     // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute,
     // \"ExtendedWork\");\n          for (int work = 0; work < 1000; ++work) {\n
-    // // Simulate computational work with profiling\n
-    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute,
-    // \"WorkUnit\");\n            for (volatile int j = 0; j < 10000; ++j) {}\n
-    // \n            if (work % 100 == 0) {\n
-    // GECKO_PROF_COUNTER(CoreExampleAppModule::c_compute,
-    // \"WorkProgress\", work);\n            }\n          }\n
-    // GECKO_INFO(CoreExampleAppModule::c_compute, \"Extended job %d in
-    // round %d completed\", i, round + 1);\n        };\n        \n        auto
-    // handle = SubmitJob(job, JobPriority::Normal,
-    // CoreExampleAppModule::c_compute);\n longJobs.push_back(handle);\n
-    // }\n      \n      WaitForJobs(longJobs.data(),
-    // static_cast<u32>(longJobs.size()));\n
+    // // Simulate computational work with profiling
+    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute, "WorkUnit");
+    // for (volatile int j = 0; j < 10000; ++j) {
+    // }
+    //
+    // if (work % 100 == 0) {
+    //     GECKO_PROF_COUNTER(CoreExampleAppModule::c_compute,
+    //                        "WorkProgress", work);
+    // }
+    // GECKO_INFO(CoreExampleAppModule::c_compute,
+    //            "Extended job %d in round %d completed", i, round + 1);
+    // };
+    //
+    // auto handle = SubmitJob(job, JobPriority::Normal,
+    //                         CoreExampleAppModule::c_compute);
+    // longJobs.push_back(handle);
+    // }
+    //
+    // WaitForJobs(longJobs.data(), static_cast<u32>(longJobs.size()));
     // GECKO_INFO(CoreExampleAppModule::c_main,
-    // \"Round %d completed\", round + 1);\n      \n      // Short delay between
-    // rounds\n      SleepMs(200);\n    }\n    \n
+    //            "Round %d completed", round + 1);
+    //
+    // // Short delay between rounds
+    // SleepMs(200);
+    // }
+    //
     // GECKO_INFO(CoreExampleAppModule::c_main,
-    // \"Extended simulation completed\");\n\n    // 5. Logging Demo\n
-    // GECKO_INFO(CoreExampleAppModule::c_main, \"=== 5. Logging System
-    // Demo ===\");
+    //            "Extended simulation completed");
+    //
+    // 5. Logging Demo
+    // GECKO_INFO(CoreExampleAppModule::c_main,
+    //            "=== 5. Logging System Demo ===");
     GECKO_TRACE(app::core_example::labels::Main,
                 "This is a trace message - very detailed info");
     GECKO_DEBUG(app::core_example::labels::Main,
