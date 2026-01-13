@@ -128,7 +128,7 @@ void WorkerTask(int workerId, int numParticles) {
   }
 
   {
-    GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PHysicsUpdate");
+    GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PhysicsUpdate");
 
     // Simulate physics steps (engaging but quick)
     const int numSteps = 50;
