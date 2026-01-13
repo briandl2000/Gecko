@@ -8,12 +8,18 @@ namespace gecko::runtime {
 
 EventBus::EventBus() { m_CapabilitySecret = RandomU64(); }
 
-EventBus::~EventBus() { m_Subscribers.clear(); }
+EventBus::~EventBus() {
+  std::lock_guard<std::mutex> lock(m_SubscribersMutex);
+  m_Subscribers.clear();
+}
 
 bool EventBus::Init() noexcept { return true; }
 
 void EventBus::Shutdown() noexcept {
-  m_Subscribers.clear();
+  {
+    std::lock_guard<std::mutex> lock(m_SubscribersMutex);
+    m_Subscribers.clear();
+  }
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
     m_EventQueue.clear();
