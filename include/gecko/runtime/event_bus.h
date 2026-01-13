@@ -2,6 +2,7 @@
 
 #include "gecko/core/events.h"
 #include <atomic>
+#include <deque>
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
@@ -57,7 +58,7 @@ private:
 
   std::unordered_map<EventCode, std::vector<Subscriber>> m_Subscribers;
   std::mutex m_SubscribersMutex;
-  std::vector<QueuedEvent> m_EventQueue;
+  std::deque<QueuedEvent> m_EventQueue;
   std::mutex m_QueueMutex;
   std::atomic<u64> m_NextSubscriptionId{1};
   std::atomic<u64> m_NextSequence{0};

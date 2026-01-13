@@ -6,9 +6,6 @@
 
 namespace gecko::runtime {
 
-EventBus::EventBus() { m_CapabilitySecret = RandomU64(); }
-
-EventBus::~EventBus() {
 EventBus::EventBus() {}
 
 EventBus::~EventBus() { m_Subscribers.clear(); }
@@ -152,9 +149,10 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
       return 0;
 
     events.reserve(count);
-    events.insert(events.end(), m_EventQueue.begin(),
-                  m_EventQueue.begin() + count);
-    m_EventQueue.erase(m_EventQueue.begin(), m_EventQueue.begin() + count);
+    for (std::size_t i = 0; i < count; ++i) {
+      events.push_back(std::move(m_EventQueue.front()));
+      m_EventQueue.pop_front();
+    }
   }
 
   for (const auto &qEvent : events) {
