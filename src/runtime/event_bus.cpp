@@ -53,7 +53,10 @@ EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void *user,
   sub.user = user;
   sub.delivery = options.delivery;
 
-  m_Subscribers[code].push_back(sub);
+  {
+    std::lock_guard<std::mutex> lock(m_SubscribersMutex);
+    m_Subscribers[code].push_back(sub);
+  }
 
   EventSubscription subscription{};
   subscription.SetSubscriptionData(this, id);
@@ -64,6 +67,7 @@ void EventBus::Unsubscribe(u64 id) noexcept {
   if (id == 0)
     return;
 
+  std::lock_guard<std::mutex> lock(m_SubscribersMutex);
   for (auto &[code, subscribers] : m_Subscribers) {
     auto it = std::find_if(subscribers.begin(), subscribers.end(),
                            [id](const Subscriber &s) { return s.id == id; });
@@ -76,8 +80,8 @@ void EventBus::Unsubscribe(u64 id) noexcept {
 
 void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
                                 EventView payload) noexcept {
-  const u32 codeModuleHash = GetEventModule(code);
-  const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
+  [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
+  [[maybe_unused]] const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
   GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
                "Event code module mismatch with emitter module");
   GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
@@ -94,8 +98,8 @@ void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
 
 void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
                        EventView payload) noexcept {
-  const u32 codeModuleHash = GetEventModule(code);
-  const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
+  [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
+  [[maybe_unused]] const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
   GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
                "Event code module mismatch with emitter module");
   GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
@@ -176,11 +180,16 @@ bool EventBus::ValidateEmitter(const EventEmitter &emitter,
 void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
                                     EventView payload,
                                     SubscriptionDelivery deliveryFilter) {
-  auto it = m_Subscribers.find(code);
-  if (it == m_Subscribers.end())
-    return;
+  std::vector<Subscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(m_SubscribersMutex);
+    auto it = m_Subscribers.find(code);
+    if (it == m_Subscribers.end())
+      return;
+    subscribers = it->second;
+  }
 
-  for (const auto &sub : it->second) {
+  for (const auto &sub : subscribers) {
     if (sub.delivery != deliveryFilter)
       continue;
     if (sub.callback) {
@@ -191,11 +200,16 @@ void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
 
 void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
                                     EventView payload) {
-  auto it = m_Subscribers.find(code);
-  if (it == m_Subscribers.end())
-    return;
+  std::vector<Subscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(m_SubscribersMutex);
+    auto it = m_Subscribers.find(code);
+    if (it == m_Subscribers.end())
+      return;
+    subscribers = it->second;
+  }
 
-  for (const auto &sub : it->second) {
+  for (const auto &sub : subscribers) {
     if (sub.callback) {
       sub.callback(sub.user, meta, payload);
     }

@@ -56,6 +56,7 @@ private:
                             SubscriptionDelivery deliveryFilter);
 
   std::unordered_map<EventCode, std::vector<Subscriber>> m_Subscribers;
+  std::mutex m_SubscribersMutex;
   std::vector<QueuedEvent> m_EventQueue;
   std::mutex m_QueueMutex;
   std::atomic<u64> m_NextSubscriptionId{1};
