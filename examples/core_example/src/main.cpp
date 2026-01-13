@@ -1,8 +1,10 @@
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <vector>
 
 #include "gecko/core/boot.h"
+#include "gecko/core/events.h"
 #include "gecko/core/log.h"
 #include "gecko/core/memory.h"
 #include "gecko/core/modules.h"
@@ -13,6 +15,7 @@
 #include "gecko/core/time.h"
 #include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
+#include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/file_log_sink.h"
 #include "gecko/runtime/module_registry.h"
 #include "gecko/runtime/ring_logger.h"
@@ -24,12 +27,12 @@
 
 using namespace gecko;
 
-namespace {
-
 namespace app::core_example::labels {
 inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.core_example");
 inline constexpr ::gecko::Label Main =
     ::gecko::MakeLabel("app.core_example.main");
+inline constexpr ::gecko::Label Events =
+    ::gecko::MakeLabel("app.core_example.events");
 inline constexpr ::gecko::Label Worker =
     ::gecko::MakeLabel("app.core_example.worker");
 inline constexpr ::gecko::Label Memory =
@@ -39,6 +42,8 @@ inline constexpr ::gecko::Label Compute =
 inline constexpr ::gecko::Label Simulation =
     ::gecko::MakeLabel("app.core_example.simulation");
 } // namespace app::core_example::labels
+
+namespace {
 
 class CoreExampleAppModule final : public ::gecko::IModule {
 public:
@@ -65,6 +70,16 @@ struct Particle {
   float vx, vy, vz;
   float mass;
 };
+
+namespace app::core_example::events {
+// Use the module's Label ID for event scoping
+constexpr ::gecko::Label ModuleLabel = app::core_example::labels::App;
+constexpr EventCode TestEvent = MakeEventCode(ModuleLabel.Id, 0x0001);
+
+struct TestEventPayload {
+  u32 value{0};
+};
+} // namespace app::core_example::events
 
 // Worker function that simulates some computation
 void WorkerTask(int workerId, int numParticles) {
@@ -299,17 +314,17 @@ void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
         double percentFreed = (double)frees / allocs * 100.0;
         GECKO_INFO(
             app::core_example::labels::Main,
-            "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu (%.1f%% freed)",
-            stats.StatsLabel.Name ? stats.StatsLabel.Name : "(unnamed)",
-            static_cast<unsigned long long>(stats.StatsLabel.Id), live, allocs,
-            frees, percentFreed);
+            "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu "
+            "(%.1f%% freed)",
+            label.Name ? label.Name : "(unnamed)",
+            static_cast<unsigned long long>(label.Id), live, allocs, frees,
+            percentFreed);
       } else {
         GECKO_INFO(
             app::core_example::labels::Main,
             "Label '%s' (%llu): Live=%llu bytes, Allocs=%llu, Frees=%llu",
-            stats.StatsLabel.Name ? stats.StatsLabel.Name : "(unnamed)",
-            static_cast<unsigned long long>(stats.StatsLabel.Id), live, allocs,
-            frees);
+            label.Name ? label.Name : "(unnamed)",
+            static_cast<unsigned long long>(label.Id), live, allocs, frees);
       }
     }
   }
@@ -328,6 +343,110 @@ void PrintMemoryStats(const runtime::TrackingAllocator &tracker) {
     GECKO_WARN(app::core_example::labels::Main,
                "Memory leak detected: %llu bytes still allocated", totalLive);
   }
+}
+
+namespace {
+struct EventSystemDemoState {
+  std::atomic<u32> onPublishCount{0};
+  std::atomic<u32> queuedCount{0};
+  EventSubscription onPublishSub{};
+  EventSubscription queuedSub{};
+};
+
+static void OnTestEventOnPublish(void *user, const EventMeta &meta,
+                                 EventView payload) {
+  (void)meta;
+  auto *state = static_cast<EventSystemDemoState *>(user);
+  const auto *p =
+      static_cast<const app::core_example::events::TestEventPayload *>(
+          payload.Data());
+  state->onPublishCount.fetch_add(1, std::memory_order_relaxed);
+  GECKO_INFO(app::core_example::labels::Events, "OnPublish received: value=%u",
+             p ? p->value : 0u);
+}
+
+static void OnTestEventQueued(void *user, const EventMeta &meta,
+                              EventView payload) {
+  (void)meta;
+  auto *state = static_cast<EventSystemDemoState *>(user);
+  const auto *p =
+      static_cast<const app::core_example::events::TestEventPayload *>(
+          payload.Data());
+  state->queuedCount.fetch_add(1, std::memory_order_relaxed);
+  GECKO_INFO(app::core_example::labels::Events,
+             "Queued dispatch received: value=%u", p ? p->value : 0u);
+}
+} // namespace
+
+static void EventSystemTest() {
+  GECKO_PROF_FUNC(app::core_example::labels::Main);
+
+  GECKO_INFO(app::core_example::labels::Main, "Setting up event system demo");
+
+  EventSystemDemoState state{};
+
+  // OnPublish subscriber: gets events immediately during Enqueue()
+  state.onPublishSub = SubscribeEvent(
+      app::core_example::events::TestEvent, &OnTestEventOnPublish, &state,
+      SubscriptionOptions{.delivery = SubscriptionDelivery::OnPublish});
+
+  // Queued subscriber (default): gets events during DispatchQueued()
+  state.queuedSub = SubscribeEvent(
+      app::core_example::events::TestEvent, &OnTestEventQueued, &state,
+      SubscriptionOptions{.delivery = SubscriptionDelivery::Queued});
+
+  // Create emitter using the module's domain.
+  // This ensures events are properly scoped to this module.
+  const EventEmitter emitter =
+      CreateEmitterForModule(app::core_example::labels::App, /*sender=*/0xC0DE);
+
+  // Test 1: PublishEvent (queued) from main thread
+  GECKO_INFO(app::core_example::labels::Main,
+             "Test 1: PublishEvent from main thread");
+  {
+    app::core_example::events::TestEventPayload payload{.value = 1};
+    PublishEvent(emitter, app::core_example::events::TestEvent, payload);
+  }
+
+  // Test 2: PublishEvent from a worker thread (thread-safe enqueue)
+  GECKO_INFO(app::core_example::labels::Main,
+             "Test 2: PublishEvent from worker thread");
+  JobHandle publishJob = SubmitJob(
+      [emitter]() {
+        app::core_example::events::TestEventPayload payload{.value = 2};
+        PublishEvent(emitter, app::core_example::events::TestEvent, payload);
+      },
+      JobPriority::Normal, app::core_example::labels::Worker);
+  WaitForJob(publishJob);
+
+  // Test 3: PublishImmediateEvent - both OnPublish and Queued subscribers
+  // should receive it immediately
+  GECKO_INFO(app::core_example::labels::Main,
+             "Test 3: PublishImmediateEvent (all subscribers notified now)");
+  {
+    app::core_example::events::TestEventPayload payload{.value = 3};
+    PublishImmediateEvent(emitter, app::core_example::events::TestEvent,
+                          payload);
+  }
+
+  GECKO_INFO(app::core_example::labels::Main,
+             "Before DispatchQueued: OnPublish=%u, Queued=%u",
+             state.onPublishCount.load(std::memory_order_relaxed),
+             state.queuedCount.load(std::memory_order_relaxed));
+
+  // Deliver queued events on the main thread.
+  const std::size_t dispatched = DispatchQueuedEvents();
+  GECKO_INFO(app::core_example::labels::Main,
+             "Event bus dispatched %zu queued events", dispatched);
+
+  GECKO_INFO(app::core_example::labels::Main,
+             "After DispatchQueued: OnPublish=%u, Queued=%u",
+             state.onPublishCount.load(std::memory_order_relaxed),
+             state.queuedCount.load(std::memory_order_relaxed));
+
+  // Expected behavior:
+  // - OnPublish: 3 (all 3 events notified immediately)
+  // - Queued: 3 (2 from PublishEvent + 1 from PublishImmediateEvent)
 }
 
 int main() {
@@ -349,6 +468,7 @@ int main() {
   runtime::RingProfiler ringProfiler(1 << 16); // 64K events
   runtime::RingLogger ringLogger(1024); // 1024 log entries in ring buffer
   runtime::ModuleRegistry moduleRegistry;
+  runtime::EventBus eventBus;
 
   // Create job system with 4 worker threads
   runtime::ThreadPoolJobSystem jobSystem;
@@ -361,7 +481,8 @@ int main() {
                        .JobSystem = &jobSystem,
                        .Profiler = &ringProfiler,
                        .Logger = &ringLogger,
-                       .Modules = &moduleRegistry}));
+                       .Modules = &moduleRegistry,
+                       .EventBus = &eventBus}));
 
   // Now configure logging sinks after services are installed
   runtime::ConsoleLogSink consoleSink;
@@ -423,9 +544,13 @@ int main() {
     MemoryStressTest();
     PrintMemoryStats(trackingAlloc);
 
-    // 2. Threading Utilities Demo
+    // 2. Event System Test
+    GECKO_INFO(app::core_example::labels::Main, "=== 2. Event System Demo ===");
+    EventSystemTest();
+
+    // 3. Threading Utilities Demo
     GECKO_INFO(app::core_example::labels::Main,
-               "=== 2. Threading Utilities Demo ===");
+               "=== 3. Threading Utilities Demo ===");
     {
       GECKO_PROF_SCOPE(app::core_example::labels::Main,
                        "ThreadingUtilitiesDemo");
@@ -510,6 +635,50 @@ int main() {
     trackingAlloc.EmitCounters();
 
     // 4. Logging Demo
+    // 4. Extended Simulation (to test crash-safety)\n
+    // GECKO_INFO(CoreExampleAppModule::c_main,
+    // \"=== 4. Extended Simulation for Crash-Safety Test ===\");\n
+    // GECKO_INFO(CoreExampleAppModule::c_main, \"Running extended
+    // simulation - interrupt anytime to test crash-safety\");\n    \n    for
+    // (int round = 0; round < 10; ++round)
+    // {\n      GECKO_INFO(CoreExampleAppModule::c_main, \"Extended
+    // simulation round %d/10\", round
+    // + 1);\n      \n      std::vector<JobHandle> longJobs;\n      for (int i =
+    // 0; i < 4; ++i) {\n        auto job = [i, round]() {\n
+    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute,
+    // \"ExtendedWork\");\n          for (int work = 0; work < 1000; ++work) {\n
+    // // Simulate computational work with profiling
+    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute, "WorkUnit");
+    // for (volatile int j = 0; j < 10000; ++j) {
+    // }
+    //
+    // if (work % 100 == 0) {
+    //     GECKO_PROF_COUNTER(CoreExampleAppModule::c_compute,
+    //                        "WorkProgress", work);
+    // }
+    // GECKO_INFO(CoreExampleAppModule::c_compute,
+    //            "Extended job %d in round %d completed", i, round + 1);
+    // };
+    //
+    // auto handle = SubmitJob(job, JobPriority::Normal,
+    //                         CoreExampleAppModule::c_compute);
+    // longJobs.push_back(handle);
+    // }
+    //
+    // WaitForJobs(longJobs.data(), static_cast<u32>(longJobs.size()));
+    // GECKO_INFO(CoreExampleAppModule::c_main,
+    //            "Round %d completed", round + 1);
+    //
+    // // Short delay between rounds
+    // SleepMs(200);
+    // }
+    //
+    // GECKO_INFO(CoreExampleAppModule::c_main,
+    //            "Extended simulation completed");
+    //
+    // 5. Logging Demo
+    // GECKO_INFO(CoreExampleAppModule::c_main,
+    //            "=== 5. Logging System Demo ===");
     GECKO_TRACE(app::core_example::labels::Main,
                 "This is a trace message - very detailed info");
     GECKO_DEBUG(app::core_example::labels::Main,

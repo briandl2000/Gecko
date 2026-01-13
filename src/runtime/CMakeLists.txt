@@ -5,6 +5,7 @@ target_sources(Runtime
   PRIVATE
     console_log_sink.cpp
     crash_safe_trace_profiler_sink.cpp
+    event_bus.cpp
     file_log_sink.cpp
     immediate_logger.cpp
     module_registry.cpp

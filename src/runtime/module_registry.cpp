@@ -5,6 +5,7 @@
 
 #include "gecko/core/assert.h"
 #include "gecko/core/log.h"
+#include "gecko/core/services.h"
 #include "labels.h"
 
 namespace gecko::runtime {
@@ -112,6 +113,18 @@ ModuleRegistry::RegisterStatic(::gecko::IModule &module) noexcept {
                                        ::gecko::ModuleResult::DuplicateModule};
   }
 
+  // Register module ID with event bus for event scoping
+  auto *eventBus = ::gecko::GetEventBus();
+  if (eventBus && !eventBus->RegisterModule(root.Id)) {
+    GECKO_WARN(labels::Modules,
+               "RegisterStatic failed: module ID %llu already registered with "
+               "event bus for %s",
+               static_cast<unsigned long long>(root.Id),
+               root.Name ? root.Name : "(unnamed)");
+    return ::gecko::ModuleRegistration{::gecko::ModuleHandle{},
+                                       ::gecko::ModuleResult::DuplicateModule};
+  }
+
   Impl::ModuleRecord rec;
   rec.Root = root;
   rec.Module = &module;
@@ -159,6 +172,12 @@ ModuleRegistry::Unregister(::gecko::Label module) noexcept {
   Impl::ModuleRecord &rec = it->second;
 
   m_impl->ShutdownModule(*this, rec);
+
+  // Unregister from event bus
+  auto *eventBus = ::gecko::GetEventBus();
+  if (eventBus) {
+    eventBus->UnregisterModule(module.Id);
+  }
 
   Impl::EraseFirstU64(m_impl->RegistrationOrder, module.Id);
   m_impl->Modules.erase(it);

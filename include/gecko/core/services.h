@@ -1,6 +1,7 @@
 #pragma once
 
 #include "api.h"
+#include "events.h"
 #include "jobs.h"
 #include "log.h"
 #include "memory.h"
@@ -15,6 +16,7 @@ struct Services {
   IProfiler *Profiler = nullptr;
   ILogger *Logger = nullptr;
   IModuleRegistry *Modules = nullptr;
+  IEventBus *EventBus = nullptr;
 };
 
 [[nodiscard]]
@@ -27,6 +29,7 @@ GECKO_API IJobSystem *GetJobSystem() noexcept;
 GECKO_API IProfiler *GetProfiler() noexcept;
 GECKO_API ILogger *GetLogger() noexcept;
 GECKO_API IModuleRegistry *GetModules() noexcept;
+GECKO_API IEventBus *GetEventBus() noexcept;
 
 GECKO_API bool IsServicesInstalled() noexcept;
 
@@ -110,6 +113,36 @@ struct NullModuleRegistry final : IModuleRegistry {
 
   [[nodiscard]] GECKO_API virtual bool StartupAllModules() noexcept override;
   GECKO_API virtual void ShutdownAllModules() noexcept override;
+};
+
+// Level 4: EventBus (may use allocator and profiler)
+// NullEventBus: True no-op event bus (like NullLogger, NullProfiler)
+// All events are silently discarded. Use runtime::EventBus for working events.
+struct NullEventBus final : IEventBus {
+  GECKO_API virtual EventSubscription
+  Subscribe(EventCode code, CallbackFn fn, void *user,
+            SubscriptionOptions options = {}) noexcept override;
+  GECKO_API virtual void PublishImmediate(const EventEmitter &emitter,
+                                          EventCode code,
+                                          EventView payload) noexcept override;
+  GECKO_API virtual void Enqueue(const EventEmitter &emitter, EventCode code,
+                                 EventView payload) noexcept override;
+  GECKO_API virtual std::size_t
+  DispatchQueued(std::size_t maxCount) noexcept override;
+
+  GECKO_API virtual bool RegisterModule(u64 moduleId) noexcept override;
+  GECKO_API virtual void UnregisterModule(u64 moduleId) noexcept override;
+  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId,
+                                               u64 sender) noexcept override;
+  GECKO_API virtual bool
+  ValidateEmitter(const EventEmitter &emitter,
+                  u64 expectedModuleId) const noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+
+protected:
+  GECKO_API virtual void Unsubscribe(u64 id) noexcept override;
 };
 
 } // namespace gecko

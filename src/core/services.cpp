@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 #include "gecko/core/assert.h"
 #include "gecko/core/log.h"
@@ -159,11 +160,64 @@ void NullJobSystem::ProcessJobs(u32 maxJobs) noexcept {}
 bool NullJobSystem::Init() noexcept { return true; }
 void NullJobSystem::Shutdown() noexcept {}
 
+// NullEventBus implementation - works synchronously without thread safety
+EventSubscription NullEventBus::Subscribe(EventCode, CallbackFn, void *,
+                                          SubscriptionOptions) noexcept {
+  // Null implementation: subscriptions are silently discarded
+  return {};
+}
+
+void NullEventBus::PublishImmediate(const EventEmitter &, EventCode,
+                                    EventView) noexcept {
+  // Null implementation: events are silently discarded
+}
+
+void NullEventBus::Enqueue(const EventEmitter &, EventCode,
+                           EventView) noexcept {
+  // Null implementation: events are silently discarded
+}
+
+std::size_t NullEventBus::DispatchQueued(std::size_t) noexcept {
+  // Null implementation: no events to dispatch
+  return 0;
+}
+
+bool NullEventBus::RegisterModule(u64) noexcept {
+  return true; // Always succeeds in null implementation
+}
+
+void NullEventBus::UnregisterModule(u64) noexcept {
+  // No-op in null implementation
+}
+
+EventEmitter NullEventBus::CreateEmitter(u64 moduleId, u64 sender) noexcept {
+  EventEmitter e{};
+  e.moduleId = moduleId;
+  e.sender = sender;
+  e.capability = 0; // No validation in null implementation
+  return e;
+}
+
+bool NullEventBus::ValidateEmitter(const EventEmitter &, u64) const noexcept {
+  return true; // Always valid in null implementation
+}
+
+void NullEventBus::Unsubscribe(u64) noexcept {
+  // Null implementation: nothing to unsubscribe
+}
+
+bool NullEventBus::Init() noexcept { return true; }
+
+void NullEventBus::Shutdown() noexcept {
+  // Null implementation: no state to clean up
+}
+
 static SystemAllocator s_SystemAllocator;
 static NullJobSystem s_NullJobSystem;
 static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
 static NullModuleRegistry s_NullModules;
+static NullEventBus s_NullEventBus;
 
 #pragma endregion //----------------------------------------------------------------
 
@@ -172,6 +226,7 @@ static std::atomic<IJobSystem *> g_JobSystem{&s_NullJobSystem};
 static std::atomic<IProfiler *> g_Profiler{&s_NullProfiler};
 static std::atomic<ILogger *> g_Logger{&s_NullLogger};
 static std::atomic<IModuleRegistry *> g_Modules{&s_NullModules};
+static std::atomic<IEventBus *> g_EventBus{&s_NullEventBus};
 static std::atomic<bool> g_Installed{false};
 
 bool InstallServices(const Services &service) noexcept {
@@ -274,14 +329,43 @@ bool InstallServices(const Services &service) noexcept {
     g_Modules.store(service.Modules, std::memory_order_release);
   }
 
+  // Level 4: EventBus (may use allocator and profiler)
+  if (service.EventBus) {
+    if (!service.EventBus->Init()) {
+      GECKO_ASSERT(false && "EventBus failed to initialize!");
+      // Rollback all previous services in reverse order
+      if (service.Logger) {
+        service.Logger->Shutdown();
+        g_Logger.store(&s_NullLogger, std::memory_order_release);
+      }
+      if (service.Profiler) {
+        service.Profiler->Shutdown();
+        g_Profiler.store(&s_NullProfiler, std::memory_order_release);
+      }
+      if (service.JobSystem) {
+        service.JobSystem->Shutdown();
+        g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
+      }
+      if (service.Allocator) {
+        service.Allocator->Shutdown();
+        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
+      }
+      return false;
+    }
+    g_EventBus.store(service.EventBus, std::memory_order_release);
+  }
+
   g_Installed.store(true, std::memory_order_release);
 
   return true;
 }
 
 void UninstallServices() noexcept {
-  // Shutdown services in reverse dependency order.
-  // Modules shut down first so modules can still log during shutdown.
+  // Shutdown services in reverse dependency order:
+  // Modules -> EventBus -> Logger -> Profiler -> JobSystem -> Allocator
+  // This ensures that higher-level services are shut down before the services
+  // they depend on. Modules are shut down first so their shutdown logic can
+  // still use the logger and event bus.
 
   static constexpr auto c_Services = ::gecko::MakeLabel("gecko.core.services");
 
@@ -292,6 +376,8 @@ void UninstallServices() noexcept {
     GECKO_INFO(c_Services, "UninstallServices: modules shutdown complete");
   }
 
+  g_EventBus.load(std::memory_order_relaxed)
+      ->Shutdown(); // Level 4: May use profiler, allocator
   g_Logger.load(std::memory_order_relaxed)
       ->Shutdown(); // Level 3: May use profiler, job system, allocator
   g_Profiler.load(std::memory_order_relaxed)
@@ -307,6 +393,7 @@ void UninstallServices() noexcept {
   g_Profiler.store(&s_NullProfiler, std::memory_order_release);
   g_Logger.store(&s_NullLogger, std::memory_order_release);
   g_Modules.store(&s_NullModules, std::memory_order_release);
+  g_EventBus.store(&s_NullEventBus, std::memory_order_release);
   g_Installed.store(false, std::memory_order_release);
 }
 
@@ -347,6 +434,14 @@ IModuleRegistry *GetModules() noexcept {
       modules &&
       "Modules not available - services may not be properly installed");
   return modules;
+}
+
+IEventBus *GetEventBus() noexcept {
+  auto *eventBus = g_EventBus.load(std::memory_order_acquire);
+  GECKO_ASSERT(
+      eventBus &&
+      "EventBus not available - services may not be properly installed");
+  return eventBus;
 }
 
 bool IsServicesInstalled() noexcept {
