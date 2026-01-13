@@ -385,10 +385,12 @@ static void EventSystemTest() {
 
   EventSystemDemoState state{};
 
+  // OnPublish subscriber: gets events immediately during Enqueue()
   state.onPublishSub = SubscribeEvent(
       app::core_example::events::TestEvent, &OnTestEventOnPublish, &state,
       SubscriptionOptions{.delivery = SubscriptionDelivery::OnPublish});
 
+  // Queued subscriber (default): gets events during DispatchQueued()
   state.queuedSub = SubscribeEvent(
       app::core_example::events::TestEvent, &OnTestEventQueued, &state,
       SubscriptionOptions{.delivery = SubscriptionDelivery::Queued});
@@ -398,13 +400,17 @@ static void EventSystemTest() {
   const EventEmitter emitter =
       CreateEmitterForModule(app::core_example::labels::App, /*sender=*/0xC0DE);
 
-  // Publish from main thread.
+  // Test 1: PublishEvent (queued) from main thread
+  GECKO_INFO(app::core_example::labels::Main,
+             "Test 1: PublishEvent from main thread");
   {
     app::core_example::events::TestEventPayload payload{.value = 1};
     PublishEvent(emitter, app::core_example::events::TestEvent, payload);
   }
 
-  // Publish from a worker thread to demonstrate thread-safe enqueue.
+  // Test 2: PublishEvent from a worker thread (thread-safe enqueue)
+  GECKO_INFO(app::core_example::labels::Main,
+             "Test 2: PublishEvent from worker thread");
   JobHandle publishJob = SubmitJob(
       [emitter]() {
         app::core_example::events::TestEventPayload payload{.value = 2};
@@ -413,15 +419,34 @@ static void EventSystemTest() {
       JobPriority::Normal, app::core_example::labels::Worker);
   WaitForJob(publishJob);
 
+  // Test 3: PublishImmediateEvent - both OnPublish and Queued subscribers
+  // should receive it immediately
+  GECKO_INFO(app::core_example::labels::Main,
+             "Test 3: PublishImmediateEvent (all subscribers notified now)");
+  {
+    app::core_example::events::TestEventPayload payload{.value = 3};
+    PublishImmediateEvent(emitter, app::core_example::events::TestEvent,
+                          payload);
+  }
+
+  GECKO_INFO(app::core_example::labels::Main,
+             "Before DispatchQueued: OnPublish=%u, Queued=%u",
+             state.onPublishCount.load(std::memory_order_relaxed),
+             state.queuedCount.load(std::memory_order_relaxed));
+
   // Deliver queued events on the main thread.
   const std::size_t dispatched = DispatchQueuedEvents();
   GECKO_INFO(app::core_example::labels::Main,
              "Event bus dispatched %zu queued events", dispatched);
 
   GECKO_INFO(app::core_example::labels::Main,
-             "Event demo counts: OnPublish=%u, Queued=%u",
+             "After DispatchQueued: OnPublish=%u, Queued=%u",
              state.onPublishCount.load(std::memory_order_relaxed),
              state.queuedCount.load(std::memory_order_relaxed));
+
+  // Expected behavior:
+  // - OnPublish: 3 (all 3 events notified immediately)
+  // - Queued: 3 (2 from PublishEvent + 1 from PublishImmediateEvent)
 }
 
 int main() {

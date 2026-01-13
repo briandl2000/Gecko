@@ -207,9 +207,21 @@ void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
 
 void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
                                     EventView payload) {
-  // Delegate to the overload that accepts a delivery filter, using a
-  // default-constructed SubscriptionDelivery value.
-  PublishToSubscribers(code, meta, payload, SubscriptionDelivery{});
+  // Notify ALL subscribers regardless of delivery type (used by PublishImmediate)
+  std::vector<Subscriber> subscribers;
+  {
+    std::lock_guard<std::mutex> lock(m_SubscribersMutex);
+    auto it = m_Subscribers.find(code);
+    if (it == m_Subscribers.end())
+      return;
+    subscribers = it->second;
+  }
+
+  for (const auto &sub : subscribers) {
+    if (sub.callback) {
+      sub.callback(sub.user, meta, payload);
+    }
+  }
 }
 
 } // namespace gecko::runtime
