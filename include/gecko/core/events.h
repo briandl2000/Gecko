@@ -73,7 +73,7 @@ struct EventEmitter {
 
 enum class SubscriptionDelivery : u8 {
   Queued = 0,   // Delivered when DispatchQueuedEvents() is called.
-  OnPublish = 1 // Delivered immediately during PublishEvent()/Enqueue().
+  OnPublish = 1 // Delivered immediately when events are published (e.g., via PublishEvent(), PublishImmediate(), or Enqueue()).
 };
 
 struct SubscriptionOptions {
