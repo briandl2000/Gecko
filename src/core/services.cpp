@@ -361,10 +361,11 @@ bool InstallServices(const Services &service) noexcept {
 }
 
 void UninstallServices() noexcept {
-  // Shutdown services in reverse dependency order: EventBus -> Modules ->
-  // Logger -> Profiler -> JobSystem -> Allocator This ensures that higher-level
-  // services are shut down before the services they depend on Modules shut down
-  // first so modules can still log during shutdown.
+  // Shutdown services in reverse dependency order:
+  // Modules -> EventBus -> Logger -> Profiler -> JobSystem -> Allocator
+  // This ensures that higher-level services are shut down before the services
+  // they depend on. Modules are shut down first so their shutdown logic can
+  // still use the logger and event bus.
 
   static constexpr auto c_Services = ::gecko::MakeLabel("gecko.core.services");
 
