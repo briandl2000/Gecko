@@ -1,13 +1,13 @@
 #include <cstdio>
 #include <cstring>
 #include <gecko/core/boot.h>
+#include <gecko/core/ptr.h>
+#include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
 #include <gecko/core/services/modules.h>
 #include <gecko/core/services/profiler.h>
-#include <gecko/core/ptr.h>
-#include <gecko/core/services.h>
-#include <gecko/core/utility/thread.h>
 #include <gecko/core/types.h>
+#include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
 #include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>

@@ -1,8 +1,8 @@
 #include "gecko/runtime/module_registry.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/services/log.h"
 #include "gecko/core/services.h"
+#include "gecko/core/services/log.h"
 #include "private/labels.h"
 
 #include <unordered_map>

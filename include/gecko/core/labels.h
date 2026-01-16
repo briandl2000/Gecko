@@ -1,7 +1,7 @@
 #pragma once
 
-#include "gecko/core/utility/hash.h"
 #include "gecko/core/types.h"
+#include "gecko/core/utility/hash.h"
 
 namespace gecko {
 
