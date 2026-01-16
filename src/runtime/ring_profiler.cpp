@@ -19,6 +19,10 @@ u32 ThisThreadId() noexcept
 
 namespace gecko::runtime {
 
+// Reentrancy guard: Prevents profiler from profiling itself
+// (e.g., if profiler internally calls a logged/profiled function)
+thread_local bool g_InsideProfiler = false;
+
 u64 RingProfiler::MonotonicNowNs() noexcept
 {
   return MonotonicTimeNs();

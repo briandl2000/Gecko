@@ -115,4 +115,27 @@ GECKO_API inline bool IsJobComplete(JobHandle handle) noexcept
   return true;
 }
 
+// NullJobSystem: Immediate execution job system (no threading)
+// Jobs execute synchronously on the calling thread
+struct NullJobSystem final : IJobSystem
+{
+  GECKO_API virtual JobHandle Submit(JobFunction job,
+                                     JobPriority priority = JobPriority::Normal,
+                                     Label label = Label {}) noexcept override;
+  GECKO_API virtual JobHandle Submit(JobFunction job,
+                                     const JobHandle* dependencies,
+                                     u32 dependencyCount,
+                                     JobPriority priority = JobPriority::Normal,
+                                     Label label = Label {}) noexcept override;
+  GECKO_API virtual void Wait(JobHandle handle) noexcept override;
+  GECKO_API virtual void WaitAll(const JobHandle* handles,
+                                 u32 count) noexcept override;
+  GECKO_API virtual bool IsComplete(JobHandle handle) noexcept override;
+  GECKO_API virtual u32 WorkerThreadCount() const noexcept override;
+  GECKO_API virtual void ProcessJobs(u32 maxJobs = 1) noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
+
 }  // namespace gecko

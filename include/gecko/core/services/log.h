@@ -118,3 +118,22 @@ GECKO_API ILogger* GetLogger() noexcept;
 #define GECKO_ERROR(cat, ...)
 #define GECKO_FATAL(cat, ...)
 #endif
+
+// NullLogger: No-op logger (discards all log messages)
+// Use when logging is disabled or during early initialization
+namespace gecko {
+struct NullLogger final : ILogger
+{
+  GECKO_API virtual void LogV(LogLevel level, Label label, const char* fmt,
+                              va_list) noexcept override;
+  GECKO_API virtual void AddSink(ILogSink* sink) noexcept override;
+  GECKO_API virtual void SetLevel(LogLevel level) noexcept override;
+  GECKO_API virtual LogLevel Level() const noexcept override;
+
+  GECKO_API virtual void Flush() noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
+
+}  // namespace gecko

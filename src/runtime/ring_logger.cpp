@@ -17,6 +17,9 @@
 
 namespace gecko::runtime {
 
+// Reentrancy guard: Prevents logger from logging itself
+thread_local bool g_InsideRingLogger = false;
+
 u64 RingLogger::NowNs() noexcept
 {
   return MonotonicTimeNs();

@@ -10,6 +10,10 @@
 
 namespace gecko::runtime {
 
+// Reentrancy guard: Prevents logger from logging itself
+// (e.g., if logger internals call logged functions)
+thread_local bool g_InsideLogger = false;
+
 u64 NowNs() noexcept
 {
   return MonotonicTimeNs();
@@ -38,7 +42,6 @@ void ImmediateLogger::AddSink(ILogSink* sink) noexcept
 void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt,
                            va_list apIn) noexcept
 {
-  // Note: Don't profile here as logging is used BY the profiler
   GECKO_ASSERT(fmt && "Format string cannot be null");
 
   // Check log level filter

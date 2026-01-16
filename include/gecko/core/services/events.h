@@ -283,4 +283,35 @@ GECKO_API inline std::size_t DispatchQueuedEvents(
   return 0;
 }
 
+// NullEventBus: No-op event bus (discards all events)
+// All events and subscriptions are silently discarded
+// Use runtime::EventBus for working event system
+struct NullEventBus final : IEventBus
+{
+  GECKO_API virtual EventSubscription Subscribe(
+      EventCode code, CallbackFn fn, void* user,
+      SubscriptionOptions options = {}) noexcept override;
+  GECKO_API virtual void PublishImmediate(const EventEmitter& emitter,
+                                          EventCode code,
+                                          EventView payload) noexcept override;
+  GECKO_API virtual void Enqueue(const EventEmitter& emitter, EventCode code,
+                                 EventView payload) noexcept override;
+  GECKO_API virtual std::size_t DispatchQueued(
+      std::size_t maxCount) noexcept override;
+
+  GECKO_API virtual bool RegisterModule(u64 moduleId) noexcept override;
+  GECKO_API virtual void UnregisterModule(u64 moduleId) noexcept override;
+  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId,
+                                               u64 sender) noexcept override;
+  GECKO_API virtual bool ValidateEmitter(
+      const EventEmitter& emitter,
+      u64 expectedModuleId) const noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+
+protected:
+  GECKO_API virtual void Unsubscribe(u64 id) noexcept override;
+};
+
 }  // namespace gecko

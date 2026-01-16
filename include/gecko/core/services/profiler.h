@@ -155,3 +155,17 @@ inline ProfScope::~ProfScope() noexcept
   }
 }
 }  // namespace gecko
+
+// NullProfiler: No-op profiler (discards all events)
+// Use for production builds or when profiling is disabled
+namespace gecko {
+struct NullProfiler final : IProfiler
+{
+  GECKO_API virtual void Emit(const ProfEvent& event) noexcept override;
+  GECKO_API virtual u64 NowNs() const noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
+
+}  // namespace gecko

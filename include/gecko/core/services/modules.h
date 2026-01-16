@@ -107,4 +107,28 @@ protected:
   }
 };
 
+// NullModuleRegistry: Minimal module registry (accepts but doesn't track
+// modules) Use when module system is disabled or during early initialization
+struct NullModuleRegistry final : IModuleRegistry
+{
+  [[nodiscard]] GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+
+  [[nodiscard]] GECKO_API virtual ModuleRegistration RegisterStatic(
+      IModule& module) noexcept override;
+  [[nodiscard]] GECKO_API virtual ModuleResult Unregister(
+      Label module) noexcept override;
+
+  [[nodiscard]] GECKO_API virtual IModule* GetModule(
+      Label module) noexcept override;
+  [[nodiscard]] GECKO_API virtual const IModule* GetModule(
+      Label module) const noexcept override;
+
+  GECKO_API virtual void ForEachModule(ModuleVisitFn fn,
+                                       void* user) noexcept override;
+
+  [[nodiscard]] GECKO_API virtual bool StartupAllModules() noexcept override;
+  GECKO_API virtual void ShutdownAllModules() noexcept override;
+};
+
 }  // namespace gecko

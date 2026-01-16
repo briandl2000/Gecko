@@ -298,6 +298,58 @@ static std::atomic<IModuleRegistry*> g_Modules {&s_NullModules};
 static std::atomic<IEventBus*> g_EventBus {&s_NullEventBus};
 static std::atomic<bool> g_Installed {false};
 
+// Service installation helper - tracks which services have been installed
+struct ServiceInstallState
+{
+  bool allocator = false;
+  bool jobSystem = false;
+  bool profiler = false;
+  bool logger = false;
+  bool modules = false;
+  bool eventBus = false;
+};
+
+static void RollbackServices(const Services& service,
+                             const ServiceInstallState& state) noexcept
+{
+  // Shutdown in reverse dependency order
+  if (state.eventBus && service.EventBus)
+  {
+    service.EventBus->Shutdown();
+    g_EventBus.store(&s_NullEventBus, std::memory_order_release);
+  }
+
+  if (state.modules && service.Modules)
+  {
+    service.Modules->Shutdown();
+    g_Modules.store(&s_NullModules, std::memory_order_release);
+  }
+
+  if (state.logger && service.Logger)
+  {
+    service.Logger->Shutdown();
+    g_Logger.store(&s_NullLogger, std::memory_order_release);
+  }
+
+  if (state.profiler && service.Profiler)
+  {
+    service.Profiler->Shutdown();
+    g_Profiler.store(&s_NullProfiler, std::memory_order_release);
+  }
+
+  if (state.jobSystem && service.JobSystem)
+  {
+    service.JobSystem->Shutdown();
+    g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
+  }
+
+  if (state.allocator && service.Allocator)
+  {
+    service.Allocator->Shutdown();
+    g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
+  }
+}
+
 bool InstallServices(const Services& service) noexcept
 {
   // NOTE: Cannot use profiling here - profiler is being initialized!
@@ -307,9 +359,10 @@ bool InstallServices(const Services& service) noexcept
     return false;
   }
 
-  // Initialize services in dependency order: Allocator -> JobSystem -> Profiler
-  // -> Logger Each level can depend on previously initialized services, but not
-  // on later ones
+  ServiceInstallState state {};
+
+  // Initialize services in dependency order
+  // Each level can depend on previously initialized services
 
   // Level 0: Allocator (no dependencies)
   if (service.Allocator)
@@ -317,109 +370,63 @@ bool InstallServices(const Services& service) noexcept
     if (!service.Allocator->Init())
     {
       GECKO_ASSERT(false && "Allocator failed to initialize!");
+      RollbackServices(service, state);
       return false;
     }
     g_Allocator.store(service.Allocator, std::memory_order_release);
+    state.allocator = true;
   }
 
-  // Level 1: JobSystem (may use allocator for job storage and worker threads)
+  // Level 1: JobSystem (may use allocator)
   if (service.JobSystem)
   {
     if (!service.JobSystem->Init())
     {
       GECKO_ASSERT(false && "JobSystem failed to initialize!");
-      // Rollback allocator if needed
-      if (service.Allocator)
-      {
-        service.Allocator->Shutdown();
-        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
-      }
+      RollbackServices(service, state);
       return false;
     }
     g_JobSystem.store(service.JobSystem, std::memory_order_release);
+    state.jobSystem = true;
   }
 
-  // Level 2: Profiler (may use allocator and job system for background
-  // processing)
+  // Level 2: Profiler (may use allocator and job system)
   if (service.Profiler)
   {
     if (!service.Profiler->Init())
     {
       GECKO_ASSERT(false && "Profiler failed to initialize!");
-      // Rollback in reverse order
-      if (service.JobSystem)
-      {
-        service.JobSystem->Shutdown();
-        g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
-      }
-      if (service.Allocator)
-      {
-        service.Allocator->Shutdown();
-        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
-      }
+      RollbackServices(service, state);
       return false;
     }
     g_Profiler.store(service.Profiler, std::memory_order_release);
+    state.profiler = true;
   }
 
-  // Level 3: Logger (may use allocator, job system, and profiler for
-  // performance tracking)
+  // Level 3: Logger (may use allocator, job system, and profiler)
   if (service.Logger)
   {
     if (!service.Logger->Init())
     {
       GECKO_ASSERT(false && "Logger failed to initialize!");
-      // Rollback all previous services in reverse order
-      if (service.Profiler)
-      {
-        service.Profiler->Shutdown();
-        g_Profiler.store(&s_NullProfiler, std::memory_order_release);
-      }
-      if (service.JobSystem)
-      {
-        service.JobSystem->Shutdown();
-        g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
-      }
-      if (service.Allocator)
-      {
-        service.Allocator->Shutdown();
-        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
-      }
+      RollbackServices(service, state);
       return false;
     }
     g_Logger.store(service.Logger, std::memory_order_release);
+    state.logger = true;
   }
 
-  // Level 4: Modules (may use allocator, job system, profiler, logger)
+  // Level 4: Modules (may use all previous services)
   if (service.Modules)
   {
     if (!service.Modules->Init())
     {
       GECKO_ASSERT(false && "ModuleRegistry failed to initialize!");
-      // Rollback previous services in reverse order
-      if (service.Logger)
-      {
-        service.Logger->Shutdown();
-        g_Logger.store(&s_NullLogger, std::memory_order_release);
-      }
-      if (service.Profiler)
-      {
-        service.Profiler->Shutdown();
-        g_Profiler.store(&s_NullProfiler, std::memory_order_release);
-      }
-      if (service.JobSystem)
-      {
-        service.JobSystem->Shutdown();
-        g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
-      }
-      if (service.Allocator)
-      {
-        service.Allocator->Shutdown();
-        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
-      }
+      RollbackServices(service, state);
       return false;
     }
     g_Modules.store(service.Modules, std::memory_order_release);
+    state.modules = true;
   }
 
   // Level 4: EventBus (may use allocator and profiler)
@@ -428,30 +435,11 @@ bool InstallServices(const Services& service) noexcept
     if (!service.EventBus->Init())
     {
       GECKO_ASSERT(false && "EventBus failed to initialize!");
-      // Rollback all previous services in reverse order
-      if (service.Logger)
-      {
-        service.Logger->Shutdown();
-        g_Logger.store(&s_NullLogger, std::memory_order_release);
-      }
-      if (service.Profiler)
-      {
-        service.Profiler->Shutdown();
-        g_Profiler.store(&s_NullProfiler, std::memory_order_release);
-      }
-      if (service.JobSystem)
-      {
-        service.JobSystem->Shutdown();
-        g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
-      }
-      if (service.Allocator)
-      {
-        service.Allocator->Shutdown();
-        g_Allocator.store(&s_SystemAllocator, std::memory_order_release);
-      }
+      RollbackServices(service, state);
       return false;
     }
     g_EventBus.store(service.EventBus, std::memory_order_release);
+    state.eventBus = true;
   }
 
   g_Installed.store(true, std::memory_order_release);

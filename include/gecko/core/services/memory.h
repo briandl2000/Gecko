@@ -53,4 +53,18 @@ GECKO_API inline T* AllocArray(u64 count, Label label,
   return static_cast<T*>(AllocBytes(sizeof(T) * count, alignment, label));
 }
 
+// SystemAllocator: Default allocator using malloc/free
+// Provides aligned allocation on all platforms
+struct SystemAllocator final : IAllocator
+{
+  GECKO_API virtual void* Alloc(u64 size, u32 alignment,
+                                Label label) noexcept override;
+
+  GECKO_API virtual void Free(void* ptr, u64 size, u32 alignment,
+                              Label label) noexcept override;
+
+  GECKO_API virtual bool Init() noexcept override;
+  GECKO_API virtual void Shutdown() noexcept override;
+};
+
 }  // namespace gecko
