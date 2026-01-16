@@ -99,6 +99,19 @@ namespace gecko {
 
 ### Formatting Standards
 
+#### Automatic Formatting
+
+The project uses **clang-format** for consistent code formatting across all C++ files.
+
+**Configuration**: `.clang-format` in the project root defines the style based on these standards.
+
+**Usage**:
+- **VS Code**: Enable format-on-save in your local settings.json (not synced with git)
+- **Command line**: `find src include examples -type f \( -name "*.cpp" -o -name "*.h" \) -exec clang-format -i {} \;`
+- **Single file**: `clang-format -i path/to/file.cpp`
+
+**Note**: The language server (clangd/IntelliSense) automatically uses the .clang-format configuration for formatting.
+
 #### Spacing and Braces
 ```cpp
 // Function definitions
