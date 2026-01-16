@@ -18,6 +18,24 @@ For the canonical, non-scattered overview of how Gecko is structured and how to 
 
 ### File Organization
 
+#### Module Structure
+
+The Gecko framework organizes headers into logical groups:
+
+**Public Headers** (`include/gecko/<module>/`):
+- **Root level**: Core infrastructure (api.h, assert.h, boot.h, labels.h, optional.h, ptr.h, services.h, types.h, version.h)
+- **services/**: System services (events.h, jobs.h, log.h, memory.h, modules.h, profiler.h)
+- **utility/**: Utility functions (bit.h, hash.h, random.h, thread.h, time.h)
+
+**Private Headers** (`src/<module>/private/`):
+- Module-internal headers (labels.h for internal label definitions)
+- Not exposed in public API
+
+**Include Path Rules**:
+- Public headers use full paths: `#include "gecko/core/services/log.h"`
+- Private headers use relative paths: `#include "private/labels.h"`
+- Headers within subdirectories need parent navigation: `#include "../private/labels.h"`
+
 #### Header Files (.h)
 ```cpp
 #pragma once
@@ -30,7 +48,9 @@ For the canonical, non-scattered overview of how Gecko is structured and how to 
 // Project includes second (alphabetical order)
 #include "gecko/core/api.h"
 #include "gecko/core/assert.h"
+#include "gecko/core/services/log.h"
 #include "gecko/core/types.h"
+#include "gecko/core/utility/time.h"
 
 namespace gecko {
   // Content here
@@ -46,12 +66,13 @@ namespace gecko {
 #include <cstdio>
 #include <memory>
 
-// Project includes (alphabetical order)
+// Project includes (alphabetical order, using full gecko/ paths)
 #include "gecko/core/assert.h"
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/utility/time.h"
 
-// Local includes last
-#include "labels.h"
+// Private/local includes last (using relative paths)
+#include "private/labels.h"
 
 namespace gecko {
   // Implementation here
@@ -290,7 +311,7 @@ int main()
 
 #### Basic Allocation
 ```cpp
-#include "gecko/core/memory.h"
+#include "gecko/core/services/memory.h"
 
 // Basic byte allocation
 auto label = gecko::MakeLabel("my_system");
@@ -333,7 +354,7 @@ public:
 
 #### Basic Logging
 ```cpp
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
 
 auto label = gecko::MakeLabel("my_system");
 
@@ -389,7 +410,7 @@ ringLogger.SetLevel(gecko::LogLevel::Trace);
 
 #### Basic Profiling
 ```cpp
-#include "gecko/core/profiler.h"
+#include "gecko/core/services/profiler.h"
 
 auto label = gecko::MakeLabel("my_system");
 
@@ -697,7 +718,7 @@ bool flip = GECKO_RANDOM_BOOL();
 Gecko provides a flexible job system for multithreading:
 
 ```cpp
-#include "gecko/core/jobs.h"
+#include "gecko/core/services/jobs.h"
 #include "gecko/runtime/thread_pool_job_system.h"
 
 // Setup (typically in main)
