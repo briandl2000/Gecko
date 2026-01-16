@@ -38,12 +38,7 @@ Add this to your local `.vscode/tasks.json` (not synced with git):
 {
   "label": "Format All Files",
   "type": "shell",
-  "command": "find",
-  "args": [
-    "src", "include", "examples",
-    "-type", "f", "(", "-name", "*.cpp", "-o", "-name", "*.h", ")",
-    "-exec", "clang-format", "-i", "{}", ";"
-  ],
+  "command": "find src include examples -type f \\( -name '*.cpp' -o -name '*.h' \\) -exec clang-format -i {} \\;",
   "options": {
     "cwd": "${workspaceFolder}"
   },
