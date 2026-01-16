@@ -14,6 +14,7 @@
 namespace gecko::runtime {
 
 bool ThreadPoolJobSystem::Init() noexcept {
+  // NOTE: Cannot profile Init() - profiler is initialized AFTER job system
   GECKO_ASSERT(!m_Initialized && "ThreadPoolJobSystem already initialized");
 
   // Determine worker thread count
@@ -42,6 +43,8 @@ bool ThreadPoolJobSystem::Init() noexcept {
 }
 
 void ThreadPoolJobSystem::Shutdown() noexcept {
+  // NOTE: Cannot profile Shutdown() - profiler may be shut down before job system
+  
   if (!m_Initialized)
     return;
 
@@ -70,8 +73,11 @@ void ThreadPoolJobSystem::Shutdown() noexcept {
 
 JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
                                       Label label) noexcept {
-  if (!m_Initialized || !job)
+  // NOTE: Cannot use profiling/logging - JobSystem is Level 1, comes before Profiler (Level 2) and Logger (Level 3)
+
+  if (!m_Initialized || !job) {
     return JobHandle{};
+  }
 
   JobHandle handle = GenerateJobHandle();
   auto jobPtr = std::make_shared<Job>(std::move(job), priority, label, handle);
@@ -90,8 +96,11 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
                                       const JobHandle *dependencies,
                                       u32 dependencyCount, JobPriority priority,
                                       Label label) noexcept {
-  if (!m_Initialized || !job)
+  // NOTE: Cannot use profiling/logging - dependency order violation
+
+  if (!m_Initialized || !job) {
     return JobHandle{};
+  }
 
   JobHandle handle = GenerateJobHandle();
   auto jobPtr = std::make_shared<Job>(std::move(job), priority, label, handle);
@@ -120,8 +129,6 @@ void ThreadPoolJobSystem::Wait(JobHandle handle) noexcept {
   if (!handle.IsValid())
     return;
 
-  GECKO_PROF_SCOPE(labels::JobSystem, "ThreadPoolJobSystem::Wait");
-
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handle]() {
     auto it = m_ActiveJobs.find(handle.Id);
@@ -134,8 +141,6 @@ void ThreadPoolJobSystem::WaitAll(const JobHandle *handles,
                                   u32 count) noexcept {
   if (!handles || count == 0)
     return;
-
-  GECKO_PROF_SCOPE(labels::JobSystem, "ThreadPoolJobSystem::WaitAll");
 
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handles, count]() {
@@ -168,17 +173,12 @@ u32 ThreadPoolJobSystem::WorkerThreadCount() const noexcept {
 }
 
 void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept {
-  GECKO_PROF_SCOPE(labels::JobSystem, "ThreadPoolJobSystem::ProcessJobs");
-
   for (u32 processed = 0; processed < maxJobs; ++processed) {
     auto job = GetNextReadyJob();
     if (!job)
       break;
 
     try {
-      GECKO_PROF_SCOPE(labels::JobSystem, "Job::Execute");
-      GECKO_PROF_COUNTER(labels::JobSystem, "jobs_processed", 1);
-
       job->Function();
       job->Completed.store(true, std::memory_order_release);
 
@@ -196,8 +196,7 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept {
 }
 
 void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
-  GECKO_PROF_SCOPE(labels::JobSystem, "WorkerThread");
-
+  // Don't profile here - worker thread starts before profiler is ready
   const u32 threadId = ThisThreadId();
 
   while (!m_Shutdown.load(std::memory_order_acquire)) {
@@ -213,16 +212,11 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept {
     }
 
     try {
-      GECKO_PROF_SCOPE(labels::JobSystem, "Job::Execute");
-      GECKO_PROF_COUNTER(labels::JobSystem, "jobs_processed", 1);
-
+      // Don't profile individual jobs in worker thread - too much overhead during init
       job->Function();
       job->Completed.store(true, std::memory_order_release);
 
     } catch (...) {
-      GECKO_ERROR(labels::JobSystem,
-                  "Job %llu threw an exception on worker thread %u",
-                  job->Handle.Id, threadId);
       job->Completed.store(true, std::memory_order_release);
     }
 

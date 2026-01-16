@@ -8,6 +8,8 @@
 
 #include "gecko/core/assert.h"
 #include "gecko/core/log.h"
+#include "gecko/core/profiler.h"
+#include "labels.h"
 
 namespace gecko {
 
@@ -230,6 +232,8 @@ static std::atomic<IEventBus *> g_EventBus{&s_NullEventBus};
 static std::atomic<bool> g_Installed{false};
 
 bool InstallServices(const Services &service) noexcept {
+  // NOTE: Cannot use profiling here - profiler is being initialized!
+  
   if (g_Installed.load(std::memory_order_relaxed)) {
     return false;
   }
@@ -356,6 +360,9 @@ bool InstallServices(const Services &service) noexcept {
   }
 
   g_Installed.store(true, std::memory_order_release);
+  
+  // Now that logger is installed and ready, we can safely log
+  GECKO_INFO(core::labels::Services, "All services installed successfully");
 
   return true;
 }
@@ -367,14 +374,10 @@ void UninstallServices() noexcept {
   // they depend on. Modules are shut down first so their shutdown logic can
   // still use the logger and event bus.
 
-  static constexpr auto c_Services = ::gecko::MakeLabel("gecko.core.services");
+  GECKO_INFO(core::labels::Services, "Shutting down Gecko services");
 
-  auto *modules = g_Modules.load(std::memory_order_relaxed);
-  if (modules) {
-    GECKO_INFO(c_Services, "UninstallServices: shutting down modules");
-    modules->Shutdown();
-    GECKO_INFO(c_Services, "UninstallServices: modules shutdown complete");
-  }
+  g_Modules.load(std::memory_order_relaxed)
+    ->Shutdown();
 
   g_EventBus.load(std::memory_order_relaxed)
       ->Shutdown(); // Level 4: May use profiler, allocator

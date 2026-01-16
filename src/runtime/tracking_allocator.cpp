@@ -5,6 +5,7 @@
 #include <tuple>
 
 #include "gecko/core/assert.h"
+#include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
 
 #include "labels.h"
@@ -21,14 +22,16 @@ MemLabelStats &TrackingAllocator::EnsureLabelLocked(Label label) {
 }
 
 void *TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept {
+  // NOTE: Cannot use profiling/logging - Allocator is Level 0, comes before everything
   GECKO_ASSERT(m_Upstream && "Upstream allocator is required");
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
 
   void *ptr = m_Upstream->Alloc(size, alignment, label);
-  if (!ptr)
+  if (!ptr) {
     return nullptr;
+  }
 
   m_TotalLive.fetch_add(size, std::memory_order_relaxed);
 

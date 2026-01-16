@@ -128,11 +128,9 @@ void RingLogger::ProcessLogEntries() noexcept {
         sink->Write(message);
     }
 
-    if (m_Profiler && (message.Level == LogLevel::Error ||
-                       message.Level == LogLevel::Fatal)) {
-      GECKO_PROF_COUNTER(message.MessageLabel, "LogErrorCount", 1);
-    }
-
+    // NOTE: Cannot use profiling here - would create circular dependency!
+    // Logger depends on Profiler, so Logger cannot call Profiler functions.
+    
     entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
     m_Tail.store(position + 1, std::memory_order_relaxed);
   }

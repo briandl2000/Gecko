@@ -1,6 +1,9 @@
 #include "gecko/runtime/event_bus.h"
 #include "gecko/core/assert.h"
+#include "gecko/core/log.h"
+#include "gecko/core/profiler.h"
 #include "gecko/core/random.h"
+#include "labels.h"
 #include <algorithm>
 #include <cstring>
 
@@ -11,11 +14,14 @@ EventBus::EventBus() {}
 EventBus::~EventBus() { m_Subscribers.clear(); }
 
 bool EventBus::Init() noexcept {
+  GECKO_PROF_FUNC(runtime::labels::General);
   m_CapabilitySecret = RandomU64();
   return true;
 }
 
 void EventBus::Shutdown() noexcept {
+  GECKO_PROF_FUNC(runtime::labels::General);
+  
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
     m_Subscribers.clear();
@@ -49,9 +55,12 @@ void EventBus::UnregisterModule(u64 moduleId) noexcept {
 
 EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void *user,
                                       SubscriptionOptions options) noexcept {
+  GECKO_PROF_FUNC(runtime::labels::General);
   GECKO_ASSERT(fn && "Callback cannot be null");
 
   u64 id = m_NextSubscriptionId.fetch_add(1, std::memory_order_relaxed);
+  GECKO_TRACE(runtime::labels::General, "Creating subscription ID=%llu for event code %u", 
+              (unsigned long long)id, code);
 
   Subscriber sub{};
   sub.id = id;
@@ -86,12 +95,17 @@ void EventBus::Unsubscribe(u64 id) noexcept {
 
 void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
                                 EventView payload) noexcept {
+  GECKO_PROF_SCOPE(runtime::labels::General, "PublishImmediate");
+  
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
   [[maybe_unused]] const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
   GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
                "Event code module mismatch with emitter module");
   GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
                "Invalid emitter capability");
+  
+  GECKO_TRACE(runtime::labels::General, "Publishing immediate event code=%u, moduleId=%llu", 
+              code, (unsigned long long)emitter.moduleId);
 
   EventMeta meta{};
   meta.code = code;
@@ -104,6 +118,8 @@ void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
 
 void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
                        EventView payload) noexcept {
+  GECKO_PROF_SCOPE(runtime::labels::General, "EnqueueEvent");
+  
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
   [[maybe_unused]] const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
   GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
@@ -112,6 +128,9 @@ void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
                "Invalid emitter capability");
   GECKO_ASSERT(payload.size <= sizeof(QueuedEvent::payloadStorage) &&
                "Payload too large for queue");
+  
+  GECKO_TRACE(runtime::labels::General, "Enqueuing event code=%u, moduleId=%llu, size=%zu", 
+              code, (unsigned long long)emitter.moduleId, payload.size);
 
   QueuedEvent qEvent{};
   qEvent.meta.code = code;
@@ -140,6 +159,8 @@ void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
 }
 
 std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
+  GECKO_PROF_FUNC(runtime::labels::General);
+  
   std::vector<QueuedEvent> events;
 
   {
@@ -147,6 +168,8 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
     std::size_t count = std::min(maxCount, m_EventQueue.size());
     if (count == 0)
       return 0;
+    
+    GECKO_TRACE(runtime::labels::General, "Dispatching %zu queued events", count);
 
     events.reserve(count);
     for (std::size_t i = 0; i < count; ++i) {

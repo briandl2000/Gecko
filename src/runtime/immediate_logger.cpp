@@ -27,6 +27,7 @@ void ImmediateLogger::AddSink(ILogSink *sink) noexcept {
 
 void ImmediateLogger::LogV(LogLevel level, Label label, const char *fmt,
                            va_list apIn) noexcept {
+  // Note: Don't profile here as logging is used BY the profiler
   GECKO_ASSERT(fmt && "Format string cannot be null");
 
   // Check log level filter

@@ -107,6 +107,8 @@ public:
     m_Windows.emplace(id, st);
     m_WindowByXid.emplace(w, id);
 
+    GECKO_INFO(labels::Window, "Created X11 window id=%llu, xid=%lu, size=%ux%u", 
+               (unsigned long long)id, (unsigned long)w, width, height);
     return true;
   }
 
@@ -121,6 +123,8 @@ public:
       return;
 
     if (m_Display && it->second.WindowId != 0) {
+      GECKO_DEBUG(labels::Window, "Destroying X11 window id=%llu, xid=%lu", 
+                  (unsigned long long)window.Id, (unsigned long)it->second.WindowId);
       m_WindowByXid.erase(it->second.WindowId);
       XDestroyWindow(m_Display, it->second.WindowId);
       XFlush(m_Display);
@@ -161,9 +165,11 @@ public:
     if (!m_Display)
       return;
 
+    int eventCount = 0;
     while (XPending(m_Display) > 0) {
       XEvent event;
       XNextEvent(m_Display, &event);
+      eventCount++;
 
       const u64 now = NowNsSafe();
 
@@ -303,6 +309,10 @@ public:
       default:
         break;
       }
+    }
+    
+    if (eventCount > 0) {
+      GECKO_TRACE(labels::Input, "Pumped %d X11 events", eventCount);
     }
   }
 

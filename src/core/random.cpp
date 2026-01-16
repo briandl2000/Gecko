@@ -4,6 +4,9 @@
 #include <random>
 
 #include "gecko/core/assert.h"
+#include "gecko/core/log.h"
+#include "gecko/core/profiler.h"
+#include "labels.h"
 
 namespace gecko {
 
@@ -13,6 +16,7 @@ struct ThreadRandomState {
   bool initialized = false;
 
   ThreadRandomState() {
+    GECKO_PROF_SCOPE(core::labels::Random, "InitThreadRandom");
     // Seed with random device by default
     std::random_device rd;
     generator.seed(rd());

@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "gecko/core/profiler.h"
+#include "labels.h"
 namespace gecko {
 
 u64 MonotonicTimeNs() noexcept {

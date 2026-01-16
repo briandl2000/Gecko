@@ -49,6 +49,8 @@ PlatformExampleAppModule g_AppModule;
 } // namespace
 
 int main() {
+  GECKO_PROF_SCOPE(app::platform_example::labels::Main, "MainFunction");
+  
   SystemAllocator systemAlloc;
   runtime::TrackingAllocator trackingAlloc(&systemAlloc);
   runtime::RingProfiler ringProfiler(1 << 16); // 64K events
@@ -110,41 +112,60 @@ int main() {
   windowDesc.Mode = WindowMode::Windowed;
 
   WindowHandle window;
+  GECKO_INFO(app::platform_example::labels::Main, "Creating application window...");
   if (!ctx->CreateWindow(windowDesc, window)) {
     GECKO_ERROR(app::platform_example::labels::Main,
                 "Failed to create window\n");
     GECKO_SHUTDOWN();
     return 1;
   }
+  GECKO_INFO(app::platform_example::labels::Main, "Window created successfully");
 
   bool running = true;
   // Avoid hanging forever in headless/Null-backend runs.
   // Run up to ~10 seconds unless a close is requested.
   u32 frameCount = 0;
+  GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
   while (running && ctx->IsWindowAlive(window) && frameCount < 600) {
-    GECKO_PROF_SCOPE(app::platform_example::labels::Main, "Main Loop");
-    ctx->PumpEvents();
+    GECKO_PROF_SCOPE(app::platform_example::labels::Main, "MainLoop");
+    
+    {
+      GECKO_PROF_SCOPE(app::platform_example::labels::Main, "PumpEvents");
+      ctx->PumpEvents();
+    }
 
-    WindowEvent ev{};
-    while (ctx->PollEvent(ev)) {
-      if (ev.Kind == WindowEventKind::CloseRequested) {
-        running = false;
-        break;
+    {
+      GECKO_PROF_SCOPE(app::platform_example::labels::Main, "ProcessEvents");
+      WindowEvent ev{};
+      while (ctx->PollEvent(ev)) {
+        if (ev.Kind == WindowEventKind::CloseRequested) {
+          GECKO_INFO(app::platform_example::labels::Main, "Close requested, exiting main loop");
+          running = false;
+          break;
+        }
       }
     }
 
     GECKO_SLEEP_MS(16);
     ++frameCount;
+    
+    if (frameCount % 60 == 0) {
+      GECKO_PROF_COUNTER(app::platform_example::labels::Main, "FrameCount", frameCount);
+    }
   }
 
   if (running) {
     // Headless/timeout fallback: request a clean shutdown.
+    GECKO_INFO(app::platform_example::labels::Main, "Timeout reached, requesting clean shutdown");
     ctx->RequestClose(window);
   }
 
+  GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
   ctx->DestroyWindow(window);
 
+  GECKO_INFO(app::platform_example::labels::Main, "Shutting down Gecko services...");
   GECKO_SHUTDOWN();
 
+  GECKO_INFO(app::platform_example::labels::Main, "Application exited successfully");
   return 0;
 }

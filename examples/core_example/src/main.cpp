@@ -699,40 +699,13 @@ int main() {
     {
       GECKO_PROF_SCOPE(app::core_example::labels::Main, "JobSystemDemo");
 
-      std::vector<JobHandle> jobHandles;
-      const int numJobs = 6; // Sweet spot for demo
-
-      // Submit some parallel jobs
-      GECKO_INFO(app::core_example::labels::Main,
-                 "Submitting %d parallel jobs...", numJobs);
-      for (int i = 0; i < numJobs; ++i) {
-        auto job = [i]() {
-          GECKO_INFO(app::core_example::labels::Compute,
-                     "Parallel Worker %d: Processing data chunk...", i);
-          // Simulate interesting computational work
-          SleepMs(15 + i * 8);
-          GECKO_PROF_COUNTER(app::core_example::labels::Compute,
-                             "parallel_jobs_completed", 1);
-        };
-
-        auto handle = SubmitJob(job, JobPriority::Normal,
-                                app::core_example::labels::Compute);
-        jobHandles.push_back(handle);
-      }
-
-      // Wait for all parallel jobs to complete
-      GECKO_INFO(app::core_example::labels::Main,
-                 "Waiting for all parallel jobs to complete...");
-      WaitForJobs(jobHandles.data(), static_cast<u32>(jobHandles.size()));
-      GECKO_INFO(app::core_example::labels::Main,
-                 "All parallel jobs completed!");
-
       // Example with job dependencies - pipeline pattern
       GECKO_INFO(app::core_example::labels::Main,
                  "Testing job dependencies (pipeline pattern)...");
 
       auto dataPreparationJob = SubmitJob(
           []() {
+            GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PipelineStage1");
             GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 1: Loading and validating data...");
             SleepMs(40);
@@ -745,6 +718,7 @@ int main() {
       JobHandle stage1Deps[] = {dataPreparationJob};
       auto dataProcessingJob = SubmitJob(
           []() {
+            GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PipelineStage2");
             GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 2: Running complex algorithms...");
             SleepMs(50);
@@ -757,6 +731,7 @@ int main() {
       JobHandle stage2Deps[] = {dataProcessingJob};
       auto dataFinalizationJob = SubmitJob(
           []() {
+            GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PipelineStage3");
             GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 3: Generating final report...");
             SleepMs(35);
@@ -767,7 +742,10 @@ int main() {
           stage2Deps, 1, JobPriority::Normal,
           app::core_example::labels::Compute);
 
-      WaitForJob(dataFinalizationJob);
+      // Process jobs on main thread while waiting to prevent deadlock with 1 worker
+      while (!IsJobComplete(dataFinalizationJob)) {
+        GetJobSystem()->ProcessJobs(1);
+      }
       GECKO_INFO(app::core_example::labels::Main,
                  "Job dependency pipeline completed successfully!");
 
@@ -777,6 +755,7 @@ int main() {
       std::vector<JobHandle> mainThreadJobs;
       for (int i = 0; i < 3; ++i) {
         auto job = [i]() {
+          GECKO_PROF_SCOPE(app::core_example::labels::Compute, "MainThreadJob");
           GECKO_INFO(app::core_example::labels::Compute, "Main thread job %d",
                      i);
         };

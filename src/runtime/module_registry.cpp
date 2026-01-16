@@ -92,6 +92,8 @@ void ModuleRegistry::Shutdown() noexcept {
 
 ::gecko::ModuleRegistration
 ModuleRegistry::RegisterStatic(::gecko::IModule &module) noexcept {
+  GECKO_PROF_FUNC(labels::Modules);
+  
   if (!m_impl) {
     m_impl.reset(new Impl());
   }
