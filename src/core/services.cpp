@@ -41,7 +41,7 @@ namespace gecko {
  * - All services can use the Allocator as the foundation
  */
 
-#pragma region(minimal defaults) // ------------------------------------------------
+// ------------------------------------------------
 
 bool NullModuleRegistry::Init() noexcept
 {
@@ -288,7 +288,7 @@ static NullLogger s_NullLogger;
 static NullModuleRegistry s_NullModules;
 static NullEventBus s_NullEventBus;
 
-#pragma endregion  //----------------------------------------------------------------
+// ----------------------------------------------------------------
 
 static std::atomic<IAllocator*> g_Allocator {&s_SystemAllocator};
 static std::atomic<IJobSystem*> g_JobSystem {&s_NullJobSystem};
