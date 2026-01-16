@@ -2,7 +2,7 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/assert.h"
-#include "types.h"
+#include "gecko/core/types.h"
 
 #include <cstddef>
 

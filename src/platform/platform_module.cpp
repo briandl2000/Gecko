@@ -1,8 +1,8 @@
 #include "gecko/platform/platform_module.h"
 
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
-#include "labels.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
+#include "private/labels.h"
 
 namespace gecko::platform {
 

@@ -1,7 +1,7 @@
 #if GECKO_OVERRIDE_NEW
 #include "gecko/core/assert.h"
-#include "gecko/core/memory.h"
-#include "labels.h"
+#include "gecko/core/services/memory.h"
+#include "private/labels.h"
 
 #include <cstddef>
 #include <new>

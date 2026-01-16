@@ -1,9 +1,9 @@
-#include "gecko/core/modules.h"  // Corresponding header first
+#include "gecko/core/services/modules.h"  // Corresponding header first
 
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
 #include "gecko/core/services.h"
-#include "labels.h"
+#include "private/labels.h"
 
 namespace gecko {
 

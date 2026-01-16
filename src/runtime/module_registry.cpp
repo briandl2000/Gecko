@@ -1,9 +1,9 @@
 #include "gecko/runtime/module_registry.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
 #include "gecko/core/services.h"
-#include "labels.h"
+#include "private/labels.h"
 
 #include <unordered_map>
 #include <vector>

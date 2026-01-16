@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
 
 #include <cstdio>
 

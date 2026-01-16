@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/core/jobs.h"
+#include "gecko/core/services/jobs.h"
 
 #include <atomic>
 #include <condition_variable>

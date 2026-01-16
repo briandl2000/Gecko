@@ -2,7 +2,7 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
 
 namespace gecko {
 

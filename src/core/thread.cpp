@@ -1,4 +1,4 @@
-#include "gecko/core/thread.h"
+#include "gecko/core/utility/thread.h"
 
 #include <chrono>
 #include <functional>
@@ -9,10 +9,10 @@
 #endif
 
 #include "gecko/core/assert.h"
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
-#include "gecko/core/time.h"
-#include "labels.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
+#include "gecko/core/utility/time.h"
+#include "private/labels.h"
 
 namespace gecko {
 

@@ -1,6 +1,6 @@
 #include "gecko/runtime/runtime_module.h"
 
-#include "labels.h"
+#include "private/labels.h"
 
 namespace gecko::runtime {
 

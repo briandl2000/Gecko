@@ -1,7 +1,7 @@
 #include "gecko/runtime/console_log_sink.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
 
 #include <cstdio>
 

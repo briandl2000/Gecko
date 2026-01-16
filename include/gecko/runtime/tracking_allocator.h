@@ -1,7 +1,7 @@
 #pragma once
 
-#include "gecko/core/memory.h"
-#include "gecko/core/profiler.h"
+#include "gecko/core/services/memory.h"
+#include "gecko/core/services/profiler.h"
 #include "gecko/core/types.h"
 
 #include <atomic>

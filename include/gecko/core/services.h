@@ -1,12 +1,12 @@
 #pragma once
 
 #include "api.h"
-#include "events.h"
-#include "jobs.h"
-#include "log.h"
-#include "memory.h"
-#include "modules.h"
-#include "profiler.h"
+#include "gecko/core/services/events.h"
+#include "gecko/core/services/jobs.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/memory.h"
+#include "gecko/core/services/modules.h"
+#include "gecko/core/services/profiler.h"
 
 namespace gecko {
 

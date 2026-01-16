@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/core/profiler.h"
+#include "gecko/core/services/profiler.h"
 
 #include <atomic>
 #include <cstdio>

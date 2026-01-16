@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gecko/core/api.h"
-#include "gecko/core/modules.h"
+#include "gecko/core/services/modules.h"
 
 #include <memory>
 

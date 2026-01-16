@@ -1,8 +1,8 @@
 #pragma once
 
-#include "api.h"
-#include "labels.h"
-#include "types.h"
+#include "gecko/core/api.h"
+#include "gecko/core/labels.h"
+#include "gecko/core/types.h"
 
 #include <functional>
 

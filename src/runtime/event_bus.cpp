@@ -1,10 +1,10 @@
 #include "gecko/runtime/event_bus.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
-#include "gecko/core/random.h"
-#include "labels.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
+#include "gecko/core/utility/random.h"
+#include "private/labels.h"
 
 #include <algorithm>
 #include <cstring>

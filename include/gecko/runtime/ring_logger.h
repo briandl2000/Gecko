@@ -1,8 +1,8 @@
 #pragma once
 
-#include "gecko/core/jobs.h"
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
+#include "gecko/core/services/jobs.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
 #include "gecko/core/types.h"
 
 #include <atomic>

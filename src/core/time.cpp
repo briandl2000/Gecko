@@ -1,7 +1,7 @@
-#include "gecko/core/time.h"
+#include "gecko/core/utility/time.h"
 
-#include "gecko/core/profiler.h"
-#include "labels.h"
+#include "gecko/core/services/profiler.h"
+#include "private/labels.h"
 
 #include <chrono>
 namespace gecko {

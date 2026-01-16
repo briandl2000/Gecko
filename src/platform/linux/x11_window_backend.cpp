@@ -2,10 +2,10 @@
 
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
 
-#include "../labels.h"
+#include "../private/labels.h"
 #include "../window_backend.h"
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
 
 #include <cstdint>
 #include <deque>

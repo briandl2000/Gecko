@@ -1,7 +1,7 @@
 #pragma once
 
-#include "api.h"
-#include "types.h"
+#include "gecko/core/api.h"
+#include "gecko/core/types.h"
 
 #include <chrono>
 #include <thread>

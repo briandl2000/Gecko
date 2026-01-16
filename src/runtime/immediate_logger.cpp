@@ -1,8 +1,8 @@
 #include "gecko/runtime/immediate_logger.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/thread.h"
-#include "gecko/core/time.h"
+#include "gecko/core/utility/thread.h"
+#include "gecko/core/utility/time.h"
 
 #include <cstdarg>
 #include <cstdio>

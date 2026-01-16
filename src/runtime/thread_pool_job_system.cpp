@@ -1,9 +1,9 @@
 #include "gecko/runtime/thread_pool_job_system.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
-#include "labels.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
+#include "private/labels.h"
 
 #include <algorithm>
 #include <chrono>
