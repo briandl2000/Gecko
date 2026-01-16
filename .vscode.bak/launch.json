@@ -1,0 +1,79 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: core_example",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/out/bin/Debug/core_example",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/working_dir",
+      "environment": [],
+      "externalConsole": false,
+      "console": "integratedTerminal",
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "CMake: Build (Debug)",
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
+    {
+      "name": "Debug: platform_example",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/out/bin/Debug/platform_example",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/working_dir",
+      "environment": [],
+      "externalConsole": false,
+      "console": "integratedTerminal",
+      "MIMode": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "CMake: Build (Debug)",
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
+    {
+      "name": "Release: core_example",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/out/bin/Release/core_example",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/working_dir",
+      "environment": [],
+      "externalConsole": false,
+      "console": "integratedTerminal",
+      "MIMode": "gdb",
+      "preLaunchTask": "CMake: Build (Release)",
+      "miDebuggerPath": "/usr/bin/gdb"
+    },
+    {
+      "name": "Release: platform_example",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/out/bin/Release/platform_example",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/working_dir",
+      "environment": [],
+      "externalConsole": false,
+      "console": "integratedTerminal",
+      "MIMode": "gdb",
+      "preLaunchTask": "CMake: Build (Release)",
+      "miDebuggerPath": "/usr/bin/gdb"
+    }
+  ]
+}

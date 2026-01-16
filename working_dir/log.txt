@@ -1,0 +1,108 @@
+[INFO ][gecko.core.services][t1775685678] All services installed successfully
+[INFO ][app.core_example.main][t1775685678] Gecko 0.0.0-alpha.0
+[INFO ][gecko.core.modules][t1775685678] Installing module 'gecko.runtime'
+[INFO ][gecko.runtime.modules][t1775685678] RegisterStatic: gecko.runtime
+[INFO ][gecko.runtime.modules][t1775685678] Registered: gecko.runtime
+[INFO ][gecko.core.modules][t1775685678] Installing module 'app.core_example'
+[INFO ][gecko.runtime.modules][t1775685678] RegisterStatic: app.core_example
+[INFO ][gecko.runtime.modules][t1775685678] Registered: app.core_example
+[INFO ][app.core_example.main][t1775685678] Services installed and sinks configured successfully!
+[INFO ][app.core_example.main][t1775685678] Log level is set to Info - Debug and Trace messages are filtered out
+[INFO ][app.core_example.main][t1775685678] Starting comprehensive memory and profiling demo
+[INFO ][app.core_example.main][t1775685678] Changing log level to Trace to show all messages
+[INFO ][app.core_example.main][t1775685678] === 1. Memory Management Demo ===
+[INFO ][app.core_example.memory][t1775685678] Starting memory stress test
+[DEBUG][app.core_example.memory][t1775685678] Stress-testing memory with 25 random allocations (64-2048 bytes each)
+[DEBUG][app.core_example.memory][t1775685678] Freeing half of the allocations randomly
+[INFO ][app.core_example.memory][t1775685678] Freed 12 allocations
+[DEBUG][app.core_example.memory][t1775685678] Allocating 25 additional blocks with 32-byte alignment
+[DEBUG][app.core_example.memory][t1775685678] Cleaning up remaining allocations
+[INFO ][app.core_example.memory][t1775685678] Cleaned up 38 remaining allocations
+[INFO ][app.core_example.memory][t1775685678] Memory stress test completed successfully
+[INFO ][app.core_example.main][t1775685678] === Memory Statistics ===
+[INFO ][app.core_example.main][t1775685678] Total Live Bytes: 64904
+[INFO ][app.core_example.main][t1775685678] Label 'app.core_example.memory' (15650389865316804865): Live=0 bytes, Allocs=50, Frees=50 (100.0% freed)
+[INFO ][app.core_example.main][t1775685678] Summary: 50 total allocations, 50 freed (100.0%), 0 bytes still allocated
+[INFO ][app.core_example.main][t1775685678] Perfect! All memory was properly freed.
+[INFO ][app.core_example.main][t1775685678] === 2. Event System Demo ===
+[INFO ][app.core_example.main][t1775685678] Setting up event system demo
+[TRACE][gecko.runtime.general][t1775685678] Creating subscription ID=1 for event code 1
+[TRACE][gecko.runtime.general][t1775685678] Creating subscription ID=2 for event code 1
+[TRACE][gecko.core.events][t1775685678] Creating emitter for module 'app.core_example' (sender=49374)
+[INFO ][app.core_example.main][t1775685678] Test 1: PublishEvent from main thread
+[TRACE][gecko.runtime.general][t1775685678] Enqueuing event code=1, moduleId=15215521018627500172, size=4
+[INFO ][app.core_example.events][t1775685678] OnPublish received: value=1
+[INFO ][app.core_example.main][t1775685678] Test 2: PublishEvent from worker thread
+[TRACE][gecko.runtime.general][t3068293376] Enqueuing event code=1, moduleId=15215521018627500172, size=4
+[INFO ][app.core_example.events][t3068293376] OnPublish received: value=2
+[INFO ][app.core_example.main][t1775685678] Test 3: PublishImmediateEvent (all subscribers notified now)
+[TRACE][gecko.runtime.general][t1775685678] Publishing immediate event code=1, moduleId=15215521018627500172
+[INFO ][app.core_example.events][t1775685678] OnPublish received: value=3
+[INFO ][app.core_example.events][t1775685678] Queued dispatch received: value=3
+[INFO ][app.core_example.main][t1775685678] Before DispatchQueued: OnPublish=3, Queued=1
+[TRACE][gecko.runtime.general][t1775685678] Dispatching 2 queued events
+[INFO ][app.core_example.events][t1775685678] Queued dispatch received: value=1
+[INFO ][app.core_example.events][t1775685678] Queued dispatch received: value=2
+[INFO ][app.core_example.main][t1775685678] Event bus dispatched 2 queued events
+[INFO ][app.core_example.main][t1775685678] After DispatchQueued: OnPublish=3, Queued=3
+[TRACE][gecko.core.events][t1775685678] Unsubscribing event subscription ID=2
+[TRACE][gecko.core.events][t1775685678] Unsubscribing event subscription ID=1
+[INFO ][app.core_example.main][t1775685678] === 3. Threading Utilities Demo ===
+[INFO ][app.core_example.main][t1775685678] Current thread ID: 1775685678, Hardware threads: 16
+[INFO ][app.core_example.main][t1775685678] PreciseSleepNs(1ms) took 1058510 ns
+[INFO ][app.core_example.main][t1775685678] Testing thread yield...
+[INFO ][app.core_example.main][t1775685678] Thread yield completed
+[TRACE][app.core_example.main][t1775685678] Testing SleepMs(10)...
+[INFO ][app.core_example.main][t1775685678] SleepMs(10) took approximately 10 ms
+[INFO ][app.core_example.main][t1775685678] === 3. Particle Physics Simulation Demo ===
+[INFO ][app.core_example.main][t1775685678] Launching 3 parallel physics simulations!
+[INFO ][app.core_example.main][t1775685678] Submitting 3 particle simulation jobs to job system
+[INFO ][app.core_example.main][t1775685678] Physics Worker 0: Simulating 800 particles in zero-gravity!
+[INFO ][app.core_example.main][t1775685678] Physics Worker 1: Simulating 1200 particles in zero-gravity!
+[INFO ][app.core_example.main][t1775685678] Physics Worker 2: Simulating 1600 particles in zero-gravity!
+[INFO ][app.core_example.worker][t1505777416] Worker 0: Starting simulation with 800 particles
+[INFO ][app.core_example.worker][t214053654] Worker 1: Starting simulation with 1200 particles
+[DEBUG][app.core_example.memory][t1505777416] Worker 0: Allocated 22400 bytes for 800 particles
+[INFO ][app.core_example.main][t1775685678] Waiting for simulation jobs to complete...
+[INFO ][app.core_example.worker][t3068293376] Worker 2: Starting simulation with 1600 particles
+[DEBUG][app.core_example.memory][t3068293376] Worker 2: Allocated 44800 bytes for 1600 particles
+[DEBUG][app.core_example.memory][t214053654] Worker 1: Allocated 33600 bytes for 1200 particles
+[TRACE][app.core_example.compute][t1505777416] Worker 0: Completed 50 physics steps
+[INFO ][app.core_example.worker][t1505777416] Worker 0: Physics simulation complete! All particles settled.
+[DEBUG][app.core_example.memory][t1505777416] Worker 0: Freed particle memory
+[TRACE][app.core_example.compute][t214053654] Worker 1: Completed 50 physics steps
+[INFO ][app.core_example.worker][t214053654] Worker 1: Physics simulation complete! All particles settled.
+[DEBUG][app.core_example.memory][t214053654] Worker 1: Freed particle memory
+[TRACE][app.core_example.compute][t3068293376] Worker 2: Completed 50 physics steps
+[INFO ][app.core_example.worker][t3068293376] Worker 2: Physics simulation complete! All particles settled.
+[DEBUG][app.core_example.memory][t3068293376] Worker 2: Freed particle memory
+[INFO ][app.core_example.main][t1775685678] Simulation jobs completed successfully
+[INFO ][app.core_example.main][t1775685678] === Memory Statistics ===
+[INFO ][app.core_example.main][t1775685678] Total Live Bytes: 65176
+[INFO ][app.core_example.main][t1775685678] Label 'app.core_example.memory' (15650389865316804865): Live=0 bytes, Allocs=50, Frees=50 (100.0% freed)
+[INFO ][app.core_example.main][t1775685678] Label 'app.core_example.simulation' (362902295576560697): Live=0 bytes, Allocs=3, Frees=3 (100.0% freed)
+[INFO ][app.core_example.main][t1775685678] Summary: 53 total allocations, 53 freed (100.0%), 0 bytes still allocated
+[INFO ][app.core_example.main][t1775685678] Perfect! All memory was properly freed.
+[TRACE][app.core_example.main][t1775685678] This is a trace message - very detailed info
+[DEBUG][app.core_example.main][t1775685678] This is a debug message - development info
+[INFO ][app.core_example.main][t1775685678] This is an info message - general information
+[WARN ][app.core_example.main][t1775685678] This is a warning - something might be wrong
+[ERROR][app.core_example.main][t1775685678] This is an error - something went wrong (but this is just a test!)
+[INFO ][app.core_example.main][t1775685678] Testing Job System with 4 worker threads...
+[INFO ][app.core_example.main][t1775685678] Testing job dependencies (pipeline pattern)...
+[INFO ][app.core_example.compute][t1775685678] Pipeline Stage 1: Loading and validating data...
+[INFO ][app.core_example.compute][t1775685678] Stage 1: Data preparation complete - 1000 records processed
+[INFO ][app.core_example.compute][t214053654] Pipeline Stage 2: Running complex algorithms...
+[INFO ][app.core_example.compute][t214053654] Stage 2: Analysis complete - 847 patterns detected
+[INFO ][app.core_example.compute][t3068293376] Pipeline Stage 3: Generating final report...
+[INFO ][app.core_example.compute][t3068293376] Stage 3: Mission accomplished! Results exported to dashboard.
+[INFO ][app.core_example.main][t1775685678] Job dependency pipeline completed successfully!
+[INFO ][app.core_example.main][t1775685678] Testing main thread job processing...
+[INFO ][app.core_example.compute][t214053654] Main thread job 0
+[INFO ][app.core_example.compute][t1249885420] Main thread job 2
+[INFO ][app.core_example.compute][t1775685678] Main thread job 1
+[INFO ][app.core_example.main][t1775685678] Main thread job processing complete!
+[INFO ][app.core_example.main][t1775685678] Flushing remaining log messages...
+[INFO ][app.core_example.main][t1775685678] Trace data has been continuously written to gecko_trace.json
+[INFO ][app.core_example.main][t1775685678] Shutting down services...
+[INFO ][app.core_example.main][t1775685678] Job dependency pipeline completed successfully!

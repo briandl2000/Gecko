@@ -1,0 +1,38 @@
+{
+  "cmake.useCMakePresets": "always",
+  "cmake.sourceDirectory": "${workspaceFolder}",
+  "cmake.configureOnOpen": true,
+
+  // Keep IntelliSense in sync with the active CMake configure.
+  "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
+
+  // Optional: helps editors/tools that look for this setting.
+  "clangd.arguments": ["--compile-commands-dir=${workspaceFolder}/build"],
+
+  // Nice-to-have for C++ projects.
+  "files.associations": {
+    "*.inl": "cpp",
+    "*.ipp": "cpp"
+  },
+
+  // One keybinding can run multiple commands (requires ryuta46.multi-command).
+  "multiCommand.commands": [
+    {
+      "command": "multiCommand.geckoOpenPerfettoTrace",
+      "sequence": [
+        "workbench.action.closeSidebar",
+        "workbench.action.closePanel",
+        {
+          "command": "perfetto-trace.open-trace-file",
+          "args": {
+            "$mid": 1,
+            "scheme": "file",
+            "path": "${workspaceFolder}/working_dir/gecko_trace.json"
+          },
+          "variableSubstitution": true
+        }
+      ]
+    }
+  ]
+}
