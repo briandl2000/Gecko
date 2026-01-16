@@ -23,6 +23,37 @@ Examples are enabled by default:
 
 Output binaries land under `build/out/bin/<Config>/`.
 
+## Code Formatting
+
+Format all C++ files in the project:
+
+**Command line:**
+```bash
+./scripts/format.sh
+```
+
+**VS Code Task (optional):**
+Add this to your local `.vscode/tasks.json` (not synced with git):
+```json
+{
+  "label": "Format All Files",
+  "type": "shell",
+  "command": "find",
+  "args": [
+    "src", "include", "examples",
+    "-type", "f", "(", "-name", "*.cpp", "-o", "-name", "*.h", ")",
+    "-exec", "clang-format", "-i", "{}", ";"
+  ],
+  "options": {
+    "cwd": "${workspaceFolder}"
+  },
+  "problemMatcher": []
+}
+```
+
+Run with: `Ctrl+Shift+P` → `Tasks: Run Task` → `Format All Files`
+
+
 ## Install / Package
 Gecko exports CMake targets (e.g. `Gecko::Core`, `Gecko::Runtime`).
 
