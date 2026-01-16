@@ -1,10 +1,10 @@
 #pragma once
 
-#include <chrono>
-#include <thread>
-
 #include "api.h"
 #include "types.h"
+
+#include <chrono>
+#include <thread>
 
 namespace gecko {
 
@@ -17,20 +17,26 @@ GECKO_API u32 HashThreadId() noexcept;
 GECKO_API u32 HardwareThreadCount() noexcept;
 
 // Sleep for specified duration
-GECKO_API inline void SleepMs(u32 milliseconds) noexcept {
+GECKO_API inline void SleepMs(u32 milliseconds) noexcept
+{
   std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 }
 
-GECKO_API inline void SleepUs(u32 microseconds) noexcept {
+GECKO_API inline void SleepUs(u32 microseconds) noexcept
+{
   std::this_thread::sleep_for(std::chrono::microseconds(microseconds));
 }
 
-GECKO_API inline void SleepNs(u64 nanoseconds) noexcept {
+GECKO_API inline void SleepNs(u64 nanoseconds) noexcept
+{
   std::this_thread::sleep_for(std::chrono::nanoseconds(nanoseconds));
 }
 
 // Yield current thread's time slice
-GECKO_API inline void YieldThread() noexcept { std::this_thread::yield(); }
+GECKO_API inline void YieldThread() noexcept
+{
+  std::this_thread::yield();
+}
 
 // Spin-wait for a short duration (busy wait)
 GECKO_API void SpinWaitNs(u64 nanoseconds) noexcept;
@@ -40,7 +46,7 @@ GECKO_API void SpinWaitNs(u64 nanoseconds) noexcept;
 // better precision
 GECKO_API void PreciseSleepNs(u64 nanoseconds) noexcept;
 
-} // namespace gecko
+}  // namespace gecko
 
 #ifndef GECKO_THREADING
 #define GECKO_THREADING 1

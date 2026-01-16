@@ -1,18 +1,21 @@
 #pragma once
 
-#include <cstdlib>
-
 #include "services.h"
 
-#define GECKO_BOOT(servicesExpr)                                               \
-  do {                                                                         \
-    if (!::gecko::InstallServices(servicesExpr)) {                             \
-      std::exit(EXIT_FAILURE);                                                 \
-    }                                                                          \
-    ::gecko::ValidateServices(true);                                           \
+#include <cstdlib>
+
+#define GECKO_BOOT(servicesExpr)                 \
+  do                                             \
+  {                                              \
+    if (!::gecko::InstallServices(servicesExpr)) \
+    {                                            \
+      std::exit(EXIT_FAILURE);                   \
+    }                                            \
+    ::gecko::ValidateServices(true);             \
   } while (0)
 
-#define GECKO_SHUTDOWN()                                                       \
-  do {                                                                         \
-    ::gecko::UninstallServices();                                              \
+#define GECKO_SHUTDOWN()          \
+  do                              \
+  {                               \
+    ::gecko::UninstallServices(); \
   } while (0)

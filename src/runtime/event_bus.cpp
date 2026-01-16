@@ -1,27 +1,35 @@
 #include "gecko/runtime/event_bus.h"
+
 #include "gecko/core/assert.h"
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
 #include "gecko/core/random.h"
 #include "labels.h"
+
 #include <algorithm>
 #include <cstring>
 
 namespace gecko::runtime {
 
-EventBus::EventBus() {}
+EventBus::EventBus()
+{}
 
-EventBus::~EventBus() { m_Subscribers.clear(); }
+EventBus::~EventBus()
+{
+  m_Subscribers.clear();
+}
 
-bool EventBus::Init() noexcept {
+bool EventBus::Init() noexcept
+{
   GECKO_PROF_FUNC(runtime::labels::General);
   m_CapabilitySecret = RandomU64();
   return true;
 }
 
-void EventBus::Shutdown() noexcept {
+void EventBus::Shutdown() noexcept
+{
   GECKO_PROF_FUNC(runtime::labels::General);
-  
+
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
     m_Subscribers.clear();
@@ -36,10 +44,12 @@ void EventBus::Shutdown() noexcept {
   }
 }
 
-bool EventBus::RegisterModule(u64 moduleId) noexcept {
+bool EventBus::RegisterModule(u64 moduleId) noexcept
+{
   std::lock_guard<std::mutex> lock(m_ModulesMutex);
 
-  if (m_RegisteredModules.find(moduleId) != m_RegisteredModules.end()) {
+  if (m_RegisteredModules.find(moduleId) != m_RegisteredModules.end())
+  {
     // Module already registered - this is a warning condition
     return false;
   }
@@ -48,21 +58,24 @@ bool EventBus::RegisterModule(u64 moduleId) noexcept {
   return true;
 }
 
-void EventBus::UnregisterModule(u64 moduleId) noexcept {
+void EventBus::UnregisterModule(u64 moduleId) noexcept
+{
   std::lock_guard<std::mutex> lock(m_ModulesMutex);
   m_RegisteredModules.erase(moduleId);
 }
 
-EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void *user,
-                                      SubscriptionOptions options) noexcept {
+EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user,
+                                      SubscriptionOptions options) noexcept
+{
   GECKO_PROF_FUNC(runtime::labels::General);
   GECKO_ASSERT(fn && "Callback cannot be null");
 
   u64 id = m_NextSubscriptionId.fetch_add(1, std::memory_order_relaxed);
-  GECKO_TRACE(runtime::labels::General, "Creating subscription ID=%llu for event code %u", 
+  GECKO_TRACE(runtime::labels::General,
+              "Creating subscription ID=%llu for event code %u",
               (unsigned long long)id, code);
 
-  Subscriber sub{};
+  Subscriber sub {};
   sub.id = id;
   sub.callback = fn;
   sub.user = user;
@@ -73,41 +86,47 @@ EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void *user,
     m_Subscribers[code].push_back(sub);
   }
 
-  EventSubscription subscription{};
+  EventSubscription subscription {};
   subscription.SetSubscriptionData(this, id);
   return subscription;
 }
 
-void EventBus::Unsubscribe(u64 id) noexcept {
+void EventBus::Unsubscribe(u64 id) noexcept
+{
   if (id == 0)
     return;
 
   std::lock_guard<std::mutex> lock(m_SubscribersMutex);
-  for (auto &[code, subscribers] : m_Subscribers) {
+  for (auto& [code, subscribers] : m_Subscribers)
+  {
     auto it = std::find_if(subscribers.begin(), subscribers.end(),
-                           [id](const Subscriber &s) { return s.id == id; });
-    if (it != subscribers.end()) {
+                           [id](const Subscriber& s) { return s.id == id; });
+    if (it != subscribers.end())
+    {
       subscribers.erase(it);
       return;
     }
   }
 }
 
-void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
-                                EventView payload) noexcept {
+void EventBus::PublishImmediate(const EventEmitter& emitter, EventCode code,
+                                EventView payload) noexcept
+{
   GECKO_PROF_SCOPE(runtime::labels::General, "PublishImmediate");
-  
+
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
-  [[maybe_unused]] const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
+  [[maybe_unused]] const u32 emitterModuleHash =
+      static_cast<u32>(emitter.moduleId >> 32);
   GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
                "Event code module mismatch with emitter module");
   GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
                "Invalid emitter capability");
-  
-  GECKO_TRACE(runtime::labels::General, "Publishing immediate event code=%u, moduleId=%llu", 
-              code, (unsigned long long)emitter.moduleId);
 
-  EventMeta meta{};
+  GECKO_TRACE(runtime::labels::General,
+              "Publishing immediate event code=%u, moduleId=%llu", code,
+              (unsigned long long)emitter.moduleId);
+
+  EventMeta meta {};
   meta.code = code;
   meta.moduleId = emitter.moduleId;
   meta.sender = emitter.sender;
@@ -116,37 +135,41 @@ void EventBus::PublishImmediate(const EventEmitter &emitter, EventCode code,
   PublishToSubscribers(code, meta, payload);
 }
 
-void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
-                       EventView payload) noexcept {
+void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
+                       EventView payload) noexcept
+{
   GECKO_PROF_SCOPE(runtime::labels::General, "EnqueueEvent");
-  
+
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
-  [[maybe_unused]] const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
+  [[maybe_unused]] const u32 emitterModuleHash =
+      static_cast<u32>(emitter.moduleId >> 32);
   GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
                "Event code module mismatch with emitter module");
   GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
                "Invalid emitter capability");
   GECKO_ASSERT(payload.size <= sizeof(QueuedEvent::payloadStorage) &&
                "Payload too large for queue");
-  
-  GECKO_TRACE(runtime::labels::General, "Enqueuing event code=%u, moduleId=%llu, size=%zu", 
-              code, (unsigned long long)emitter.moduleId, payload.size);
 
-  QueuedEvent qEvent{};
+  GECKO_TRACE(runtime::labels::General,
+              "Enqueuing event code=%u, moduleId=%llu, size=%zu", code,
+              (unsigned long long)emitter.moduleId, payload.size);
+
+  QueuedEvent qEvent {};
   qEvent.meta.code = code;
   qEvent.meta.moduleId = emitter.moduleId;
   qEvent.meta.sender = emitter.sender;
   qEvent.meta.seq = m_NextSequence.fetch_add(1, std::memory_order_relaxed);
   qEvent.payloadSize = payload.size;
 
-  const void *data = payload.Data();
-  if (data && payload.size > 0) {
+  const void* data = payload.Data();
+  if (data && payload.size > 0)
+  {
     std::memcpy(qEvent.payloadStorage, data, payload.size);
   }
 
   // Notify OnPublish subscribers immediately on the caller's stack.
   {
-    EventView view{};
+    EventView view {};
     view.ptr = qEvent.payloadStorage;
     view.size = qEvent.payloadSize;
     view.isInline = false;
@@ -158,9 +181,10 @@ void EventBus::Enqueue(const EventEmitter &emitter, EventCode code,
   m_EventQueue.push_back(qEvent);
 }
 
-std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
+std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
+{
   GECKO_PROF_FUNC(runtime::labels::General);
-  
+
   std::vector<QueuedEvent> events;
 
   {
@@ -168,18 +192,21 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
     std::size_t count = std::min(maxCount, m_EventQueue.size());
     if (count == 0)
       return 0;
-    
-    GECKO_TRACE(runtime::labels::General, "Dispatching %zu queued events", count);
+
+    GECKO_TRACE(runtime::labels::General, "Dispatching %zu queued events",
+                count);
 
     events.reserve(count);
-    for (std::size_t i = 0; i < count; ++i) {
+    for (std::size_t i = 0; i < count; ++i)
+    {
       events.push_back(std::move(m_EventQueue.front()));
       m_EventQueue.pop_front();
     }
   }
 
-  for (const auto &qEvent : events) {
-    EventView view{};
+  for (const auto& qEvent : events)
+  {
+    EventView view {};
     view.ptr = qEvent.payloadStorage;
     view.size = qEvent.payloadSize;
     view.isInline = false;
@@ -190,16 +217,18 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept {
   return events.size();
 }
 
-EventEmitter EventBus::CreateEmitter(u64 moduleId, u64 sender) noexcept {
-  EventEmitter emitter{};
+EventEmitter EventBus::CreateEmitter(u64 moduleId, u64 sender) noexcept
+{
+  EventEmitter emitter {};
   emitter.moduleId = moduleId;
   emitter.sender = sender;
   emitter.capability = m_CapabilitySecret ^ moduleId;
   return emitter;
 }
 
-bool EventBus::ValidateEmitter(const EventEmitter &emitter,
-                               u64 expectedModuleId) const noexcept {
+bool EventBus::ValidateEmitter(const EventEmitter& emitter,
+                               u64 expectedModuleId) const noexcept
+{
   if (emitter.moduleId != expectedModuleId)
     return false;
 
@@ -207,9 +236,10 @@ bool EventBus::ValidateEmitter(const EventEmitter &emitter,
   return emitter.capability == expectedCapability;
 }
 
-void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
+void EventBus::PublishToSubscribers(EventCode code, const EventMeta& meta,
                                     EventView payload,
-                                    SubscriptionDelivery deliveryFilter) {
+                                    SubscriptionDelivery deliveryFilter)
+{
   std::vector<Subscriber> subscribers;
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
@@ -219,18 +249,22 @@ void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
     subscribers = it->second;
   }
 
-  for (const auto &sub : subscribers) {
+  for (const auto& sub : subscribers)
+  {
     if (sub.delivery != deliveryFilter)
       continue;
-    if (sub.callback) {
+    if (sub.callback)
+    {
       sub.callback(sub.user, meta, payload);
     }
   }
 }
 
-void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
-                                    EventView payload) {
-  // Notify ALL subscribers regardless of delivery type (used by PublishImmediate)
+void EventBus::PublishToSubscribers(EventCode code, const EventMeta& meta,
+                                    EventView payload)
+{
+  // Notify ALL subscribers regardless of delivery type (used by
+  // PublishImmediate)
   std::vector<Subscriber> subscribers;
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
@@ -240,11 +274,13 @@ void EventBus::PublishToSubscribers(EventCode code, const EventMeta &meta,
     subscribers = it->second;
   }
 
-  for (const auto &sub : subscribers) {
-    if (sub.callback) {
+  for (const auto& sub : subscribers)
+  {
+    if (sub.callback)
+    {
       sub.callback(sub.user, meta, payload);
     }
   }
 }
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

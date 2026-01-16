@@ -1,37 +1,49 @@
 #include "gecko/runtime/immediate_logger.h"
 
-#include <cstdarg>
-#include <cstdio>
-#include <mutex>
-
 #include "gecko/core/assert.h"
 #include "gecko/core/thread.h"
 #include "gecko/core/time.h"
 
+#include <cstdarg>
+#include <cstdio>
+#include <mutex>
+
 namespace gecko::runtime {
 
-u64 NowNs() noexcept { return MonotonicTimeNs(); }
+u64 NowNs() noexcept
+{
+  return MonotonicTimeNs();
+}
 
-u32 ThreadId() noexcept { return HashThreadId(); }
+u32 ThreadId() noexcept
+{
+  return HashThreadId();
+}
 
-void ImmediateLogger::AddSink(ILogSink *sink) noexcept {
+void ImmediateLogger::AddSink(ILogSink* sink) noexcept
+{
   GECKO_ASSERT(sink && "Cannot add null sink");
 
-  if (m_ThreadSafe) {
+  if (m_ThreadSafe)
+  {
     std::lock_guard<std::mutex> lock(m_Mutex);
     m_Sinks.push_back(sink);
-  } else {
+  }
+  else
+  {
     m_Sinks.push_back(sink);
   }
 }
 
-void ImmediateLogger::LogV(LogLevel level, Label label, const char *fmt,
-                           va_list apIn) noexcept {
+void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt,
+                           va_list apIn) noexcept
+{
   // Note: Don't profile here as logging is used BY the profiler
   GECKO_ASSERT(fmt && "Format string cannot be null");
 
   // Check log level filter
-  if (static_cast<int>(level) < static_cast<int>(m_Level)) {
+  if (static_cast<int>(level) < static_cast<int>(m_Level))
+  {
     return;
   }
 
@@ -54,24 +66,32 @@ void ImmediateLogger::LogV(LogLevel level, Label label, const char *fmt,
   message.Text = buffer;
 
   // Write to all sinks immediately
-  if (m_ThreadSafe) {
+  if (m_ThreadSafe)
+  {
     std::lock_guard<std::mutex> lock(m_Mutex);
-    for (auto *sink : m_Sinks)
+    for (auto* sink : m_Sinks)
       sink->Write(message);
-  } else {
-    for (auto *sink : m_Sinks)
+  }
+  else
+  {
+    for (auto* sink : m_Sinks)
       sink->Write(message);
   }
 }
 
-bool ImmediateLogger::Init() noexcept { return true; }
+bool ImmediateLogger::Init() noexcept
+{
+  return true;
+}
 
-void ImmediateLogger::Shutdown() noexcept {}
+void ImmediateLogger::Shutdown() noexcept
+{}
 
-void ImmediateLogger::Flush() noexcept {
+void ImmediateLogger::Flush() noexcept
+{
   // For immediate logger, flush is a no-op since everything is written
   // immediately We could potentially flush the underlying sinks if they support
   // it
 }
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

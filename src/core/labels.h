@@ -20,4 +20,4 @@ inline constexpr ::gecko::Label Thread =
     ::gecko::MakeLabel("gecko.core.thread");
 inline constexpr ::gecko::Label Time = ::gecko::MakeLabel("gecko.core.time");
 
-} // namespace gecko::core::labels
+}  // namespace gecko::core::labels

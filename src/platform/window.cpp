@@ -1,33 +1,35 @@
 #include "gecko/platform/window.h"
 
-#include <deque>
-#include <unordered_map>
-
 #include "gecko/core/log.h"
 #include "gecko/core/profiler.h"
-
 #include "labels.h"
 #include "window_backend.h"
+
+#include <deque>
+#include <unordered_map>
 
 namespace gecko::platform {
 
 namespace {
-struct WindowState {
-  WindowDesc Desc{};
-  Extent2D ClientSize{};
-  bool Alive{true};
+struct WindowState
+{
+  WindowDesc Desc {};
+  Extent2D ClientSize {};
+  bool Alive {true};
 };
-} // namespace
+}  // namespace
 
 namespace {
-class NullWindowBackend final : public IWindowBackend {
+class NullWindowBackend final : public IWindowBackend
+{
 public:
-  bool CreateWindow(const WindowDesc &desc,
-                    WindowHandle &outWindow) noexcept override {
+  bool CreateWindow(const WindowDesc& desc,
+                    WindowHandle& outWindow) noexcept override
+  {
     GECKO_PROF_FUNC(labels::General);
 
     const u64 id = ++m_NextId;
-    outWindow = WindowHandle{id};
+    outWindow = WindowHandle {id};
 
     WindowState st;
     st.Desc = desc;
@@ -41,7 +43,8 @@ public:
     return true;
   }
 
-  void DestroyWindow(WindowHandle window) noexcept override {
+  void DestroyWindow(WindowHandle window) noexcept override
+  {
     GECKO_PROF_FUNC(labels::General);
     if (!window.IsValid())
       return;
@@ -52,7 +55,7 @@ public:
 
     it->second.Alive = false;
 
-    WindowEvent ev{};
+    WindowEvent ev {};
     ev.Kind = WindowEventKind::Closed;
     ev.Window = window;
     ev.TimeNs = NowNsSafe();
@@ -61,20 +64,22 @@ public:
     m_Windows.erase(it);
   }
 
-  bool IsWindowAlive(WindowHandle window) const noexcept override {
+  bool IsWindowAlive(WindowHandle window) const noexcept override
+  {
     if (!window.IsValid())
       return false;
     return m_Windows.find(window.Id) != m_Windows.end();
   }
 
-  bool RequestClose(WindowHandle window) noexcept override {
+  bool RequestClose(WindowHandle window) noexcept override
+  {
     GECKO_PROF_FUNC(labels::General);
     if (!window.IsValid())
       return false;
     if (!IsWindowAlive(window))
       return false;
 
-    WindowEvent ev{};
+    WindowEvent ev {};
     ev.Kind = WindowEventKind::CloseRequested;
     ev.Window = window;
     ev.TimeNs = NowNsSafe();
@@ -82,12 +87,14 @@ public:
     return true;
   }
 
-  void PumpEvents() noexcept override {
+  void PumpEvents() noexcept override
+  {
     GECKO_PROF_FUNC(labels::General);
     // Null backend: no OS events.
   }
 
-  bool PollEvent(WindowEvent &outEvent) noexcept override {
+  bool PollEvent(WindowEvent& outEvent) noexcept override
+  {
     if (m_Events.empty())
       return false;
     outEvent = m_Events.front();
@@ -95,56 +102,63 @@ public:
     return true;
   }
 
-  Extent2D GetClientSize(WindowHandle window) const noexcept override {
+  Extent2D GetClientSize(WindowHandle window) const noexcept override
+  {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
-      return Extent2D{};
+      return Extent2D {};
     return it->second.ClientSize;
   }
 
-  void SetTitle(WindowHandle window, const char *title) noexcept override {
+  void SetTitle(WindowHandle window, const char* title) noexcept override
+  {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
       return;
     it->second.Desc.Title = title;
   }
 
-  DpiInfo GetDpi(WindowHandle window) const noexcept override {
+  DpiInfo GetDpi(WindowHandle window) const noexcept override
+  {
     (void)window;
-    return DpiInfo{};
+    return DpiInfo {};
   }
 
-  NativeWindowHandle
-  GetNativeWindowHandle(WindowHandle window) const noexcept override {
+  NativeWindowHandle GetNativeWindowHandle(
+      WindowHandle window) const noexcept override
+  {
     (void)window;
-    return NativeWindowHandle{};
+    return NativeWindowHandle {};
   }
 
 private:
-  static u64 NowNsSafe() noexcept {
-    if (auto *profiler = GetProfiler())
+  static u64 NowNsSafe() noexcept
+  {
+    if (auto* profiler = GetProfiler())
       return profiler->NowNs();
     return 0;
   }
 
-  u64 m_NextId{0};
+  u64 m_NextId {0};
   std::unordered_map<u64, WindowState> m_Windows;
   std::deque<WindowEvent> m_Events;
 };
-} // namespace
+}  // namespace
 
-IWindowBackend &GetNullWindowBackend() noexcept {
+IWindowBackend& GetNullWindowBackend() noexcept
+{
   static NullWindowBackend backend;
   return backend;
 }
 
 // Provided by src/platform/linux/x11_window_backend.cpp when enabled.
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
-IWindowBackend &GetXlibWindowBackend() noexcept;
+IWindowBackend& GetXlibWindowBackend() noexcept;
 #endif
 
-IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
-  auto &nullBackend = GetNullWindowBackend();
+IWindowBackend& ResolveWindowBackend(WindowBackendKind requested) noexcept
+{
+  auto& nullBackend = GetNullWindowBackend();
 
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
   constexpr bool hasX11 = true;
@@ -153,23 +167,25 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
 #endif
 
 #if defined(_WIN32)
-  constexpr bool hasWin32 = false; // not implemented yet
+  constexpr bool hasWin32 = false;  // not implemented yet
 #else
   constexpr bool hasWin32 = false;
 #endif
 
 #if defined(__APPLE__)
-  constexpr bool hasCocoa = false; // not implemented yet
+  constexpr bool hasCocoa = false;  // not implemented yet
 #else
   constexpr bool hasCocoa = false;
 #endif
 
-  switch (requested) {
+  switch (requested)
+  {
   case WindowBackendKind::Null:
     return nullBackend;
 
   case WindowBackendKind::Xlib:
-    if (hasX11) {
+    if (hasX11)
+    {
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
       return GetXlibWindowBackend();
 #endif
@@ -185,7 +201,8 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
     return nullBackend;
 
   case WindowBackendKind::Win32:
-    if (hasWin32) {
+    if (hasWin32)
+    {
       return nullBackend;
     }
     GECKO_WARN(labels::General,
@@ -194,7 +211,8 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
     return nullBackend;
 
   case WindowBackendKind::Cocoa:
-    if (hasCocoa) {
+    if (hasCocoa)
+    {
       return nullBackend;
     }
     GECKO_WARN(labels::General,
@@ -204,7 +222,8 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
 
   case WindowBackendKind::Auto:
   default:
-    if (hasX11) {
+    if (hasX11)
+    {
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
       return GetXlibWindowBackend();
 #endif
@@ -213,4 +232,4 @@ IWindowBackend &ResolveWindowBackend(WindowBackendKind requested) noexcept {
   }
 }
 
-} // namespace gecko::platform
+}  // namespace gecko::platform

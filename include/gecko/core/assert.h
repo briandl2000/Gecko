@@ -11,10 +11,12 @@
 #endif
 
 #ifndef GECKO_VERIFY
-#define GECKO_VERIFY(x)                                                        \
-  do {                                                                         \
-    if (!(x)) {                                                                \
-      GECKO_ASSERT(false && #x);                                               \
-    }                                                                          \
+#define GECKO_VERIFY(x)          \
+  do                             \
+  {                              \
+    if (!(x))                    \
+    {                            \
+      GECKO_ASSERT(false && #x); \
+    }                            \
   } while (0)
 #endif

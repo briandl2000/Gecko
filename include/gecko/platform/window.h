@@ -6,7 +6,8 @@ namespace gecko::platform {
 
 // Identifies (a) the selected backend or (b) the native window system used.
 // `Auto` and `Null` are selection-only.
-enum class WindowBackendKind : u8 {
+enum class WindowBackendKind : u8
+{
   Unknown,
   Auto,
   Null,
@@ -18,78 +19,105 @@ enum class WindowBackendKind : u8 {
   Cocoa,
 };
 
-struct WindowHandle {
-  u64 Id{0};
+struct WindowHandle
+{
+  u64 Id {0};
 
   WindowHandle() = default;
-  explicit WindowHandle(u64 id) noexcept : Id(id) {}
+  explicit WindowHandle(u64 id) noexcept : Id(id)
+  {}
 
-  bool IsValid() const noexcept { return Id != 0; }
-  void Reset() noexcept { Id = 0; }
+  bool IsValid() const noexcept
+  {
+    return Id != 0;
+  }
+  void Reset() noexcept
+  {
+    Id = 0;
+  }
 
-  bool operator==(const WindowHandle &other) const noexcept {
+  bool operator==(const WindowHandle& other) const noexcept
+  {
     return Id == other.Id;
   }
-  bool operator!=(const WindowHandle &other) const noexcept {
+  bool operator!=(const WindowHandle& other) const noexcept
+  {
     return Id != other.Id;
   }
 };
 
-struct MonitorHandle {
-  u64 Id{0};
+struct MonitorHandle
+{
+  u64 Id {0};
 
   MonitorHandle() = default;
-  explicit MonitorHandle(u64 id) noexcept : Id(id) {}
+  explicit MonitorHandle(u64 id) noexcept : Id(id)
+  {}
 
-  bool IsValid() const noexcept { return Id != 0; }
-  void Reset() noexcept { Id = 0; }
+  bool IsValid() const noexcept
+  {
+    return Id != 0;
+  }
+  void Reset() noexcept
+  {
+    Id = 0;
+  }
 
-  bool operator==(const MonitorHandle &other) const noexcept {
+  bool operator==(const MonitorHandle& other) const noexcept
+  {
     return Id == other.Id;
   }
-  bool operator!=(const MonitorHandle &other) const noexcept {
+  bool operator!=(const MonitorHandle& other) const noexcept
+  {
     return Id != other.Id;
   }
 };
 
-struct Extent2D {
-  u32 Width{0};
-  u32 Height{0};
+struct Extent2D
+{
+  u32 Width {0};
+  u32 Height {0};
 };
 
-enum class WindowMode : u8 {
+enum class WindowMode : u8
+{
   Windowed,
   Fullscreen,
   BorderlessFullscreen,
 };
 
-enum class CursorMode : u8 {
+enum class CursorMode : u8
+{
   Normal,
   Hidden,
   Locked,
 };
 
-struct DpiInfo {
-  u32 Dpi{96};
-  float Scale{1.0F};
+struct DpiInfo
+{
+  u32 Dpi {96};
+  float Scale {1.0F};
 };
 
-struct WindowDesc {
-  const char *Title{"Gecko"};
-  Extent2D Size{1280, 720};
-  WindowMode Mode{WindowMode::Windowed};
-  bool Resizable{true};
-  bool Visible{true};
-  bool HighDpi{true};
+struct WindowDesc
+{
+  const char* Title {"Gecko"};
+  Extent2D Size {1280, 720};
+  WindowMode Mode {WindowMode::Windowed};
+  bool Resizable {true};
+  bool Visible {true};
+  bool HighDpi {true};
 };
 
-struct NativeWindowHandle {
-  WindowBackendKind Backend{WindowBackendKind::Unknown};
-  void *Handle{nullptr};
-  void *Display{nullptr};
+struct NativeWindowHandle
+{
+  WindowBackendKind Backend {WindowBackendKind::Unknown};
+  void* Handle {nullptr};
+  void* Display {nullptr};
 };
 
-enum class WindowEventKind : u8 {
+enum class WindowEventKind : u8
+{
   None,
   CloseRequested,
   Closed,
@@ -102,47 +130,56 @@ enum class WindowEventKind : u8 {
   MouseWheel,
 };
 
-struct WindowEvent {
-  WindowEventKind Kind{WindowEventKind::None};
-  WindowHandle Window{};
-  u64 TimeNs{0};
+struct WindowEvent
+{
+  WindowEventKind Kind {WindowEventKind::None};
+  WindowHandle Window {};
+  u64 TimeNs {0};
 
-  union {
-    struct {
+  union
+  {
+    struct
+    {
       u32 Width;
       u32 Height;
     } Resize;
 
-    struct {
+    struct
+    {
       u32 Dpi;
       float Scale;
     } Dpi;
 
-    struct {
+    struct
+    {
       u32 Key;
       u8 Down;
       u8 Repeat;
     } Key;
 
-    struct {
+    struct
+    {
       u32 Codepoint;
     } Char;
 
-    struct {
+    struct
+    {
       i32 X;
       i32 Y;
     } MouseMove;
 
-    struct {
+    struct
+    {
       u8 Button;
       u8 Down;
     } MouseButton;
 
-    struct {
+    struct
+    {
       float DeltaX;
       float DeltaY;
     } MouseWheel;
-  } Data{};
+  } Data {};
 };
 
-} // namespace gecko::platform
+}  // namespace gecko::platform

@@ -4,9 +4,10 @@
 
 namespace gecko::runtime {
 
-class ConsoleLogSink final : public ILogSink {
+class ConsoleLogSink final : public ILogSink
+{
 public:
-  virtual void Write(const LogMessage &message) noexcept override;
+  virtual void Write(const LogMessage& message) noexcept override;
 };
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

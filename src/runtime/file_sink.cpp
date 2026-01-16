@@ -10,7 +10,8 @@
 
 namespace gecko::runtime {
 
-FileLogSink::FileLogSink(const char *path) {
+FileLogSink::FileLogSink(const char* path)
+{
   GECKO_ASSERT(path && "File path cannot be null");
 
 #if defined(_WIN32)
@@ -20,12 +21,14 @@ FileLogSink::FileLogSink(const char *path) {
 #endif
 }
 
-FileLogSink::~FileLogSink() {
+FileLogSink::~FileLogSink()
+{
   if (m_File)
     std::fclose(m_File);
 }
 
-void FileLogSink::Write(const LogMessage &message) noexcept {
+void FileLogSink::Write(const LogMessage& message) noexcept
+{
   if (!m_File)
     return;
 
@@ -36,4 +39,4 @@ void FileLogSink::Write(const LogMessage &message) noexcept {
                message.ThreadId, message.Text ? message.Text : "");
   std::fflush(m_File);
 }
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

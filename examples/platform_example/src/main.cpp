@@ -28,33 +28,38 @@ inline constexpr ::gecko::Label App =
     ::gecko::MakeLabel("app.platform_example");
 inline constexpr ::gecko::Label Main =
     ::gecko::MakeLabel("app.platform_example.main");
-} // namespace app::platform_example::labels
+}  // namespace app::platform_example::labels
 
-class PlatformExampleAppModule final : public ::gecko::IModule {
+class PlatformExampleAppModule final : public ::gecko::IModule
+{
 public:
-  [[nodiscard]] ::gecko::Label RootLabel() const noexcept override {
+  [[nodiscard]] ::gecko::Label RootLabel() const noexcept override
+  {
     return app::platform_example::labels::App;
   }
 
-  [[nodiscard]] bool
-  Startup(::gecko::IModuleRegistry &modules) noexcept override {
+  [[nodiscard]] bool Startup(
+      ::gecko::IModuleRegistry& modules) noexcept override
+  {
     return true;
   }
 
-  void Shutdown(::gecko::IModuleRegistry &modules) noexcept override {}
+  void Shutdown(::gecko::IModuleRegistry& modules) noexcept override
+  {}
 };
 
 PlatformExampleAppModule g_AppModule;
 
-} // namespace
+}  // namespace
 
-int main() {
+int main()
+{
   GECKO_PROF_SCOPE(app::platform_example::labels::Main, "MainFunction");
-  
+
   SystemAllocator systemAlloc;
   runtime::TrackingAllocator trackingAlloc(&systemAlloc);
-  runtime::RingProfiler ringProfiler(1 << 16); // 64K events
-  runtime::RingLogger ringLogger(1024); // 1024 log entries in ring buffer
+  runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
+  runtime::RingLogger ringLogger(1024);  // 1024 log entries in ring buffer
 
   runtime::ModuleRegistry moduleRegistry;
 
@@ -65,21 +70,22 @@ int main() {
   // Use GECKO_BOOT system for proper service installation and validation
   // Services are in dependency order: Allocator -> JobSystem -> Profiler ->
   // Logger
-  GECKO_BOOT((Services{.Allocator = &trackingAlloc,
-                       .JobSystem = &jobSystem,
-                       .Profiler = &ringProfiler,
-                       .Logger = &ringLogger,
-                       .Modules = &moduleRegistry}));
+  GECKO_BOOT((Services {.Allocator = &trackingAlloc,
+                        .JobSystem = &jobSystem,
+                        .Profiler = &ringProfiler,
+                        .Logger = &ringLogger,
+                        .Modules = &moduleRegistry}));
 
   // Now configure logging sinks after services are installed
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
 
-  if (auto *logger = GetLogger()) {
+  if (auto* logger = GetLogger())
+  {
     logger->AddSink(&fileSink);
     logger->AddSink(&consoleSink);
     logger->SetLevel(
-        LogLevel::Info); // Filter out Trace and Debug messages initially
+        LogLevel::Info);  // Filter out Trace and Debug messages initially
   }
 
   gecko::LogVersion(app::platform_example::labels::Main);
@@ -91,10 +97,13 @@ int main() {
 
   // Set up trace file sink for profiling data after services are available
   runtime::TraceFileSink traceSink("gecko_trace.json");
-  if (!traceSink.IsOpen()) {
+  if (!traceSink.IsOpen())
+  {
     GECKO_WARN(app::platform_example::labels::Main,
                "Failed to open trace profiler sink\n");
-  } else {
+  }
+  else
+  {
     // We know the profiler is a RingProfiler, so we can safely add the sink
     ringProfiler.AddSink(&traceSink);
   }
@@ -106,29 +115,33 @@ int main() {
 
   WindowDesc windowDesc;
   windowDesc.Title = "Gecko Platform Example";
-  windowDesc.Size = Extent2D{1280, 720};
+  windowDesc.Size = Extent2D {1280, 720};
   windowDesc.Visible = true;
   windowDesc.Resizable = false;
   windowDesc.Mode = WindowMode::Windowed;
 
   WindowHandle window;
-  GECKO_INFO(app::platform_example::labels::Main, "Creating application window...");
-  if (!ctx->CreateWindow(windowDesc, window)) {
+  GECKO_INFO(app::platform_example::labels::Main,
+             "Creating application window...");
+  if (!ctx->CreateWindow(windowDesc, window))
+  {
     GECKO_ERROR(app::platform_example::labels::Main,
                 "Failed to create window\n");
     GECKO_SHUTDOWN();
     return 1;
   }
-  GECKO_INFO(app::platform_example::labels::Main, "Window created successfully");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "Window created successfully");
 
   bool running = true;
   // Avoid hanging forever in headless/Null-backend runs.
   // Run up to ~10 seconds unless a close is requested.
   u32 frameCount = 0;
   GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
-  while (running && ctx->IsWindowAlive(window) && frameCount < 600) {
+  while (running && ctx->IsWindowAlive(window) && frameCount < 600)
+  {
     GECKO_PROF_SCOPE(app::platform_example::labels::Main, "MainLoop");
-    
+
     {
       GECKO_PROF_SCOPE(app::platform_example::labels::Main, "PumpEvents");
       ctx->PumpEvents();
@@ -136,10 +149,13 @@ int main() {
 
     {
       GECKO_PROF_SCOPE(app::platform_example::labels::Main, "ProcessEvents");
-      WindowEvent ev{};
-      while (ctx->PollEvent(ev)) {
-        if (ev.Kind == WindowEventKind::CloseRequested) {
-          GECKO_INFO(app::platform_example::labels::Main, "Close requested, exiting main loop");
+      WindowEvent ev {};
+      while (ctx->PollEvent(ev))
+      {
+        if (ev.Kind == WindowEventKind::CloseRequested)
+        {
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Close requested, exiting main loop");
           running = false;
           break;
         }
@@ -148,24 +164,30 @@ int main() {
 
     GECKO_SLEEP_MS(16);
     ++frameCount;
-    
-    if (frameCount % 60 == 0) {
-      GECKO_PROF_COUNTER(app::platform_example::labels::Main, "FrameCount", frameCount);
+
+    if (frameCount % 60 == 0)
+    {
+      GECKO_PROF_COUNTER(app::platform_example::labels::Main, "FrameCount",
+                         frameCount);
     }
   }
 
-  if (running) {
+  if (running)
+  {
     // Headless/timeout fallback: request a clean shutdown.
-    GECKO_INFO(app::platform_example::labels::Main, "Timeout reached, requesting clean shutdown");
+    GECKO_INFO(app::platform_example::labels::Main,
+               "Timeout reached, requesting clean shutdown");
     ctx->RequestClose(window);
   }
 
   GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
   ctx->DestroyWindow(window);
 
-  GECKO_INFO(app::platform_example::labels::Main, "Shutting down Gecko services...");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "Shutting down Gecko services...");
   GECKO_SHUTDOWN();
 
-  GECKO_INFO(app::platform_example::labels::Main, "Application exited successfully");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "Application exited successfully");
   return 0;
 }

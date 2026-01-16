@@ -1,35 +1,39 @@
 #include "gecko/runtime/tracking_allocator.h"
 
+#include "gecko/core/assert.h"
+#include "gecko/core/log.h"
+#include "gecko/core/profiler.h"
+#include "labels.h"
+
 #include <atomic>
 #include <mutex>
 #include <tuple>
 
-#include "gecko/core/assert.h"
-#include "gecko/core/log.h"
-#include "gecko/core/profiler.h"
-
-#include "labels.h"
-
 namespace gecko::runtime {
 
-MemLabelStats &TrackingAllocator::EnsureLabelLocked(Label label) {
+MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
+{
   auto result = m_ByLabel.try_emplace(label.Id);
-  auto &stats = result.first->second;
-  if (result.second) { // new element was inserted
+  auto& stats = result.first->second;
+  if (result.second)
+  {  // new element was inserted
     stats.StatsLabel = label;
   }
   return stats;
 }
 
-void *TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept {
-  // NOTE: Cannot use profiling/logging - Allocator is Level 0, comes before everything
+void* TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept
+{
+  // NOTE: Cannot use profiling/logging - Allocator is Level 0, comes before
+  // everything
   GECKO_ASSERT(m_Upstream && "Upstream allocator is required");
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
 
-  void *ptr = m_Upstream->Alloc(size, alignment, label);
-  if (!ptr) {
+  void* ptr = m_Upstream->Alloc(size, alignment, label);
+  if (!ptr)
+  {
     return nullptr;
   }
 
@@ -37,7 +41,7 @@ void *TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept {
 
   {
     std::lock_guard<std::mutex> lk(m_Mutex);
-    auto &st = EnsureLabelLocked(label);
+    auto& st = EnsureLabelLocked(label);
     st.LiveBytes.fetch_add(size, std::memory_order_relaxed);
     st.Allocs.fetch_add(1, std::memory_order_relaxed);
   }
@@ -45,8 +49,9 @@ void *TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept {
   return ptr;
 }
 
-void TrackingAllocator::Free(void *ptr, u64 size, u32 alignment,
-                             Label label) noexcept {
+void TrackingAllocator::Free(void* ptr, u64 size, u32 alignment,
+                             Label label) noexcept
+{
   if (!ptr)
     return;
 
@@ -58,14 +63,16 @@ void TrackingAllocator::Free(void *ptr, u64 size, u32 alignment,
   {
     std::lock_guard<std::mutex> lk(m_Mutex);
     auto it = m_ByLabel.find(label.Id);
-    if (it != m_ByLabel.end()) {
+    if (it != m_ByLabel.end())
+    {
       it->second.LiveBytes.fetch_sub(size, std::memory_order_relaxed);
       it->second.Frees.fetch_add(1, std::memory_order_relaxed);
     }
   }
 }
 
-bool TrackingAllocator::StatsFor(Label label, MemLabelStats &outStats) const {
+bool TrackingAllocator::StatsFor(Label label, MemLabelStats& outStats) const
+{
   std::lock_guard<std::mutex> lk(m_Mutex);
   auto it = m_ByLabel.find(label.Id);
   if (it == m_ByLabel.end())
@@ -83,13 +90,15 @@ bool TrackingAllocator::StatsFor(Label label, MemLabelStats &outStats) const {
 }
 
 void TrackingAllocator::Snapshot(
-    std::unordered_map<u64, MemLabelStats> &out) const {
+    std::unordered_map<u64, MemLabelStats>& out) const
+{
   std::lock_guard<std::mutex> lk(m_Mutex);
   out.clear();
   out.reserve(m_ByLabel.size());
-  for (auto &[id, st] : m_ByLabel) {
+  for (auto& [id, st] : m_ByLabel)
+  {
     auto result = out.try_emplace(id);
-    auto &snap = result.first->second;
+    auto& snap = result.first->second;
     snap.StatsLabel = st.StatsLabel;
     snap.LiveBytes.store(st.LiveBytes.load(std::memory_order_relaxed),
                          std::memory_order_relaxed);
@@ -100,7 +109,8 @@ void TrackingAllocator::Snapshot(
   }
 }
 
-void TrackingAllocator::EmitCounters() noexcept {
+void TrackingAllocator::EmitCounters() noexcept
+{
   if (!m_Profiler)
     return;
 
@@ -109,16 +119,19 @@ void TrackingAllocator::EmitCounters() noexcept {
 
   std::unordered_map<u64, MemLabelStats> snap;
   Snapshot(snap);
-  for (auto &[id, st] : snap) {
-    const char *name = st.StatsLabel.Name ? st.StatsLabel.Name : "mem";
+  for (auto& [id, st] : snap)
+  {
+    const char* name = st.StatsLabel.Name ? st.StatsLabel.Name : "mem";
     GECKO_PROF_COUNTER(st.StatsLabel, name,
                        st.LiveBytes.load(std::memory_order_relaxed));
   }
 }
 
-void TrackingAllocator::ResetCounters() noexcept {
+void TrackingAllocator::ResetCounters() noexcept
+{
   std::lock_guard<std::mutex> lk(m_Mutex);
-  for (auto &[id, st] : m_ByLabel) {
+  for (auto& [id, st] : m_ByLabel)
+  {
     st.LiveBytes.store(0, std::memory_order_relaxed);
     st.Allocs.store(0, std::memory_order_relaxed);
     st.Frees.store(0, std::memory_order_relaxed);
@@ -126,8 +139,12 @@ void TrackingAllocator::ResetCounters() noexcept {
   m_TotalLive.store(0, std::memory_order_relaxed);
 }
 
-bool TrackingAllocator::Init() noexcept { return true; }
+bool TrackingAllocator::Init() noexcept
+{
+  return true;
+}
 
-void TrackingAllocator::Shutdown() noexcept {}
+void TrackingAllocator::Shutdown() noexcept
+{}
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

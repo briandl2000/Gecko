@@ -21,4 +21,4 @@ inline constexpr ::gecko::Label OperatorNew =
 inline constexpr ::gecko::Label Modules =
     ::gecko::MakeLabel("gecko.runtime.modules");
 
-} // namespace gecko::runtime::labels
+}  // namespace gecko::runtime::labels
