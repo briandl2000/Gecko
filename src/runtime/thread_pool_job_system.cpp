@@ -224,8 +224,8 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept
 
 void ThreadPoolJobSystem::WorkerThreadFunction() noexcept
 {
-  // Don't profile here - worker thread starts before profiler is ready
-  const u32 threadId = ThisThreadId();
+  // NOTE: Cannot use profiling/logging - JobSystem is Layer 1, comes before
+  // Profiler (Layer 2) and Logger (Layer 3)
 
   while (!m_Shutdown.load(std::memory_order_acquire))
   {
@@ -261,7 +261,8 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept
     m_JobCompleted.notify_all();
   }
 
-  GECKO_TRACE(labels::JobSystem, "Worker thread %u exiting", threadId);
+  // NOTE: Cannot use profiling/logging - JobSystem is Layer 1, comes before
+  // Profiler (Layer 2) and Logger (Layer 3)
 }
 
 std::shared_ptr<Job> ThreadPoolJobSystem::GetNextReadyJob() noexcept

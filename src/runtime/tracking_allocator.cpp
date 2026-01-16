@@ -111,20 +111,10 @@ void TrackingAllocator::Snapshot(
 
 void TrackingAllocator::EmitCounters() noexcept
 {
-  if (!m_Profiler)
-    return;
-
-  GECKO_PROF_COUNTER(labels::TrackingAllocator, "heap_live_bytes",
-                     TotalLiveBytes());
-
-  std::unordered_map<u64, MemLabelStats> snap;
-  Snapshot(snap);
-  for (auto& [id, st] : snap)
-  {
-    const char* name = st.StatsLabel.Name ? st.StatsLabel.Name : "mem";
-    GECKO_PROF_COUNTER(st.StatsLabel, name,
-                       st.LiveBytes.load(std::memory_order_relaxed));
-  }
+  // NOTE: Cannot use profiling - Allocator is Layer 0, comes before Profiler
+  // (Layer 2)
+  // EmitCounters is a no-op now; external systems can call TotalLiveBytes() or
+  // Snapshot() and profile those values themselves
 }
 
 void TrackingAllocator::ResetCounters() noexcept
