@@ -1,16 +1,13 @@
 #include "gecko/core/utility/random.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/services/log.h"
 #include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 
-#include <cstring>
 #include <random>
 
 namespace gecko {
 
-// Thread-local random state to avoid contention
 struct ThreadRandomState
 {
   std::mt19937_64 generator;
@@ -19,7 +16,6 @@ struct ThreadRandomState
   ThreadRandomState()
   {
     GECKO_PROF_SCOPE(core::labels::Random, "InitThreadRandom");
-    // Seed with random device by default
     std::random_device rd;
     generator.seed(rd());
     initialized = true;
@@ -28,7 +24,6 @@ struct ThreadRandomState
 
 static thread_local ThreadRandomState g_ThreadRandomState;
 
-// Internal helper to get thread-local generator
 static std::mt19937_64& GetGenerator() noexcept
 {
   if (!g_ThreadRandomState.initialized)
@@ -82,7 +77,7 @@ i64 RandomI64(i64 min, i64 max) noexcept
   return dist(GetGenerator());
 }
 
-float RandomFloat(float min, float max) noexcept
+f32 RandomF32(f32 min, f32 max) noexcept
 {
   GECKO_ASSERT(min <= max && "Random range: min must be <= max");
   GECKO_ASSERT(std::isfinite(min) && std::isfinite(max) &&
@@ -91,11 +86,11 @@ float RandomFloat(float min, float max) noexcept
   if (min == max)
     return min;
 
-  std::uniform_real_distribution<float> dist(min, max);
+  std::uniform_real_distribution<f32> dist(min, max);
   return dist(GetGenerator());
 }
 
-double RandomDouble(double min, double max) noexcept
+f64 RandomF64(f64 min, f64 max) noexcept
 {
   GECKO_ASSERT(min <= max && "Random range: min must be <= max");
   GECKO_ASSERT(std::isfinite(min) && std::isfinite(max) &&
@@ -104,7 +99,7 @@ double RandomDouble(double min, double max) noexcept
   if (min == max)
     return min;
 
-  std::uniform_real_distribution<double> dist(min, max);
+  std::uniform_real_distribution<f64> dist(min, max);
   return dist(GetGenerator());
 }
 
@@ -114,7 +109,7 @@ bool RandomBool() noexcept
   return dist(GetGenerator());
 }
 
-void RandomBytes(void* buffer, size_t size) noexcept
+void RandomBytes(void* buffer, usize size) noexcept
 {
   GECKO_ASSERT(buffer && "Buffer cannot be null");
 
@@ -125,7 +120,7 @@ void RandomBytes(void* buffer, size_t size) noexcept
   std::uniform_int_distribution<int> dist(0, 255);
   auto& gen = GetGenerator();
 
-  for (size_t i = 0; i < size; ++i)
+  for (usize i = 0; i < size; ++i)
   {
     bytes[i] = static_cast<u8>(dist(gen));
   }

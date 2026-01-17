@@ -1,4 +1,4 @@
-add_library(Platform)
+add_library(Platform STATIC)
 add_library(Gecko::Platform ALIAS Platform)
 
 target_sources(Platform
@@ -29,7 +29,7 @@ target_include_directories(Platform
 
 target_compile_definitions(Platform PUBLIC GECKO_PLATFORM_API)
 
-target_link_libraries(Platform PUBLIC Gecko::Core)
+target_link_libraries(Platform PUBLIC Gecko::Core Gecko::CoreServices)
 
 install(TARGETS Platform
   EXPORT ${GECKO_EXPORT_SET_NAME}

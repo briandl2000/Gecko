@@ -14,7 +14,7 @@ void* operator new(std::size_t size)
   {
     if (void* ptr = allocator->Alloc(static_cast<gecko::u64>(size),
                                      alignof(std::max_align_t),
-                                     gecko::runtime::labels::OperatorNew))
+                                     gecko::core::labels::OperatorNew))
     {
       return ptr;
     }
@@ -31,7 +31,7 @@ void operator delete(void* ptr) noexcept
   if (auto* allocator = gecko::GetAllocator())
   {
     allocator->Free(ptr, 0, alignof(std::max_align_t),
-                    gecko::runtime::labels::OperatorNew);
+                    gecko::core::labels::OperatorNew);
   }
 }
 
@@ -45,7 +45,7 @@ void* operator new(std::size_t size, std::align_val_t align)
   {
     if (void* ptr = allocator->Alloc(static_cast<gecko::u64>(size),
                                      static_cast<gecko::u64>(align),
-                                     gecko::runtime::labels::OperatorNew))
+                                     gecko::core::labels::OperatorNew))
     {
       return ptr;
     }
@@ -62,7 +62,7 @@ void operator delete(void* ptr, std::align_val_t align) noexcept
   if (auto* allocator = gecko::GetAllocator())
   {
     allocator->Free(ptr, 0, static_cast<gecko::u64>(align),
-                    gecko::runtime::labels::OperatorNew);
+                    gecko::core::labels::OperatorNew);
   }
 }
 
@@ -75,7 +75,7 @@ void operator delete(void* ptr, std::size_t size) noexcept
   if (auto* allocator = gecko::GetAllocator())
   {
     allocator->Free(ptr, size, alignof(std::max_align_t),
-                    gecko::runtime::labels::OperatorNew);
+                    gecko::core::labels::OperatorNew);
   }
 }
 

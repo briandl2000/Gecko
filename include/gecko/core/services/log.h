@@ -1,18 +1,16 @@
 #pragma once
 
-// System includes first (alphabetical order)
-#include <cstdarg>
-
-// Project includes second (alphabetical order)
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/types.h"
+
+#include <cstdarg>
 
 namespace gecko {
 
 enum class LogLevel : u8
 {
-  Trace,  // Default: most verbose level ensures maximum information
+  Trace,
   Debug,
   Info,
   Warn,
@@ -20,7 +18,7 @@ enum class LogLevel : u8
   Fatal
 };
 
-GECKO_API inline const char* LevelName(LogLevel level)
+inline const char* LevelName(LogLevel level)
 {
   switch (level)
   {
@@ -29,9 +27,9 @@ GECKO_API inline const char* LevelName(LogLevel level)
   case LogLevel::Debug:
     return "DEBUG";
   case LogLevel::Info:
-    return "INFO ";
+    return "INFO";
   case LogLevel::Warn:
-    return "WARN ";
+    return "WARN";
   case LogLevel::Error:
     return "ERROR";
   case LogLevel::Fatal:
@@ -42,14 +40,22 @@ GECKO_API inline const char* LevelName(LogLevel level)
   return "?";
 }
 
-struct LogMessage
+// Aligned to speed up LogMessages
+struct alignas(64) LogMessage
 {
-  LogLevel Level {LogLevel::Trace};
-  Label MessageLabel {};
   u64 TimeNs {0};
-  u32 ThreadId {0};
   const char* Text {nullptr};
+  Label MessageLabel {};
+
+  u32 ThreadId {0};
+
+  LogLevel Level {LogLevel::Trace};
 };
+
+static_assert(sizeof(LogMessage) == 64,
+              "LogMessage must be 64 bytes (cache line size)");
+static_assert(alignof(LogMessage) == 64,
+              "LogMessage must be cache-line aligned");
 
 struct ILogSink
 {
@@ -62,14 +68,14 @@ struct ILogger
   GECKO_API virtual ~ILogger() = default;
 
   GECKO_API virtual void LogV(LogLevel level, Label label, const char* fmt,
-                              va_list) noexcept = 0;
+                              ::va_list) noexcept = 0;
 
-  GECKO_API inline void Log(LogLevel level, Label label, const char* fmt, ...)
+  inline void Log(LogLevel level, Label label, const char* fmt, ...)
   {
-    va_list ap;
-    va_start(ap, fmt);
+    ::va_list ap;
+    ::va_start(ap, fmt);
     LogV(level, label, fmt, ap);
-    va_end(ap);
+    ::va_end(ap);
   }
 
   GECKO_API virtual void AddSink(ILogSink* sink) noexcept = 0;
@@ -111,16 +117,14 @@ GECKO_API ILogger* GetLogger() noexcept;
 #define GECKO_FATAL(label, ...) \
   GECKO_LOG(::gecko::LogLevel::Fatal, (label), __VA_ARGS__)
 #else
-#define GECKO_TRACE(cat, ...)
-#define GECKO_DEBUG(cat, ...)
-#define GECKO_INFO(cat, ...)
-#define GECKO_WARN(cat, ...)
-#define GECKO_ERROR(cat, ...)
-#define GECKO_FATAL(cat, ...)
+#define GECKO_TRACE(label, ...)
+#define GECKO_DEBUG(label, ...)
+#define GECKO_INFO(label, ...)
+#define GECKO_WARN(label, ...)
+#define GECKO_ERROR(label, ...)
+#define GECKO_FATAL(label, ...)
 #endif
 
-// NullLogger: No-op logger (discards all log messages)
-// Use when logging is disabled or during early initialization
 namespace gecko {
 struct NullLogger final : ILogger
 {

@@ -169,10 +169,7 @@ void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
 
   // Notify OnPublish subscribers immediately on the caller's stack.
   {
-    EventView view {};
-    view.ptr = qEvent.payloadStorage;
-    view.size = qEvent.payloadSize;
-    view.isInline = false;
+    EventView view {qEvent.payloadStorage, qEvent.payloadSize};
     PublishToSubscribers(code, qEvent.meta, view,
                          SubscriptionDelivery::OnPublish);
   }
@@ -206,10 +203,7 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
 
   for (const auto& qEvent : events)
   {
-    EventView view {};
-    view.ptr = qEvent.payloadStorage;
-    view.size = qEvent.payloadSize;
-    view.isInline = false;
+    EventView view {qEvent.payloadStorage, qEvent.payloadSize};
     PublishToSubscribers(qEvent.meta.code, qEvent.meta, view,
                          SubscriptionDelivery::Queued);
   }

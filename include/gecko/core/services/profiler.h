@@ -14,29 +14,33 @@ enum class ProfEventKind : u8
   FrameMark
 };
 
-struct ProfEvent
+// aligned to speed up profile events
+struct alignas(64) ProfEvent
 {
-  ProfEventKind Kind {ProfEventKind::ZoneBegin};
   u64 TimestampNs {0};
-  u32 ThreadId {0};
-  Label EventLabel {};
-  u32 NameHash {0};
-  const char* Name {nullptr};
   u64 Value {0};
+  const char* Name {nullptr};
+  Label EventLabel {};
+
+  u32 ThreadId {0};
+  u32 NameHash {0};
+
+  ProfEventKind Kind {ProfEventKind::ZoneBegin};
 };
+
+static_assert(sizeof(ProfEvent) == 64,
+              "ProfEvent must be 64 bytes (cache line size)");
+static_assert(alignof(ProfEvent) == 64, "ProfEvent must be cache-line aligned");
 
 struct IProfilerSink
 {
   GECKO_API virtual ~IProfilerSink() = default;
 
-  /// Write a single profiling event
   GECKO_API virtual void Write(const ProfEvent& event) noexcept = 0;
 
-  /// Write a batch of profiling events for better performance
   GECKO_API virtual void WriteBatch(const ProfEvent* events,
-                                    std::size_t count) noexcept = 0;
+                                    ::std::size_t count) noexcept = 0;
 
-  /// Flush any buffered data to ensure it's persisted
   GECKO_API virtual void Flush() noexcept = 0;
 };
 
@@ -58,10 +62,10 @@ GECKO_API u32 ThisThreadId() noexcept;
 struct ProfScope
 {
   Label ScopeLabel {};
-  u32 NameHash {0};
-  const char* Name {nullptr};
-  u32 TimeId {0};
   u64 Time0 {0};
+  const char* Name {nullptr};
+  u32 NameHash {0};
+  u32 TimeId {0};
 
   ProfScope(Label labelIn, u32 nameHash, const char* namePtr) noexcept;
   ~ProfScope() noexcept;
@@ -85,36 +89,36 @@ struct ProfScope
     (label), ::gecko::FNV1a(name), name \
   }
 
-#define GECKO_PROF_COUNTER(label, name, val)                     \
-  do                                                             \
-  {                                                              \
-    if (auto* p = ::gecko::GetProfiler())                        \
-    {                                                            \
-      ::gecko::ProfEvent event {::gecko::ProfEventKind::Counter, \
-                                p->NowNs(),                      \
-                                ::gecko::ThisThreadId(),         \
-                                (label),                         \
-                                ::gecko::FNV1a(name),            \
-                                name,                            \
-                                (::gecko::u64)(val)};            \
-      p->Emit(event);                                            \
-    }                                                            \
+#define GECKO_PROF_COUNTER(label, name, val)                              \
+  do                                                                      \
+  {                                                                       \
+    if (auto* p = ::gecko::GetProfiler())                                 \
+    {                                                                     \
+      ::gecko::ProfEvent event {.TimestampNs = p->NowNs(),                \
+                                .Value = (::gecko::u64)(val),             \
+                                .Name = name,                             \
+                                .EventLabel = (label),                    \
+                                .ThreadId = ::gecko::ThisThreadId(),      \
+                                .NameHash = ::gecko::FNV1a(name),         \
+                                .Kind = ::gecko::ProfEventKind::Counter}; \
+      p->Emit(event);                                                     \
+    }                                                                     \
   } while (0)
 
-#define GECKO_PROF_FRAME(label, name)                              \
-  do                                                               \
-  {                                                                \
-    if (auto* p = ::gecko::GetProfiler())                          \
-    {                                                              \
-      ::gecko::ProfEvent event {::gecko::ProfEventKind::FrameMark, \
-                                p->NowNs(),                        \
-                                ::gecko::ThisThreadId(),           \
-                                (label),                           \
-                                ::gecko::FNV1a(name),              \
-                                name,                              \
-                                0};                                \
-      p->Emit(event);                                              \
-    }                                                              \
+#define GECKO_PROF_FRAME(label, name)                                       \
+  do                                                                        \
+  {                                                                         \
+    if (auto* p = ::gecko::GetProfiler())                                   \
+    {                                                                       \
+      ::gecko::ProfEvent event {.TimestampNs = p->NowNs(),                  \
+                                .Value = 0,                                 \
+                                .Name = name,                               \
+                                .EventLabel = (label),                      \
+                                .ThreadId = ::gecko::ThisThreadId(),        \
+                                .NameHash = ::gecko::FNV1a(name),           \
+                                .Kind = ::gecko::ProfEventKind::FrameMark}; \
+      p->Emit(event);                                                       \
+    }                                                                       \
   } while (0)
 #else
 #define GECKO_PROF_CATEGORY(x)
@@ -128,14 +132,19 @@ namespace gecko {
 
 inline ProfScope::ProfScope(Label labelIn, u32 nameHash,
                             const char* namePtr) noexcept
-    : ScopeLabel(labelIn), NameHash(nameHash), Name(namePtr),
-      TimeId(ThisThreadId()), Time0(0)
+    : ScopeLabel(labelIn), Time0(0), Name(namePtr), NameHash(nameHash),
+      TimeId(ThisThreadId())
 {
   if (auto* profiler = GetProfiler())
   {
     Time0 = profiler->NowNs();
-    ProfEvent event {
-        ProfEventKind::ZoneBegin, Time0, TimeId, ScopeLabel, NameHash, Name, 0};
+    ProfEvent event {.TimestampNs = Time0,
+                     .Value = 0,
+                     .Name = Name,
+                     .EventLabel = ScopeLabel,
+                     .ThreadId = TimeId,
+                     .NameHash = NameHash,
+                     .Kind = ProfEventKind::ZoneBegin};
     profiler->Emit(event);
   }
 }
@@ -144,20 +153,18 @@ inline ProfScope::~ProfScope() noexcept
 {
   if (auto* profiler = GetProfiler())
   {
-    ProfEvent event {ProfEventKind::ZoneEnd,
-                     profiler->NowNs(),
-                     TimeId,
-                     ScopeLabel,
-                     NameHash,
-                     Name,
-                     0};
+    ProfEvent event {.TimestampNs = profiler->NowNs(),
+                     .Value = 0,
+                     .Name = Name,
+                     .EventLabel = ScopeLabel,
+                     .ThreadId = TimeId,
+                     .NameHash = NameHash,
+                     .Kind = ProfEventKind::ZoneEnd};
     profiler->Emit(event);
   }
 }
 }  // namespace gecko
 
-// NullProfiler: No-op profiler (discards all events)
-// Use for production builds or when profiling is disabled
 namespace gecko {
 struct NullProfiler final : IProfiler
 {

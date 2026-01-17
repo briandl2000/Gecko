@@ -82,7 +82,11 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
   // (Producers could otherwise stall if the consumer is stopped.)
   if (!m_Run.load(std::memory_order_relaxed))
   {
-    LogMessage message {level, label, NowNs(), ThreadId(), buffer};
+    LogMessage message {.TimeNs = NowNs(),
+                        .Text = buffer,
+                        .MessageLabel = label,
+                        .ThreadId = ThreadId(),
+                        .Level = level};
     {
       std::lock_guard<std::mutex> lk(m_SinkMu);
       for (auto* sink : m_Sinks)
@@ -161,8 +165,11 @@ void RingLogger::ProcessLogEntries() noexcept
   u64 dropped = m_Dropped.exchange(0, std::memory_order_relaxed);
   if (dropped)
   {
-    LogMessage dropMessage {LogLevel::Warn, m_LoggerLabel, NowNs(), ThreadId(),
-                            nullptr};
+    LogMessage dropMessage {.TimeNs = NowNs(),
+                            .Text = nullptr,
+                            .MessageLabel = m_LoggerLabel,
+                            .ThreadId = ThreadId(),
+                            .Level = LogLevel::Warn};
     char temp[128];
     std::snprintf(temp, sizeof(temp), "[Logger] dropped %llu messages",
                   static_cast<unsigned long long>(dropped));
@@ -243,8 +250,11 @@ void RingLogger::Flush() noexcept
       if (static_cast<i64>(sequence) - static_cast<i64>(position + 1) != 0)
         break;
 
-      LogMessage message {entry.Level, entry.EntryLabel, entry.TimeNs,
-                          entry.ThreadId, entry.Text};
+      LogMessage message {.TimeNs = entry.TimeNs,
+                          .Text = entry.Text,
+                          .MessageLabel = entry.EntryLabel,
+                          .ThreadId = entry.ThreadId,
+                          .Level = entry.Level};
       {
         std::lock_guard<std::mutex> lk(m_SinkMu);
         for (auto* sink : m_Sinks)

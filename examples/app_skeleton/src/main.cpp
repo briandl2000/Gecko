@@ -220,7 +220,7 @@ static int AppMain(int argc, char** argv)
     logger->SetLevel(LogLevel::Info);
   }
 
-  gecko::LogVersion(app::app_skeleton::labels::Main);
+  GECKO_INFO(app::app_skeleton::labels::Main, gecko::VersionFullString());
 
   // Register library modules after boot (now that logging is configured).
   (void)InstallModule(runtime::GetModule());

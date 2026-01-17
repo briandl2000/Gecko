@@ -6,8 +6,6 @@ namespace gecko::core::labels {
 
 inline constexpr ::gecko::Label Core = ::gecko::MakeLabel("gecko.core");
 
-inline constexpr ::gecko::Label General =
-    ::gecko::MakeLabel("gecko.core.general");
 inline constexpr ::gecko::Label Services =
     ::gecko::MakeLabel("gecko.core.services");
 inline constexpr ::gecko::Label Events =
@@ -19,5 +17,7 @@ inline constexpr ::gecko::Label Random =
 inline constexpr ::gecko::Label Thread =
     ::gecko::MakeLabel("gecko.core.thread");
 inline constexpr ::gecko::Label Time = ::gecko::MakeLabel("gecko.core.time");
+inline constexpr ::gecko::Label OperatorNew =
+    ::gecko::MakeLabel("gecko.core.operator_new");
 
 }  // namespace gecko::core::labels

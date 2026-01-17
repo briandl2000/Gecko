@@ -97,6 +97,34 @@ namespace gecko {
 - Allowed prefixes are `m_`, `g_`, `s_`.
 - Do **not** use `k*` prefixes (e.g. `kRootLabel`, `kMaxSize`).
 
+### Namespace Qualification
+
+Always use the `::` prefix when referring to global namespace items to prevent ambiguity and make scope explicit:
+
+```cpp
+// ✅ Global namespace - always use ::
+::std::malloc()
+::std::vector<int>
+::std::string
+::posix_memalign()
+::pthread_create()
+
+// ✅ Within gecko namespace - no prefix needed (you're already inside)
+IAllocator* allocator;
+GetLogger();
+Label myLabel;
+
+// ✅ Other namespaces - explicit qualification without leading ::
+gecko::runtime::EventBus
+platform::Window
+```
+
+**Rationale**:
+- **Clarity**: Immediately visible what's from global scope vs your namespace
+- **Prevents collisions**: If you add a `malloc` to `gecko`, `::malloc` still refers to the global one
+- **Explicit intent**: `::std::` means "std from global namespace, not some nested std"
+- **Consistency**: Works for C functions, C++ stdlib, and OS-specific APIs
+
 ### Formatting Standards
 
 #### Automatic Formatting
@@ -139,6 +167,53 @@ if (!ptr) return;
 - Blank line between system and project includes
 - Blank line between project and local includes
 - Alphabetical order within each group
+
+#### Section Comments
+Use this format **sparingly** to separate logical sections within source files only when the code becomes hard to read (60 characters wide):
+```cpp
+//------------------------------------------------------------
+// Section Name
+//------------------------------------------------------------
+```
+
+**When to Use**:
+- Files with multiple distinct logical groups (e.g., public API vs internal helpers)
+- Long implementation files where navigation becomes difficult
+- Clear functional boundaries that benefit from visual separation
+
+**When NOT to Use**:
+- Short, focused files (prefer keeping them small instead)
+- Between every function (excessive visual noise)
+- As a substitute for proper file organization
+
+**Spacing Rules**:
+- One blank line before the section comment
+- One blank line after the section comment
+- No blank line between the section comment and the first line of code in that section
+
+Example:
+```cpp
+void SomeFunction()
+{
+  // code here
+}
+
+//------------------------------------------------------------
+// Public API
+//------------------------------------------------------------
+
+void PublicFunction()
+{
+  // implementation
+}
+```
+
+Common section names (when needed):
+- Public API
+- Internal Helpers
+- Lifecycle Management
+- Service Registration
+- Platform Implementation
 
 #### Assertions
 Strategic assertions should be placed at:

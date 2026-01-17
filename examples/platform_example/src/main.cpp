@@ -88,7 +88,7 @@ int main()
         LogLevel::Info);  // Filter out Trace and Debug messages initially
   }
 
-  gecko::LogVersion(app::platform_example::labels::Main);
+  GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
 
   // Register library modules after boot (now that logging is configured).
   (void)InstallModule(runtime::GetModule());

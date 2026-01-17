@@ -25,7 +25,6 @@ struct Label
   }
 };
 
-// 1) Literal-friendly: keeps Name pointer.
 constexpr Label MakeLabel(const char* fullName) noexcept
 {
   if (!fullName || *fullName == '\0')

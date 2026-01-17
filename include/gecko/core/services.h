@@ -1,6 +1,6 @@
 #pragma once
 
-#include "api.h"
+#include "gecko/core/api.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/jobs.h"
 #include "gecko/core/services/log.h"

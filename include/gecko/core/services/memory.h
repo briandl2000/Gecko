@@ -24,7 +24,7 @@ struct IAllocator
 GECKO_API IAllocator* GetAllocator() noexcept;
 
 [[nodiscard]]
-GECKO_API inline void* AllocBytes(u64 size, u32 alignment, Label label) noexcept
+inline void* AllocBytes(u64 size, u32 alignment, Label label) noexcept
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
@@ -34,8 +34,8 @@ GECKO_API inline void* AllocBytes(u64 size, u32 alignment, Label label) noexcept
   return nullptr;
 }
 
-GECKO_API inline void DeallocBytes(void* ptr, u64 size, u32 alignment,
-                                   Label label) noexcept
+inline void DeallocBytes(void* ptr, u64 size, u32 alignment,
+                         Label label) noexcept
 {
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
@@ -53,8 +53,6 @@ GECKO_API inline T* AllocArray(u64 count, Label label,
   return static_cast<T*>(AllocBytes(sizeof(T) * count, alignment, label));
 }
 
-// SystemAllocator: Default allocator using malloc/free
-// Provides aligned allocation on all platforms
 struct SystemAllocator final : IAllocator
 {
   GECKO_API virtual void* Alloc(u64 size, u32 alignment,

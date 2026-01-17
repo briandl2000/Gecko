@@ -10,29 +10,23 @@ namespace gecko {
 
 struct Label;
 
-// EventCode is 64-bit: upper 32 bits from module's Label.Id hash,
-// lower 32 bits for module-local event code.
 using EventCode = u64;
 
-// Create a globally-unique event code from a module's Label ID and local code.
 constexpr inline EventCode MakeEventCode(u64 moduleId, u32 localCode)
 {
   return ((moduleId >> 32) << 32) | static_cast<u64>(localCode);
 }
 
-// Extract the module hash portion (upper 32 bits of EventCode).
 constexpr inline u32 GetEventModule(EventCode code)
 {
   return static_cast<u32>(code >> 32);
 }
 
-// Extract the module-local event code (lower 32 bits).
 constexpr inline u32 GetEventLocal(EventCode code)
 {
   return static_cast<u32>(code & 0xFFFFFFFFu);
 }
 
-// Legacy compatibility helpers (deprecated - use MakeEventCode instead)
 constexpr inline EventCode MakeEvent(u8 domain, u32 local24)
 {
   return (static_cast<u64>(domain) << 24) | (local24 & 0x00FF'FFFFu);
@@ -50,48 +44,39 @@ constexpr inline u32 EventLocal(EventCode code)
 
 struct EventView
 {
-  union
-  {
-    const void* ptr;
-    u8 inlineData[16];
-  };
-  u32 size = 0;
-  bool isInline = false;
+  const void* ptr {nullptr};
+  u32 size {0};
 
-  EventView() : ptr(nullptr)
+  EventView() = default;
+
+  EventView(const void* p, u32 s) : ptr(p), size(s)
   {}
 
-  // Construct from pointer
-  EventView(const void* p, u32 s) : ptr(p), size(s), isInline(false)
-  {}
-
-  // Get data pointer (works for both inline and pointer)
   const void* Data() const
   {
-    return isInline ? inlineData : ptr;
+    return ptr;
   }
 };
 
 struct EventMeta
 {
-  EventCode code {};  // Packed: module hash (upper 32) + local code (lower 32)
-  u64 moduleId {0};   // Full Label.Id of the module that sent this event
-  u64 sender {0};     // Optional sender identifier
-  u64 seq {0};        // Sequence number
+  EventCode code {};
+  u64 moduleId {0};
+  u64 sender {0};
+  u64 seq {0};
 };
 
 struct EventEmitter
 {
-  u64 moduleId {0};    // Full Label.Id of the owning module
-  u64 sender {0};      // Optional sender identifier
-  u64 capability {0};  // Secret capability for validation
+  u64 moduleId {0};
+  u64 sender {0};
+  u64 capability {0};
 };
 
 enum class SubscriptionDelivery : u8
 {
-  Queued = 0,    // Delivered when DispatchQueuedEvents() is called.
-  OnPublish = 1  // Delivered immediately when events are published (e.g., via
-                 // PublishEvent(), PublishImmediate(), or Enqueue()).
+  Queued = 0,
+  OnPublish = 1
 };
 
 struct SubscriptionOptions
@@ -186,19 +171,13 @@ public:
   GECKO_API virtual std::size_t DispatchQueued(
       std::size_t maxCount = static_cast<std::size_t>(-1)) = 0;
 
-  // Register a module ID with the event bus (called during module
-  // registration). Returns true if registered successfully, false if already
-  // registered.
   GECKO_API virtual bool RegisterModule(u64 moduleId) = 0;
 
-  // Unregister a module ID from the event bus.
   GECKO_API virtual void UnregisterModule(u64 moduleId) = 0;
 
-  // Create an emitter for a registered module.
   GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId,
                                                u64 sender = 0) = 0;
 
-  // Validate that an emitter is authentic and matches the expected module.
   GECKO_API virtual bool ValidateEmitter(const EventEmitter& emitter,
                                          u64 expectedModuleId) const = 0;
 
@@ -207,11 +186,8 @@ protected:
   GECKO_API virtual void Unsubscribe(u64 id) = 0;
 };
 
-// Forward declaration for inline helper functions below
 IEventBus* GetEventBus() noexcept;
 
-// Create emitter for a registered module using its Label ID.
-// This is the preferred way for modules to create emitters.
 [[nodiscard]] GECKO_API inline EventEmitter CreateEmitter(u64 moduleId,
                                                           u64 sender = 0)
 {
@@ -221,8 +197,6 @@ IEventBus* GetEventBus() noexcept;
   return {};
 }
 
-// Create emitter for a module using its Label.
-// Looks up the module and uses its Label.Id.
 [[nodiscard]] GECKO_API EventEmitter CreateEmitterForModule(Label moduleLabel,
                                                             u64 sender = 0);
 
@@ -237,7 +211,6 @@ GECKO_API inline EventSubscription SubscribeEvent(
   return {};
 }
 
-// Delayed publish (preferred).
 GECKO_API inline void PublishEvent(const EventEmitter& emitter, EventCode code,
                                    EventView payload)
 {
@@ -255,7 +228,6 @@ inline void PublishEvent(const EventEmitter& emitter, EventCode code,
                EventView {&payload, static_cast<u32>(sizeof(T))});
 }
 
-// Immediate publish (use sparingly).
 inline void PublishImmediateEvent(const EventEmitter& emitter, EventCode code,
                                   EventView payload)
 {
@@ -283,9 +255,6 @@ GECKO_API inline std::size_t DispatchQueuedEvents(
   return 0;
 }
 
-// NullEventBus: No-op event bus (discards all events)
-// All events and subscriptions are silently discarded
-// Use runtime::EventBus for working event system
 struct NullEventBus final : IEventBus
 {
   GECKO_API virtual EventSubscription Subscribe(

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "services.h"
+#include "gecko/core/services.h"
 
 #include <cstdlib>
 
@@ -9,7 +9,7 @@
   {                                              \
     if (!::gecko::InstallServices(servicesExpr)) \
     {                                            \
-      std::exit(EXIT_FAILURE);                   \
+      ::std::exit(EXIT_FAILURE);                 \
     }                                            \
     ::gecko::ValidateServices(true);             \
   } while (0)

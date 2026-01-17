@@ -125,13 +125,13 @@ void WorkerTask(int workerId, int numParticles)
 
       for (int i = 0; i < numParticles; ++i)
       {
-        particles[i] = {gecko::RandomFloat(-100.0f, 100.0f),
-                        gecko::RandomFloat(-100.0f, 100.0f),
-                        gecko::RandomFloat(-100.0f, 100.0f),
-                        gecko::RandomFloat(-10.0f, 10.0f),
-                        gecko::RandomFloat(-10.0f, 10.0f),
-                        gecko::RandomFloat(-10.0f, 10.0f),
-                        gecko::RandomFloat(1.0f, 5.0f)};
+        particles[i] = {gecko::RandomF32(-100.0f, 100.0f),
+                        gecko::RandomF32(-100.0f, 100.0f),
+                        gecko::RandomF32(-100.0f, 100.0f),
+                        gecko::RandomF32(-10.0f, 10.0f),
+                        gecko::RandomF32(-10.0f, 10.0f),
+                        gecko::RandomF32(-10.0f, 10.0f),
+                        gecko::RandomF32(1.0f, 5.0f)};
       }
     }
   }
@@ -162,13 +162,6 @@ void WorkerTask(int workerId, int numParticles)
         p.vx *= damping;
         p.vy *= damping;
         p.vz *= damping;
-      }
-
-      // Emit progress counter (reduce frequency to minimize profiling overhead)
-      if (step % 20 == 0)
-      {
-        GECKO_PROF_COUNTER(app::core_example::labels::Worker,
-                           "SimulationProgress", step);
       }
     }
 
@@ -539,7 +532,7 @@ int main()
         LogLevel::Info);  // Filter out Trace and Debug messages initially
   }
 
-  gecko::LogVersion(app::core_example::labels::Main);
+  GECKO_INFO(app::core_example::labels::Main, gecko::VersionFullString());
 
   (void)InstallModule(runtime::GetModule());
   (void)InstallModule(g_AppModule);
@@ -832,13 +825,13 @@ int main()
     // Add a frame mark to separate the main work from cleanup
     if (auto* profiler = GetProfiler())
     {
-      ProfEvent frameEvent {ProfEventKind::FrameMark,
-                            profiler->NowNs(),
-                            ThisThreadId(),
-                            app::core_example::labels::Main,
-                            FNV1a("EndOfDemo"),
-                            "EndOfDemo",
-                            0};
+      ProfEvent frameEvent {.TimestampNs = profiler->NowNs(),
+                            .Value = 0,
+                            .Name = "EndOfDemo",
+                            .EventLabel = app::core_example::labels::Main,
+                            .ThreadId = ThisThreadId(),
+                            .NameHash = FNV1a("EndOfDemo"),
+                            .Kind = ProfEventKind::FrameMark};
       profiler->Emit(frameEvent);
     }
   }

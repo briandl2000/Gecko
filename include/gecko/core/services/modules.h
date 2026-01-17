@@ -107,8 +107,6 @@ protected:
   }
 };
 
-// NullModuleRegistry: Minimal module registry (accepts but doesn't track
-// modules) Use when module system is disabled or during early initialization
 struct NullModuleRegistry final : IModuleRegistry
 {
   [[nodiscard]] GECKO_API virtual bool Init() noexcept override;

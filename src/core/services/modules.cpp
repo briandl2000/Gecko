@@ -1,4 +1,4 @@
-#include "gecko/core/services/modules.h"  // Corresponding header first
+#include "gecko/core/services/modules.h"
 
 #include "gecko/core/services.h"
 #include "gecko/core/services/log.h"
@@ -84,5 +84,53 @@ void ModuleHandle::Release() noexcept
   m_modules = nullptr;
   m_label = {};
 }
+
+bool NullModuleRegistry::Init() noexcept
+{
+  return true;
+}
+void NullModuleRegistry::Shutdown() noexcept
+{}
+
+ModuleRegistration NullModuleRegistry::RegisterStatic(IModule& module) noexcept
+{
+  const Label id = module.RootLabel();
+  if (!id.IsValid())
+  {
+    return ModuleRegistration {ModuleHandle {}, ModuleResult::InvalidArgument};
+  }
+  return ModuleRegistration {MakeHandle(id), ModuleResult::Ok};
+}
+
+ModuleResult NullModuleRegistry::Unregister(Label id) noexcept
+{
+  (void)id;
+  return ModuleResult::Ok;
+}
+
+IModule* NullModuleRegistry::GetModule(Label id) noexcept
+{
+  (void)id;
+  return nullptr;
+}
+
+const IModule* NullModuleRegistry::GetModule(Label id) const noexcept
+{
+  (void)id;
+  return nullptr;
+}
+
+void NullModuleRegistry::ForEachModule(ModuleVisitFn fn, void* user) noexcept
+{
+  (void)fn;
+  (void)user;
+}
+
+bool NullModuleRegistry::StartupAllModules() noexcept
+{
+  return true;
+}
+void NullModuleRegistry::ShutdownAllModules() noexcept
+{}
 
 }  // namespace gecko

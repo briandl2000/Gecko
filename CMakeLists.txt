@@ -19,7 +19,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE) #link time optimization
 
 # Enable all warnings and treat warnings as errors
 if(MSVC)
-    add_compile_options(/W4 /WX -Wno-unused-parameter)
+    add_compile_options(/W4 /WX)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()

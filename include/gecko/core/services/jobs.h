@@ -8,7 +8,7 @@
 
 namespace gecko {
 
-using JobFunction = std::function<void()>;
+using JobFunction = ::std::function<void()>;
 
 struct JobHandle
 {
@@ -50,13 +50,13 @@ struct IJobSystem
 
   GECKO_API virtual JobHandle Submit(JobFunction job,
                                      JobPriority priority = JobPriority::Normal,
-                                     Label label = Label {}) noexcept = 0;
+                                     Label label = {}) noexcept = 0;
 
   GECKO_API virtual JobHandle Submit(JobFunction job,
                                      const JobHandle* dependencies,
                                      u32 dependencyCount,
                                      JobPriority priority = JobPriority::Normal,
-                                     Label label = Label {}) noexcept = 0;
+                                     Label label = {}) noexcept = 0;
 
   GECKO_API virtual void Wait(JobHandle handle) noexcept = 0;
 
@@ -75,48 +75,45 @@ struct IJobSystem
 
 GECKO_API IJobSystem* GetJobSystem() noexcept;
 
-GECKO_API inline JobHandle SubmitJob(JobFunction job,
-                                     JobPriority priority = JobPriority::Normal,
-                                     Label label = Label {}) noexcept
+inline JobHandle SubmitJob(JobFunction job,
+                           JobPriority priority = JobPriority::Normal,
+                           Label label = {}) noexcept
 {
   if (auto* jobSystem = GetJobSystem())
-    return jobSystem->Submit(std::move(job), priority, label);
+    return jobSystem->Submit(::std::move(job), priority, label);
   return JobHandle {};
 }
 
-GECKO_API inline JobHandle SubmitJob(JobFunction job,
-                                     const JobHandle* dependencies,
-                                     u32 dependencyCount,
-                                     JobPriority priority = JobPriority::Normal,
-                                     Label label = Label {}) noexcept
+inline JobHandle SubmitJob(JobFunction job, const JobHandle* dependencies,
+                           u32 dependencyCount,
+                           JobPriority priority = JobPriority::Normal,
+                           Label label = {}) noexcept
 {
   if (auto* jobSystem = GetJobSystem())
-    return jobSystem->Submit(std::move(job), dependencies, dependencyCount,
+    return jobSystem->Submit(::std::move(job), dependencies, dependencyCount,
                              priority, label);
   return JobHandle {};
 }
 
-GECKO_API inline void WaitForJob(JobHandle handle) noexcept
+inline void WaitForJob(JobHandle handle) noexcept
 {
   if (auto* jobSystem = GetJobSystem())
     jobSystem->Wait(handle);
 }
 
-GECKO_API inline void WaitForJobs(const JobHandle* handles, u32 count) noexcept
+inline void WaitForJobs(const JobHandle* handles, u32 count) noexcept
 {
   if (auto* jobSystem = GetJobSystem())
     jobSystem->WaitAll(handles, count);
 }
 
-GECKO_API inline bool IsJobComplete(JobHandle handle) noexcept
+inline bool IsJobComplete(JobHandle handle) noexcept
 {
   if (auto* jobSystem = GetJobSystem())
     return jobSystem->IsComplete(handle);
   return true;
 }
 
-// NullJobSystem: Immediate execution job system (no threading)
-// Jobs execute synchronously on the calling thread
 struct NullJobSystem final : IJobSystem
 {
   GECKO_API virtual JobHandle Submit(JobFunction job,
