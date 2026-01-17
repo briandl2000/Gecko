@@ -187,6 +187,8 @@ static Services CreateServices(runtime::TrackingAllocator& trackingAlloc,
 
 static int AppMain(int argc, char** argv)
 {
+  int result = 0;
+
   AppConfig cfg {};
   if (!ParseArgs(argc, argv, cfg))
   {
@@ -239,7 +241,6 @@ static int AppMain(int argc, char** argv)
   }
 
   // 4) Run either headless or windowed.
-  int result = 0;
 
   if (!cfg.windowed)
   {
@@ -257,7 +258,6 @@ static int AppMain(int argc, char** argv)
     {
       GECKO_ERROR(app::app_skeleton::labels::Main,
                   "Failed to create PlatformContext");
-      GECKO_SHUTDOWN();
       return 1;
     }
 
@@ -271,7 +271,6 @@ static int AppMain(int argc, char** argv)
     if (!ctx->CreateWindow(windowDesc, window))
     {
       GECKO_ERROR(app::app_skeleton::labels::Main, "Failed to create window");
-      GECKO_SHUTDOWN();
       return 1;
     }
 

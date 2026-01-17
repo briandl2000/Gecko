@@ -12,7 +12,8 @@ namespace gecko::runtime {
 class RingProfiler final : public IProfiler
 {
 public:
-  explicit RingProfiler(size_t capacityPow2 = 1u << 20);
+  explicit RingProfiler(size_t capacityPow2 = 1u << 20) noexcept;
+  RingProfiler() noexcept;
   ~RingProfiler();
 
   void Emit(const ProfEvent& event) noexcept override;
@@ -32,8 +33,16 @@ private:
   {
     std::atomic<u64> Sequence {0};
     ProfEvent ProfileEvent {};
+
+    Slot() = default;
+
+    Slot(const Slot&) = delete;
+    Slot& operator=(const Slot&) = delete;
+    Slot(Slot&&) = delete;
+    Slot& operator=(Slot&&) = delete;
   };
   std::vector<Slot> m_Ring {};
+  size_t m_Capacity {1u << 20};
   size_t m_Mask {0};
   std::atomic<u64> m_Head {0};
   std::atomic<u64> m_Tail {0};
@@ -44,6 +53,7 @@ private:
 
   // Async consumer system
   std::atomic<bool> m_Run {true};
+  std::mutex m_JobMu {};  // Protects m_ConsumerJob
   JobHandle m_ConsumerJob {};
   Label m_ProfilerLabel {};
 

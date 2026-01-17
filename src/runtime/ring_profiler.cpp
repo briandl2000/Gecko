@@ -28,38 +28,30 @@ u64 RingProfiler::MonotonicNowNs() noexcept
   return MonotonicTimeNs();
 }
 
-RingProfiler::RingProfiler(size_t capacityPow2)
-    : m_Ring(capacityPow2), m_Mask(capacityPow2 - 1), m_Head(0), m_Tail(0),
-      m_Run(true), m_ProfilerLabel(labels::Profiler)
+RingProfiler::RingProfiler(size_t capacityPow2) noexcept
+    : m_Capacity(capacityPow2), m_Head(0), m_Tail(0), m_Run(true),
+      m_ProfilerLabel(labels::Profiler)
 {
   GECKO_ASSERT(capacityPow2 > 0 &&
                "Ring buffer capacity must be greater than 0");
 
   // Ensure capacity is power of 2
-  if ((capacityPow2 & (capacityPow2 - 1)) != 0)
+  if ((m_Capacity & (m_Capacity - 1)) != 0)
   {
-    m_Mask = (Bit(20)) - 1;
-    m_Ring = std::vector<Slot>(Bit(20));
+    m_Capacity = Bit(20);
   }
-  for (u64 i = 0; i < m_Ring.size(); ++i)
-  {
-    m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
-  }
+  m_Mask = m_Capacity - 1;
+}
+
+RingProfiler::RingProfiler() noexcept
+    : m_Head(0), m_Tail(0), m_Run(true), m_ProfilerLabel(labels::Profiler)
+{
+  m_Mask = m_Capacity - 1;
 }
 
 RingProfiler::~RingProfiler()
 {
-  // Stop accepting new events
   m_Run.store(false, std::memory_order_relaxed);
-
-  // Wait for any active consumer job to complete
-  if (m_ConsumerJob.IsValid())
-  {
-    WaitForJob(m_ConsumerJob);
-  }
-
-  // Process any remaining events to ensure sinks get final data
-  ProcessProfEvents();
 }
 
 u64 RingProfiler::NowNs() const noexcept
@@ -69,6 +61,9 @@ u64 RingProfiler::NowNs() const noexcept
 
 void RingProfiler::Emit(const ProfEvent& event) noexcept
 {
+  if (!m_Run.load(std::memory_order_relaxed))
+    return;
+
   u64 pos = m_Head.fetch_add(1, std::memory_order_acq_rel);
   Slot& slot = m_Ring[pos & m_Mask];
 
@@ -105,14 +100,6 @@ bool RingProfiler::TryPop(ProfEvent& event) noexcept
   return false;
 }
 
-bool RingProfiler::Init() noexcept
-{
-  return true;
-}
-
-void RingProfiler::Shutdown() noexcept
-{}
-
 void RingProfiler::AddSink(IProfilerSink* sink) noexcept
 {
   if (sink)
@@ -137,7 +124,7 @@ void RingProfiler::RemoveSink(IProfilerSink* sink) noexcept
 
 void RingProfiler::ProcessProfEvents() noexcept
 {
-  if (!m_Run.load(std::memory_order_relaxed))
+  if (!m_Run.load(std::memory_order_acquire))
     return;
 
   ProfEvent event {};
@@ -162,7 +149,7 @@ void RingProfiler::ProcessProfEvents() noexcept
   }
 
   // Continue processing if more events are pending
-  if (HasPendingEvents())
+  if (HasPendingEvents() && m_Run.load(std::memory_order_acquire))
   {
     ScheduleNextConsumerJob();
   }
@@ -170,11 +157,17 @@ void RingProfiler::ProcessProfEvents() noexcept
 
 void RingProfiler::TryScheduleConsumerJob() noexcept
 {
-  if (!m_Run.load(std::memory_order_relaxed))
-    return;
+  JobHandle currentJob;
+  {
+    std::lock_guard<std::mutex> lock(m_JobMu);
+    // Check m_Run while holding lock to synchronize with Shutdown
+    if (!m_Run.load(std::memory_order_acquire))
+      return;
+    currentJob = m_ConsumerJob;
+  }
 
   // Only schedule if there's no active consumer job
-  if (m_ConsumerJob.IsValid() && !IsJobComplete(m_ConsumerJob))
+  if (currentJob.IsValid() && !IsJobComplete(currentJob))
     return;
 
   auto* jobSystem = GetJobSystem();
@@ -199,6 +192,10 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   if (lastScheduleTime.compare_exchange_weak(lastTime, now,
                                              std::memory_order_relaxed))
   {
+    std::lock_guard<std::mutex> lock(m_JobMu);
+    // Check m_Run again while holding the lock to prevent shutdown race
+    if (!m_Run.load(std::memory_order_acquire))
+      return;
     m_ConsumerJob = jobSystem->Submit([this]() { ProcessProfEvents(); },
                                       JobPriority::Low, m_ProfilerLabel);
   }
@@ -214,6 +211,45 @@ bool RingProfiler::HasPendingEvents() const noexcept
   u64 head = m_Head.load(std::memory_order_relaxed);
   u64 tail = m_Tail.load(std::memory_order_relaxed);
   return head != tail;
+}
+
+bool RingProfiler::Init() noexcept
+{
+  // Allocate ring buffer now that allocator is available
+  if (m_Ring.empty())
+  {
+    // Direct resize with default construction avoids moves
+    m_Ring = std::vector<Slot>(m_Capacity);
+    for (u64 i = 0; i < m_Capacity; ++i)
+    {
+      m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
+    }
+  }
+
+  return true;
+}
+
+void RingProfiler::Shutdown() noexcept
+{
+  JobHandle jobToWait;
+  {
+    std::lock_guard<std::mutex> lock(m_JobMu);
+    m_Run.store(false, std::memory_order_release);
+    jobToWait = m_ConsumerJob;
+    m_ConsumerJob = JobHandle {};
+  }
+  
+  if (jobToWait.IsValid())
+  {
+    WaitForJob(jobToWait);
+  }
+
+  decltype(m_Ring)().swap(m_Ring);
+
+  {
+    std::lock_guard<std::mutex> lk(m_SinkMu);
+    decltype(m_Sinks)().swap(m_Sinks);
+  }
 }
 
 }  // namespace gecko::runtime

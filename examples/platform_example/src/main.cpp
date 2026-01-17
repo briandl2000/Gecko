@@ -127,7 +127,7 @@ int main()
   {
     GECKO_ERROR(app::platform_example::labels::Main,
                 "Failed to create window\n");
-    GECKO_SHUTDOWN();
+
     return 1;
   }
   GECKO_INFO(app::platform_example::labels::Main,
@@ -183,8 +183,6 @@ int main()
   GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
   ctx->DestroyWindow(window);
 
-  GECKO_INFO(app::platform_example::labels::Main,
-             "Shutting down Gecko services...");
   GECKO_SHUTDOWN();
 
   GECKO_INFO(app::platform_example::labels::Main,

@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <deque>
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <unordered_set>
@@ -60,14 +61,15 @@ private:
                             EventView payload,
                             SubscriptionDelivery deliveryFilter);
 
-  std::unordered_map<EventCode, std::vector<Subscriber>> m_Subscribers;
+  std::unique_ptr<std::unordered_map<EventCode, std::vector<Subscriber>>>
+      m_Subscribers;
   std::mutex m_SubscribersMutex;
-  std::deque<QueuedEvent> m_EventQueue;
+  std::unique_ptr<std::deque<QueuedEvent>> m_EventQueue;
   std::mutex m_QueueMutex;
   std::atomic<u64> m_NextSubscriptionId {1};
   std::atomic<u64> m_NextSequence {0};
   u64 m_CapabilitySecret {0};
-  std::unordered_set<u64> m_RegisteredModules;
+  std::unique_ptr<std::unordered_set<u64>> m_RegisteredModules;
   std::mutex m_ModulesMutex;
 };
 

@@ -49,9 +49,6 @@ bool ThreadPoolJobSystem::Init() noexcept
 
 void ThreadPoolJobSystem::Shutdown() noexcept
 {
-  // NOTE: Cannot profile Shutdown() - profiler may be shut down before job
-  // system
-
   if (!m_Initialized)
     return;
 
@@ -61,21 +58,16 @@ void ThreadPoolJobSystem::Shutdown() noexcept
   for (auto& thread : m_WorkerThreads)
   {
     if (thread.joinable())
-    {
       thread.join();
-    }
   }
 
-  m_WorkerThreads.clear();
+  // Force complete deallocation before allocator shutdown
+  decltype(m_WorkerThreads)().swap(m_WorkerThreads);
 
   {
     std::lock_guard<std::mutex> lock(m_Mutex);
-    // Clear remaining jobs
-    while (!m_JobQueue.empty())
-    {
-      m_JobQueue.pop();
-    }
-    m_ActiveJobs.clear();
+    decltype(m_JobQueue)().swap(m_JobQueue);
+    decltype(m_ActiveJobs)().swap(m_ActiveJobs);
   }
 
   m_Initialized = false;

@@ -17,6 +17,16 @@ namespace gecko {
  * The services are initialized and shut down in a specific order to avoid
  * circular dependencies:
  *
+ * REQUIRED SERVICES (must be provided to InstallServices):
+ * - Allocator    - Foundation for all memory allocation
+ * - Modules      - Core architecture for organizing application code
+ * - EventBus     - Core communication system between modules
+ *
+ * OPTIONAL SERVICES (will use null implementations if not provided):
+ * - JobSystem    - Threading and background task processing
+ * - Profiler     - Performance profiling and instrumentation
+ * - Logger       - Logging system for diagnostics and debugging
+ *
  * INITIALIZATION ORDER (low to high dependency):
  * Level 0: Allocator    - No dependencies on other services
  * Level 1: JobSystem    - May use allocator for job storage and worker threads
@@ -25,36 +35,38 @@ namespace gecko {
  * Level 3: Logger       - May use allocator, job system, and profiler for
  * performance tracking
  * Level 4: Modules      - May use allocator, job system, profiler, and logger
+ * Level 4: EventBus     - May use allocator and profiler
  *
  * SHUTDOWN ORDER (reverse of initialization):
- * Level 4: Modules -> Level 3: Logger -> Level 2: Profiler -> Level 1:
- * JobSystem -> Level 0: Allocator
+ * EventBus -> Modules -> Logger -> Profiler -> JobSystem -> Allocator
  *
  * BENEFITS OF THIS ORDER:
+ * - Allocator is always available as the foundation for all allocations
  * - JobSystem is available early for background processing by Profiler and
  * Logger
  * - Logger can use JobSystem for efficient background log processing
  * - Profiler can use JobSystem for background trace writing and data processing
- * - All services can use the Allocator as the foundation
+ * - Modules and EventBus are the highest level organizational constructs
  */
 
 // ------------------------------------------------
 
-static SystemAllocator s_SystemAllocator;
+// Optional service null implementations
 static NullJobSystem s_NullJobSystem;
 static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
-static NullModuleRegistry s_NullModules;
-static NullEventBus s_NullEventBus;
 
 // ----------------------------------------------------------------
 
-static ::std::atomic<IAllocator*> g_Allocator {&s_SystemAllocator};
+// Required services start as nullptr - must be provided to InstallServices
+static ::std::atomic<IAllocator*> g_Allocator {nullptr};
+static ::std::atomic<IModuleRegistry*> g_Modules {nullptr};
+static ::std::atomic<IEventBus*> g_EventBus {nullptr};
+
+// Optional services have null implementations as fallback
 static ::std::atomic<IJobSystem*> g_JobSystem {&s_NullJobSystem};
 static ::std::atomic<IProfiler*> g_Profiler {&s_NullProfiler};
 static ::std::atomic<ILogger*> g_Logger {&s_NullLogger};
-static ::std::atomic<IModuleRegistry*> g_Modules {&s_NullModules};
-static ::std::atomic<IEventBus*> g_EventBus {&s_NullEventBus};
 static ::std::atomic<bool> g_Installed {false};
 
 // Service installation helper - tracks which services have been installed
@@ -75,13 +87,13 @@ static void RollbackServices(const Services& service,
   if (state.eventBus && service.EventBus)
   {
     service.EventBus->Shutdown();
-    g_EventBus.store(&s_NullEventBus, ::std::memory_order_release);
+    g_EventBus.store(nullptr, ::std::memory_order_release);
   }
 
   if (state.modules && service.Modules)
   {
     service.Modules->Shutdown();
-    g_Modules.store(&s_NullModules, ::std::memory_order_release);
+    g_Modules.store(nullptr, ::std::memory_order_release);
   }
 
   if (state.logger && service.Logger)
@@ -105,7 +117,7 @@ static void RollbackServices(const Services& service,
   if (state.allocator && service.Allocator)
   {
     service.Allocator->Shutdown();
-    g_Allocator.store(&s_SystemAllocator, ::std::memory_order_release);
+    g_Allocator.store(nullptr, ::std::memory_order_release);
   }
 }
 
@@ -118,23 +130,31 @@ bool InstallServices(const Services& service) noexcept
     return false;
   }
 
+  // Validate required services are provided
+  GECKO_ASSERT(service.Allocator &&
+               "Allocator is required - must provide allocator to "
+               "InstallServices");
+  GECKO_ASSERT(service.Modules &&
+               "ModuleRegistry is required - must provide module registry to "
+               "InstallServices");
+  GECKO_ASSERT(service.EventBus &&
+               "EventBus is required - must provide event bus to "
+               "InstallServices");
+
   ServiceInstallState state {};
 
   // Initialize services in dependency order
   // Each level can depend on previously initialized services
 
-  // Level 0: Allocator (no dependencies)
-  if (service.Allocator)
+  // Level 0: Allocator (REQUIRED - no dependencies)
+  if (!service.Allocator->Init())
   {
-    if (!service.Allocator->Init())
-    {
-      GECKO_ASSERT(false && "Allocator failed to initialize!");
-      RollbackServices(service, state);
-      return false;
-    }
-    g_Allocator.store(service.Allocator, ::std::memory_order_release);
-    state.allocator = true;
+    GECKO_ASSERT(false && "Allocator failed to initialize!");
+    RollbackServices(service, state);
+    return false;
   }
+  g_Allocator.store(service.Allocator, ::std::memory_order_release);
+  state.allocator = true;
 
   // Level 1: JobSystem (may use allocator)
   if (service.JobSystem)
@@ -175,31 +195,25 @@ bool InstallServices(const Services& service) noexcept
     state.logger = true;
   }
 
-  // Level 4: Modules (may use all previous services)
-  if (service.Modules)
+  // Level 4: Modules (REQUIRED - may use all previous services)
+  if (!service.Modules->Init())
   {
-    if (!service.Modules->Init())
-    {
-      GECKO_ASSERT(false && "ModuleRegistry failed to initialize!");
-      RollbackServices(service, state);
-      return false;
-    }
-    g_Modules.store(service.Modules, ::std::memory_order_release);
-    state.modules = true;
+    GECKO_ASSERT(false && "ModuleRegistry failed to initialize!");
+    RollbackServices(service, state);
+    return false;
   }
+  g_Modules.store(service.Modules, ::std::memory_order_release);
+  state.modules = true;
 
-  // Level 4: EventBus (may use allocator and profiler)
-  if (service.EventBus)
+  // Level 4: EventBus (REQUIRED - may use allocator and profiler)
+  if (!service.EventBus->Init())
   {
-    if (!service.EventBus->Init())
-    {
-      GECKO_ASSERT(false && "EventBus failed to initialize!");
-      RollbackServices(service, state);
-      return false;
-    }
-    g_EventBus.store(service.EventBus, ::std::memory_order_release);
-    state.eventBus = true;
+    GECKO_ASSERT(false && "EventBus failed to initialize!");
+    RollbackServices(service, state);
+    return false;
   }
+  g_EventBus.store(service.EventBus, ::std::memory_order_release);
+  state.eventBus = true;
 
   g_Installed.store(true, ::std::memory_order_release);
 
@@ -211,34 +225,23 @@ bool InstallServices(const Services& service) noexcept
 
 void UninstallServices() noexcept
 {
-  // Shutdown services in reverse dependency order:
-  // Modules -> EventBus -> Logger -> Profiler -> JobSystem -> Allocator
-  // This ensures that higher-level services are shut down before the services
-  // they depend on. Modules are shut down first so their shutdown logic can
-  // still use the logger and event bus.
-
   GECKO_INFO(core::labels::Services, "Shutting down Gecko services");
 
+  // Logger/Profiler wait for jobs, then JobSystem stops threads, then Allocator
+  g_Logger.load(::std::memory_order_relaxed)->Shutdown();
+  g_Profiler.load(::std::memory_order_relaxed)->Shutdown();
+  g_JobSystem.load(::std::memory_order_relaxed)->Shutdown();
   g_Modules.load(::std::memory_order_relaxed)->Shutdown();
+  g_EventBus.load(::std::memory_order_relaxed)->Shutdown();
+  g_Allocator.load(::std::memory_order_relaxed)->Shutdown();
 
-  g_EventBus.load(::std::memory_order_relaxed)
-      ->Shutdown();  // Level 4: May use profiler, allocator
-  g_Logger.load(::std::memory_order_relaxed)
-      ->Shutdown();  // Level 3: May use profiler, job system, allocator
-  g_Profiler.load(::std::memory_order_relaxed)
-      ->Shutdown();  // Level 2: May use job system, allocator
-  g_JobSystem.load(::std::memory_order_relaxed)
-      ->Shutdown();  // Level 1: May use allocator
-  g_Allocator.load(::std::memory_order_relaxed)
-      ->Shutdown();  // Level 0: No dependencies
-
-  // Reset to default null implementations
-  g_Allocator.store(&s_SystemAllocator, ::std::memory_order_release);
+  // Reset to default implementations
+  g_Allocator.store(nullptr, ::std::memory_order_release);
   g_JobSystem.store(&s_NullJobSystem, ::std::memory_order_release);
   g_Profiler.store(&s_NullProfiler, ::std::memory_order_release);
   g_Logger.store(&s_NullLogger, ::std::memory_order_release);
-  g_Modules.store(&s_NullModules, ::std::memory_order_release);
-  g_EventBus.store(&s_NullEventBus, ::std::memory_order_release);
+  g_Modules.store(nullptr, ::std::memory_order_release);
+  g_EventBus.store(nullptr, ::std::memory_order_release);
   g_Installed.store(false, ::std::memory_order_release);
 }
 

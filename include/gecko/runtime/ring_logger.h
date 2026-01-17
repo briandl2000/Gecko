@@ -14,7 +14,8 @@ namespace gecko::runtime {
 class RingLogger final : public ILogger
 {
 public:
-  explicit RingLogger(size_t capacity = 4096);
+  explicit RingLogger(size_t capacity = 4096) noexcept;
+  RingLogger() noexcept;
   virtual ~RingLogger();
 
   virtual void LogV(LogLevel level, Label label, const char* fmt,
@@ -43,20 +44,30 @@ public:
 private:
   struct Entry
   {
-    std::atomic<u64> Sequence;
-    LogLevel Level;
-    Label EntryLabel;
-    u64 TimeNs;
-    u32 ThreadId;
-    char Text[512];
+    std::atomic<u64> Sequence {0};
+    LogLevel Level {LogLevel::Info};
+    Label EntryLabel {};
+    u64 TimeNs {0};
+    u32 ThreadId {0};
+    char Text[512] {};
+
+    Entry() = default;
+
+    // Atomics are not copyable or moveable, so we delete these
+    Entry(const Entry&) = delete;
+    Entry& operator=(const Entry&) = delete;
+    Entry(Entry&&) = delete;
+    Entry& operator=(Entry&&) = delete;
   };
 
   std::vector<Entry> m_Ring;
+  size_t m_Capacity {4096};
   size_t m_Mask {0};
   std::atomic<u64> m_Head {0};
   std::atomic<u64> m_Tail {0};
 
   std::mutex m_SinkMu;
+  std::mutex m_JobMu;  // Protects m_ConsumerJob
   std::vector<ILogSink*> m_Sinks;
 
   std::atomic<LogLevel> m_Level {LogLevel::Info};

@@ -30,25 +30,22 @@ u32 RingLogger::ThreadId() noexcept
   return HashThreadId();
 }
 
-RingLogger::RingLogger(size_t capacity) : m_LoggerLabel(labels::Logger)
+RingLogger::RingLogger(size_t capacity) noexcept
+    : m_Capacity(capacity), m_LoggerLabel(labels::Logger)
 {
   GECKO_ASSERT(capacity > 0 && "Ring buffer capacity must be greater than 0");
 
   // Ensure capacity is power of 2
-  if ((capacity & (capacity - 1)) != 0)
-    capacity = 4096;
-
-  m_Ring = std::vector<Entry>(capacity);
-  m_Mask = capacity - 1;
-  for (u64 i = 0; i < capacity; ++i)
-  {
-    m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
-  }
+  if ((m_Capacity & (m_Capacity - 1)) != 0)
+    m_Capacity = 4096;
 }
+
+RingLogger::RingLogger() noexcept : m_LoggerLabel(labels::Logger)
+{}
 
 RingLogger::~RingLogger()
 {
-  Shutdown();
+  m_Run.store(false, std::memory_order_relaxed);
 }
 
 void RingLogger::AddSink(ILogSink* sink) noexcept
@@ -78,8 +75,6 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
     buffer[0] = '\0';
   }
 
-  // If we're shutting down, don't enqueue into the ring buffer.
-  // (Producers could otherwise stall if the consumer is stopped.)
   if (!m_Run.load(std::memory_order_relaxed))
   {
     LogMessage message {.TimeNs = NowNs(),
@@ -129,6 +124,9 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
 
 void RingLogger::ProcessLogEntries() noexcept
 {
+  if (!m_Run.load(std::memory_order_acquire))
+    return;
+
   LogMessage message {};
   const int maxBatchSize =
       128;  // Process more entries per job to reduce job overhead
@@ -181,7 +179,7 @@ void RingLogger::ProcessLogEntries() noexcept
 
   // Always check if there are more entries to process.
   // Only reschedule if the logger is still running.
-  if (m_Run.load(std::memory_order_relaxed) && HasPendingEntries())
+  if (m_Run.load(std::memory_order_acquire) && HasPendingEntries())
   {
     ScheduleNextConsumerJob();
   }
@@ -189,11 +187,17 @@ void RingLogger::ProcessLogEntries() noexcept
 
 void RingLogger::TryScheduleConsumerJob() noexcept
 {
-  if (!m_Run.load(std::memory_order_relaxed))
-    return;
+  JobHandle currentJob;
+  {
+    std::lock_guard<std::mutex> lock(m_JobMu);
+    // Check m_Run while holding lock to synchronize with Shutdown
+    if (!m_Run.load(std::memory_order_acquire))
+      return;
+    currentJob = m_ConsumerJob;
+  }
 
   // Only schedule if there's no active consumer job
-  if (m_ConsumerJob.IsValid() && !IsJobComplete(m_ConsumerJob))
+  if (currentJob.IsValid() && !IsJobComplete(currentJob))
     return;
 
   auto* jobSystem = GetJobSystem();
@@ -218,6 +222,10 @@ void RingLogger::TryScheduleConsumerJob() noexcept
   if (lastScheduleTime.compare_exchange_weak(lastTime, now,
                                              std::memory_order_relaxed))
   {
+    std::lock_guard<std::mutex> lock(m_JobMu);
+    // Check m_Run again while holding the lock to prevent shutdown race
+    if (!m_Run.load(std::memory_order_acquire))
+      return;
     m_ConsumerJob = jobSystem->Submit([this]() { ProcessLogEntries(); },
                                       JobPriority::Normal, m_LoggerLabel);
   }
@@ -272,6 +280,18 @@ void RingLogger::Flush() noexcept
 
 bool RingLogger::Init() noexcept
 {
+  // Allocate ring buffer now that allocator is available
+  if (m_Ring.empty())
+  {
+    // Direct resize with default construction avoids moves
+    m_Ring = std::vector<Entry>(m_Capacity);
+    m_Mask = m_Capacity - 1;
+    for (u64 i = 0; i < m_Capacity; ++i)
+    {
+      m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
+    }
+  }
+
   m_Run.store(true, std::memory_order_relaxed);
 
   // JobSystem is now available during Logger initialization (Allocator ->
@@ -284,16 +304,25 @@ bool RingLogger::Init() noexcept
 
 void RingLogger::Shutdown() noexcept
 {
-  m_Run.store(false, std::memory_order_relaxed);
-
-  // Wait for any running consumer job to complete
-  if (m_ConsumerJob.IsValid())
+  JobHandle jobToWait;
   {
-    WaitForJob(m_ConsumerJob);
+    std::lock_guard<std::mutex> lock(m_JobMu);
+    m_Run.store(false, std::memory_order_release);
+    jobToWait = m_ConsumerJob;
+    m_ConsumerJob = JobHandle {};
+  }
+  
+  if (jobToWait.IsValid())
+  {
+    WaitForJob(jobToWait);
   }
 
-  // Process any remaining entries
-  Flush();
+  decltype(m_Ring)().swap(m_Ring);
+
+  {
+    std::lock_guard<std::mutex> lk(m_SinkMu);
+    decltype(m_Sinks)().swap(m_Sinks);
+  }
 }
 
 }  // namespace gecko::runtime

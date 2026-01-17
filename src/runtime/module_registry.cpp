@@ -105,6 +105,9 @@ void ModuleRegistry::Shutdown() noexcept
   m_impl->Modules.clear();
   m_impl->RegistrationOrder.clear();
   m_impl->Booted = false;
+  
+  // Deallocate Impl before allocator is uninstalled
+  m_impl.reset();
 }
 
 ::gecko::ModuleRegistration ModuleRegistry::RegisterStatic(

@@ -537,22 +537,36 @@ int main()
   (void)InstallModule(runtime::GetModule());
   (void)InstallModule(g_AppModule);
 
-  // Set up trace file sink for profiling data after services are available
-  runtime::TraceFileSink traceSink("gecko_trace.json");
-  if (!traceSink.IsOpen())
   {
-    GECKO_WARN(app::core_example::labels::Main,
-               "Failed to open trace profiler sink\n");
-  }
-  else
-  {
-    // We know the profiler is a RingProfiler, so we can safely add the sink
-    ringProfiler.AddSink(&traceSink);
-  }
+    // Scope for sinks - they must destruct before GECKO_SHUTDOWN
+    // Now configure logging sinks after services are installed
+    runtime::ConsoleLogSink consoleSink;
+    runtime::FileLogSink fileSink("log.txt");
 
-  // Now logging works with all sinks configured!
-  GECKO_INFO(app::core_example::labels::Main,
-             "Services installed and sinks configured successfully!");
+    if (auto* logger = GetLogger())
+    {
+      logger->AddSink(&fileSink);
+      logger->AddSink(&consoleSink);
+      logger->SetLevel(
+          LogLevel::Info);  // Filter out Trace and Debug messages initially
+    }
+
+    // Set up trace file sink for profiling data after services are available
+    runtime::TraceFileSink traceSink("gecko_trace.json");
+    if (!traceSink.IsOpen())
+    {
+      GECKO_WARN(app::core_example::labels::Main,
+                 "Failed to open trace profiler sink\n");
+    }
+    else
+    {
+      // We know the profiler is a RingProfiler, so we can safely add the sink
+      ringProfiler.AddSink(&traceSink);
+    }
+
+    // Now logging works with all sinks configured!
+    GECKO_INFO(app::core_example::labels::Main,
+               "Services installed and sinks configured successfully!");
 
   GECKO_DEBUG(
       app::core_example::labels::Main,
@@ -851,17 +865,16 @@ int main()
     logger->Flush();
   }
 
-  // Clean up the trace sink (destructor handles cleanup)
-  // traceSink.Shutdown(); // Not needed - destructor handles cleanup
-
-  // Use GECKO_SHUTDOWN for proper cleanup
-  GECKO_SHUTDOWN();
+  }  // Close sink scope - sinks destruct here before GECKO_SHUTDOWN
 
   std::printf("\nDemo completed successfully! Check the log output above.\n");
   std::printf("The immediate logger writes all log messages directly without "
               "buffering.\n");
   std::printf("This ensures immediate output but may be slower than buffered "
               "logging.\n");
+
+  // Use GECKO_SHUTDOWN for proper cleanup
+  GECKO_SHUTDOWN();
 
   return 0;
 }

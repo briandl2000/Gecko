@@ -12,9 +12,10 @@
       ::std::exit(EXIT_FAILURE);                 \
     }                                            \
     ::gecko::ValidateServices(true);             \
-  } while (0)
-
+  } while (0);                                   \
+  {
 #define GECKO_SHUTDOWN()          \
+  }                               \
   do                              \
   {                               \
     ::gecko::UninstallServices(); \

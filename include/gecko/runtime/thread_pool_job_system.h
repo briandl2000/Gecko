@@ -59,7 +59,10 @@ class ThreadPoolJobSystem final : public IJobSystem
 {
 public:
   ThreadPoolJobSystem() = default;
-  virtual ~ThreadPoolJobSystem() = default;
+  virtual ~ThreadPoolJobSystem()
+  {
+    Shutdown();
+  }
 
   virtual JobHandle Submit(JobFunction job,
                            JobPriority priority = JobPriority::Normal,

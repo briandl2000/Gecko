@@ -1,24 +1,30 @@
 #if GECKO_OVERRIDE_NEW
 #include "gecko/core/assert.h"
+#include "gecko/core/services.h"
 #include "gecko/core/services/memory.h"
 #include "private/labels.h"
 
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <new>
 
 void* operator new(std::size_t size)
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
 
-  if (auto* allocator = gecko::GetAllocator())
+  auto* allocator = gecko::GetAllocator();
+  GECKO_ASSERT(allocator &&
+               "operator new called before allocator service installed - call "
+               "gecko::InstallServices() first");
+
+  if (void* ptr = allocator->Alloc(static_cast<gecko::u64>(size),
+                                   alignof(std::max_align_t),
+                                   gecko::core::labels::OperatorNew))
   {
-    if (void* ptr = allocator->Alloc(static_cast<gecko::u64>(size),
-                                     alignof(std::max_align_t),
-                                     gecko::core::labels::OperatorNew))
-    {
-      return ptr;
-    }
+    return ptr;
   }
+
   throw std::bad_alloc {};
 }
 
@@ -41,15 +47,18 @@ void* operator new(std::size_t size, std::align_val_t align)
   GECKO_ASSERT(static_cast<gecko::u64>(align) > 0 &&
                "Alignment must be greater than 0");
 
-  if (auto* allocator = gecko::GetAllocator())
+  auto* allocator = gecko::GetAllocator();
+  GECKO_ASSERT(allocator &&
+               "operator new called before allocator service installed - call "
+               "gecko::InstallServices() first");
+
+  if (void* ptr = allocator->Alloc(static_cast<gecko::u64>(size),
+                                   static_cast<gecko::u64>(align),
+                                   gecko::core::labels::OperatorNew))
   {
-    if (void* ptr = allocator->Alloc(static_cast<gecko::u64>(size),
-                                     static_cast<gecko::u64>(align),
-                                     gecko::core::labels::OperatorNew))
-    {
-      return ptr;
-    }
+    return ptr;
   }
+
   throw std::bad_alloc {};
 }
 

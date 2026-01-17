@@ -16,13 +16,23 @@ EventBus::EventBus()
 
 EventBus::~EventBus()
 {
-  m_Subscribers.clear();
+  // unique_ptr automatically cleans up
 }
 
 bool EventBus::Init() noexcept
 {
   GECKO_PROF_FUNC(runtime::labels::General);
   m_CapabilitySecret = RandomU64();
+
+  // Allocate containers now that allocator service is installed
+  m_Subscribers = std::make_unique<
+      std::unordered_map<EventCode, std::vector<Subscriber>>>();
+  m_EventQueue = std::make_unique<std::deque<QueuedEvent>>();
+  m_RegisteredModules = std::make_unique<std::unordered_set<u64>>();
+
+  m_Subscribers->reserve(16);
+  m_RegisteredModules->reserve(16);
+
   return true;
 }
 
@@ -32,15 +42,15 @@ void EventBus::Shutdown() noexcept
 
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
-    m_Subscribers.clear();
+    m_Subscribers.reset();
   }
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
-    m_EventQueue.clear();
+    m_EventQueue.reset();
   }
   {
     std::lock_guard<std::mutex> lock(m_ModulesMutex);
-    m_RegisteredModules.clear();
+    m_RegisteredModules.reset();
   }
 }
 
@@ -48,20 +58,24 @@ bool EventBus::RegisterModule(u64 moduleId) noexcept
 {
   std::lock_guard<std::mutex> lock(m_ModulesMutex);
 
-  if (m_RegisteredModules.find(moduleId) != m_RegisteredModules.end())
+  if (!m_RegisteredModules)
+    return false;
+
+  if (m_RegisteredModules->find(moduleId) != m_RegisteredModules->end())
   {
     // Module already registered - this is a warning condition
     return false;
   }
 
-  m_RegisteredModules.insert(moduleId);
+  m_RegisteredModules->insert(moduleId);
   return true;
 }
 
 void EventBus::UnregisterModule(u64 moduleId) noexcept
 {
   std::lock_guard<std::mutex> lock(m_ModulesMutex);
-  m_RegisteredModules.erase(moduleId);
+  if (m_RegisteredModules)
+    m_RegisteredModules->erase(moduleId);
 }
 
 EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user,
@@ -83,7 +97,8 @@ EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user,
 
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
-    m_Subscribers[code].push_back(sub);
+    if (m_Subscribers)
+      (*m_Subscribers)[code].push_back(sub);
   }
 
   EventSubscription subscription {};
@@ -97,7 +112,10 @@ void EventBus::Unsubscribe(u64 id) noexcept
     return;
 
   std::lock_guard<std::mutex> lock(m_SubscribersMutex);
-  for (auto& [code, subscribers] : m_Subscribers)
+  if (!m_Subscribers)
+    return;
+
+  for (auto& [code, subscribers] : *m_Subscribers)
   {
     auto it = std::find_if(subscribers.begin(), subscribers.end(),
                            [id](const Subscriber& s) { return s.id == id; });
@@ -175,7 +193,8 @@ void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
   }
 
   std::lock_guard<std::mutex> lock(m_QueueMutex);
-  m_EventQueue.push_back(qEvent);
+  if (m_EventQueue)
+    m_EventQueue->push_back(qEvent);
 }
 
 std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
@@ -186,7 +205,10 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
 
   {
     std::lock_guard<std::mutex> lock(m_QueueMutex);
-    std::size_t count = std::min(maxCount, m_EventQueue.size());
+    if (!m_EventQueue)
+      return 0;
+
+    std::size_t count = std::min(maxCount, m_EventQueue->size());
     if (count == 0)
       return 0;
 
@@ -196,8 +218,8 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
     events.reserve(count);
     for (std::size_t i = 0; i < count; ++i)
     {
-      events.push_back(std::move(m_EventQueue.front()));
-      m_EventQueue.pop_front();
+      events.push_back(std::move(m_EventQueue->front()));
+      m_EventQueue->pop_front();
     }
   }
 
@@ -237,8 +259,11 @@ void EventBus::PublishToSubscribers(EventCode code, const EventMeta& meta,
   std::vector<Subscriber> subscribers;
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
-    auto it = m_Subscribers.find(code);
-    if (it == m_Subscribers.end())
+    if (!m_Subscribers)
+      return;
+
+    auto it = m_Subscribers->find(code);
+    if (it == m_Subscribers->end())
       return;
     subscribers = it->second;
   }
@@ -262,8 +287,11 @@ void EventBus::PublishToSubscribers(EventCode code, const EventMeta& meta,
   std::vector<Subscriber> subscribers;
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
-    auto it = m_Subscribers.find(code);
-    if (it == m_Subscribers.end())
+    if (!m_Subscribers)
+      return;
+
+    auto it = m_Subscribers->find(code);
+    if (it == m_Subscribers->end())
       return;
     subscribers = it->second;
   }
