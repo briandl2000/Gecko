@@ -8,9 +8,9 @@ u64 NullProfiler::NowNs() const noexcept
 {
   return 0;
 }
-void NullProfiler::AddSinkImpl(IProfilerSink* sink) noexcept
+void NullProfiler::AddSink(IProfilerSink* sink) noexcept
 {}
-void NullProfiler::RemoveSinkImpl(IProfilerSink* sink) noexcept
+void NullProfiler::RemoveSink(IProfilerSink* sink) noexcept
 {}
 bool NullProfiler::Init() noexcept
 {

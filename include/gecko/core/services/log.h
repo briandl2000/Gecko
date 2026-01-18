@@ -83,8 +83,8 @@ struct ILogger
   }
 
   // Internal: called by RegisteredSink
-  GECKO_API virtual void AddSinkImpl(ILogSink* sink) noexcept = 0;
-  GECKO_API virtual void RemoveSinkImpl(ILogSink* sink) noexcept = 0;
+  GECKO_API virtual void AddSink(ILogSink* sink) noexcept = 0;
+  GECKO_API virtual void RemoveSink(ILogSink* sink) noexcept = 0;
 
   GECKO_API virtual void SetLevel(LogLevel level) noexcept = 0;
   GECKO_API virtual LogLevel Level() const noexcept = 0;
@@ -137,8 +137,8 @@ struct NullLogger final : ILogger
 {
   GECKO_API virtual void LogV(LogLevel level, Label label, const char* fmt,
                               va_list) noexcept override;
-  GECKO_API virtual void AddSinkImpl(ILogSink* sink) noexcept override;
-  GECKO_API virtual void RemoveSinkImpl(ILogSink* sink) noexcept override;
+  GECKO_API virtual void AddSink(ILogSink* sink) noexcept override;
+  GECKO_API virtual void RemoveSink(ILogSink* sink) noexcept override;
   GECKO_API virtual void SetLevel(LogLevel level) noexcept override;
   GECKO_API virtual LogLevel Level() const noexcept override;
 

@@ -56,8 +56,8 @@ struct IProfiler
   GECKO_API virtual u64 NowNs() const noexcept = 0;
 
   // Internal: called by RegisteredSink
-  GECKO_API virtual void AddSinkImpl(IProfilerSink* sink) noexcept = 0;
-  GECKO_API virtual void RemoveSinkImpl(IProfilerSink* sink) noexcept = 0;
+  GECKO_API virtual void AddSink(IProfilerSink* sink) noexcept = 0;
+  GECKO_API virtual void RemoveSink(IProfilerSink* sink) noexcept = 0;
 
   GECKO_API virtual bool Init() noexcept = 0;
   GECKO_API virtual void Shutdown() noexcept = 0;
@@ -178,8 +178,8 @@ struct NullProfiler final : IProfiler
 {
   GECKO_API virtual void Emit(const ProfEvent& event) noexcept override;
   GECKO_API virtual u64 NowNs() const noexcept override;
-  GECKO_API virtual void AddSinkImpl(IProfilerSink* sink) noexcept override;
-  GECKO_API virtual void RemoveSinkImpl(IProfilerSink* sink) noexcept override;
+  GECKO_API virtual void AddSink(IProfilerSink* sink) noexcept override;
+  GECKO_API virtual void RemoveSink(IProfilerSink* sink) noexcept override;
 
   GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;

@@ -25,7 +25,7 @@ u32 ThreadId() noexcept
   return HashThreadId();
 }
 
-void ImmediateLogger::AddSinkImpl(ILogSink* sink) noexcept
+void ImmediateLogger::AddSink(ILogSink* sink) noexcept
 {
   if (!sink)
     return;
@@ -41,7 +41,7 @@ void ImmediateLogger::AddSinkImpl(ILogSink* sink) noexcept
   }
 }
 
-void ImmediateLogger::RemoveSinkImpl(ILogSink* sink) noexcept
+void ImmediateLogger::RemoveSink(ILogSink* sink) noexcept
 {
   if (!sink)
     return;

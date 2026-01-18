@@ -24,8 +24,8 @@ public:
 
   bool TryPop(ProfEvent& event) noexcept;
 
-  void AddSinkImpl(IProfilerSink* sink) noexcept override;
-  void RemoveSinkImpl(IProfilerSink* sink) noexcept override;
+  void AddSink(IProfilerSink* sink) noexcept override;
+  void RemoveSink(IProfilerSink* sink) noexcept override;
 
   // Flushes all pending events to sinks
   void Flush() noexcept;

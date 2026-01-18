@@ -48,7 +48,7 @@ RingLogger::~RingLogger()
   m_Run.store(false, std::memory_order_relaxed);
 }
 
-void RingLogger::AddSinkImpl(ILogSink* sink) noexcept
+void RingLogger::AddSink(ILogSink* sink) noexcept
 {
   if (sink)
   {
@@ -57,7 +57,7 @@ void RingLogger::AddSinkImpl(ILogSink* sink) noexcept
   }
 }
 
-void RingLogger::RemoveSinkImpl(ILogSink* sink) noexcept
+void RingLogger::RemoveSink(ILogSink* sink) noexcept
 {
   if (!sink)
     return;

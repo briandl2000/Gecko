@@ -100,7 +100,7 @@ bool RingProfiler::TryPop(ProfEvent& event) noexcept
   return false;
 }
 
-void RingProfiler::AddSinkImpl(IProfilerSink* sink) noexcept
+void RingProfiler::AddSink(IProfilerSink* sink) noexcept
 {
   if (sink)
   {
@@ -109,7 +109,7 @@ void RingProfiler::AddSinkImpl(IProfilerSink* sink) noexcept
   }
 }
 
-void RingProfiler::RemoveSinkImpl(IProfilerSink* sink) noexcept
+void RingProfiler::RemoveSink(IProfilerSink* sink) noexcept
 {
   if (!sink)
     return;
