@@ -520,14 +520,14 @@ int main()
                         .Modules = &moduleRegistry,
                         .EventBus = &eventBus}));
 
-  // Now configure logging sinks after services are installed
+  // Configure logging sinks - they auto-unregister when destroyed
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
 
   if (auto* logger = GetLogger())
   {
-    logger->AddSink(&fileSink);
-    logger->AddSink(&consoleSink);
+    fileSink.RegisterWith(logger);
+    consoleSink.RegisterWith(logger);
     logger->SetLevel(
         LogLevel::Info);  // Filter out Trace and Debug messages initially
   }
@@ -537,36 +537,24 @@ int main()
   (void)InstallModule(runtime::GetModule());
   (void)InstallModule(g_AppModule);
 
+  // Set up trace file sink for profiling data after services are available
+  // Sink auto-unregisters when destroyed
+  runtime::TraceFileSink traceSink("gecko_trace.json");
+
+  if (!traceSink.IsOpen())
   {
-    // Scope for sinks - they must destruct before GECKO_SHUTDOWN
-    // Now configure logging sinks after services are installed
-    runtime::ConsoleLogSink consoleSink;
-    runtime::FileLogSink fileSink("log.txt");
+    GECKO_WARN(app::core_example::labels::Main,
+               "Failed to open trace profiler sink\n");
+  }
+  else
+  {
+    if (auto* profiler = GetProfiler())
+      traceSink.RegisterWith(profiler);
+  }
 
-    if (auto* logger = GetLogger())
-    {
-      logger->AddSink(&fileSink);
-      logger->AddSink(&consoleSink);
-      logger->SetLevel(
-          LogLevel::Info);  // Filter out Trace and Debug messages initially
-    }
-
-    // Set up trace file sink for profiling data after services are available
-    runtime::TraceFileSink traceSink("gecko_trace.json");
-    if (!traceSink.IsOpen())
-    {
-      GECKO_WARN(app::core_example::labels::Main,
-                 "Failed to open trace profiler sink\n");
-    }
-    else
-    {
-      // We know the profiler is a RingProfiler, so we can safely add the sink
-      ringProfiler.AddSink(&traceSink);
-    }
-
-    // Now logging works with all sinks configured!
-    GECKO_INFO(app::core_example::labels::Main,
-               "Services installed and sinks configured successfully!");
+  // Now logging works with all sinks configured!
+  GECKO_INFO(app::core_example::labels::Main,
+             "Services installed and sinks configured successfully!");
 
   GECKO_DEBUG(
       app::core_example::labels::Main,
@@ -865,16 +853,19 @@ int main()
     logger->Flush();
   }
 
-  }  // Close sink scope - sinks destruct here before GECKO_SHUTDOWN
+  // Unregister sinks before shutting down services
+  consoleSink.Unregister();
+  fileSink.Unregister();
+  traceSink.Unregister();
+
+  // Use GECKO_SHUTDOWN for proper cleanup
+  GECKO_SHUTDOWN();
 
   std::printf("\nDemo completed successfully! Check the log output above.\n");
   std::printf("The immediate logger writes all log messages directly without "
               "buffering.\n");
   std::printf("This ensures immediate output but may be slower than buffered "
               "logging.\n");
-
-  // Use GECKO_SHUTDOWN for proper cleanup
-  GECKO_SHUTDOWN();
 
   return 0;
 }

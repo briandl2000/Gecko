@@ -100,7 +100,7 @@ bool RingProfiler::TryPop(ProfEvent& event) noexcept
   return false;
 }
 
-void RingProfiler::AddSink(IProfilerSink* sink) noexcept
+void RingProfiler::AddSinkImpl(IProfilerSink* sink) noexcept
 {
   if (sink)
   {
@@ -109,16 +109,46 @@ void RingProfiler::AddSink(IProfilerSink* sink) noexcept
   }
 }
 
-void RingProfiler::RemoveSink(IProfilerSink* sink) noexcept
+void RingProfiler::RemoveSinkImpl(IProfilerSink* sink) noexcept
 {
-  if (sink)
+  if (!sink)
+    return;
+
+  // Flush all pending work first to ensure no in-flight references
+  Flush();
+
+  // Now safe to remove the sink
+  std::lock_guard<std::mutex> lk(m_SinkMu);
+  auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
+  if (it != m_Sinks.end())
+    m_Sinks.erase(it);
+}
+
+void RingProfiler::Flush() noexcept
+{
+  // Copy sinks vector once to avoid holding lock during I/O
+  std::vector<IProfilerSink*> sinks;
   {
     std::lock_guard<std::mutex> lk(m_SinkMu);
-    auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
-    if (it != m_Sinks.end())
+    sinks = m_Sinks;
+  }
+
+  // Process all pending events synchronously
+  ProfEvent event {};
+  while (TryPop(event))
+  {
+    for (auto* sink : sinks)
     {
-      m_Sinks.erase(it);
+      if (sink)
+        sink->Write(event);
     }
+  }
+
+  // Flush all sinks
+  for (auto* sink : sinks)
+  {
+    if (sink)
+      sink->Flush();
   }
 }
 
@@ -126,6 +156,13 @@ void RingProfiler::ProcessProfEvents() noexcept
 {
   if (!m_Run.load(std::memory_order_acquire))
     return;
+
+  // Copy sinks vector once to avoid holding lock during I/O
+  std::vector<IProfilerSink*> sinks;
+  {
+    std::lock_guard<std::mutex> lk(m_SinkMu);
+    sinks = m_Sinks;
+  }
 
   ProfEvent event {};
   const int maxBatchSize = 128;  // Process events in batches for efficiency
@@ -135,15 +172,11 @@ void RingProfiler::ProcessProfEvents() noexcept
     if (!TryPop(event))
       break;
 
-    // Write to all sinks
+    for (auto* sink : sinks)
     {
-      std::lock_guard<std::mutex> lk(m_SinkMu);
-      for (auto* sink : m_Sinks)
+      if (sink)
       {
-        if (sink)
-        {
-          sink->Write(event);
-        }
+        sink->Write(event);
       }
     }
   }
@@ -157,10 +190,28 @@ void RingProfiler::ProcessProfEvents() noexcept
 
 void RingProfiler::TryScheduleConsumerJob() noexcept
 {
+  // Fast path: check if we're still running without acquiring mutex
+  if (!m_Run.load(std::memory_order_acquire))
+    return;
+
+  // Rate-limit scheduling to avoid job spam (check BEFORE mutex)
+  static std::atomic<u64> lastScheduleTime {0};
+  u64 now = NowNs();
+  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
+
+  // Don't schedule too frequently (at most every 100µs)
+  if (now - lastTime < 100000)  // 100 microseconds
+    return;
+
+  // Try to claim the scheduling slot atomically (still no mutex)
+  if (!lastScheduleTime.compare_exchange_weak(lastTime, now,
+                                              std::memory_order_relaxed))
+    return;
+
+  // Now we need to check if a job is already running - this needs the mutex
   JobHandle currentJob;
   {
     std::lock_guard<std::mutex> lock(m_JobMu);
-    // Check m_Run while holding lock to synchronize with Shutdown
     if (!m_Run.load(std::memory_order_acquire))
       return;
     currentJob = m_ConsumerJob;
@@ -178,19 +229,6 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
     return;
   }
 
-  // Use low priority for profiler jobs and limit scheduling frequency
-  static std::atomic<u64> lastScheduleTime {0};
-  u64 now = NowNs();
-  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
-
-  // Don't schedule too frequently (at most every 100µs) to avoid job spam
-  if (now - lastTime < 100000)  // 100 microseconds
-  {
-    return;
-  }
-
-  if (lastScheduleTime.compare_exchange_weak(lastTime, now,
-                                             std::memory_order_relaxed))
   {
     std::lock_guard<std::mutex> lock(m_JobMu);
     // Check m_Run again while holding the lock to prevent shutdown race
@@ -238,7 +276,7 @@ void RingProfiler::Shutdown() noexcept
     jobToWait = m_ConsumerJob;
     m_ConsumerJob = JobHandle {};
   }
-  
+
   if (jobToWait.IsValid())
   {
     WaitForJob(jobToWait);

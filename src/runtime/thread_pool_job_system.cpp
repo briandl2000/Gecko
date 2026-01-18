@@ -176,10 +176,20 @@ bool ThreadPoolJobSystem::IsComplete(JobHandle handle) noexcept
   if (!handle.IsValid())
     return true;
 
-  std::lock_guard<std::mutex> lock(m_Mutex);
-  auto it = m_ActiveJobs.find(handle.Id);
-  return it == m_ActiveJobs.end() ||
-         it->second->Completed.load(std::memory_order_acquire);
+  // Fast path: try to find the job and check completion without holding
+  // the lock for the entire duration. We use a lock to safely get the
+  // shared_ptr, then check the atomic outside the lock.
+  std::shared_ptr<Job> job;
+  {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    auto it = m_ActiveJobs.find(handle.Id);
+    if (it == m_ActiveJobs.end())
+      return true;  // Job not found = completed and cleaned up
+    job = it->second;
+  }
+
+  // Check completion flag outside the lock
+  return job->Completed.load(std::memory_order_acquire);
 }
 
 u32 ThreadPoolJobSystem::WorkerThreadCount() const noexcept

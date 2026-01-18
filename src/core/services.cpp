@@ -227,12 +227,11 @@ void UninstallServices() noexcept
 {
   GECKO_INFO(core::labels::Services, "Shutting down Gecko services");
 
-  // Logger/Profiler wait for jobs, then JobSystem stops threads, then Allocator
+  g_EventBus.load(::std::memory_order_relaxed)->Shutdown();
+  g_Modules.load(::std::memory_order_relaxed)->Shutdown();
   g_Logger.load(::std::memory_order_relaxed)->Shutdown();
   g_Profiler.load(::std::memory_order_relaxed)->Shutdown();
   g_JobSystem.load(::std::memory_order_relaxed)->Shutdown();
-  g_Modules.load(::std::memory_order_relaxed)->Shutdown();
-  g_EventBus.load(::std::memory_order_relaxed)->Shutdown();
   g_Allocator.load(::std::memory_order_relaxed)->Shutdown();
 
   // Reset to default implementations

@@ -48,12 +48,28 @@ RingLogger::~RingLogger()
   m_Run.store(false, std::memory_order_relaxed);
 }
 
-void RingLogger::AddSink(ILogSink* sink) noexcept
+void RingLogger::AddSinkImpl(ILogSink* sink) noexcept
 {
-  GECKO_ASSERT(sink && "Cannot add null sink");
+  if (sink)
+  {
+    std::lock_guard<std::mutex> lk(m_SinkMu);
+    m_Sinks.push_back(sink);
+  }
+}
 
+void RingLogger::RemoveSinkImpl(ILogSink* sink) noexcept
+{
+  if (!sink)
+    return;
+
+  // Flush all pending work first to ensure no in-flight references
+  Flush();
+
+  // Now safe to remove the sink
   std::lock_guard<std::mutex> lk(m_SinkMu);
-  m_Sinks.push_back(sink);
+  auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
+  if (it != m_Sinks.end())
+    m_Sinks.erase(it);
 }
 
 void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
@@ -82,12 +98,17 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
                         .MessageLabel = label,
                         .ThreadId = ThreadId(),
                         .Level = level};
+
+    // Copy sinks vector to avoid holding lock during I/O
+    std::vector<ILogSink*> sinks;
     {
       std::lock_guard<std::mutex> lk(m_SinkMu);
-      for (auto* sink : m_Sinks)
-      {
+      sinks = m_Sinks;
+    }
+    for (auto* sink : sinks)
+    {
+      if (sink)
         sink->Write(message);
-      }
     }
     return;
   }
@@ -127,6 +148,13 @@ void RingLogger::ProcessLogEntries() noexcept
   if (!m_Run.load(std::memory_order_acquire))
     return;
 
+  // Copy sinks vector once to avoid holding lock during I/O
+  std::vector<ILogSink*> sinks;
+  {
+    std::lock_guard<std::mutex> lk(m_SinkMu);
+    sinks = m_Sinks;
+  }
+
   LogMessage message {};
   const int maxBatchSize =
       128;  // Process more entries per job to reduce job overhead
@@ -146,9 +174,9 @@ void RingLogger::ProcessLogEntries() noexcept
     message.ThreadId = entry.ThreadId;
     message.Text = entry.Text;
 
+    for (auto* sink : sinks)
     {
-      std::lock_guard<std::mutex> lk(m_SinkMu);
-      for (auto* sink : m_Sinks)
+      if (sink)
         sink->Write(message);
     }
 
@@ -159,7 +187,7 @@ void RingLogger::ProcessLogEntries() noexcept
     m_Tail.store(position + 1, std::memory_order_relaxed);
   }
 
-  // Handle dropped message reporting
+  // Handle dropped message reporting (reuse the sinks vector from above)
   u64 dropped = m_Dropped.exchange(0, std::memory_order_relaxed);
   if (dropped)
   {
@@ -172,9 +200,12 @@ void RingLogger::ProcessLogEntries() noexcept
     std::snprintf(temp, sizeof(temp), "[Logger] dropped %llu messages",
                   static_cast<unsigned long long>(dropped));
     dropMessage.Text = temp;
-    std::lock_guard<std::mutex> lk(m_SinkMu);
-    for (auto* sink : m_Sinks)
-      sink->Write(dropMessage);
+
+    for (auto* sink : sinks)
+    {
+      if (sink)
+        sink->Write(dropMessage);
+    }
   }
 
   // Always check if there are more entries to process.
@@ -187,10 +218,28 @@ void RingLogger::ProcessLogEntries() noexcept
 
 void RingLogger::TryScheduleConsumerJob() noexcept
 {
+  // Fast path: check if we're still running without acquiring mutex
+  if (!m_Run.load(std::memory_order_acquire))
+    return;
+
+  // Rate-limit scheduling to avoid job spam (check BEFORE mutex)
+  static std::atomic<u64> lastScheduleTime {0};
+  u64 now = NowNs();
+  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
+
+  // Don't schedule too frequently (at most every 100µs)
+  if (now - lastTime < 100000)  // 100 microseconds
+    return;
+
+  // Try to claim the scheduling slot atomically (still no mutex)
+  if (!lastScheduleTime.compare_exchange_weak(lastTime, now,
+                                              std::memory_order_relaxed))
+    return;
+
+  // Now we need to check if a job is already running - this needs the mutex
   JobHandle currentJob;
   {
     std::lock_guard<std::mutex> lock(m_JobMu);
-    // Check m_Run while holding lock to synchronize with Shutdown
     if (!m_Run.load(std::memory_order_acquire))
       return;
     currentJob = m_ConsumerJob;
@@ -208,19 +257,6 @@ void RingLogger::TryScheduleConsumerJob() noexcept
     return;
   }
 
-  // Use normal priority for logger jobs and limit how often we schedule
-  static std::atomic<u64> lastScheduleTime {0};
-  u64 now = NowNs();
-  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
-
-  // Don't schedule too frequently (at most every 100µs) to avoid job spam
-  if (now - lastTime < 100000)  // 100 microseconds
-  {
-    return;
-  }
-
-  if (lastScheduleTime.compare_exchange_weak(lastTime, now,
-                                             std::memory_order_relaxed))
   {
     std::lock_guard<std::mutex> lock(m_JobMu);
     // Check m_Run again while holding the lock to prevent shutdown race
@@ -246,6 +282,13 @@ bool RingLogger::HasPendingEntries() const noexcept
 
 void RingLogger::Flush() noexcept
 {
+  // Copy sinks vector once to avoid holding lock during I/O
+  std::vector<ILogSink*> sinks;
+  {
+    std::lock_guard<std::mutex> lk(m_SinkMu);
+    sinks = m_Sinks;
+  }
+
   while (true)
   {
     bool processedAny = false;
@@ -263,9 +306,10 @@ void RingLogger::Flush() noexcept
                           .MessageLabel = entry.EntryLabel,
                           .ThreadId = entry.ThreadId,
                           .Level = entry.Level};
+
+      for (auto* sink : sinks)
       {
-        std::lock_guard<std::mutex> lk(m_SinkMu);
-        for (auto* sink : m_Sinks)
+        if (sink)
           sink->Write(message);
       }
       entry.Sequence.store(position + m_Ring.size(), std::memory_order_release);
@@ -311,7 +355,7 @@ void RingLogger::Shutdown() noexcept
     jobToWait = m_ConsumerJob;
     m_ConsumerJob = JobHandle {};
   }
-  
+
   if (jobToWait.IsValid())
   {
     WaitForJob(jobToWait);

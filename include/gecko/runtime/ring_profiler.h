@@ -24,9 +24,11 @@ public:
 
   bool TryPop(ProfEvent& event) noexcept;
 
-  // Sink management
-  void AddSink(IProfilerSink* sink) noexcept;
-  void RemoveSink(IProfilerSink* sink) noexcept;
+  void AddSinkImpl(IProfilerSink* sink) noexcept override;
+  void RemoveSinkImpl(IProfilerSink* sink) noexcept override;
+
+  // Flushes all pending events to sinks
+  void Flush() noexcept;
 
 private:
   struct Slot
@@ -47,7 +49,6 @@ private:
   std::atomic<u64> m_Head {0};
   std::atomic<u64> m_Tail {0};
 
-  // Sink storage with thread safety
   std::vector<IProfilerSink*> m_Sinks {};
   std::mutex m_SinkMu {};
 

@@ -2,6 +2,7 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
+#include "gecko/core/sink_registration.h"
 #include "gecko/core/types.h"
 
 #include <cstdarg>
@@ -57,7 +58,10 @@ static_assert(sizeof(LogMessage) == 64,
 static_assert(alignof(LogMessage) == 64,
               "LogMessage must be cache-line aligned");
 
-struct ILogSink
+// Forward declare for RegisteredSink
+struct ILogger;
+
+struct ILogSink : public RegisteredSink<ILogSink, ILogger>
 {
   GECKO_API virtual ~ILogSink() = default;
   GECKO_API virtual void Write(const LogMessage& message) noexcept = 0;
@@ -78,7 +82,10 @@ struct ILogger
     ::va_end(ap);
   }
 
-  GECKO_API virtual void AddSink(ILogSink* sink) noexcept = 0;
+  // Internal: called by RegisteredSink
+  GECKO_API virtual void AddSinkImpl(ILogSink* sink) noexcept = 0;
+  GECKO_API virtual void RemoveSinkImpl(ILogSink* sink) noexcept = 0;
+
   GECKO_API virtual void SetLevel(LogLevel level) noexcept = 0;
   GECKO_API virtual LogLevel Level() const noexcept = 0;
 
@@ -130,7 +137,8 @@ struct NullLogger final : ILogger
 {
   GECKO_API virtual void LogV(LogLevel level, Label label, const char* fmt,
                               va_list) noexcept override;
-  GECKO_API virtual void AddSink(ILogSink* sink) noexcept override;
+  GECKO_API virtual void AddSinkImpl(ILogSink* sink) noexcept override;
+  GECKO_API virtual void RemoveSinkImpl(ILogSink* sink) noexcept override;
   GECKO_API virtual void SetLevel(LogLevel level) noexcept override;
   GECKO_API virtual LogLevel Level() const noexcept override;
 

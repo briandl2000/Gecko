@@ -2,6 +2,7 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
+#include "gecko/core/sink_registration.h"
 #include "gecko/core/types.h"
 
 namespace gecko {
@@ -32,7 +33,10 @@ static_assert(sizeof(ProfEvent) == 64,
               "ProfEvent must be 64 bytes (cache line size)");
 static_assert(alignof(ProfEvent) == 64, "ProfEvent must be cache-line aligned");
 
-struct IProfilerSink
+// Forward declare for RegisteredSink
+struct IProfiler;
+
+struct IProfilerSink : public RegisteredSink<IProfilerSink, IProfiler>
 {
   GECKO_API virtual ~IProfilerSink() = default;
 
@@ -50,6 +54,10 @@ struct IProfiler
 
   GECKO_API virtual void Emit(const ProfEvent& ev) noexcept = 0;
   GECKO_API virtual u64 NowNs() const noexcept = 0;
+
+  // Internal: called by RegisteredSink
+  GECKO_API virtual void AddSinkImpl(IProfilerSink* sink) noexcept = 0;
+  GECKO_API virtual void RemoveSinkImpl(IProfilerSink* sink) noexcept = 0;
 
   GECKO_API virtual bool Init() noexcept = 0;
   GECKO_API virtual void Shutdown() noexcept = 0;
@@ -170,6 +178,8 @@ struct NullProfiler final : IProfiler
 {
   GECKO_API virtual void Emit(const ProfEvent& event) noexcept override;
   GECKO_API virtual u64 NowNs() const noexcept override;
+  GECKO_API virtual void AddSinkImpl(IProfilerSink* sink) noexcept override;
+  GECKO_API virtual void RemoveSinkImpl(IProfilerSink* sink) noexcept override;
 
   GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;

@@ -5,7 +5,9 @@ namespace gecko {
 void NullLogger::LogV(LogLevel level, Label label, const char* fmt,
                       ::va_list) noexcept
 {}
-void NullLogger::AddSink(ILogSink* sink) noexcept
+void NullLogger::AddSinkImpl(ILogSink* sink) noexcept
+{}
+void NullLogger::RemoveSinkImpl(ILogSink* sink) noexcept
 {}
 void NullLogger::SetLevel(LogLevel level) noexcept
 {}

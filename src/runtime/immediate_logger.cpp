@@ -4,6 +4,7 @@
 #include "gecko/core/utility/thread.h"
 #include "gecko/core/utility/time.h"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
@@ -24,9 +25,10 @@ u32 ThreadId() noexcept
   return HashThreadId();
 }
 
-void ImmediateLogger::AddSink(ILogSink* sink) noexcept
+void ImmediateLogger::AddSinkImpl(ILogSink* sink) noexcept
 {
-  GECKO_ASSERT(sink && "Cannot add null sink");
+  if (!sink)
+    return;
 
   if (m_ThreadSafe)
   {
@@ -36,6 +38,26 @@ void ImmediateLogger::AddSink(ILogSink* sink) noexcept
   else
   {
     m_Sinks.push_back(sink);
+  }
+}
+
+void ImmediateLogger::RemoveSinkImpl(ILogSink* sink) noexcept
+{
+  if (!sink)
+    return;
+
+  if (m_ThreadSafe)
+  {
+    std::lock_guard<std::mutex> lock(m_Mutex);
+    auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
+    if (it != m_Sinks.end())
+      m_Sinks.erase(it);
+  }
+  else
+  {
+    auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
+    if (it != m_Sinks.end())
+      m_Sinks.erase(it);
   }
 }
 
@@ -73,12 +95,18 @@ void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt,
   {
     std::lock_guard<std::mutex> lock(m_Mutex);
     for (auto* sink : m_Sinks)
-      sink->Write(message);
+    {
+      if (sink)
+        sink->Write(message);
+    }
   }
   else
   {
     for (auto* sink : m_Sinks)
-      sink->Write(message);
+    {
+      if (sink)
+        sink->Write(message);
+    }
   }
 }
 

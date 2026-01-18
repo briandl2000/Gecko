@@ -1,7 +1,6 @@
 #include <cstdio>
 #include <cstring>
 #include <gecko/core/boot.h>
-#include <gecko/core/ptr.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
 #include <gecko/core/services/modules.h>
@@ -12,6 +11,7 @@
 #include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
+#include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
 #include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_logger.h>
@@ -174,7 +174,8 @@ static Services CreateServices(runtime::TrackingAllocator& trackingAlloc,
                                runtime::ThreadPoolJobSystem& jobSystem,
                                runtime::RingProfiler& ringProfiler,
                                runtime::RingLogger& ringLogger,
-                               runtime::ModuleRegistry& moduleRegistry)
+                               runtime::ModuleRegistry& moduleRegistry,
+                               runtime::EventBus& eventBus)
 {
   Services services {};
   services.Allocator = &trackingAlloc;
@@ -182,6 +183,7 @@ static Services CreateServices(runtime::TrackingAllocator& trackingAlloc,
   services.Profiler = &ringProfiler;
   services.Logger = &ringLogger;
   services.Modules = &moduleRegistry;
+  services.EventBus = &eventBus;
   return services;
 }
 
@@ -207,18 +209,21 @@ static int AppMain(int argc, char** argv)
   runtime::RingLogger ringLogger(1024);
 
   runtime::ModuleRegistry moduleRegistry;
+  runtime::EventBus eventBus;
 
   // 2) Install services (Allocator -> JobSystem -> Profiler -> Logger).
   GECKO_BOOT((CreateServices(trackingAlloc, jobSystem, ringProfiler, ringLogger,
-                             moduleRegistry)));
+                             moduleRegistry, eventBus)));
 
-  // 3) Configure sinks AFTER services are installed.
+  // 3) Configure sinks AFTER services are installed - they auto-unregister
+  // when destroyed
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
+
   if (auto* logger = GetLogger())
   {
-    logger->AddSink(&consoleSink);
-    logger->AddSink(&fileSink);
+    consoleSink.RegisterWith(logger);
+    fileSink.RegisterWith(logger);
     logger->SetLevel(LogLevel::Info);
   }
 
@@ -229,10 +234,13 @@ static int AppMain(int argc, char** argv)
   (void)InstallModule(platform::GetModule());
   (void)InstallModule(g_AppModule);
 
+  // Trace sink auto-unregisters when destroyed
   runtime::TraceFileSink traceSink("gecko_trace.json");
+
   if (traceSink.IsOpen())
   {
-    ringProfiler.AddSink(&traceSink);
+    if (auto* profiler = GetProfiler())
+      traceSink.RegisterWith(profiler);
   }
   else
   {
@@ -304,6 +312,11 @@ static int AppMain(int argc, char** argv)
 
     ctx->DestroyWindow(window);
   }
+
+  // Unregister sinks before shutting down services
+  consoleSink.Unregister();
+  fileSink.Unregister();
+  traceSink.Unregister();
 
   // 5) Shutdown services in reverse order.
   GECKO_SHUTDOWN();

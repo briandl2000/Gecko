@@ -24,7 +24,9 @@ public:
   virtual bool Init() noexcept override;
   virtual void Shutdown() noexcept override;
 
-  virtual void AddSink(ILogSink* sink) noexcept override;
+  virtual void AddSinkImpl(ILogSink* sink) noexcept override;
+  virtual void RemoveSinkImpl(ILogSink* sink) noexcept override;
+
   virtual void SetLevel(LogLevel level) noexcept override
   {
     m_Level.store(level, std::memory_order_relaxed);

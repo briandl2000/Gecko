@@ -1,5 +1,4 @@
 #include <gecko/core/boot.h>
-#include <gecko/core/ptr.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
 #include <gecko/core/services/modules.h>
@@ -9,6 +8,7 @@
 #include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
+#include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
 #include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_logger.h>
@@ -62,6 +62,7 @@ int main()
   runtime::RingLogger ringLogger(1024);  // 1024 log entries in ring buffer
 
   runtime::ModuleRegistry moduleRegistry;
+  runtime::EventBus eventBus;
 
   // Create job system with 4 worker threads
   runtime::ThreadPoolJobSystem jobSystem;
@@ -74,16 +75,17 @@ int main()
                         .JobSystem = &jobSystem,
                         .Profiler = &ringProfiler,
                         .Logger = &ringLogger,
-                        .Modules = &moduleRegistry}));
+                        .Modules = &moduleRegistry,
+                        .EventBus = &eventBus}));
 
-  // Now configure logging sinks after services are installed
+  // Now configure logging sinks - they auto-unregister when destroyed
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
 
   if (auto* logger = GetLogger())
   {
-    logger->AddSink(&fileSink);
-    logger->AddSink(&consoleSink);
+    fileSink.RegisterWith(logger);
+    consoleSink.RegisterWith(logger);
     logger->SetLevel(
         LogLevel::Info);  // Filter out Trace and Debug messages initially
   }
@@ -96,7 +98,9 @@ int main()
   (void)InstallModule(g_AppModule);
 
   // Set up trace file sink for profiling data after services are available
+  // Sink auto-unregisters when destroyed
   runtime::TraceFileSink traceSink("gecko_trace.json");
+
   if (!traceSink.IsOpen())
   {
     GECKO_WARN(app::platform_example::labels::Main,
@@ -104,8 +108,8 @@ int main()
   }
   else
   {
-    // We know the profiler is a RingProfiler, so we can safely add the sink
-    ringProfiler.AddSink(&traceSink);
+    if (auto* profiler = GetProfiler())
+      traceSink.RegisterWith(profiler);
   }
 
   PlatformConfig cfg = {};
@@ -183,9 +187,13 @@ int main()
   GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
   ctx->DestroyWindow(window);
 
+  // Unregister sinks before shutting down services
+  consoleSink.Unregister();
+  fileSink.Unregister();
+  traceSink.Unregister();
+
   GECKO_SHUTDOWN();
 
-  GECKO_INFO(app::platform_example::labels::Main,
-             "Application exited successfully");
+  std::printf("Application exited successfully\n");
   return 0;
 }
