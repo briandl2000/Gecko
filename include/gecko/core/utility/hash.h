@@ -15,6 +15,18 @@ constexpr u32 FNV1a(const char* s) noexcept
   return h;
 }
 
+// Force compile-time evaluation for string literals (C++20 consteval)
+consteval u32 FNV1aLiteral(const char* s) noexcept
+{
+  u32 h = 2166136261u;
+  while (*s)
+  {
+    h ^= static_cast<u8>(*s++);
+    h *= 16777619u;
+  }
+  return h;
+}
+
 constexpr u32 FNV1a(const void* data, usize size) noexcept
 {
   const u8* bytes = static_cast<const u8*>(data);

@@ -85,16 +85,18 @@ struct ProfScope
 #endif
 
 #if GECKO_PROFILING
+// Note: GECKO_PROF_FUNC uses FNV1a (runtime) because __func__ is not a literal
 #define GECKO_PROF_FUNC(label)                  \
   ::gecko::ProfScope _g_scope                   \
   {                                             \
     (label), ::gecko::FNV1a(__func__), __func__ \
   }
 
-#define GECKO_PROF_SCOPE(label, name)   \
-  ::gecko::ProfScope _g_scope           \
-  {                                     \
-    (label), ::gecko::FNV1a(name), name \
+// Use FNV1aLiteral for compile-time hash of string literal names
+#define GECKO_PROF_SCOPE(label, name)         \
+  ::gecko::ProfScope _g_scope                 \
+  {                                           \
+    (label), ::gecko::FNV1aLiteral(name), name \
   }
 
 #define GECKO_PROF_COUNTER(label, name, val)                              \
@@ -107,7 +109,7 @@ struct ProfScope
                                 .Name = name,                             \
                                 .EventLabel = (label),                    \
                                 .ThreadId = ::gecko::ThisThreadId(),      \
-                                .NameHash = ::gecko::FNV1a(name),         \
+                                .NameHash = ::gecko::FNV1aLiteral(name),  \
                                 .Kind = ::gecko::ProfEventKind::Counter}; \
       p->Emit(event);                                                     \
     }                                                                     \
@@ -123,7 +125,7 @@ struct ProfScope
                                 .Name = name,                               \
                                 .EventLabel = (label),                      \
                                 .ThreadId = ::gecko::ThisThreadId(),        \
-                                .NameHash = ::gecko::FNV1a(name),           \
+                                .NameHash = ::gecko::FNV1aLiteral(name),    \
                                 .Kind = ::gecko::ProfEventKind::FrameMark}; \
       p->Emit(event);                                                       \
     }                                                                       \

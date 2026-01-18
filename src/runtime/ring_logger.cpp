@@ -117,11 +117,39 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
   Entry& entry = m_Ring[position & m_Mask];
 
   u64 sequence = entry.Sequence.load(std::memory_order_acquire);
+
+  // Bounded retry to prevent infinite loop with single-threaded job systems
+  constexpr int kMaxRetries = 1000;
+  int retries = 0;
+
   while (static_cast<i64>(sequence) - static_cast<i64>(position) != 0)
   {
-    // The ring is full for this slot. We must not "skip" positions, otherwise
-    // the single consumer can get stuck waiting for an unpublished entry.
-    // Try to drain a bit on the current thread to ensure forward progress.
+    if (++retries > kMaxRetries)
+    {
+      // Ring is full and we can't make progress - fallback to direct write
+      // The slot we claimed is "lost" but we don't hang
+      m_Dropped.fetch_add(1, std::memory_order_relaxed);
+
+      LogMessage message {.TimeNs = NowNs(),
+                          .Text = buffer,
+                          .MessageLabel = label,
+                          .ThreadId = ThreadId(),
+                          .Level = level};
+
+      std::vector<ILogSink*> sinks;
+      {
+        std::lock_guard<std::mutex> lk(m_SinkMu);
+        sinks = m_Sinks;
+      }
+      for (auto* sink : sinks)
+      {
+        if (sink)
+          sink->Write(message);
+      }
+      return;
+    }
+
+    // Try to drain on current thread to make progress
     ProcessLogEntries();
     std::this_thread::yield();
     sequence = entry.Sequence.load(std::memory_order_acquire);
@@ -140,7 +168,13 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
   entry.Sequence.store(position + 1, std::memory_order_release);
 
   // Try to schedule processing, but don't wait if job system is busy
-  TryScheduleConsumerJob();
+  // Use reentrancy guard to prevent infinite recursion with single-threaded job systems
+  if (!g_InsideRingLogger)
+  {
+    g_InsideRingLogger = true;
+    TryScheduleConsumerJob();
+    g_InsideRingLogger = false;
+  }
 }
 
 void RingLogger::ProcessLogEntries() noexcept
@@ -218,6 +252,11 @@ void RingLogger::ProcessLogEntries() noexcept
 
 void RingLogger::TryScheduleConsumerJob() noexcept
 {
+  // Reentrancy guard: With single-threaded job systems (like NullJobSystem),
+  // Submit() runs the job immediately inline, which could cause infinite recursion
+  if (g_InsideRingLogger)
+    return;
+
   // Fast path: check if we're still running without acquiring mutex
   if (!m_Run.load(std::memory_order_acquire))
     return;

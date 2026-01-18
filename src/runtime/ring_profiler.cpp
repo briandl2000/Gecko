@@ -75,7 +75,13 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
     slot.Sequence.store(pos + 1, std::memory_order_release);
 
     // Try to schedule async processing
-    TryScheduleConsumerJob();
+    // Use reentrancy guard to prevent infinite recursion with single-threaded job systems
+    if (!g_InsideProfiler)
+    {
+      g_InsideProfiler = true;
+      TryScheduleConsumerJob();
+      g_InsideProfiler = false;
+    }
   }
   else
   {
@@ -190,6 +196,11 @@ void RingProfiler::ProcessProfEvents() noexcept
 
 void RingProfiler::TryScheduleConsumerJob() noexcept
 {
+  // Reentrancy guard: With single-threaded job systems (like NullJobSystem),
+  // Submit() runs the job immediately inline, which could cause infinite recursion
+  if (g_InsideProfiler)
+    return;
+
   // Fast path: check if we're still running without acquiring mutex
   if (!m_Run.load(std::memory_order_acquire))
     return;
