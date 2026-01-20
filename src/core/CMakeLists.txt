@@ -1,6 +1,9 @@
 add_library(Core STATIC)
 add_library(Gecko::Core ALIAS Core)
 
+# Enable position independent code for static lib that links into shared libs
+set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_sources(Core
   PRIVATE
     services/events.cpp

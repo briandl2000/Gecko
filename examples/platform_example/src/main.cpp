@@ -1,8 +1,8 @@
 #include <gecko/core/boot.h>
+#include <gecko/core/scope.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
 #include <gecko/core/services/modules.h>
-#include <gecko/core/services/profiler.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
 #include <gecko/platform/platform_context.h>
@@ -54,8 +54,6 @@ PlatformExampleAppModule g_AppModule;
 
 int main()
 {
-  GECKO_PROF_SCOPE(app::platform_example::labels::Main, "MainFunction");
-
   SystemAllocator systemAlloc;
   runtime::TrackingAllocator trackingAlloc(&systemAlloc);
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
@@ -77,26 +75,6 @@ int main()
                         .Logger = &ringLogger,
                         .Modules = &moduleRegistry,
                         .EventBus = &eventBus}));
-
-  // Now configure logging sinks - they auto-unregister when destroyed
-  runtime::ConsoleLogSink consoleSink;
-  runtime::FileLogSink fileSink("log.txt");
-
-  if (auto* logger = GetLogger())
-  {
-    fileSink.RegisterWith(logger);
-    consoleSink.RegisterWith(logger);
-    logger->SetLevel(
-        LogLevel::Info);  // Filter out Trace and Debug messages initially
-  }
-
-  GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
-
-  // Register library modules after boot (now that logging is configured).
-  (void)InstallModule(runtime::GetModule());
-  (void)InstallModule(platform::GetModule());
-  (void)InstallModule(g_AppModule);
-
   // Set up trace file sink for profiling data after services are available
   // Sink auto-unregisters when destroyed
   runtime::TraceFileSink traceSink("gecko_trace.json");
@@ -112,82 +90,103 @@ int main()
       traceSink.RegisterWith(profiler);
   }
 
-  PlatformConfig cfg = {};
-  cfg.WindowBackend = WindowBackendKind::Auto;
+  // Now configure logging sinks - they auto-unregister when destroyed
+  runtime::ConsoleLogSink consoleSink;
+  runtime::FileLogSink fileSink("log.txt");
 
-  Unique<PlatformContext> ctx = PlatformContext::Create(cfg);
-
-  WindowDesc windowDesc;
-  windowDesc.Title = "Gecko Platform Example";
-  windowDesc.Size = Extent2D {1280, 720};
-  windowDesc.Visible = true;
-  windowDesc.Resizable = false;
-  windowDesc.Mode = WindowMode::Windowed;
-
-  WindowHandle window;
-  GECKO_INFO(app::platform_example::labels::Main,
-             "Creating application window...");
-  if (!ctx->CreateWindow(windowDesc, window))
+  if (auto* logger = GetLogger())
   {
-    GECKO_ERROR(app::platform_example::labels::Main,
-                "Failed to create window\n");
-
-    return 1;
+    fileSink.RegisterWith(logger);
+    consoleSink.RegisterWith(logger);
+    logger->SetLevel(
+        LogLevel::Info);  // Filter out Trace and Debug messages initially
   }
-  GECKO_INFO(app::platform_example::labels::Main,
-             "Window created successfully");
-
-  bool running = true;
-  // Avoid hanging forever in headless/Null-backend runs.
-  // Run up to ~10 seconds unless a close is requested.
-  u32 frameCount = 0;
-  GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
-  while (running && ctx->IsWindowAlive(window) && frameCount < 600)
   {
-    GECKO_PROF_SCOPE(app::platform_example::labels::Main, "MainLoop");
+    GECKO_FUNC(app::platform_example::labels::Main);
+    GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
 
+    // Register library modules after boot (now that logging is configured).
+    (void)InstallModule(runtime::GetModule());
+    (void)InstallModule(platform::GetModule());
+    (void)InstallModule(g_AppModule);
+
+    PlatformConfig cfg = {};
+    cfg.WindowBackend = WindowBackendKind::Auto;
+
+    Unique<PlatformContext> ctx = PlatformContext::Create(cfg);
+
+    WindowDesc windowDesc;
+    windowDesc.Title = "Gecko Platform Example";
+    windowDesc.Size = Extent2D {1280, 720};
+    windowDesc.Visible = true;
+    windowDesc.Resizable = false;
+    windowDesc.Mode = WindowMode::Windowed;
+
+    WindowHandle window;
+    GECKO_INFO(app::platform_example::labels::Main,
+               "Creating application window...");
+    if (!ctx->CreateWindow(windowDesc, window))
     {
-      GECKO_PROF_SCOPE(app::platform_example::labels::Main, "PumpEvents");
-      ctx->PumpEvents();
+      GECKO_ERROR(app::platform_example::labels::Main,
+                  "Failed to create window\n");
+
+      return 1;
     }
+    GECKO_INFO(app::platform_example::labels::Main,
+               "Window created successfully");
 
+    bool running = true;
+    // Avoid hanging forever in headless/Null-backend runs.
+    // Run up to ~10 seconds unless a close is requested.
+    u32 frameCount = 0;
+    GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
+    while (running && ctx->IsWindowAlive(window) && frameCount < 600)
     {
-      GECKO_PROF_SCOPE(app::platform_example::labels::Main, "ProcessEvents");
-      WindowEvent ev {};
-      while (ctx->PollEvent(ev))
+      GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "MainLoop");
+
       {
-        if (ev.Kind == WindowEventKind::CloseRequested)
+        GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "PumpEvents");
+        ctx->PumpEvents();
+      }
+
+      {
+        GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "ProcessEvents");
+        WindowEvent ev {};
+        while (ctx->PollEvent(ev))
         {
-          GECKO_INFO(app::platform_example::labels::Main,
-                     "Close requested, exiting main loop");
-          running = false;
-          break;
+          if (ev.Kind == WindowEventKind::CloseRequested)
+          {
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "Close requested, exiting main loop");
+            running = false;
+            break;
+          }
         }
+      }
+
+      GECKO_SLEEP_MS(16);
+      ++frameCount;
+
+      if (frameCount % 60 == 0)
+      {
+        GECKO_COUNTER(app::platform_example::labels::Main, "FrameCount",
+                      frameCount);
       }
     }
 
-    GECKO_SLEEP_MS(16);
-    ++frameCount;
-
-    if (frameCount % 60 == 0)
+    if (running)
     {
-      GECKO_PROF_COUNTER(app::platform_example::labels::Main, "FrameCount",
-                         frameCount);
+      // Headless/timeout fallback: request a clean shutdown.
+      GECKO_INFO(app::platform_example::labels::Main,
+                 "Timeout reached, requesting clean shutdown");
+      ctx->RequestClose(window);
     }
+
+    GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
+    ctx->DestroyWindow(window);
+
+    // Unregister sinks before shutting down services
   }
-
-  if (running)
-  {
-    // Headless/timeout fallback: request a clean shutdown.
-    GECKO_INFO(app::platform_example::labels::Main,
-               "Timeout reached, requesting clean shutdown");
-    ctx->RequestClose(window);
-  }
-
-  GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
-  ctx->DestroyWindow(window);
-
-  // Unregister sinks before shutting down services
   consoleSink.Unregister();
   fileSink.Unregister();
   traceSink.Unregister();

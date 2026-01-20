@@ -1,15 +1,15 @@
 #include "gecko/core/services/modules.h"
 
+#include "gecko/core/scope.h"
 #include "gecko/core/services.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 
 namespace gecko {
 
 ModuleResult InstallModule(IModule& module) noexcept
 {
-  GECKO_PROF_FUNC(core::labels::Modules);
+  GECKO_FUNC(core::labels::Modules);
 
   Label rootLabel = module.RootLabel();
   GECKO_INFO(core::labels::Modules, "Installing module '%s'",
@@ -45,12 +45,9 @@ ModuleHandle::ModuleHandle(ModuleHandle&& other) noexcept
 ModuleHandle& ModuleHandle::operator=(ModuleHandle&& other) noexcept
 {
   if (this == &other)
-  {
     return *this;
-  }
 
   Reset();
-
   m_modules = other.m_modules;
   m_label = other.m_label;
   other.m_modules = nullptr;
@@ -66,13 +63,12 @@ ModuleHandle::~ModuleHandle() noexcept
 
 void ModuleHandle::Reset() noexcept
 {
-  GECKO_PROF_FUNC(core::labels::Modules);
+  GECKO_FUNC(core::labels::Modules);
 
   if (m_modules && m_label.IsValid())
   {
     GECKO_TRACE(core::labels::Modules, "Unregistering module '%s'",
                 m_label.Name ? m_label.Name : "<unnamed>");
-    (void)m_modules->Unregister(m_label);
   }
 
   m_modules = nullptr;
@@ -85,6 +81,7 @@ void ModuleHandle::Release() noexcept
   m_label = {};
 }
 
+// NullModuleRegistry - no profiling, simple no-ops
 bool NullModuleRegistry::Init() noexcept
 {
   return true;
@@ -96,36 +93,25 @@ ModuleRegistration NullModuleRegistry::RegisterStatic(IModule& module) noexcept
 {
   const Label id = module.RootLabel();
   if (!id.IsValid())
-  {
-    return ModuleRegistration {ModuleHandle {}, ModuleResult::InvalidArgument};
-  }
+    return ModuleRegistration {{}, ModuleResult::InvalidArgument};
   return ModuleRegistration {MakeHandle(id), ModuleResult::Ok};
 }
 
-ModuleResult NullModuleRegistry::Unregister(Label id) noexcept
+ModuleResult NullModuleRegistry::Unregister(Label) noexcept
 {
-  (void)id;
   return ModuleResult::Ok;
 }
 
-IModule* NullModuleRegistry::GetModule(Label id) noexcept
+IModule* NullModuleRegistry::GetModule(Label) noexcept
 {
-  (void)id;
   return nullptr;
 }
-
-const IModule* NullModuleRegistry::GetModule(Label id) const noexcept
+const IModule* NullModuleRegistry::GetModule(Label) const noexcept
 {
-  (void)id;
   return nullptr;
 }
-
-void NullModuleRegistry::ForEachModule(ModuleVisitFn fn, void* user) noexcept
-{
-  (void)fn;
-  (void)user;
-}
-
+void NullModuleRegistry::ForEachModule(ModuleVisitFn, void*) noexcept
+{}
 bool NullModuleRegistry::StartupAllModules() noexcept
 {
   return true;

@@ -168,7 +168,8 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
   entry.Sequence.store(position + 1, std::memory_order_release);
 
   // Try to schedule processing, but don't wait if job system is busy
-  // Use reentrancy guard to prevent infinite recursion with single-threaded job systems
+  // Use reentrancy guard to prevent infinite recursion with single-threaded job
+  // systems
   if (!g_InsideRingLogger)
   {
     g_InsideRingLogger = true;
@@ -253,7 +254,8 @@ void RingLogger::ProcessLogEntries() noexcept
 void RingLogger::TryScheduleConsumerJob() noexcept
 {
   // Reentrancy guard: With single-threaded job systems (like NullJobSystem),
-  // Submit() runs the job immediately inline, which could cause infinite recursion
+  // Submit() runs the job immediately inline, which could cause infinite
+  // recursion
   if (g_InsideRingLogger)
     return;
 

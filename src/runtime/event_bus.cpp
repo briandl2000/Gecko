@@ -1,8 +1,8 @@
 #include "gecko/runtime/event_bus.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 #include "gecko/core/utility/random.h"
 #include "private/labels.h"
 
@@ -21,7 +21,7 @@ EventBus::~EventBus()
 
 bool EventBus::Init() noexcept
 {
-  GECKO_PROF_FUNC(runtime::labels::General);
+  GECKO_FUNC(runtime::labels::General);
   m_CapabilitySecret = RandomU64();
 
   // Allocate containers now that allocator service is installed
@@ -38,7 +38,7 @@ bool EventBus::Init() noexcept
 
 void EventBus::Shutdown() noexcept
 {
-  GECKO_PROF_FUNC(runtime::labels::General);
+  GECKO_FUNC(runtime::labels::General);
 
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
@@ -81,7 +81,7 @@ void EventBus::UnregisterModule(u64 moduleId) noexcept
 EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user,
                                       SubscriptionOptions options) noexcept
 {
-  GECKO_PROF_FUNC(runtime::labels::General);
+  GECKO_FUNC(runtime::labels::General);
   GECKO_ASSERT(fn && "Callback cannot be null");
 
   u64 id = m_NextSubscriptionId.fetch_add(1, std::memory_order_relaxed);
@@ -130,7 +130,7 @@ void EventBus::Unsubscribe(u64 id) noexcept
 void EventBus::PublishImmediate(const EventEmitter& emitter, EventCode code,
                                 EventView payload) noexcept
 {
-  GECKO_PROF_SCOPE(runtime::labels::General, "PublishImmediate");
+  GECKO_SCOPE_NAMED(runtime::labels::General, "PublishImmediate");
 
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
   [[maybe_unused]] const u32 emitterModuleHash =
@@ -156,7 +156,7 @@ void EventBus::PublishImmediate(const EventEmitter& emitter, EventCode code,
 void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
                        EventView payload) noexcept
 {
-  GECKO_PROF_SCOPE(runtime::labels::General, "EnqueueEvent");
+  GECKO_SCOPE_NAMED(runtime::labels::General, "EnqueueEvent");
 
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
   [[maybe_unused]] const u32 emitterModuleHash =
@@ -199,7 +199,7 @@ void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
 
 std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
 {
-  GECKO_PROF_FUNC(runtime::labels::General);
+  GECKO_FUNC(runtime::labels::General);
 
   std::vector<QueuedEvent> events;
 

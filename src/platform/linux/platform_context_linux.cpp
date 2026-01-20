@@ -4,8 +4,8 @@
 
 #include "../private/labels.h"
 #include "../window_backend.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 
 namespace gecko::platform {
 
@@ -13,8 +13,8 @@ namespace {
 class LinuxPlatformContext final : public PlatformContext
 {
 public:
-  explicit LinuxPlatformContext(IWindowBackend& backend) noexcept
-      : m_Backend(&backend)
+  explicit LinuxPlatformContext(Unique<IWindowBackend> backend) noexcept
+      : m_Backend(std::move(backend))
   {}
 
   bool CreateWindow(const WindowDesc& desc,
@@ -70,17 +70,17 @@ public:
   }
 
 private:
-  IWindowBackend* m_Backend {nullptr};
+  Unique<IWindowBackend> m_Backend;
 };
 }  // namespace
 
 Unique<PlatformContext> PlatformContext::Create(const PlatformConfig& cfg)
 {
-  GECKO_PROF_FUNC(labels::General);
+  GECKO_FUNC(labels::General);
   GECKO_INFO(labels::General, "PlatformContext::Create (Linux)\n");
 
-  IWindowBackend& backend = ResolveWindowBackend(cfg.WindowBackend);
-  return CreateUnique<LinuxPlatformContext>(backend);
+  Unique<IWindowBackend> backend = CreateWindowBackend(cfg.WindowBackend);
+  return CreateUnique<LinuxPlatformContext>(std::move(backend));
 }
 
 }  // namespace gecko::platform

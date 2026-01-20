@@ -2,34 +2,27 @@
 
 namespace gecko {
 
-JobHandle NullJobSystem::Submit(JobFunction job, JobPriority priority,
-                                Label label) noexcept
+// NullJobSystem - executes jobs synchronously, no profiling overhead
+JobHandle NullJobSystem::Submit(JobFunction job, JobPriority, Label) noexcept
 {
-  (void)priority;
-  (void)label;
   if (job)
     job();
   return JobHandle {};
 }
 
-JobHandle NullJobSystem::Submit(JobFunction job, const JobHandle* dependencies,
-                                u32 dependencyCount, JobPriority priority,
-                                Label label) noexcept
+JobHandle NullJobSystem::Submit(JobFunction job, const JobHandle*, u32,
+                                JobPriority, Label) noexcept
 {
-  (void)dependencies;
-  (void)dependencyCount;
-  (void)priority;
-  (void)label;
   if (job)
     job();
   return JobHandle {};
 }
 
-void NullJobSystem::Wait(JobHandle handle) noexcept
+void NullJobSystem::Wait(JobHandle) noexcept
 {}
-void NullJobSystem::WaitAll(const JobHandle* handles, u32 count) noexcept
+void NullJobSystem::WaitAll(const JobHandle*, u32) noexcept
 {}
-bool NullJobSystem::IsComplete(JobHandle handle) noexcept
+bool NullJobSystem::IsComplete(JobHandle) noexcept
 {
   return true;
 }
@@ -37,7 +30,7 @@ u32 NullJobSystem::WorkerThreadCount() const noexcept
 {
   return 0;
 }
-void NullJobSystem::ProcessJobs(u32 maxJobs) noexcept
+void NullJobSystem::ProcessJobs(u32) noexcept
 {}
 bool NullJobSystem::Init() noexcept
 {

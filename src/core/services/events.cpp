@@ -2,15 +2,15 @@
 
 #include "gecko/core/assert.h"
 #include "gecko/core/labels.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 
 namespace gecko {
 
 void EventSubscription::Reset()
 {
-  GECKO_PROF_FUNC(core::labels::Events);
+  GECKO_FUNC(core::labels::Events);
 
   if (m_Bus && m_Id != 0)
   {
@@ -25,7 +25,7 @@ void EventSubscription::Reset()
 
 EventEmitter CreateEmitterForModule(Label moduleLabel, u64 sender)
 {
-  GECKO_PROF_FUNC(core::labels::Events);
+  GECKO_FUNC(core::labels::Events);
 
   if (!moduleLabel.IsValid())
   {
@@ -42,6 +42,7 @@ EventEmitter CreateEmitterForModule(Label moduleLabel, u64 sender)
   return CreateEmitter(moduleLabel.Id, sender);
 }
 
+// NullEventBus - no profiling, these are no-ops
 EventSubscription NullEventBus::Subscribe(EventCode, CallbackFn, void*,
                                           SubscriptionOptions) noexcept
 {

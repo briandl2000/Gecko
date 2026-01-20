@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gecko/core/ptr.h"
 #include "gecko/platform/window.h"
 
 namespace gecko::platform {
@@ -26,11 +27,12 @@ public:
       WindowHandle window) const noexcept = 0;
 };
 
-IWindowBackend& GetNullWindowBackend() noexcept;
+Unique<IWindowBackend> CreateNullWindowBackend() noexcept;
 
-// Selects and returns the backend to use.
+// Creates the backend to use.
 // - Auto: prefers best available backend for this build
 // - X11/Wayland: uses that backend if available, otherwise falls back to Null
-IWindowBackend& ResolveWindowBackend(WindowBackendKind requested) noexcept;
+Unique<IWindowBackend> CreateWindowBackend(
+    WindowBackendKind requested) noexcept;
 
 }  // namespace gecko::platform

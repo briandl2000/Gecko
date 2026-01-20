@@ -1,6 +1,7 @@
 #include "gecko/runtime/ring_profiler.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/services/memory.h"
 #include "gecko/core/utility/bit.h"
 #include "gecko/core/utility/thread.h"
 #include "gecko/core/utility/time.h"
@@ -59,9 +60,28 @@ u64 RingProfiler::NowNs() const noexcept
   return MonotonicNowNs();
 }
 
+void RingProfiler::SetMinLevel(ProfLevel level) noexcept
+{
+  m_MinLevel.store(level, std::memory_order_relaxed);
+}
+
+ProfLevel RingProfiler::GetMinLevel() const noexcept
+{
+  return m_MinLevel.load(std::memory_order_relaxed);
+}
+
+bool RingProfiler::IsLevelEnabled(ProfLevel level) const noexcept
+{
+  return level <= m_MinLevel.load(std::memory_order_relaxed);
+}
+
 void RingProfiler::Emit(const ProfEvent& event) noexcept
 {
   if (!m_Run.load(std::memory_order_relaxed))
+    return;
+
+  // Guard against emitting before Init (m_Ring is empty)
+  if (m_Ring.empty())
     return;
 
   u64 pos = m_Head.fetch_add(1, std::memory_order_acq_rel);
@@ -75,7 +95,8 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
     slot.Sequence.store(pos + 1, std::memory_order_release);
 
     // Try to schedule async processing
-    // Use reentrancy guard to prevent infinite recursion with single-threaded job systems
+    // Use reentrancy guard to prevent infinite recursion with single-threaded
+    // job systems
     if (!g_InsideProfiler)
     {
       g_InsideProfiler = true;
@@ -86,7 +107,7 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   else
   {
     // overflow — drop event (cheap fallback)
-    // Optionally: back off or count drops.
+    m_DroppedEvents.fetch_add(1, std::memory_order_relaxed);
   }
 }
 
@@ -187,6 +208,27 @@ void RingProfiler::ProcessProfEvents() noexcept
     }
   }
 
+  // Report dropped events if any occurred
+  u64 dropped = m_DroppedEvents.exchange(0, std::memory_order_relaxed);
+  if (dropped)
+  {
+    // Emit a counter event to mark dropped events in the trace
+    ProfEvent dropEvent {};
+    dropEvent.Kind = ProfEventKind::Counter;
+    dropEvent.TimestampNs = MonotonicNowNs();
+    dropEvent.ThreadId = gecko::ThisThreadId();
+    dropEvent.Name = "[Profiler] Dropped Events";
+    dropEvent.Value = static_cast<u64>(dropped);
+
+    for (auto* sink : sinks)
+    {
+      if (sink)
+      {
+        sink->Write(dropEvent);
+      }
+    }
+  }
+
   // Continue processing if more events are pending
   if (HasPendingEvents() && m_Run.load(std::memory_order_acquire))
   {
@@ -197,7 +239,8 @@ void RingProfiler::ProcessProfEvents() noexcept
 void RingProfiler::TryScheduleConsumerJob() noexcept
 {
   // Reentrancy guard: With single-threaded job systems (like NullJobSystem),
-  // Submit() runs the job immediately inline, which could cause infinite recursion
+  // Submit() runs the job immediately inline, which could cause infinite
+  // recursion
   if (g_InsideProfiler)
     return;
 
@@ -265,8 +308,11 @@ bool RingProfiler::HasPendingEvents() const noexcept
 bool RingProfiler::Init() noexcept
 {
   // Allocate ring buffer now that allocator is available
+  // Use GECKO_PUSH_LABEL so the profiler's own memory is tracked under its
+  // label
   if (m_Ring.empty())
   {
+    GECKO_PUSH_LABEL(m_ProfilerLabel);
     // Direct resize with default construction avoids moves
     m_Ring = std::vector<Slot>(m_Capacity);
     for (u64 i = 0; i < m_Capacity; ++i)
@@ -280,6 +326,9 @@ bool RingProfiler::Init() noexcept
 
 void RingProfiler::Shutdown() noexcept
 {
+  // Flush all pending events before shutdown
+  Flush();
+
   JobHandle jobToWait;
   {
     std::lock_guard<std::mutex> lock(m_JobMu);

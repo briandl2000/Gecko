@@ -1,7 +1,7 @@
 #include "gecko/platform/platform_module.h"
 
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 
 namespace gecko::platform {
@@ -15,14 +15,14 @@ constexpr ::gecko::Label PlatformModule::RootLabel() const noexcept
 
 bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
 {
-  GECKO_PROF_FUNC(labels::Platform);
+  GECKO_FUNC(labels::Platform);
   // Minimal placeholder extension point.
   return true;
 }
 
 void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
 {
-  GECKO_PROF_FUNC(labels::Platform);
+  GECKO_FUNC(labels::Platform);
 }
 
 ::gecko::ModuleRegistration InstallPlatformModule(

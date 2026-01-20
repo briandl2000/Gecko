@@ -4,8 +4,8 @@
 
 #include "../private/labels.h"
 #include "../window_backend.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 
 #include <cstdint>
 #include <deque>
@@ -53,7 +53,7 @@ public:
   bool CreateWindow(const WindowDesc& desc,
                     WindowHandle& outWindow) noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
 
     if (!EnsureDisplay())
       return false;
@@ -121,7 +121,7 @@ public:
 
   void DestroyWindow(WindowHandle window) noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
 
     if (!window.IsValid())
       return;
@@ -158,7 +158,7 @@ public:
 
   bool RequestClose(WindowHandle window) noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
 
     if (!IsWindowAlive(window))
       return false;
@@ -173,7 +173,7 @@ public:
 
   void PumpEvents() noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
 
     if (!m_Display)
       return;
@@ -527,10 +527,9 @@ private:
   std::deque<WindowEvent> m_Events;
 };
 
-IWindowBackend& GetXlibWindowBackend() noexcept
+Unique<IWindowBackend> CreateXlibWindowBackend() noexcept
 {
-  static X11WindowBackend backend;
-  return backend;
+  return CreateUnique<X11WindowBackend>();
 }
 
 }  // namespace gecko::platform

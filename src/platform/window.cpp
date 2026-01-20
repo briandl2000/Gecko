@@ -1,7 +1,7 @@
 #include "gecko/platform/window.h"
 
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 #include "window_backend.h"
 
@@ -26,7 +26,7 @@ public:
   bool CreateWindow(const WindowDesc& desc,
                     WindowHandle& outWindow) noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
 
     const u64 id = ++m_NextId;
     outWindow = WindowHandle {id};
@@ -45,7 +45,7 @@ public:
 
   void DestroyWindow(WindowHandle window) noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
     if (!window.IsValid())
       return;
 
@@ -73,7 +73,7 @@ public:
 
   bool RequestClose(WindowHandle window) noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
     if (!window.IsValid())
       return false;
     if (!IsWindowAlive(window))
@@ -89,7 +89,7 @@ public:
 
   void PumpEvents() noexcept override
   {
-    GECKO_PROF_FUNC(labels::General);
+    GECKO_FUNC(labels::General);
     // Null backend: no OS events.
   }
 
@@ -145,21 +145,18 @@ private:
 };
 }  // namespace
 
-IWindowBackend& GetNullWindowBackend() noexcept
+Unique<IWindowBackend> CreateNullWindowBackend() noexcept
 {
-  static NullWindowBackend backend;
-  return backend;
+  return CreateUnique<NullWindowBackend>();
 }
 
 // Provided by src/platform/linux/x11_window_backend.cpp when enabled.
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
-IWindowBackend& GetXlibWindowBackend() noexcept;
+Unique<IWindowBackend> CreateXlibWindowBackend() noexcept;
 #endif
 
-IWindowBackend& ResolveWindowBackend(WindowBackendKind requested) noexcept
+Unique<IWindowBackend> CreateWindowBackend(WindowBackendKind requested) noexcept
 {
-  auto& nullBackend = GetNullWindowBackend();
-
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
   constexpr bool hasX11 = true;
 #else
@@ -181,54 +178,54 @@ IWindowBackend& ResolveWindowBackend(WindowBackendKind requested) noexcept
   switch (requested)
   {
   case WindowBackendKind::Null:
-    return nullBackend;
+    return CreateNullWindowBackend();
 
   case WindowBackendKind::Xlib:
     if (hasX11)
     {
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
-      return GetXlibWindowBackend();
+      return CreateXlibWindowBackend();
 #endif
     }
     GECKO_WARN(labels::General, "Requested Xlib window backend, but it's "
                                 "not available; using Null backend\n");
-    return nullBackend;
+    return CreateNullWindowBackend();
 
   case WindowBackendKind::Wayland:
     GECKO_WARN(labels::General,
                "Requested Wayland window backend, but it's not implemented "
                "yet; using Null backend\n");
-    return nullBackend;
+    return CreateNullWindowBackend();
 
   case WindowBackendKind::Win32:
     if (hasWin32)
     {
-      return nullBackend;
+      return CreateNullWindowBackend();
     }
     GECKO_WARN(labels::General,
                "Requested Win32 window backend, but it's not implemented yet; "
                "using Null backend\n");
-    return nullBackend;
+    return CreateNullWindowBackend();
 
   case WindowBackendKind::Cocoa:
     if (hasCocoa)
     {
-      return nullBackend;
+      return CreateNullWindowBackend();
     }
     GECKO_WARN(labels::General,
                "Requested Cocoa window backend, but it's not implemented yet; "
                "using Null backend\n");
-    return nullBackend;
+    return CreateNullWindowBackend();
 
   case WindowBackendKind::Auto:
   default:
     if (hasX11)
     {
 #if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
-      return GetXlibWindowBackend();
+      return CreateXlibWindowBackend();
 #endif
     }
-    return nullBackend;
+    return CreateNullWindowBackend();
   }
 }
 

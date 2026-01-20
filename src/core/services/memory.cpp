@@ -6,19 +6,19 @@
 
 namespace gecko {
 
-void* SystemAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept
+void* SystemAllocator::Alloc(u64 size, u32 alignment) noexcept
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
 
-  (void)label;
-
+  // For small alignments, just use malloc
   if (alignment <= alignof(std::max_align_t))
   {
     return ::std::malloc(static_cast<usize>(size));
   }
 
+  // For larger alignments, use platform-specific aligned allocation
 #if defined(_MSC_VER)
   return ::_aligned_malloc(static_cast<usize>(size), alignment);
 #else
@@ -29,27 +29,20 @@ void* SystemAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept
 #endif
 }
 
-void SystemAllocator::Free(void* ptr, u64 size, u32 alignment,
-                           Label label) noexcept
+void SystemAllocator::Free(void* ptr) noexcept
 {
   if (!ptr)
     return;
 
-  (void)size;
-  (void)label;
-#if defined(_MSC_VER)
-  if (alignment > alignof(::std::max_align_t))
-  {
-    ::_aligned_free(ptr);
-    return;
-  }
-#endif
   ::std::free(ptr);
 }
+
 bool SystemAllocator::Init() noexcept
 {
   return true;
 }
+
 void SystemAllocator::Shutdown() noexcept
 {}
+
 }  // namespace gecko

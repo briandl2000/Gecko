@@ -1,10 +1,10 @@
 #include "gecko/core/boot.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/modules.h"
-#include "gecko/core/services/profiler.h"
 #include "gecko/core/utility/random.h"
 #include "gecko/core/utility/thread.h"
 #include "gecko/core/utility/time.h"
@@ -90,7 +90,7 @@ struct TestEventPayload
 // Worker function that simulates some computation
 void WorkerTask(int workerId, int numParticles)
 {
-  GECKO_PROF_FUNC(app::core_example::labels::Worker);
+  GECKO_FUNC(app::core_example::labels::Worker);
 
   GECKO_INFO(app::core_example::labels::Worker,
              "Worker %d: Starting simulation with %d particles", workerId,
@@ -99,9 +99,8 @@ void WorkerTask(int workerId, int numParticles)
   // Allocate particles
   Particle* particles = nullptr;
   {
-    GECKO_PROF_SCOPE(app::core_example::labels::Memory, "AllocateParticles");
-    particles = AllocArray<Particle>(numParticles,
-                                     app::core_example::labels::Simulation);
+    GECKO_SCOPE_NAMED(app::core_example::labels::Memory, "AllocateParticles");
+    particles = AllocArray<Particle>(numParticles);
   }
   {
     if (!particles)
@@ -117,8 +116,8 @@ void WorkerTask(int workerId, int numParticles)
 
     // Initialize particles
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Compute,
-                       "InitializeParticles");
+      GECKO_SCOPE_NAMED(app::core_example::labels::Compute,
+                        "InitializeParticles");
       // Seed random generator differently per worker for unique particle
       // behaviors
       gecko::SeedRandom(workerId * 12345 + 42);
@@ -137,7 +136,7 @@ void WorkerTask(int workerId, int numParticles)
   }
 
   {
-    GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PhysicsUpdate");
+    GECKO_SCOPE_NAMED(app::core_example::labels::Compute, "PhysicsUpdate");
 
     // Simulate physics steps (engaging but quick)
     const int numSteps = 50;
@@ -146,7 +145,7 @@ void WorkerTask(int workerId, int numParticles)
 
     for (int step = 0; step < numSteps; ++step)
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Compute, "PhysicsStep");
+      GECKO_SCOPE_NAMED(app::core_example::labels::Compute, "PhysicsStep");
 
       // Optimized physics update with better cache usage
       for (int i = 0; i < numParticles; ++i)
@@ -174,9 +173,8 @@ void WorkerTask(int workerId, int numParticles)
 
   // Clean up
   {
-    GECKO_PROF_SCOPE(app::core_example::labels::Memory, "DeallocateParticles");
-    DeallocBytes(particles, numParticles * sizeof(Particle), alignof(Particle),
-                 app::core_example::labels::Simulation);
+    GECKO_SCOPE_NAMED(app::core_example::labels::Memory, "DeallocateParticles");
+    DeallocBytes(particles);
     GECKO_DEBUG(app::core_example::labels::Memory,
                 "Worker %d: Freed particle memory", workerId);
   }
@@ -185,7 +183,7 @@ void WorkerTask(int workerId, int numParticles)
 // Function to perform some memory stress testing
 void MemoryStressTest()
 {
-  GECKO_PROF_FUNC(app::core_example::labels::Memory);
+  GECKO_FUNC(app::core_example::labels::Memory);
 
   GECKO_INFO(app::core_example::labels::Memory, "Starting memory stress test");
 
@@ -203,7 +201,7 @@ void MemoryStressTest()
   for (int i = 0; i < 25; ++i)
   {
     size_t size = gecko::random::Size(64, 4096);
-    void* ptr = AllocBytes(size, 16, app::core_example::labels::Memory);
+    void* ptr = AllocBytes(size, 16);
     if (ptr)
     {
       allocations.push_back({ptr, size});
@@ -219,8 +217,8 @@ void MemoryStressTest()
     // Use tracking allocator's live bytes count instead of manual counting
     if (trackingAlloc && (i % 10 == 0))
     {
-      GECKO_PROF_COUNTER(app::core_example::labels::Memory, "LiveBytes",
-                         trackingAlloc->TotalLiveBytes());
+      GECKO_COUNTER(app::core_example::labels::Memory, "LiveBytes",
+                    trackingAlloc->TotalLiveBytes());
     }
   }
 
@@ -239,8 +237,7 @@ void MemoryStressTest()
   {
     if (allocations[i].first)
     {
-      DeallocBytes(allocations[i].first, allocations[i].second, 16,
-                   app::core_example::labels::Memory);
+      DeallocBytes(allocations[i].first);
       allocations[i].first = nullptr;
       freedCount++;
     }
@@ -252,8 +249,8 @@ void MemoryStressTest()
   // Emit counter after freeing
   if (trackingAlloc)
   {
-    GECKO_PROF_COUNTER(app::core_example::labels::Memory, "LiveBytesAfterFree",
-                       trackingAlloc->TotalLiveBytes());
+    GECKO_COUNTER(app::core_example::labels::Memory, "LiveBytesAfterFree",
+                  trackingAlloc->TotalLiveBytes());
   }
 
   GECKO_DEBUG(app::core_example::labels::Memory,
@@ -263,7 +260,7 @@ void MemoryStressTest()
   for (int i = 0; i < 25; ++i)
   {
     size_t size = gecko::random::Size(64, 4096);
-    void* ptr = AllocBytes(size, 32, app::core_example::labels::Memory);
+    void* ptr = AllocBytes(size, 32);
     if (ptr)
     {
       allocations.push_back({ptr, size});
@@ -286,8 +283,7 @@ void MemoryStressTest()
   {
     if (alloc.first)
     {
-      DeallocBytes(alloc.first, alloc.second, 16,
-                   app::core_example::labels::Memory);
+      DeallocBytes(alloc.first);
       cleanupCount++;
     }
   }
@@ -298,8 +294,8 @@ void MemoryStressTest()
   // Final counter after cleanup
   if (trackingAlloc)
   {
-    GECKO_PROF_COUNTER(app::core_example::labels::Memory, "FinalLiveBytes",
-                       trackingAlloc->TotalLiveBytes());
+    GECKO_COUNTER(app::core_example::labels::Memory, "FinalLiveBytes",
+                  trackingAlloc->TotalLiveBytes());
   }
 
   GECKO_INFO(app::core_example::labels::Memory,
@@ -308,7 +304,7 @@ void MemoryStressTest()
 
 void PrintMemoryStats(const runtime::TrackingAllocator& tracker)
 {
-  GECKO_PROF_FUNC(app::core_example::labels::Main);
+  GECKO_FUNC(app::core_example::labels::Main);
 
   GECKO_INFO(app::core_example::labels::Main, "=== Memory Statistics ===");
   GECKO_INFO(app::core_example::labels::Main, "Total Live Bytes: %llu",
@@ -414,7 +410,7 @@ static void OnTestEventQueued(void* user, const EventMeta& meta,
 
 static void EventSystemTest()
 {
-  GECKO_PROF_FUNC(app::core_example::labels::Main);
+  GECKO_FUNC(app::core_example::labels::Main);
 
   GECKO_INFO(app::core_example::labels::Main, "Setting up event system demo");
 
@@ -568,7 +564,7 @@ int main()
       "Log level is set to Info - Debug and Trace messages are filtered out");
 
   {
-    GECKO_PROF_FUNC(app::core_example::labels::Main);
+    GECKO_FUNC(app::core_example::labels::Main);
 
     GECKO_INFO(app::core_example::labels::Main,
                "Starting comprehensive memory and profiling demo");
@@ -595,8 +591,8 @@ int main()
     GECKO_INFO(app::core_example::labels::Main,
                "=== 3. Threading Utilities Demo ===");
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Main,
-                       "ThreadingUtilitiesDemo");
+      GECKO_SCOPE_NAMED(app::core_example::labels::Main,
+                        "ThreadingUtilitiesDemo");
 
       u32 threadId = ThisThreadId();
       u32 coreCount = HardwareThreadCount();
@@ -642,7 +638,8 @@ int main()
                numWorkers);
 
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Main, "SubmitSimulationJobs");
+      GECKO_SCOPE_NAMED(app::core_example::labels::Main,
+                        "SubmitSimulationJobs");
       for (int i = 0; i < numWorkers; ++i)
       {
         int particleCount = 800 + i * 400;  // More interesting particle counts
@@ -663,8 +660,8 @@ int main()
     GECKO_INFO(app::core_example::labels::Main,
                "Waiting for simulation jobs to complete...");
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Main,
-                       "WaitForSimulationJobs");
+      GECKO_SCOPE_NAMED(app::core_example::labels::Main,
+                        "WaitForSimulationJobs");
       WaitForJobs(simulationJobs.data(),
                   static_cast<u32>(simulationJobs.size()));
     }
@@ -689,10 +686,10 @@ int main()
     // simulation round %d/10\", round
     // + 1);\n      \n      std::vector<JobHandle> longJobs;\n      for (int i =
     // 0; i < 4; ++i) {\n        auto job = [i, round]() {\n
-    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute,
+    // GECKO_SCOPE_NAMED(CoreExampleAppModule::c_compute,
     // \"ExtendedWork\");\n          for (int work = 0; work < 1000; ++work) {\n
     // // Simulate computational work with profiling
-    // GECKO_PROF_SCOPE(CoreExampleAppModule::c_compute, "WorkUnit");
+    // GECKO_SCOPE_NAMED(CoreExampleAppModule::c_compute, "WorkUnit");
     // for (volatile int j = 0; j < 10000; ++j) {
     // }
     //
@@ -741,7 +738,7 @@ int main()
                "Testing Job System with %u worker threads...",
                GetJobSystem()->WorkerThreadCount());
     {
-      GECKO_PROF_SCOPE(app::core_example::labels::Main, "JobSystemDemo");
+      GECKO_SCOPE_NAMED(app::core_example::labels::Main, "JobSystemDemo");
 
       // Example with job dependencies - pipeline pattern
       GECKO_INFO(app::core_example::labels::Main,
@@ -749,8 +746,8 @@ int main()
 
       auto dataPreparationJob = SubmitJob(
           []() {
-            GECKO_PROF_SCOPE(app::core_example::labels::Compute,
-                             "PipelineStage1");
+            GECKO_SCOPE_NAMED(app::core_example::labels::Compute,
+                              "PipelineStage1");
             GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 1: Loading and validating data...");
             SleepMs(40);
@@ -763,8 +760,8 @@ int main()
       JobHandle stage1Deps[] = {dataPreparationJob};
       auto dataProcessingJob = SubmitJob(
           []() {
-            GECKO_PROF_SCOPE(app::core_example::labels::Compute,
-                             "PipelineStage2");
+            GECKO_SCOPE_NAMED(app::core_example::labels::Compute,
+                              "PipelineStage2");
             GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 2: Running complex algorithms...");
             SleepMs(50);
@@ -777,8 +774,8 @@ int main()
       JobHandle stage2Deps[] = {dataProcessingJob};
       auto dataFinalizationJob = SubmitJob(
           []() {
-            GECKO_PROF_SCOPE(app::core_example::labels::Compute,
-                             "PipelineStage3");
+            GECKO_SCOPE_NAMED(app::core_example::labels::Compute,
+                              "PipelineStage3");
             GECKO_INFO(app::core_example::labels::Compute,
                        "Pipeline Stage 3: Generating final report...");
             SleepMs(35);
@@ -805,7 +802,8 @@ int main()
       for (int i = 0; i < 3; ++i)
       {
         auto job = [i]() {
-          GECKO_PROF_SCOPE(app::core_example::labels::Compute, "MainThreadJob");
+          GECKO_SCOPE_NAMED(app::core_example::labels::Compute,
+                            "MainThreadJob");
           GECKO_INFO(app::core_example::labels::Compute, "Main thread job %d",
                      i);
         };

@@ -12,6 +12,33 @@
 
 namespace gecko::runtime {
 
+constexpr u32 AllocHeaderMagic = 0x47454B4F;  // "GEKO"
+
+struct AllocHeader
+{
+  u32 Magic;
+  u32 Alignment;
+  u64 RequestedSize;
+  Label AllocLabel;
+  u64 RawOffset;
+};
+
+inline AllocHeader* HeaderFromUserPtr(void* userPtr) noexcept
+{
+  return reinterpret_cast<AllocHeader*>(static_cast<u8*>(userPtr) -
+                                        sizeof(AllocHeader));
+}
+
+inline void* RawPtrFromHeader(AllocHeader* header) noexcept
+{
+  return reinterpret_cast<u8*>(header) - header->RawOffset;
+}
+
+inline bool IsValidAllocHeader(const AllocHeader* header) noexcept
+{
+  return header && header->Magic == AllocHeaderMagic;
+}
+
 struct MemLabelStats
 {
   std::atomic<u64> LiveBytes {0};
@@ -43,6 +70,7 @@ struct MemLabelStats
 };
 
 // Custom allocator template that bypasses tracking for internal containers
+// Uses upstream directly without going through TrackingAllocator
 template <typename T>
 class UpstreamAllocator
 {
@@ -62,15 +90,15 @@ public:
   {
     if (!m_Upstream)
       return nullptr;
-    auto* ptr = m_Upstream->Alloc(n * sizeof(T), alignof(T), {});
-    return static_cast<T*>(ptr);
+    return static_cast<T*>(m_Upstream->Alloc(n * sizeof(T), alignof(T)));
   }
 
   void deallocate(T* ptr, std::size_t n) noexcept
   {
+    (void)n;
     if (m_Upstream && ptr)
     {
-      m_Upstream->Free(ptr, n * sizeof(T), alignof(T), {});
+      m_Upstream->Free(ptr);
     }
   }
 
@@ -93,6 +121,8 @@ private:
   IAllocator* m_Upstream;
 };
 
+constexpr u32 MaxLabelStackDepth = 64;
+
 class TrackingAllocator final : public IAllocator
 {
 public:
@@ -102,10 +132,19 @@ public:
             UpstreamAllocator<std::pair<const u64, MemLabelStats>>(upstream))
   {}
 
-  virtual void* Alloc(u64 size, u32 alignment, Label label) noexcept override;
-  virtual void Free(void* ptr, u64 size, u32 alignment,
-                    Label label) noexcept override;
+  // IAllocator interface
+  void* Alloc(u64 size, u32 alignment) noexcept override;
+  void Free(void* ptr) noexcept override;
 
+  // Label stack - thread-local, used by GECKO_SCOPE macros
+  void PushLabel(Label label) noexcept override;
+  void PopLabel() noexcept override;
+  Label CurrentLabel() const noexcept override;
+
+  bool Init() noexcept override;
+  void Shutdown() noexcept override;
+
+  // TrackingAllocator-specific methods
   void SetProfiler(IProfiler* profiler) noexcept
   {
     m_Profiler = profiler;
@@ -117,15 +156,9 @@ public:
   }
 
   bool StatsFor(Label label, MemLabelStats& outStats) const;
-
   void Snapshot(std::unordered_map<u64, MemLabelStats>& out) const;
-
   void EmitCounters() noexcept;
-
   void ResetCounters() noexcept;
-
-  virtual bool Init() noexcept override;
-  virtual void Shutdown() noexcept override;
 
 private:
   IAllocator* m_Upstream {nullptr};

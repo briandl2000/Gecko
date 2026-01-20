@@ -1,6 +1,7 @@
 #include "gecko/runtime/module_registry.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services.h"
 #include "gecko/core/services/log.h"
 #include "private/labels.h"
@@ -113,7 +114,7 @@ void ModuleRegistry::Shutdown() noexcept
 ::gecko::ModuleRegistration ModuleRegistry::RegisterStatic(
     ::gecko::IModule& module) noexcept
 {
-  GECKO_PROF_FUNC(labels::Modules);
+  GECKO_FUNC(labels::Modules);
 
   if (!m_impl)
   {

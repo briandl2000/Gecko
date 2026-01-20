@@ -17,7 +17,6 @@ inline constexpr ::gecko::Label Random =
 inline constexpr ::gecko::Label Thread =
     ::gecko::MakeLabel("gecko.core.thread");
 inline constexpr ::gecko::Label Time = ::gecko::MakeLabel("gecko.core.time");
-inline constexpr ::gecko::Label OperatorNew =
-    ::gecko::MakeLabel("gecko.core.operator_new");
-
+inline constexpr ::gecko::Label Memory =
+    ::gecko::MakeLabel("gecko.core.memory");
 }  // namespace gecko::core::labels

@@ -1,10 +1,10 @@
 #include <cstdio>
 #include <cstring>
 #include <gecko/core/boot.h>
+#include <gecko/core/scope.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
 #include <gecko/core/services/modules.h>
-#include <gecko/core/services/profiler.h>
 #include <gecko/core/types.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
@@ -287,7 +287,7 @@ static int AppMain(int argc, char** argv)
 
     while (running && ctx->IsWindowAlive(window))
     {
-      GECKO_PROF_SCOPE(app::app_skeleton::labels::Main, "Frame");
+      GECKO_SCOPE_NAMED(app::app_skeleton::labels::Main, "Frame");
 
       ctx->PumpEvents();
       WindowEvent ev {};

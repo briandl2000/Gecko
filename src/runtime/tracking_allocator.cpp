@@ -5,11 +5,66 @@
 #include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 
+#include <array>
 #include <atomic>
 #include <mutex>
 #include <tuple>
 
 namespace gecko::runtime {
+
+// =============================================================================
+// Thread-local allocation context
+// =============================================================================
+// Label stack and memory tags are thread-local
+
+namespace {
+
+constexpr Label g_DefaultLabel = MakeLabel("gecko.default");
+
+struct ThreadAllocContext
+{
+  std::array<Label, MaxLabelStackDepth> LabelStack {};
+  u32 StackDepth {0};
+};
+
+thread_local ThreadAllocContext g_AllocContext;
+
+}  // namespace
+
+// =============================================================================
+// Label stack implementation
+// =============================================================================
+
+void TrackingAllocator::PushLabel(Label label) noexcept
+{
+  if (g_AllocContext.StackDepth < MaxLabelStackDepth)
+  {
+    g_AllocContext.LabelStack[g_AllocContext.StackDepth] = label;
+    ++g_AllocContext.StackDepth;
+  }
+  // At max depth, we just don't push (last label is used)
+}
+
+void TrackingAllocator::PopLabel() noexcept
+{
+  if (g_AllocContext.StackDepth > 0)
+  {
+    --g_AllocContext.StackDepth;
+  }
+}
+
+Label TrackingAllocator::CurrentLabel() const noexcept
+{
+  if (g_AllocContext.StackDepth == 0)
+  {
+    return g_DefaultLabel;
+  }
+  return g_AllocContext.LabelStack[g_AllocContext.StackDepth - 1];
+}
+
+// =============================================================================
+// TrackingAllocator implementation
+// =============================================================================
 
 MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
 {
@@ -22,7 +77,7 @@ MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
   return stats;
 }
 
-void* TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept
+void* TrackingAllocator::Alloc(u64 size, u32 alignment) noexcept
 {
   // NOTE: Cannot use profiling/logging - Allocator is Level 0, comes before
   // everything
@@ -31,12 +86,36 @@ void* TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
 
-  void* ptr = m_Upstream->Alloc(size, alignment, label);
-  if (!ptr)
-  {
-    return nullptr;
-  }
+  // Get label from thread-local context
+  const Label label = CurrentLabel();
 
+  // Calculate total size with header
+  // Layout: [padding] [AllocHeader] [user data]
+  const u64 headerSize = sizeof(AllocHeader);
+  const u32 effectiveAlign = alignment > alignof(AllocHeader)
+                                 ? alignment
+                                 : static_cast<u32>(alignof(AllocHeader));
+  const u64 totalSize = headerSize + (effectiveAlign - 1) + size;
+
+  // Allocate from upstream (which is minimal, no header)
+  void* rawPtr = m_Upstream->Alloc(totalSize, effectiveAlign);
+  if (!rawPtr)
+    return nullptr;
+
+  // Calculate aligned user pointer position
+  auto rawAddr = reinterpret_cast<uintptr_t>(rawPtr);
+  const uintptr_t alignMask = static_cast<uintptr_t>(alignment) - 1;
+  uintptr_t userAddr = (rawAddr + headerSize + alignMask) & ~alignMask;
+
+  // Place header immediately before user data
+  auto* header = reinterpret_cast<AllocHeader*>(userAddr - headerSize);
+  header->Magic = AllocHeaderMagic;
+  header->Alignment = alignment;
+  header->RequestedSize = size;
+  header->AllocLabel = label;
+  header->RawOffset = reinterpret_cast<uintptr_t>(header) - rawAddr;
+
+  // Update tracking stats
   m_TotalLive.fetch_add(size, std::memory_order_relaxed);
 
   {
@@ -46,18 +125,31 @@ void* TrackingAllocator::Alloc(u64 size, u32 alignment, Label label) noexcept
     st.Allocs.fetch_add(1, std::memory_order_relaxed);
   }
 
-  return ptr;
+  return reinterpret_cast<void*>(userAddr);
 }
 
-void TrackingAllocator::Free(void* ptr, u64 size, u32 alignment,
-                             Label label) noexcept
+void TrackingAllocator::Free(void* ptr) noexcept
 {
   if (!ptr)
     return;
 
-  if (m_Upstream)
-    m_Upstream->Free(ptr, size, alignment, label);
+  // Read header (immediately before user pointer)
+  auto* header = HeaderFromUserPtr(ptr);
+  GECKO_ASSERT(IsValidAllocHeader(header) &&
+               "Invalid allocation header in TrackingAllocator::Free");
 
+  const u64 size = header->RequestedSize;
+  const Label label = header->AllocLabel;
+
+  // Get raw pointer and clear header
+  void* rawPtr = RawPtrFromHeader(header);
+  header->Magic = 0;  // Detect double-free
+
+  // Free via upstream
+  if (m_Upstream)
+    m_Upstream->Free(rawPtr);
+
+  // Update tracking stats
   m_TotalLive.fetch_sub(size, std::memory_order_relaxed);
 
   {

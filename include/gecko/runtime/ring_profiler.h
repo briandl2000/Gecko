@@ -19,6 +19,10 @@ public:
   void Emit(const ProfEvent& event) noexcept override;
   u64 NowNs() const noexcept override;
 
+  void SetMinLevel(ProfLevel level) noexcept override;
+  ProfLevel GetMinLevel() const noexcept override;
+  bool IsLevelEnabled(ProfLevel level) const noexcept override;
+
   virtual bool Init() noexcept override;
   virtual void Shutdown() noexcept override;
 
@@ -57,6 +61,8 @@ private:
   std::mutex m_JobMu {};  // Protects m_ConsumerJob
   JobHandle m_ConsumerJob {};
   Label m_ProfilerLabel {};
+  std::atomic<ProfLevel> m_MinLevel {ProfLevel::Detailed};
+  std::atomic<u64> m_DroppedEvents {0};
 
   void ProcessProfEvents() noexcept;
   void TryScheduleConsumerJob() noexcept;
