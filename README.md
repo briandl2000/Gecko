@@ -44,9 +44,9 @@ Gecko is built around three core modules that work together:
 
 ```cpp
 #include "gecko/core/boot.h"
-#include "gecko/core/log.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/services.h"
+#include "gecko/core/services/log.h"
 
 namespace app::my_game::labels {
 inline constexpr gecko::Label Game = gecko::MakeLabel("app.my_game");

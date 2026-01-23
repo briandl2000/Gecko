@@ -12,4 +12,4 @@ inline constexpr ::gecko::Label Input =
 inline constexpr ::gecko::Label General =
     ::gecko::MakeLabel("gecko.platform.general");
 
-} // namespace gecko::platform::labels
+}  // namespace gecko::platform::labels

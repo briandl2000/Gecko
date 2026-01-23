@@ -1,25 +1,26 @@
 #pragma once
 
-#include <cstdio>
+#include "gecko/core/services/profiler.h"
 
-#include "gecko/core/profiler.h"
+#include <cstdio>
 
 namespace gecko::runtime {
 
-class TraceWriter {
+class TraceWriter
+{
 public:
   TraceWriter();
   ~TraceWriter();
 
-  bool Open(const char *path);
+  bool Open(const char* path);
   void Close();
 
-  void Write(const ProfEvent &event);
+  void Write(const ProfEvent& event);
 
 private:
-  std::FILE *m_File{nullptr};
-  bool m_First{true};
-  u64 m_Time0Ns{0};
+  std::FILE* m_File {nullptr};
+  bool m_First {true};
+  u64 m_Time0Ns {0};
 };
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

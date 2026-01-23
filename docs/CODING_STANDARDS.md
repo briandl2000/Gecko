@@ -18,6 +18,24 @@ For the canonical, non-scattered overview of how Gecko is structured and how to 
 
 ### File Organization
 
+#### Module Structure
+
+The Gecko framework organizes headers into logical groups:
+
+**Public Headers** (`include/gecko/<module>/`):
+- **Root level**: Core infrastructure (api.h, assert.h, boot.h, labels.h, optional.h, ptr.h, services.h, types.h, version.h)
+- **services/**: System services (events.h, jobs.h, log.h, memory.h, modules.h, profiler.h)
+- **utility/**: Utility functions (bit.h, hash.h, random.h, thread.h, time.h)
+
+**Private Headers** (`src/<module>/private/`):
+- Module-internal headers (labels.h for internal label definitions)
+- Not exposed in public API
+
+**Include Path Rules**:
+- Public headers use full paths: `#include "gecko/core/services/log.h"`
+- Private headers use relative paths: `#include "private/labels.h"`
+- Headers within subdirectories need parent navigation: `#include "../private/labels.h"`
+
 #### Header Files (.h)
 ```cpp
 #pragma once
@@ -30,7 +48,9 @@ For the canonical, non-scattered overview of how Gecko is structured and how to 
 // Project includes second (alphabetical order)
 #include "gecko/core/api.h"
 #include "gecko/core/assert.h"
+#include "gecko/core/services/log.h"
 #include "gecko/core/types.h"
+#include "gecko/core/utility/time.h"
 
 namespace gecko {
   // Content here
@@ -46,12 +66,13 @@ namespace gecko {
 #include <cstdio>
 #include <memory>
 
-// Project includes (alphabetical order)
+// Project includes (alphabetical order, using full gecko/ paths)
 #include "gecko/core/assert.h"
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/utility/time.h"
 
-// Local includes last
-#include "labels.h"
+// Private/local includes last (using relative paths)
+#include "private/labels.h"
 
 namespace gecko {
   // Implementation here
@@ -76,7 +97,48 @@ namespace gecko {
 - Allowed prefixes are `m_`, `g_`, `s_`.
 - Do **not** use `k*` prefixes (e.g. `kRootLabel`, `kMaxSize`).
 
+### Namespace Qualification
+
+Always use the `::` prefix when referring to global namespace items to prevent ambiguity and make scope explicit:
+
+```cpp
+// ✅ Global namespace - always use ::
+::std::malloc()
+::std::vector<int>
+::std::string
+::posix_memalign()
+::pthread_create()
+
+// ✅ Within gecko namespace - no prefix needed (you're already inside)
+IAllocator* allocator;
+GetLogger();
+Label myLabel;
+
+// ✅ Other namespaces - explicit qualification without leading ::
+gecko::runtime::EventBus
+platform::Window
+```
+
+**Rationale**:
+- **Clarity**: Immediately visible what's from global scope vs your namespace
+- **Prevents collisions**: If you add a `malloc` to `gecko`, `::malloc` still refers to the global one
+- **Explicit intent**: `::std::` means "std from global namespace, not some nested std"
+- **Consistency**: Works for C functions, C++ stdlib, and OS-specific APIs
+
 ### Formatting Standards
+
+#### Automatic Formatting
+
+The project uses **clang-format** for consistent code formatting across all C++ files.
+
+**Configuration**: `.clang-format` in the project root defines the style based on these standards.
+
+**Usage**:
+- **VS Code**: Enable format-on-save in your local settings.json (not synced with git)
+- **Command line**: `find src include examples -type f \( -name "*.cpp" -o -name "*.h" \) -exec clang-format -i {} \;`
+- **Single file**: `clang-format -i path/to/file.cpp`
+
+**Note**: The language server (clangd/IntelliSense) automatically uses the .clang-format configuration for formatting.
 
 #### Spacing and Braces
 ```cpp
@@ -105,6 +167,53 @@ if (!ptr) return;
 - Blank line between system and project includes
 - Blank line between project and local includes
 - Alphabetical order within each group
+
+#### Section Comments
+Use this format **sparingly** to separate logical sections within source files only when the code becomes hard to read (60 characters wide):
+```cpp
+//------------------------------------------------------------
+// Section Name
+//------------------------------------------------------------
+```
+
+**When to Use**:
+- Files with multiple distinct logical groups (e.g., public API vs internal helpers)
+- Long implementation files where navigation becomes difficult
+- Clear functional boundaries that benefit from visual separation
+
+**When NOT to Use**:
+- Short, focused files (prefer keeping them small instead)
+- Between every function (excessive visual noise)
+- As a substitute for proper file organization
+
+**Spacing Rules**:
+- One blank line before the section comment
+- One blank line after the section comment
+- No blank line between the section comment and the first line of code in that section
+
+Example:
+```cpp
+void SomeFunction()
+{
+  // code here
+}
+
+//------------------------------------------------------------
+// Public API
+//------------------------------------------------------------
+
+void PublicFunction()
+{
+  // implementation
+}
+```
+
+Common section names (when needed):
+- Public API
+- Internal Helpers
+- Lifecycle Management
+- Service Registration
+- Platform Implementation
 
 #### Assertions
 Strategic assertions should be placed at:
@@ -290,7 +399,7 @@ int main()
 
 #### Basic Allocation
 ```cpp
-#include "gecko/core/memory.h"
+#include "gecko/core/services/memory.h"
 
 // Basic byte allocation
 auto label = gecko::MakeLabel("my_system");
@@ -333,7 +442,7 @@ public:
 
 #### Basic Logging
 ```cpp
-#include "gecko/core/log.h"
+#include "gecko/core/services/log.h"
 
 auto label = gecko::MakeLabel("my_system");
 
@@ -389,7 +498,7 @@ ringLogger.SetLevel(gecko::LogLevel::Trace);
 
 #### Basic Profiling
 ```cpp
-#include "gecko/core/profiler.h"
+#include "gecko/core/services/profiler.h"
 
 auto label = gecko::MakeLabel("my_system");
 
@@ -697,7 +806,7 @@ bool flip = GECKO_RANDOM_BOOL();
 Gecko provides a flexible job system for multithreading:
 
 ```cpp
-#include "gecko/core/jobs.h"
+#include "gecko/core/services/jobs.h"
 #include "gecko/runtime/thread_pool_job_system.h"
 
 // Setup (typically in main)

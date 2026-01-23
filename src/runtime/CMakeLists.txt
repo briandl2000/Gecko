@@ -1,4 +1,4 @@
-add_library(Runtime)
+add_library(Runtime STATIC)
 add_library(Gecko::Runtime ALIAS Runtime)
 
 target_sources(Runtime
@@ -9,7 +9,6 @@ target_sources(Runtime
     file_log_sink.cpp
     immediate_logger.cpp
     module_registry.cpp
-    override_new.cpp
     ring_logger.cpp
     ring_profiler.cpp
     thread_pool_job_system.cpp
@@ -25,11 +24,9 @@ target_include_directories(Runtime
     $<INSTALL_INTERFACE:include>
 )
 
-target_compile_definitions(Runtime PRIVATE GECKO_OVERRIDE_NEW)
-
 target_compile_definitions(Runtime PUBLIC GECKO_PLATFORM_API)
 
-target_link_libraries(Runtime PUBLIC Gecko::Core)
+target_link_libraries(Runtime PUBLIC Gecko::Core Gecko::CoreServices)
 
 install(TARGETS Runtime
   EXPORT ${GECKO_EXPORT_SET_NAME}
