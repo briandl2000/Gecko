@@ -4,11 +4,6 @@ import sys
 from pathlib import Path
 
 
-def to_pascal(name: str) -> str:
-    parts = re.split(r"[_\-\s]+", name)
-    return "".join(part[:1].upper() + part[1:] for part in parts if part)
-
-
 def normalize_deps(deps: list[str]) -> list[str]:
     normalized = []
     for dep in deps:
@@ -19,22 +14,20 @@ def normalize_deps(deps: list[str]) -> list[str]:
     return normalized
 
 
-def module_target_name(module_name: str) -> str:
-    return to_pascal(module_name)
-
-
 def dep_to_target(dep: str) -> str:
     dep_name = dep.strip()
     if dep_name.startswith("Gecko::"):
         return dep_name
-    return f"Gecko::{to_pascal(dep_name)}"
+    parts = re.split(r"[_\-\s]+", dep_name)
+    pascal = "".join(part[:1].upper() + part[1:] for part in parts if part)
+    return f"Gecko::{pascal}"
 
 
 def render_dep_lines(deps: list[str]) -> str:
     targets = []
     for dep in deps:
         dep_lower = dep.lower()
-        if dep_lower in {"core", "coreservices"}:
+        if dep_lower in {"core", "runtime"}:
             continue
         target = dep_to_target(dep)
         if target not in targets:
@@ -66,14 +59,12 @@ def ensure_repo_root(repo_root: Path) -> bool:
 def copy_template(
     template_root: Path,
     repo_root: Path,
-    module_name: str,
-    module_pascal: str,
+    example_name: str,
     dep_lines: str,
 ) -> bool:
     replacements = {
-        "__MODULE__": module_name,
-        "__MODULE_CAMEL__": module_pascal,
-        "__MODULE_DEP_TARGETS__": dep_lines,
+        "__EXAMPLE__": example_name,
+        "__EXAMPLE_DEP_TARGETS__": dep_lines,
     }
 
     existing_files: list[Path] = []
@@ -81,7 +72,7 @@ def copy_template(
         if not path.is_file():
             continue
         rel = path.relative_to(template_root)
-        rel_str = str(rel).replace("__MODULE__", module_name)
+        rel_str = str(rel).replace("__EXAMPLE__", example_name)
         dest = repo_root / rel_str
         if dest.exists():
             existing_files.append(dest)
@@ -94,7 +85,7 @@ def copy_template(
 
     for path in template_root.rglob("*"):
         rel = path.relative_to(template_root)
-        rel_str = str(rel).replace("__MODULE__", module_name)
+        rel_str = str(rel).replace("__EXAMPLE__", example_name)
         dest = repo_root / rel_str
 
         if path.is_dir():
@@ -111,66 +102,62 @@ def copy_template(
     return True
 
 
-def update_src_cmake(src_cmake: Path, module_name: str) -> None:
-    add_line = f"add_subdirectory({module_name})"
-    content = src_cmake.read_text(encoding="utf-8")
+def update_examples_cmake(examples_cmake: Path, example_name: str) -> None:
+    add_line = f"add_subdirectory({example_name})"
+    content = examples_cmake.read_text(encoding="utf-8")
     if add_line in content:
         return
     content = content.rstrip() + "\n" + add_line + "\n"
-    src_cmake.write_text(content, encoding="utf-8")
+    examples_cmake.write_text(content, encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("name", help="Module name (required)")
+    parser.add_argument("name", help="Example name (required)")
     parser.add_argument(
         "--dep",
         action="append",
         default=[],
         metavar="DEP",
-        help="Add a dependency (repeatable) Example: --dep core --dep platform",
+        help="Add a dependency (repeatable) Example: --dep platform",
     )
 
     args = parser.parse_args(argv)
 
     raw_name = args.name.strip()
     if not raw_name:
-        print("Module name is required.", file=sys.stderr)
+        print("Example name is required.", file=sys.stderr)
         return 1
 
-    module_name = raw_name.lower()
-    if not re.fullmatch(r"[a-z][a-z0-9_]*", module_name):
+    example_name = raw_name.lower()
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", example_name):
         print(
-            "Module name must match [a-z][a-z0-9_]* (lowercase, underscores).",
+            "Example name must match [a-z][a-z0-9_]* (lowercase, underscores).",
             file=sys.stderr,
         )
         return 1
-
-    module_pascal = module_target_name(module_name)
-    deps = normalize_deps(args.dep)
 
     repo_root = Path(__file__).resolve().parents[1]
     if not ensure_repo_root(repo_root):
         return 1
 
-    template_root = repo_root / "template" / "module"
+    template_root = repo_root / "template" / "example"
     if not ensure_template_exists(template_root):
         return 1
 
-    src_dir = repo_root / "src" / module_name
-    include_dir = repo_root / "include" / "gecko" / module_name
-    if src_dir.exists() or include_dir.exists():
-        print("Module already exists.", file=sys.stderr)
+    example_dir = repo_root / "examples" / example_name
+    if example_dir.exists():
+        print("Example already exists.", file=sys.stderr)
         return 1
 
+    deps = normalize_deps(args.dep)
     dep_lines = render_dep_lines(deps)
 
-    if not copy_template(template_root, repo_root, module_name, module_pascal, dep_lines):
+    if not copy_template(template_root, repo_root, example_name, dep_lines):
         return 1
+    update_examples_cmake(repo_root / "examples" / "CMakeLists.txt", example_name)
 
-    update_src_cmake(repo_root / "src" / "CMakeLists.txt", module_name)
-
-    print(f"Module '{module_name}' created successfully.")
+    print(f"Example '{example_name}' created successfully.")
     return 0
 
 
