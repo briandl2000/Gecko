@@ -34,13 +34,10 @@ $env:PATH = \"$RepoRoot\\bin;$env:PATH\"
     _write_if_missing(
         bat_env,
         """@echo off
-setlocal
 set \"REPO_ROOT=%~dp0\"
 set \"PATH=%REPO_ROOT%bin;%PATH%\"
 """,
     )
-
-
 def _ensure_envrc(repo_root: Path) -> None:
     envrc = repo_root / ".envrc"
     _write_if_missing(envrc, "source ./.gecko_env\n")
