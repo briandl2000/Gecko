@@ -1,0 +1,3 @@
+add_subdirectory(core_example)
+add_subdirectory(platform_example)
+add_subdirectory(app_skeleton)

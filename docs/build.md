@@ -29,7 +29,7 @@ Format all C++ files in the project:
 
 **Command line:**
 ```bash
-./scripts/format.sh
+gecko format
 ```
 
 **VS Code Task (optional):**
@@ -38,7 +38,8 @@ Add this to your local `.vscode/tasks.json` (not synced with git):
 {
   "label": "Format All Files",
   "type": "shell",
-  "command": "find src include examples -type f \\( -name '*.cpp' -o -name '*.h' \\) -exec clang-format -i {} \\;",
+  "command": "${workspaceFolder}/bin/gecko",
+  "args": ["format"],
   "options": {
     "cwd": "${workspaceFolder}"
   },
@@ -47,6 +48,14 @@ Add this to your local `.vscode/tasks.json` (not synced with git):
 ```
 
 Run with: `Ctrl+Shift+P` → `Tasks: Run Task` → `Format All Files`
+
+## Developer CLI Setup
+
+Set up repo-local `gecko` commands and autocomplete (no global install):
+
+```bash
+./bin/gecko setup
+```
 
 
 ## Install / Package

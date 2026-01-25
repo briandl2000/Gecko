@@ -137,6 +137,9 @@ celerybeat.pid
 # Environments
 .env
 .envrc
+.gecko_env
+.gecko_env.ps1
+.gecko_env.bat
 .venv
 env/
 venv/

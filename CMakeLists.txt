@@ -39,14 +39,10 @@ set(GECKO_EXPORT_SET_NAME "${PROJECT_NAME}Targets")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-add_subdirectory(src/core)
-add_subdirectory(src/platform)
-add_subdirectory(src/runtime)
+add_subdirectory(src)
 
 if (GECKO_BUILD_EXAMPLES)
-  add_subdirectory(examples/core_example)
-  add_subdirectory(examples/platform_example)
-  add_subdirectory(examples/app_skeleton)
+  add_subdirectory(examples)
 endif()
 
 include(CMakePackageConfigHelpers)
