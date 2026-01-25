@@ -69,6 +69,26 @@ struct Aabb2i
            b.Min.Y > a.Max.Y);
 }
 
+[[nodiscard]] constexpr Aabb2 Expand(const Aabb2& box, f32 amount) noexcept
+{
+  return {box.Min - Float2 {amount, amount}, box.Max + Float2 {amount, amount}};
+}
+
+[[nodiscard]] constexpr Aabb2 Expand(const Aabb2& box, const Float2& p) noexcept
+{
+  return {::gecko::math::Min(box.Min, p), ::gecko::math::Max(box.Max, p)};
+}
+
+[[nodiscard]] constexpr Aabb2 Union(const Aabb2& a, const Aabb2& b) noexcept
+{
+  return {::gecko::math::Min(a.Min, b.Min), ::gecko::math::Max(a.Max, b.Max)};
+}
+
+[[nodiscard]] constexpr Float2 Clamp(const Aabb2& box, const Float2& p) noexcept
+{
+  return ::gecko::math::Clamp(p, box.Min, box.Max);
+}
+
 [[nodiscard]] constexpr Int2 Size(const Aabb2i& box) noexcept
 {
   return {box.Max.X - box.Min.X, box.Max.Y - box.Min.Y};
@@ -90,6 +110,26 @@ struct Aabb2i
 {
   return !(b.Max.X < a.Min.X || b.Min.X > a.Max.X || b.Max.Y < a.Min.Y ||
            b.Min.Y > a.Max.Y);
+}
+
+[[nodiscard]] constexpr Aabb2i Expand(const Aabb2i& box, i32 amount) noexcept
+{
+  return {box.Min - Int2 {amount, amount}, box.Max + Int2 {amount, amount}};
+}
+
+[[nodiscard]] constexpr Aabb2i Expand(const Aabb2i& box, const Int2& p) noexcept
+{
+  return {::gecko::math::Min(box.Min, p), ::gecko::math::Max(box.Max, p)};
+}
+
+[[nodiscard]] constexpr Aabb2i Union(const Aabb2i& a, const Aabb2i& b) noexcept
+{
+  return {::gecko::math::Min(a.Min, b.Min), ::gecko::math::Max(a.Max, b.Max)};
+}
+
+[[nodiscard]] constexpr Int2 Clamp(const Aabb2i& box, const Int2& p) noexcept
+{
+  return ::gecko::math::Clamp(p, box.Min, box.Max);
 }
 
 using RectF = Aabb2;

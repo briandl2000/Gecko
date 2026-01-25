@@ -4,6 +4,9 @@
 
 namespace gecko::math {
 
+// Forward declaration
+struct Rotor;
+
 struct Float2x2
 {
   union
@@ -39,6 +42,13 @@ struct Float2x2
   static constexpr Float2x2 Identity() noexcept
   {
     return {};
+  }
+
+  static inline Float2x2 Rotation(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {c, -s, s, c};
   }
 };
 
@@ -86,6 +96,27 @@ struct Float3x3
   static constexpr Float3x3 Identity() noexcept
   {
     return {};
+  }
+
+  static inline Float3x3 RotationX(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {1.0f, 0.0f, 0.0f, 0.0f, c, -s, 0.0f, s, c};
+  }
+
+  static inline Float3x3 RotationY(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {c, 0.0f, s, 0.0f, 1.0f, 0.0f, -s, 0.0f, c};
+  }
+
+  static inline Float3x3 RotationZ(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {c, -s, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 };
 
@@ -155,6 +186,75 @@ struct Float4x4
   {
     return {s.X,  0.0f, 0.0f, 0.0f, 0.0f, s.Y,  0.0f, 0.0f,
             0.0f, 0.0f, s.Z,  0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+  }
+
+  static inline Float4x4 RotationX(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, c,    -s,   0.0f,
+            0.0f, s,    c,    0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+  }
+
+  static inline Float4x4 RotationY(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {c,  0.0f, s, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
+            -s, 0.0f, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+  }
+
+  static inline Float4x4 RotationZ(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {c,    -s,   0.0f, 0.0f, s,    c,    0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+  }
+
+  static inline Float4x4 LookAt(const Float3& eye, const Float3& target,
+                                const Float3& up) noexcept
+  {
+    const Float3 f = Normalized(target - eye);
+    const Float3 r = Normalized(Cross(f, up));
+    const Float3 u = Cross(r, f);
+    return {r.X,  r.Y,  r.Z,  -Dot(r, eye), u.X,  u.Y,  u.Z,  -Dot(u, eye),
+            -f.X, -f.Y, -f.Z, Dot(f, eye),  0.0f, 0.0f, 0.0f, 1.0f};
+  }
+
+  static inline Float4x4 Orthographic(f32 left, f32 right, f32 bottom, f32 top,
+                                      f32 near, f32 far) noexcept
+  {
+    const f32 rl = 1.0f / (right - left);
+    const f32 tb = 1.0f / (top - bottom);
+    const f32 fn = 1.0f / (far - near);
+    return {2.0f * rl, 0.0f,      0.0f,       -(right + left) * rl,
+            0.0f,      2.0f * tb, 0.0f,       -(top + bottom) * tb,
+            0.0f,      0.0f,      -2.0f * fn, -(far + near) * fn,
+            0.0f,      0.0f,      0.0f,       1.0f};
+  }
+
+  static inline Float4x4 Perspective(f32 fovY, f32 aspect, f32 near,
+                                     f32 far) noexcept
+  {
+    const f32 tanHalfFovy = ::gecko::math::Tan(fovY / 2.0f);
+    const f32 fn = 1.0f / (far - near);
+    return {1.0f / (aspect * tanHalfFovy),
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f / tanHalfFovy,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            -(far + near) * fn,
+            -2.0f * far * near * fn,
+            0.0f,
+            0.0f,
+            -1.0f,
+            0.0f};
   }
 };
 
@@ -232,6 +332,11 @@ constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
   const Float4 p = m * Float4 {v.X, v.Y, v.Z, 0.0f};
   return {p.X, p.Y, p.Z};
 }
+
+// Rotor conversion functions (declarations)
+Float3x3 ToMatrix3(const Rotor& r) noexcept;
+Float4x4 ToMatrix4(const Rotor& r) noexcept;
+Rotor ToRotor(const Float3x3& m) noexcept;
 
 using float2x2 = Float2x2;
 using float3x3 = Float3x3;

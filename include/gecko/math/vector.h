@@ -6,6 +6,79 @@
 
 namespace gecko::math {
 
+// Common math constants
+inline constexpr f32 Pi = 3.14159265358979323846f;
+inline constexpr f32 TwoPi = 6.28318530717958647692f;
+inline constexpr f32 HalfPi = 1.57079632679489661923f;
+inline constexpr f32 Epsilon = 1e-6f;
+
+// Utility functions
+[[nodiscard]] constexpr f32 ToRadians(f32 degrees) noexcept
+{
+  return degrees * (Pi / 180.0f);
+}
+
+[[nodiscard]] constexpr f32 ToDegrees(f32 radians) noexcept
+{
+  return radians * (180.0f / Pi);
+}
+
+[[nodiscard]] constexpr f32 Min(f32 a, f32 b) noexcept
+{
+  return a < b ? a : b;
+}
+
+[[nodiscard]] constexpr f32 Max(f32 a, f32 b) noexcept
+{
+  return a > b ? a : b;
+}
+
+[[nodiscard]] constexpr f32 Clamp(f32 value, f32 min, f32 max) noexcept
+{
+  return value < min ? min : (value > max ? max : value);
+}
+
+[[nodiscard]] constexpr f32 Lerp(f32 a, f32 b, f32 t) noexcept
+{
+  return a + (b - a) * t;
+}
+
+[[nodiscard]] constexpr f32 Smoothstep(f32 edge0, f32 edge1, f32 x) noexcept
+{
+  const f32 t = Clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+  return t * t * (3.0f - 2.0f * t);
+}
+
+[[nodiscard]] inline f32 Abs(f32 x) noexcept
+{
+  return ::std::abs(x);
+}
+
+[[nodiscard]] inline f32 Sqrt(f32 x) noexcept
+{
+  return ::std::sqrt(x);
+}
+
+[[nodiscard]] inline f32 Sin(f32 x) noexcept
+{
+  return ::std::sin(x);
+}
+
+[[nodiscard]] inline f32 Cos(f32 x) noexcept
+{
+  return ::std::cos(x);
+}
+
+[[nodiscard]] inline f32 Tan(f32 x) noexcept
+{
+  return ::std::tan(x);
+}
+
+[[nodiscard]] inline f32 Atan2(f32 y, f32 x) noexcept
+{
+  return ::std::atan2(y, x);
+}
+
 struct Float2
 {
   union
@@ -242,6 +315,33 @@ constexpr Float2 operator/(const Float2& v, f32 s) noexcept
   return len > 0.0f ? (v / len) : Float2 {};
 }
 
+[[nodiscard]] constexpr Float2 Min(const Float2& a, const Float2& b) noexcept
+{
+  return {Min(a.X, b.X), Min(a.Y, b.Y)};
+}
+
+[[nodiscard]] constexpr Float2 Max(const Float2& a, const Float2& b) noexcept
+{
+  return {Max(a.X, b.X), Max(a.Y, b.Y)};
+}
+
+[[nodiscard]] constexpr Float2 Clamp(const Float2& v, const Float2& min,
+                                     const Float2& max) noexcept
+{
+  return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y)};
+}
+
+[[nodiscard]] constexpr Float2 Lerp(const Float2& a, const Float2& b,
+                                    f32 t) noexcept
+{
+  return {Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t)};
+}
+
+[[nodiscard]] constexpr Float2 Abs(const Float2& v) noexcept
+{
+  return {Abs(v.X), Abs(v.Y)};
+}
+
 // Float3 operations
 constexpr bool operator==(const Float3& a, const Float3& b) noexcept
 {
@@ -304,6 +404,34 @@ constexpr Float3 operator/(const Float3& v, f32 s) noexcept
   return len > 0.0f ? (v / len) : Float3 {};
 }
 
+[[nodiscard]] constexpr Float3 Min(const Float3& a, const Float3& b) noexcept
+{
+  return {Min(a.X, b.X), Min(a.Y, b.Y), Min(a.Z, b.Z)};
+}
+
+[[nodiscard]] constexpr Float3 Max(const Float3& a, const Float3& b) noexcept
+{
+  return {Max(a.X, b.X), Max(a.Y, b.Y), Max(a.Z, b.Z)};
+}
+
+[[nodiscard]] constexpr Float3 Clamp(const Float3& v, const Float3& min,
+                                     const Float3& max) noexcept
+{
+  return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y),
+          Clamp(v.Z, min.Z, max.Z)};
+}
+
+[[nodiscard]] constexpr Float3 Lerp(const Float3& a, const Float3& b,
+                                    f32 t) noexcept
+{
+  return {Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t), Lerp(a.Z, b.Z, t)};
+}
+
+[[nodiscard]] constexpr Float3 Abs(const Float3& v) noexcept
+{
+  return {Abs(v.X), Abs(v.Y), Abs(v.Z)};
+}
+
 // Float4 operations
 constexpr bool operator==(const Float4& a, const Float4& b) noexcept
 {
@@ -361,6 +489,35 @@ constexpr Float4 operator/(const Float4& v, f32 s) noexcept
   return len > 0.0f ? (v / len) : Float4 {};
 }
 
+[[nodiscard]] constexpr Float4 Min(const Float4& a, const Float4& b) noexcept
+{
+  return {Min(a.X, b.X), Min(a.Y, b.Y), Min(a.Z, b.Z), Min(a.W, b.W)};
+}
+
+[[nodiscard]] constexpr Float4 Max(const Float4& a, const Float4& b) noexcept
+{
+  return {Max(a.X, b.X), Max(a.Y, b.Y), Max(a.Z, b.Z), Max(a.W, b.W)};
+}
+
+[[nodiscard]] constexpr Float4 Clamp(const Float4& v, const Float4& min,
+                                     const Float4& max) noexcept
+{
+  return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y),
+          Clamp(v.Z, min.Z, max.Z), Clamp(v.W, min.W, max.W)};
+}
+
+[[nodiscard]] constexpr Float4 Lerp(const Float4& a, const Float4& b,
+                                    f32 t) noexcept
+{
+  return {Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t), Lerp(a.Z, b.Z, t),
+          Lerp(a.W, b.W, t)};
+}
+
+[[nodiscard]] constexpr Float4 Abs(const Float4& v) noexcept
+{
+  return {Abs(v.X), Abs(v.Y), Abs(v.Z), Abs(v.W)};
+}
+
 // Int2 operations
 constexpr bool operator==(const Int2& a, const Int2& b) noexcept
 {
@@ -397,6 +554,23 @@ constexpr Int2 operator/(const Int2& v, i32 s) noexcept
   return a.X * b.X + a.Y * b.Y;
 }
 
+[[nodiscard]] constexpr Int2 Min(const Int2& a, const Int2& b) noexcept
+{
+  return {a.X < b.X ? a.X : b.X, a.Y < b.Y ? a.Y : b.Y};
+}
+
+[[nodiscard]] constexpr Int2 Max(const Int2& a, const Int2& b) noexcept
+{
+  return {a.X > b.X ? a.X : b.X, a.Y > b.Y ? a.Y : b.Y};
+}
+
+[[nodiscard]] constexpr Int2 Clamp(const Int2& v, const Int2& min,
+                                   const Int2& max) noexcept
+{
+  return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X),
+          v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y)};
+}
+
 // Int3 operations
 constexpr bool operator==(const Int3& a, const Int3& b) noexcept
 {
@@ -431,6 +605,24 @@ constexpr Int3 operator/(const Int3& v, i32 s) noexcept
 [[nodiscard]] constexpr i32 Dot(const Int3& a, const Int3& b) noexcept
 {
   return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
+}
+
+[[nodiscard]] constexpr Int3 Min(const Int3& a, const Int3& b) noexcept
+{
+  return {a.X < b.X ? a.X : b.X, a.Y < b.Y ? a.Y : b.Y, a.Z < b.Z ? a.Z : b.Z};
+}
+
+[[nodiscard]] constexpr Int3 Max(const Int3& a, const Int3& b) noexcept
+{
+  return {a.X > b.X ? a.X : b.X, a.Y > b.Y ? a.Y : b.Y, a.Z > b.Z ? a.Z : b.Z};
+}
+
+[[nodiscard]] constexpr Int3 Clamp(const Int3& v, const Int3& min,
+                                   const Int3& max) noexcept
+{
+  return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X),
+          v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y),
+          v.Z < min.Z ? min.Z : (v.Z > max.Z ? max.Z : v.Z)};
 }
 
 // Int4 operations
