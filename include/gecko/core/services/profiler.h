@@ -34,6 +34,10 @@ enum class ProfEventKind : u8
   FrameMark
 };
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4324)  // structure was padded due to alignment
+#endif
 struct alignas(64) ProfEvent
 {
   u64 TimestampNs {0};
@@ -47,6 +51,9 @@ struct alignas(64) ProfEvent
 };
 
 static_assert(sizeof(ProfEvent) == 64, "ProfEvent must be 64 bytes");
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 struct IProfiler;
 
@@ -101,14 +108,17 @@ struct ProfScope
 
 #if GECKO_PROFILING
 
+#define GECKO_PROF_CONCAT_(x, y) x##y
+#define GECKO_PROF_CONCAT(x, y) GECKO_PROF_CONCAT_(x, y)
+
 #if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_NORMAL
 #define GECKO_PROF_SCOPE(label)                                             \
-  ::gecko::ProfScope _g_prof                                                \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __COUNTER__)               \
   {                                                                         \
     (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Normal \
   }
 #define GECKO_PROF_SCOPE_NAMED(label, name)                                \
-  ::gecko::ProfScope _g_prof                                               \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __COUNTER__)              \
   {                                                                        \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal \
   }
@@ -121,12 +131,12 @@ struct ProfScope
 
 #if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_DETAILED
 #define GECKO_PROF_SCOPE_DETAILED(label)                                      \
-  ::gecko::ProfScope _g_prof                                                  \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __COUNTER__)                 \
   {                                                                           \
     (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Detailed \
   }
 #define GECKO_PROF_SCOPE_NAMED_DETAILED(label, name)                         \
-  ::gecko::ProfScope _g_prof                                                 \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __COUNTER__)                \
   {                                                                          \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Detailed \
   }
@@ -138,12 +148,12 @@ struct ProfScope
 #endif
 
 #define GECKO_PROF_SCOPE_MARK(label)                                        \
-  ::gecko::ProfScope _g_prof                                                \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __COUNTER__)               \
   {                                                                         \
     (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Always \
   }
 #define GECKO_PROF_SCOPE_NAMED_MARK(label, name)                           \
-  ::gecko::ProfScope _g_prof                                               \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __COUNTER__)              \
   {                                                                        \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Always \
   }

@@ -7,7 +7,11 @@ add_executable(math_tests
 
 target_link_libraries(math_tests PRIVATE Catch2::Catch2WithMain)
 target_include_directories(math_tests PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_compile_options(math_tests PRIVATE -Wno-pedantic)
+
+# Suppress pedantic warnings for GCC/Clang only (not MSVC)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(math_tests PRIVATE -Wno-pedantic)
+endif()
 
 # Discover and register tests with CTest
 include(Catch)

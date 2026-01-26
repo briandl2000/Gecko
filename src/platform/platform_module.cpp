@@ -13,14 +13,14 @@ constexpr ::gecko::Label PlatformModule::RootLabel() const noexcept
   return labels::Platform;
 }
 
-bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
+bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Platform);
   // Minimal placeholder extension point.
   return true;
 }
 
-void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
+void PlatformModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Platform);
 }

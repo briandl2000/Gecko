@@ -2,6 +2,11 @@
 
 #include "gecko/math/vector.h"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4201)  // nonstandard extension: nameless struct/union
+#endif
+
 namespace gecko::math {
 
 // Forward declaration
@@ -343,3 +348,7 @@ using float3x3 = Float3x3;
 using float4x4 = Float4x4;
 
 }  // namespace gecko::math
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

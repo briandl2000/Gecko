@@ -42,6 +42,10 @@ inline const char* LevelName(LogLevel level)
 }
 
 // Aligned to speed up LogMessages
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4324)  // structure was padded due to alignment
+#endif
 struct alignas(64) LogMessage
 {
   u64 TimeNs {0};
@@ -57,6 +61,9 @@ static_assert(sizeof(LogMessage) == 64,
               "LogMessage must be 64 bytes (cache line size)");
 static_assert(alignof(LogMessage) == 64,
               "LogMessage must be cache-line aligned");
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 // Forward declare for RegisteredSink
 struct ILogger;
@@ -72,14 +79,14 @@ struct ILogger
   GECKO_API virtual ~ILogger() = default;
 
   GECKO_API virtual void LogV(LogLevel level, Label label, const char* fmt,
-                              ::va_list) noexcept = 0;
+                              va_list) noexcept = 0;
 
   inline void Log(LogLevel level, Label label, const char* fmt, ...)
   {
-    ::va_list ap;
-    ::va_start(ap, fmt);
+    va_list ap;
+    va_start(ap, fmt);
     LogV(level, label, fmt, ap);
-    ::va_end(ap);
+    va_end(ap);
   }
 
   // Internal: called by RegisteredSink

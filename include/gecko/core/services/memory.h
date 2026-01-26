@@ -73,10 +73,12 @@ struct LabelScope
   LabelScope& operator=(const LabelScope&) = delete;
 };
 
-#define GECKO_PUSH_LABEL(label)      \
-  ::gecko::LabelScope _g_label_scope \
-  {                                  \
-    (label)                          \
+#define GECKO_PUSH_LABEL_CONCAT_(x, y) x##y
+#define GECKO_PUSH_LABEL_CONCAT(x, y) GECKO_PUSH_LABEL_CONCAT_(x, y)
+#define GECKO_PUSH_LABEL(label)                                      \
+  ::gecko::LabelScope GECKO_PUSH_LABEL_CONCAT(_g_label_scope_, __COUNTER__) \
+  {                                                                  \
+    (label)                                                          \
   }
 
 struct SystemAllocator final : IAllocator

@@ -20,6 +20,8 @@ if(UNIX AND NOT APPLE)
     endif()
     target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_X11)
   endif()
+elseif(WIN32)
+  target_sources(Platform PRIVATE windows/platform_context_windows.cpp)
 endif()
 
 target_include_directories(Platform

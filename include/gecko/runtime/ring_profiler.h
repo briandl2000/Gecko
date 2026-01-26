@@ -35,6 +35,10 @@ public:
   void Flush() noexcept;
 
 private:
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4324)  // structure was padded due to alignment
+#endif
   struct Slot
   {
     std::atomic<u64> Sequence {0};
@@ -47,6 +51,9 @@ private:
     Slot(Slot&&) = delete;
     Slot& operator=(Slot&&) = delete;
   };
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
   std::vector<Slot> m_Ring {};
   size_t m_Capacity {1u << 20};
   size_t m_Mask {0};

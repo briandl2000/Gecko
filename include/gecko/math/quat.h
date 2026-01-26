@@ -2,6 +2,11 @@
 
 #include "gecko/math/vector.h"
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4201)  // nonstandard extension: nameless struct/union
+#endif
+
 namespace gecko::math {
 
 // Forward declarations
@@ -50,7 +55,7 @@ struct Quat
   {}
 
   // Create from axis and angle
-  constexpr Quat(const Float3& axis, f32 angle) noexcept
+  Quat(const Float3& axis, f32 angle) noexcept
       : X(axis.X * Sin(angle * 0.5f)), Y(axis.Y * Sin(angle * 0.5f)),
         Z(axis.Z * Sin(angle * 0.5f)), W(Cos(angle * 0.5f))
   {}
@@ -286,3 +291,7 @@ inline Float3x3 ToMatrix3(const Quat& q) noexcept;
 inline Float4x4 ToMatrix4(const Quat& q) noexcept;
 
 }  // namespace gecko::math
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif

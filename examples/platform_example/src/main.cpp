@@ -39,12 +39,12 @@ public:
   }
 
   [[nodiscard]] bool Startup(
-      ::gecko::IModuleRegistry& modules) noexcept override
+      ::gecko::IModuleRegistry& /*modules*/) noexcept override
   {
     return true;
   }
 
-  void Shutdown(::gecko::IModuleRegistry& modules) noexcept override
+  void Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept override
   {}
 };
 

@@ -11,12 +11,12 @@ constexpr ::gecko::Label RuntimeModule::RootLabel() const noexcept
   return labels::Runtime;
 }
 
-bool RuntimeModule::Startup(::gecko::IModuleRegistry& modules) noexcept
+bool RuntimeModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   return true;
 }
 
-void RuntimeModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
+void RuntimeModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 {}
 
 ::gecko::ModuleRegistration InstallRuntimeModule(
