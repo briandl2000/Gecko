@@ -116,42 +116,42 @@ int main()
                 combined.Min.Y, combined.Max.X, combined.Max.Y);
   ::std::printf("Clamped point: (%.0f, %.0f)\n", clamped.X, clamped.Y);
 
-  // NEW: Test Rotors (geometric algebra rotations)
-  ::std::printf("\n--- Rotors (Geometric Algebra) ---\n");
-  using ::gecko::math::Rotor;
+  // Test Quaternions (rotation representation)
+  ::std::printf("\n--- Quaternions ---\n");
+  using ::gecko::math::Quat;
 
-  // Create rotor from axis-angle
-  const Rotor r1 =
-      Rotor::AxisAngle({0.0f, 0.0f, 1.0f}, ::gecko::math::ToRadians(90.0f));
+  // Create quaternion from axis-angle
+  const Quat q1 =
+      Quat::AxisAngle({0.0f, 0.0f, 1.0f}, ::gecko::math::ToRadians(90.0f));
   const Float3 vec {1.0f, 0.0f, 0.0f};
-  const Float3 rotatedVec = ::gecko::math::Rotate(r1, vec);
+  const Float3 rotatedVec = ::gecko::math::Rotate(q1, vec);
   ::std::printf(
       "Vector (1,0,0) rotated 90° around Z-axis: (%.2f, %.2f, %.2f)\n",
       rotatedVec.X, rotatedVec.Y, rotatedVec.Z);
 
-  // Rotor composition (apply R2 after R1)
-  const Rotor r2 =
-      Rotor::AxisAngle({1.0f, 0.0f, 0.0f}, ::gecko::math::ToRadians(45.0f));
-  const Rotor combined_rotor = r2 * r1;  // Compose rotations
-  const Float3 doubleRotated = ::gecko::math::Rotate(combined_rotor, vec);
+  // Quaternion composition (apply q2 after q1)
+  const Quat q2 =
+      Quat::AxisAngle({1.0f, 0.0f, 0.0f}, ::gecko::math::ToRadians(45.0f));
+  const Quat combined_quat = q2 * q1;  // Compose rotations
+  const Float3 doubleRotated = ::gecko::math::Rotate(combined_quat, vec);
   ::std::printf("After composing two rotations: (%.2f, %.2f, %.2f)\n",
                 doubleRotated.X, doubleRotated.Y, doubleRotated.Z);
 
-  // Rotor from one vector to another
+  // Quaternion from one vector to another
   const Float3 from {1.0f, 0.0f, 0.0f};
   const Float3 to {0.0f, 1.0f, 0.0f};
-  const Rotor fromTo = Rotor::FromTo(from, to);
+  const Quat fromTo = Quat::FromTo(from, to);
   const Float3 aligned = ::gecko::math::Rotate(fromTo, from);
-  ::std::printf("FromTo rotor aligns (1,0,0) to: (%.2f, %.2f, %.2f)\n",
+  ::std::printf("FromTo quaternion aligns (1,0,0) to: (%.2f, %.2f, %.2f)\n",
                 aligned.X, aligned.Y, aligned.Z);
 
   // Spherical linear interpolation
-  const Rotor r3 = Rotor::AxisAngle({0.0f, 1.0f, 0.0f}, 0.0f);
-  const Rotor r4 =
-      Rotor::AxisAngle({0.0f, 1.0f, 0.0f}, ::gecko::math::ToRadians(180.0f));
-  const Rotor midRotor = ::gecko::math::Slerp(r3, r4, 0.5f);
+  const Quat q3 = Quat::AxisAngle({0.0f, 1.0f, 0.0f}, 0.0f);
+  const Quat q4 =
+      Quat::AxisAngle({0.0f, 1.0f, 0.0f}, ::gecko::math::ToRadians(180.0f));
+  const Quat midQuat = ::gecko::math::Slerp(q3, q4, 0.5f);
   const Float3 halfRotated =
-      ::gecko::math::Rotate(midRotor, {1.0f, 0.0f, 0.0f});
+      ::gecko::math::Rotate(midQuat, {1.0f, 0.0f, 0.0f});
   ::std::printf("Slerp halfway between 0° and 180°: (%.2f, %.2f, %.2f)\n",
                 halfRotated.X, halfRotated.Y, halfRotated.Z);
 

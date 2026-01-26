@@ -2,7 +2,7 @@ add_executable(math_tests
   test_vector.cpp
   test_matrix.cpp
   test_aabb.cpp
-  test_rotor.cpp
+  test_quat.cpp
 )
 
 target_link_libraries(math_tests PRIVATE Catch2::Catch2WithMain)
