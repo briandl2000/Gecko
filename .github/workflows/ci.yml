@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  # =============================================================================
+  # Build & Test - runs on all PRs and pushes
+  # =============================================================================
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libx11-dev libxext-dev
+      
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
+      
+      - name: Configure
+        run: cmake --preset debug -DGECKO_BUILD_TESTS=ON
+      
+      - name: Build
+        run: cmake --build out/build --config Release
+      
+      - name: Run tests
+        run: ./out/bin/Release/tests/math_tests
+        shell: bash
+
+  # =============================================================================
+  # Package - only on push (merge) to dev or main
+  # =============================================================================
+  package:
+    name: Package (${{ matrix.os }})
+    needs: build-and-test
+    if: github.event_name == 'push'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libx11-dev libxext-dev zip
+      
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja
+      
+      - name: Configure
+        run: cmake --preset release
+      
+      - name: Build Release
+        run: cmake --build out/build --config Release
+      
+      - name: Get version info
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(grep -oP 'project\(Gecko VERSION \K[\d.]+' CMakeLists.txt || grep -o 'VERSION [0-9.]*' CMakeLists.txt | cut -d' ' -f2)
+          PRERELEASE=$(grep -oP 'GECKO_VERSION_PRERELEASE "\K[^"]+' CMakeLists.txt || echo "")
+          
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+            if [ -n "$PRERELEASE" ]; then
+              VERSION_STR="${VERSION}-${PRERELEASE}-dev.${TIMESTAMP}"
+            else
+              VERSION_STR="${VERSION}-dev.${TIMESTAMP}"
+            fi
+          else
+            if [ -n "$PRERELEASE" ]; then
+              VERSION_STR="${VERSION}-${PRERELEASE}"
+            else
+              VERSION_STR="${VERSION}"
+            fi
+          fi
+          
+          echo "version=${VERSION_STR}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION_STR}" >> $GITHUB_OUTPUT
+      
+      - name: Install to package directory
+        run: cmake --install out/build --prefix out/package/gecko-${{ steps.version.outputs.version }} --config Release
+      
+      - name: Create zip (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd out/package
+          zip -r gecko-${{ steps.version.outputs.version }}-${{ matrix.platform }}.zip gecko-${{ steps.version.outputs.version }}
+      
+      - name: Create zip (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd out/package
+          Compress-Archive -Path gecko-${{ steps.version.outputs.version }} -DestinationPath gecko-${{ steps.version.outputs.version }}-${{ matrix.platform }}.zip
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gecko-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          path: out/package/*.zip
+          retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
+
+  # =============================================================================
+  # Release - create GitHub release after packaging (only on main)
+  # =============================================================================
+  release:
+    name: Create Release
+    needs: package
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep -oP 'project\(Gecko VERSION \K[\d.]+' CMakeLists.txt)
+          PRERELEASE=$(grep -oP 'GECKO_VERSION_PRERELEASE "\K[^"]+' CMakeLists.txt || echo "")
+          if [ -n "$PRERELEASE" ]; then
+            echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+            echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: gecko-*
+      
+      - name: Collect packages
+        run: |
+          mkdir -p release
+          find artifacts -name "*.zip" -exec cp {} release/ \;
+          ls -la release/
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Gecko ${{ steps.version.outputs.version }}
+          files: release/*.zip
+          draft: false
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

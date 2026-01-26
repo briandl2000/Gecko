@@ -1,63 +1,70 @@
 from __future__ import annotations
 
-import shutil
+import os
 import subprocess
+import sys
 from pathlib import Path
 
 
-def _write_if_missing(path: Path, content: str) -> None:
-    if path.exists():
+def _configure_cmake(repo_root: Path) -> int:
+    """Configure CMake if not already done."""
+    build_dir = repo_root / "out" / "build"
+    
+    if (build_dir / "CMakeCache.txt").exists():
+        print("CMake already configured.")
+        return 0
+    
+    print("Configuring CMake...")
+    result = subprocess.run(
+        ["cmake", "--preset", "debug"],
+        cwd=repo_root,
+        check=False,
+    )
+    return result.returncode
+
+
+def _setup_compile_commands(repo_root: Path) -> None:
+    """Create symlink for compile_commands.json in repo root."""
+    source = repo_root / "out" / "build" / "compile_commands.json"
+    target = repo_root / "compile_commands.json"
+    
+    if target.exists() or target.is_symlink():
         return
-    path.write_text(content, encoding="utf-8")
+    
+    if source.exists():
+        try:
+            target.symlink_to(source)
+            print("Created compile_commands.json symlink")
+        except OSError:
+            # Windows without symlink permission - copy instead
+            import shutil
+            shutil.copy2(source, target)
+            print("Copied compile_commands.json (symlink not available)")
 
 
-def _ensure_env_scripts(repo_root: Path) -> None:
-    bash_env = repo_root / ".gecko_env"
-    ps_env = repo_root / ".gecko_env.ps1"
-    bat_env = repo_root / ".gecko_env.bat"
-
-    _write_if_missing(
-        bash_env,
-        """#!/usr/bin/env bash
-REPO_ROOT=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"
-export PATH=\"${REPO_ROOT}/bin:${PATH}\"
-""",
-    )
-
-    _write_if_missing(
-        ps_env,
-        """$RepoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$env:PATH = \"$RepoRoot\\bin;$env:PATH\"
-""",
-    )
-
-    _write_if_missing(
-        bat_env,
-        """@echo off
-set \"REPO_ROOT=%~dp0\"
-set \"PATH=%REPO_ROOT%bin;%PATH%\"
-""",
-    )
-def _ensure_envrc(repo_root: Path) -> None:
-    envrc = repo_root / ".envrc"
-    _write_if_missing(envrc, "source ./.gecko_env\n")
+def _print_usage() -> None:
+    print("\n" + "=" * 50)
+    print("Gecko development environment ready!")
+    print("=" * 50)
+    print("\nAdd bin/ to your PATH:")
+    print("  export PATH=\"$PWD/bin:$PATH\"   # bash/zsh")
+    print("  $env:PATH = \"$PWD\\bin;$env:PATH\"   # PowerShell")
+    print("\nCommon commands:")
+    print("  gecko build [debug|release|all]")
+    print("  gecko test [debug|release]")
+    print("  gecko format")
 
 
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
-    _ensure_env_scripts(repo_root)
-    _ensure_envrc(repo_root)
-
-    if shutil.which("direnv"):
-        subprocess.run(["direnv", "allow", str(repo_root)], check=False)
-
-    print("Gecko dev env files created.")
-    print("\nBash/Zsh:")
-    print("  source ./.gecko_env   (or use direnv if installed)")
-    print("\nPowerShell:")
-    print("  .\\.gecko_env.ps1")
-    print("\nCmd.exe:")
-    print("  .\\.gecko_env.bat")
+    os.chdir(repo_root)
+    
+    result = _configure_cmake(repo_root)
+    if result != 0:
+        return result
+    
+    _setup_compile_commands(repo_root)
+    _print_usage()
     return 0
 
 
