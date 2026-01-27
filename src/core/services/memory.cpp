@@ -9,14 +9,12 @@
 namespace gecko {
 
 // ============================================================================
-// SystemAllocator Implementation
-// ============================================================================
+// MSVC-only aligned allocation tracking
 // On MSVC, _aligned_malloc must be paired with _aligned_free, not free().
-// We need to track which allocations used aligned_malloc.
-//
-// Approach: Use a small, fast hash table to track aligned allocations.
-// This is the same strategy used in overwrite_new.cpp for fallback tracking.
+// We track which allocations used aligned_malloc via a hash table.
+// On POSIX systems, posix_memalign can be freed with free(), so no tracking.
 // ============================================================================
+#if defined(_MSC_VER)
 
 namespace {
 
@@ -136,6 +134,8 @@ bool UnregisterAligned(void* ptr) noexcept
 }
 
 }  // namespace
+
+#endif  // defined(_MSC_VER)
 
 void* SystemAllocator::Alloc(u64 size, u32 alignment) noexcept
 {
