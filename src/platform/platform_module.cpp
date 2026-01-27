@@ -2,16 +2,10 @@
 
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "private/labels.h"
 
 namespace gecko::platform {
 
 static PlatformModule s_PlatformModule;
-
-constexpr ::gecko::Label PlatformModule::RootLabel() const noexcept
-{
-  return labels::Platform;
-}
 
 bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {

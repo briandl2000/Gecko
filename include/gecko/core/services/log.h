@@ -41,11 +41,7 @@ inline const char* LevelName(LogLevel level)
   return "?";
 }
 
-// Aligned to speed up LogMessages
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4324)  // structure was padded due to alignment
-#endif
+// Aligned for cache-line performance
 struct alignas(64) LogMessage
 {
   u64 TimeNs {0};
@@ -61,9 +57,6 @@ static_assert(sizeof(LogMessage) == 64,
               "LogMessage must be 64 bytes (cache line size)");
 static_assert(alignof(LogMessage) == 64,
               "LogMessage must be cache-line aligned");
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
 
 // Forward declare for RegisteredSink
 struct ILogger;

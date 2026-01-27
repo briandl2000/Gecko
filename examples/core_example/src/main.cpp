@@ -494,7 +494,6 @@ int main()
   std::printf("(As expected, no log output appeared above)\n\n");
 
   // Set up our services
-  std::printf("Setting up services...\n");
   SystemAllocator systemAlloc;
   runtime::TrackingAllocator trackingAlloc(&systemAlloc);
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events

@@ -8,7 +8,7 @@ on:
 
 jobs:
   # =============================================================================
-  # Build & Test - runs on all PRs and pushes
+  # Build & Test - Clang only (clang on Linux, clang-cl on Windows)
   # =============================================================================
   build-and-test:
     name: Build & Test (${{ matrix.os }})
@@ -25,21 +25,49 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libx11-dev libxext-dev
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install ninja
+        shell: powershell
+        run: |
+          choco install ninja llvm
+      
+      - name: Setup MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
       
       - name: Configure
-        run: cmake --preset debug -DGECKO_BUILD_TESTS=ON
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            export CC=clang-cl
+            export CXX=clang-cl
+          else
+            export CC=clang
+            export CXX=clang++
+          fi
+          cmake -S . -B out/build -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
       
       - name: Build
         run: cmake --build out/build --config Release
       
       - name: Run tests
-        run: ./out/bin/Release/tests/math_tests
         shell: bash
+        run: |
+          if [ -f "./out/bin/Release/tests/math_tests.exe" ]; then
+            ./out/bin/Release/tests/math_tests.exe
+          elif [ -f "./out/bin/Release/tests/math_tests" ]; then
+            ./out/bin/Release/tests/math_tests
+          else
+            echo "Test executable not found!"
+            exit 1
+          fi
 
   # =============================================================================
   # Package - only on push (merge) to dev or main
@@ -66,14 +94,27 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libx11-dev libxext-dev zip
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install ninja
+        run: choco install ninja llvm
+      
+      - name: Setup MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
       
       - name: Configure
-        run: cmake --preset release
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            export CC=clang-cl
+            export CXX=clang-cl
+          else
+            export CC=clang
+            export CXX=clang++
+          fi
+          cmake -S . -B out/build -G "Ninja Multi-Config"
       
       - name: Build Release
         run: cmake --build out/build --config Release

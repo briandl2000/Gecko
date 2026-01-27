@@ -4,12 +4,19 @@
 
 namespace gecko::runtime {
 
+namespace labels {
+inline constexpr ::gecko::Label Runtime = ::gecko::MakeLabel("gecko.runtime");
+}
+
 // Runtime library's module.
 class RuntimeModule final : public ::gecko::IModule
 {
 public:
   [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
-      const noexcept override;
+      const noexcept override
+  {
+    return labels::Runtime;
+  }
 
   [[nodiscard]] GECKO_API bool
 

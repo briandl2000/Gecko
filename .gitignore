@@ -18,6 +18,8 @@ __pycache__/
 
 # Logs and working files
 *.log
+log.txt
+gecko_trace.json
 working_dir/
 
 # direnv (if used)

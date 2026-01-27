@@ -2,6 +2,17 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Gecko VERSION 0.0.0 LANGUAGES C CXX)
 
+# Enforce Clang compiler (either Clang or clang-cl on Windows)
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  message(FATAL_ERROR 
+    "Gecko requires Clang compiler but detected: ${CMAKE_CXX_COMPILER_ID}\n"
+    "Please install LLVM/Clang:\n"
+    "  Windows: Visual Studio Installer > Individual Components > 'C++ Clang Compiler'\n"
+    "  Ubuntu:  sudo apt-get install clang\n"
+    "  macOS:   brew install llvm\n"
+    "Then delete the out/build directory and reconfigure.")
+endif()
+
 # Optional SemVer prerelease identifier (repo-controlled).
 # Examples: "alpha.1", "beta.2", "rc.1". Set to "" for a normal release.
 set(GECKO_VERSION_PRERELEASE "alpha.0")
@@ -28,10 +39,13 @@ if(CCACHE_PROGRAM)
   message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
 endif()
 
-# Enable all warnings and treat warnings as errors
+# Compiler flags - Clang-only, consistent across platforms
+# clang-cl uses MSVC-style flags, regular clang uses GCC-style
 if(MSVC)
+    # clang-cl on Windows (still sets MSVC=true but uses Clang frontend)
     add_compile_options(/W4 /WX)
 else()
+    # clang on Linux/macOS
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
 

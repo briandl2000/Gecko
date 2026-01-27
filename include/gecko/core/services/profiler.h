@@ -34,10 +34,6 @@ enum class ProfEventKind : u8
   FrameMark
 };
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4324)  // structure was padded due to alignment
-#endif
 struct alignas(64) ProfEvent
 {
   u64 TimestampNs {0};
@@ -51,9 +47,6 @@ struct alignas(64) ProfEvent
 };
 
 static_assert(sizeof(ProfEvent) == 64, "ProfEvent must be 64 bytes");
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
 
 struct IProfiler;
 

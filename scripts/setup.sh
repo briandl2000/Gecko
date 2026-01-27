@@ -14,7 +14,22 @@ export -f gk
 # Configure CMake if not already done
 if [ ! -d "$REPO_ROOT/out/build" ]; then
     echo "Configuring CMake..."
-    cmake --preset debug -S "$REPO_ROOT"
+    
+    # Require Clang compiler
+    if command -v clang &> /dev/null && command -v clang++ &> /dev/null; then
+        echo "Using Clang compiler: $(clang --version | head -n1)"
+        export CC=clang
+        export CXX=clang++
+    else
+        echo "ERROR: Clang compiler not found!"
+        echo "Install with:"
+        echo "  Ubuntu/Debian: sudo apt-get install clang"
+        echo "  Fedora:        sudo dnf install clang"
+        echo "  macOS:         brew install llvm"
+        return 1
+    fi
+    
+    cmake -S "$REPO_ROOT" -B "$REPO_ROOT/out/build" -G "Ninja Multi-Config"
 fi
 
 echo "Gecko dev environment ready. Commands: gk build, gk test, gk package"

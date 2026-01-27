@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "gecko/core/services/jobs.h"
 #include "gecko/core/services/log.h"

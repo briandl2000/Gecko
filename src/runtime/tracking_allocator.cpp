@@ -1,4 +1,4 @@
-#include "gecko/runtime/tracking_allocator.h"
+﻿#include "gecko/runtime/tracking_allocator.h"
 
 #include "gecko/core/assert.h"
 #include "gecko/core/services/log.h"
@@ -79,6 +79,10 @@ MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
 
 void* TrackingAllocator::Alloc(u64 size, u32 alignment) noexcept
 {
+  if (!m_Upstream)
+  {
+    return nullptr;
+  }
   // NOTE: Cannot use profiling/logging - Allocator is Level 0, comes before
   // everything
   GECKO_ASSERT(m_Upstream && "Upstream allocator is required");
@@ -133,8 +137,19 @@ void TrackingAllocator::Free(void* ptr) noexcept
   if (!ptr)
     return;
 
+  if (!m_Upstream)
+  {
+    return;
+  }
+
   // Read header (immediately before user pointer)
   auto* header = HeaderFromUserPtr(ptr);
+
+  if (!IsValidAllocHeader(header))
+  {
+    return;
+  }
+
   GECKO_ASSERT(IsValidAllocHeader(header) &&
                "Invalid allocation header in TrackingAllocator::Free");
 

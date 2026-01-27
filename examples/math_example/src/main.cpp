@@ -150,8 +150,7 @@ int main()
   const Quat q4 =
       Quat::AxisAngle({0.0f, 1.0f, 0.0f}, ::gecko::math::ToRadians(180.0f));
   const Quat midQuat = ::gecko::math::Slerp(q3, q4, 0.5f);
-  const Float3 halfRotated =
-      ::gecko::math::Rotate(midQuat, {1.0f, 0.0f, 0.0f});
+  const Float3 halfRotated = ::gecko::math::Rotate(midQuat, {1.0f, 0.0f, 0.0f});
   ::std::printf("Slerp halfway between 0° and 180°: (%.2f, %.2f, %.2f)\n",
                 halfRotated.X, halfRotated.Y, halfRotated.Z);
 

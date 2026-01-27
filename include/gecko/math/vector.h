@@ -4,11 +4,6 @@
 
 #include <cmath>
 
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable : 4201)  // nonstandard extension: nameless struct/union
-#endif
-
 namespace gecko::math {
 
 // Common math constants
@@ -689,7 +684,3 @@ using Size3i = Int3;
 using Size4i = Int4;
 
 }  // namespace gecko::math
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif

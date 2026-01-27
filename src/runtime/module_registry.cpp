@@ -6,6 +6,7 @@
 #include "gecko/core/services/log.h"
 #include "private/labels.h"
 
+#include <atomic>
 #include <unordered_map>
 #include <vector>
 
@@ -72,6 +73,14 @@ struct ModuleRegistry::Impl
     rec.Started = false;
   }
 
+  // Note: Explicit constructor with memory barrier to ensure thread-safe
+  // initialization. The atomic_thread_fence provides synchronization with
+  // other threads that may be using the allocator concurrently.
+  Impl()
+  {
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+  }
+
   bool Booted {false};
   std::unordered_map<u64, ModuleRecord> Modules;
   std::vector<u64> RegistrationOrder;
@@ -88,7 +97,18 @@ bool ModuleRegistry::Init() noexcept
 {
   if (!m_impl)
   {
-    m_impl.reset(new Impl());
+    try
+    {
+      m_impl.reset(new Impl());
+    }
+    catch (const std::exception&)
+    {
+      return false;
+    }
+    catch (...)
+    {
+      return false;
+    }
   }
   // Service init corresponds to "engine booted": newly registered modules
   // should be started immediately.
