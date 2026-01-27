@@ -4,12 +4,19 @@
 
 namespace gecko::platform {
 
+namespace labels {
+inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
+}
+
 // Platform library's module.
 class PlatformModule final : public ::gecko::IModule
 {
 public:
   [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
-      const noexcept override;
+      const noexcept override
+  {
+    return labels::Platform;
+  }
 
   [[nodiscard]] GECKO_API bool Startup(
       ::gecko::IModuleRegistry& modules) noexcept override;

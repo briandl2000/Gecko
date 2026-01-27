@@ -144,6 +144,7 @@ bool InstallServices(const Services& svc) noexcept
   st.eventBus = true;
 
   g_Installed.store(true, std::memory_order_release);
+
   GECKO_INFO(core::labels::Services, "All services installed successfully");
 
   return true;

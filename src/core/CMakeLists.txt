@@ -25,6 +25,11 @@ target_sources(Core
 add_library(CoreServices SHARED)
 add_library(Gecko::CoreServices ALIAS CoreServices)
 
+# Export all symbols on Windows to create the .lib import library
+set_target_properties(CoreServices PROPERTIES
+  WINDOWS_EXPORT_ALL_SYMBOLS ON
+)
+
 target_compile_definitions(Core PRIVATE GECKO_OVERRIDE_NEW)
 
 target_sources(CoreServices

@@ -47,6 +47,7 @@ private:
     Slot(Slot&&) = delete;
     Slot& operator=(Slot&&) = delete;
   };
+
   std::vector<Slot> m_Ring {};
   size_t m_Capacity {1u << 20};
   size_t m_Mask {0};

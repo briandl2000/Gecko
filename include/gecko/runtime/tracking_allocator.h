@@ -89,8 +89,11 @@ public:
   T* allocate(std::size_t n)
   {
     if (!m_Upstream)
-      return nullptr;
-    return static_cast<T*>(m_Upstream->Alloc(n * sizeof(T), alignof(T)));
+      throw std::bad_alloc {};
+    void* ptr = m_Upstream->Alloc(n * sizeof(T), alignof(T));
+    if (!ptr)
+      throw std::bad_alloc {};
+    return static_cast<T*>(ptr);
   }
 
   void deallocate(T* ptr, std::size_t n) noexcept
