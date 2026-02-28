@@ -26,7 +26,7 @@ gk test
 - **CMake** 3.22+
 - **Python** 3.7+
 - **Ninja** (recommended)
-- **GCC 13+** or **Clang 17+** with C++23 support
+- **Clang 17+** with C++23 support (GCC/MSVC not currently supported)
 
 ## CLI Commands
 

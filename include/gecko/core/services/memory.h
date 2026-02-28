@@ -72,7 +72,8 @@ inline void* PlaceAllocHeader(void* rawPtr, u64 size, u32 userAlignment,
 {
   const u32 effAlign = EffectiveAlignment(userAlignment);
   auto rawAddr = reinterpret_cast<uintptr_t>(rawPtr);
-  const uintptr_t alignMask = static_cast<uintptr_t>(userAlignment) - 1;
+
+  const uintptr_t alignMask = static_cast<uintptr_t>(effAlign) - 1;
   uintptr_t userAddr = (rawAddr + sizeof(AllocHeader) + alignMask) & ~alignMask;
 
   auto* header = reinterpret_cast<AllocHeader*>(userAddr - sizeof(AllocHeader));

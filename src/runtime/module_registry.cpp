@@ -6,7 +6,6 @@
 #include "gecko/core/services/log.h"
 #include "private/labels.h"
 
-#include <atomic>
 #include <unordered_map>
 #include <vector>
 
@@ -71,14 +70,6 @@ struct ModuleRegistry::Impl
     GECKO_ASSERT(rec.Module != nullptr);
     rec.Module->Shutdown(self);
     rec.Started = false;
-  }
-
-  // Note: Explicit constructor with memory barrier to ensure thread-safe
-  // initialization. The atomic_thread_fence provides synchronization with
-  // other threads that may be using the allocator concurrently.
-  Impl()
-  {
-    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
   bool Booted {false};

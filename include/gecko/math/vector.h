@@ -49,9 +49,9 @@ inline constexpr f32 Epsilon = 1e-6f;
   return t * t * (3.0f - 2.0f * t);
 }
 
-[[nodiscard]] inline f32 Abs(f32 x) noexcept
+[[nodiscard]] constexpr f32 Abs(f32 x) noexcept
 {
-  return ::std::abs(x);
+  return x < 0.0f ? -x : x;
 }
 
 [[nodiscard]] inline f32 Sqrt(f32 x) noexcept

@@ -127,9 +127,9 @@ struct Quat
             cr * cp * sy - sr * sp * cy, cr * cp * cy + sr * sp * sy};
   }
 
-  // Create from rotation matrix
-  static inline Quat FromMatrix(const Float3x3& m) noexcept;
-  static inline Quat FromMatrix(const Float4x4& m) noexcept;
+  // TODO: Implement when matrix conversions are needed
+  // static Quat FromMatrix(const Float3x3& m) noexcept;
+  // static Quat FromMatrix(const Float4x4& m) noexcept;
 };
 
 // Quaternion operations
@@ -279,10 +279,8 @@ inline void ToAxisAngle(const Quat& q, Float3& outAxis, f32& outAngle) noexcept
   }
 }
 
-// Convert to 3x3 rotation matrix
-inline Float3x3 ToMatrix3(const Quat& q) noexcept;
-
-// Convert to 4x4 rotation matrix
-inline Float4x4 ToMatrix4(const Quat& q) noexcept;
+// TODO: Implement when matrix conversions are needed
+// Float3x3 ToMatrix3(const Quat& q) noexcept;
+// Float4x4 ToMatrix4(const Quat& q) noexcept;
 
 }  // namespace gecko::math

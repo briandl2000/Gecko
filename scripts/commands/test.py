@@ -55,9 +55,10 @@ def _run(args) -> int:
     
     # Run tests directly (Catch2 handles test discovery and reporting)
     print(f"\nRunning tests...")
-    test_executable = f"out/bin/{config}/tests/math_tests"
+    exe_suffix = ".exe" if os.name == "nt" else ""
+    test_executable = Path(f"out/bin/{config}/tests/math_tests{exe_suffix}")
     test_result = subprocess.run(
-        [test_executable],
+        [str(test_executable)],
         check=False,
     )
     

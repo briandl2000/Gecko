@@ -56,6 +56,9 @@ struct MemLabelStats
 template <typename T>
 class MallocAllocator
 {
+  static_assert(alignof(T) <= alignof(::std::max_align_t),
+                "MallocAllocator does not support over-aligned types");
+
 public:
   using value_type = T;
 
