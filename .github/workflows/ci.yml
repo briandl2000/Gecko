@@ -253,19 +253,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Delete previous dev releases
-        if: github.ref == 'refs/heads/dev'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Delete all previous dev releases to keep releases clean
-          gh release list --limit 100 --json tagName,isPrerelease \
-            -q '.[] | select(.isPrerelease and (.tagName | contains("-dev."))) | .tagName' \
-          | while read -r tag; do
-            echo "Deleting old dev release: $tag"
-            gh release delete "$tag" --yes --cleanup-tag || true
-          done
-      
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
