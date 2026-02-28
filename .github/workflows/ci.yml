@@ -70,12 +70,97 @@ jobs:
           fi
 
   # =============================================================================
+  # Version check - ensure version was bumped before merging to main
+  # =============================================================================
+  version-check:
+    name: Version Bump Check
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check version was bumped
+        run: |
+          PR_VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          MAIN_VERSION=$(git show origin/main:CMakeLists.txt | sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p')
+          
+          PR_PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
+          MAIN_PRERELEASE=$(git show origin/main:CMakeLists.txt | sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p')
+          
+          PR_FULL="${PR_VERSION}"
+          MAIN_FULL="${MAIN_VERSION}"
+          [ -n "$PR_PRERELEASE" ] && PR_FULL="${PR_VERSION}-${PR_PRERELEASE}"
+          [ -n "$MAIN_PRERELEASE" ] && MAIN_FULL="${MAIN_VERSION}-${MAIN_PRERELEASE}"
+          
+          echo "Main version:  ${MAIN_FULL}"
+          echo "PR version:    ${PR_FULL}"
+          
+          if [ "$PR_FULL" = "$MAIN_FULL" ]; then
+            echo ""
+            echo "::error::Version was not bumped! Update the version in CMakeLists.txt before merging to main."
+            echo "Current main version: ${MAIN_FULL}"
+            echo ""
+            echo "To bump: change 'project(Gecko VERSION x.y.z)' and/or GECKO_VERSION_PRERELEASE in CMakeLists.txt"
+            exit 1
+          fi
+          
+          echo "Version bump verified: ${MAIN_FULL} -> ${PR_FULL}"
+
+  # =============================================================================
+  # Resolve version - compute version string once for all downstream jobs
+  # =============================================================================
+  resolve-version:
+    name: Resolve Version
+    needs: build-and-test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Compute version string
+        id: version
+        run: |
+          VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
+          
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+            if [ -n "$PRERELEASE" ]; then
+              VERSION_STR="${VERSION}-${PRERELEASE}-dev.${TIMESTAMP}"
+            else
+              VERSION_STR="${VERSION}-dev.${TIMESTAMP}"
+            fi
+            echo "version=${VERSION_STR}" >> $GITHUB_OUTPUT
+            echo "tag=v${VERSION_STR}" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            if [ -n "$PRERELEASE" ]; then
+              echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+              echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+              echo "prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "version=${VERSION}" >> $GITHUB_OUTPUT
+              echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+              echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+          
+          echo "Resolved version: $(cat $GITHUB_OUTPUT | grep ^version= | cut -d= -f2)"
+
+  # =============================================================================
   # Package - only on push (merge) to dev or main
   # =============================================================================
   package:
     name: Package (${{ matrix.os }})
-    needs: build-and-test
-    if: github.event_name == 'push'
+    needs: resolve-version
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -119,50 +204,25 @@ jobs:
       - name: Build Release
         run: cmake --build out/build --config Release
       
-      - name: Get version info
-        id: version
-        shell: bash
-        run: |
-          VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
-          PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
-          
-          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-            if [ -n "$PRERELEASE" ]; then
-              VERSION_STR="${VERSION}-${PRERELEASE}-dev.${TIMESTAMP}"
-            else
-              VERSION_STR="${VERSION}-dev.${TIMESTAMP}"
-            fi
-          else
-            if [ -n "$PRERELEASE" ]; then
-              VERSION_STR="${VERSION}-${PRERELEASE}"
-            else
-              VERSION_STR="${VERSION}"
-            fi
-          fi
-          
-          echo "version=${VERSION_STR}" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION_STR}" >> $GITHUB_OUTPUT
-      
       - name: Install to package directory
-        run: cmake --install out/build --prefix out/package/gecko-${{ steps.version.outputs.version }} --config Release
+        run: cmake --install out/build --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
       
       - name: Create zip (Linux)
         if: runner.os == 'Linux'
         run: |
           cd out/package
-          zip -r gecko-${{ steps.version.outputs.version }}-${{ matrix.platform }}.zip gecko-${{ steps.version.outputs.version }}
+          zip -r gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip gecko-${{ needs.resolve-version.outputs.version }}
       
       - name: Create zip (Windows)
         if: runner.os == 'Windows'
         run: |
           cd out/package
-          Compress-Archive -Path gecko-${{ steps.version.outputs.version }} -DestinationPath gecko-${{ steps.version.outputs.version }}-${{ matrix.platform }}.zip
+          Compress-Archive -Path gecko-${{ needs.resolve-version.outputs.version }} -DestinationPath gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gecko-${{ steps.version.outputs.version }}-${{ matrix.platform }}
+          name: gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}
           path: out/package/*.zip
           retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
 
@@ -171,42 +231,13 @@ jobs:
   # =============================================================================
   release:
     name: Create Release
-    needs: package
-    if: github.event_name == 'push'
+    needs: [resolve-version, package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Get version
-        id: version
-        run: |
-          VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
-          PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
-          
-          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-            if [ -n "$PRERELEASE" ]; then
-              VERSION_STR="${VERSION}-${PRERELEASE}-dev.${TIMESTAMP}"
-            else
-              VERSION_STR="${VERSION}-dev.${TIMESTAMP}"
-            fi
-            echo "version=${VERSION_STR}" >> $GITHUB_OUTPUT
-            echo "tag=v${VERSION_STR}" >> $GITHUB_OUTPUT
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            if [ -n "$PRERELEASE" ]; then
-              echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
-              echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
-              echo "prerelease=true" >> $GITHUB_OUTPUT
-            else
-              echo "version=${VERSION}" >> $GITHUB_OUTPUT
-              echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
-              echo "prerelease=false" >> $GITHUB_OUTPUT
-            fi
-          fi
       
       - name: Delete previous dev releases
         if: github.ref == 'refs/heads/dev'
@@ -233,24 +264,50 @@ jobs:
           find artifacts -name "*.zip" -exec cp {} release/ \;
           ls -la release/
       
+      - name: Extract changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          # For dev builds, use the base version (without -dev.timestamp)
+          BASE_VERSION=$(echo "$VERSION" | sed 's/-dev\.[0-9]*//')
+          
+          if [ -f CHANGELOG.md ]; then
+            # Extract the section for this version (between ## [x.y.z] headers)
+            NOTES=$(sed -n "/^## \[${BASE_VERSION}\]/,/^## \[/{ /^## \[${BASE_VERSION}\]/d; /^## \[/d; p; }" CHANGELOG.md)
+            if [ -z "$NOTES" ]; then
+              NOTES="No changelog entry for ${BASE_VERSION}."
+            fi
+          else
+            NOTES="No CHANGELOG.md found."
+          fi
+          
+          # Write to file for gh release
+          echo "$NOTES" > release_notes.md
+          
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            echo -e "**Dev build from \`dev\` branch — may be unstable.**\n" | cat - release_notes.md > tmp && mv tmp release_notes.md
+          fi
+          
+          echo "Generated release notes:"
+          cat release_notes.md
+      
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
-            PRERELEASE_FLAG="--prerelease"
-          else
-            PRERELEASE_FLAG=""
+          FLAGS=""
+          if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
+            FLAGS="--prerelease"
           fi
           
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            TITLE="Gecko Dev Build ${{ steps.version.outputs.version }}"
+            TITLE="Gecko Dev Build ${{ needs.resolve-version.outputs.version }}"
           else
-            TITLE="Gecko ${{ steps.version.outputs.version }}"
+            TITLE="Gecko ${{ needs.resolve-version.outputs.version }}"
           fi
           
-          gh release create "${{ steps.version.outputs.tag }}" \
+          gh release create "${{ needs.resolve-version.outputs.tag }}" \
             --title "${TITLE}" \
-            ${PRERELEASE_FLAG} \
-            --generate-notes \
+            --notes-file release_notes.md \
+            ${FLAGS} \
             release/*.zip
