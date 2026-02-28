@@ -167,13 +167,15 @@ jobs:
           retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
 
   # =============================================================================
-  # Release - create GitHub release after packaging (only on main)
+  # Release - create GitHub release after packaging (dev and main)
   # =============================================================================
   release:
     name: Create Release
     needs: package
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     
     steps:
       - uses: actions/checkout@v4
@@ -183,15 +185,41 @@ jobs:
         run: |
           VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
           PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
-          if [ -n "$PRERELEASE" ]; then
-            echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
-            echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+          
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+            if [ -n "$PRERELEASE" ]; then
+              VERSION_STR="${VERSION}-${PRERELEASE}-dev.${TIMESTAMP}"
+            else
+              VERSION_STR="${VERSION}-dev.${TIMESTAMP}"
+            fi
+            echo "version=${VERSION_STR}" >> $GITHUB_OUTPUT
+            echo "tag=v${VERSION_STR}" >> $GITHUB_OUTPUT
             echo "prerelease=true" >> $GITHUB_OUTPUT
           else
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-            echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
-            echo "prerelease=false" >> $GITHUB_OUTPUT
+            if [ -n "$PRERELEASE" ]; then
+              echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+              echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+              echo "prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "version=${VERSION}" >> $GITHUB_OUTPUT
+              echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+              echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
           fi
+      
+      - name: Delete previous dev releases
+        if: github.ref == 'refs/heads/dev'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete all previous dev releases to keep releases clean
+          gh release list --limit 100 --json tagName,isPrerelease \
+            -q '.[] | select(.isPrerelease and (.tagName | contains("-dev."))) | .tagName' \
+          | while read -r tag; do
+            echo "Deleting old dev release: $tag"
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done
       
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -206,13 +234,23 @@ jobs:
           ls -la release/
       
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Gecko ${{ steps.version.outputs.version }}
-          files: release/*.zip
-          draft: false
-          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
-          generate_release_notes: true
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          else
+            PRERELEASE_FLAG=""
+          fi
+          
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            TITLE="Gecko Dev Build ${{ steps.version.outputs.version }}"
+          else
+            TITLE="Gecko ${{ steps.version.outputs.version }}"
+          fi
+          
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "${TITLE}" \
+            ${PRERELEASE_FLAG} \
+            --generate-notes \
+            release/*.zip
