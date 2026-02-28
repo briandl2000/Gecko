@@ -1,0 +1,308 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  # =============================================================================
+  # Build & Test - Clang only (clang on Linux, clang-cl on Windows)
+  # =============================================================================
+  build-and-test:
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev
+      
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          choco install ninja llvm
+      
+      - name: Setup MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Configure
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            export CC=clang-cl
+            export CXX=clang-cl
+          else
+            export CC=clang
+            export CXX=clang++
+          fi
+          cmake -S . -B out/build -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
+      
+      - name: Build
+        run: cmake --build out/build --config Release
+      
+      - name: Run tests
+        shell: bash
+        run: |
+          if [ -f "./out/bin/Release/tests/math_tests.exe" ]; then
+            ./out/bin/Release/tests/math_tests.exe
+          elif [ -f "./out/bin/Release/tests/math_tests" ]; then
+            ./out/bin/Release/tests/math_tests
+          else
+            echo "Test executable not found!"
+            exit 1
+          fi
+
+  # =============================================================================
+  # PR checks - enforce version bump and changelog for PRs to main
+  # =============================================================================
+  pr-checks:
+    name: PR Checks (main)
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check version was bumped
+        run: |
+          PR_VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          MAIN_VERSION=$(git show origin/main:CMakeLists.txt | sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p')
+          
+          PR_PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
+          MAIN_PRERELEASE=$(git show origin/main:CMakeLists.txt | sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p')
+          
+          PR_FULL="${PR_VERSION}"
+          MAIN_FULL="${MAIN_VERSION}"
+          [ -n "$PR_PRERELEASE" ] && PR_FULL="${PR_VERSION}-${PR_PRERELEASE}"
+          [ -n "$MAIN_PRERELEASE" ] && MAIN_FULL="${MAIN_VERSION}-${MAIN_PRERELEASE}"
+          
+          echo "Main version:  ${MAIN_FULL}"
+          echo "PR version:    ${PR_FULL}"
+          
+          if [ "$PR_FULL" = "$MAIN_FULL" ]; then
+            echo ""
+            echo "::error::Version was not bumped! Update the version in CMakeLists.txt before merging to main."
+            echo "Current main version: ${MAIN_FULL}"
+            echo ""
+            echo "To bump: change 'project(Gecko VERSION x.y.z)' and/or GECKO_VERSION_PRERELEASE in CMakeLists.txt"
+            exit 1
+          fi
+          
+          echo "Version bump verified: ${MAIN_FULL} -> ${PR_FULL}"
+      
+      - name: Check changelog was updated
+        run: |
+          if ! git diff origin/main...HEAD --name-only | grep -q "^CHANGELOG.md$"; then
+            echo "::error::CHANGELOG.md was not updated! Add an entry describing your changes before merging to main."
+            echo ""
+            echo "Add your changes under the appropriate section in CHANGELOG.md:"
+            echo "  ### Added     - for new features"
+            echo "  ### Changed   - for changes to existing functionality"
+            echo "  ### Fixed     - for bug fixes"
+            echo "  ### Removed   - for removed features"
+            exit 1
+          fi
+          echo "Changelog updated"
+
+  # =============================================================================
+  # Resolve version - compute version string once for all downstream jobs
+  # =============================================================================
+  resolve-version:
+    name: Resolve Version
+    needs: build-and-test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Compute version string
+        id: version
+        run: |
+          VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
+          
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
+            if [ -n "$PRERELEASE" ]; then
+              VERSION_STR="${VERSION}-${PRERELEASE}-dev.${TIMESTAMP}"
+            else
+              VERSION_STR="${VERSION}-dev.${TIMESTAMP}"
+            fi
+            echo "version=${VERSION_STR}" >> $GITHUB_OUTPUT
+            echo "tag=v${VERSION_STR}" >> $GITHUB_OUTPUT
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            if [ -n "$PRERELEASE" ]; then
+              echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+              echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
+              echo "prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "version=${VERSION}" >> $GITHUB_OUTPUT
+              echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+              echo "prerelease=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+          
+          echo "Resolved version: $(cat $GITHUB_OUTPUT | grep ^version= | cut -d= -f2)"
+
+  # =============================================================================
+  # Package - only on push (merge) to dev or main
+  # =============================================================================
+  package:
+    name: Package (${{ matrix.os }})
+    needs: resolve-version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev zip
+      
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ninja llvm
+      
+      - name: Setup MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      
+      - name: Configure
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            export CC=clang-cl
+            export CXX=clang-cl
+          else
+            export CC=clang
+            export CXX=clang++
+          fi
+          cmake -S . -B out/build -G "Ninja Multi-Config"
+      
+      - name: Build Release
+        run: cmake --build out/build --config Release
+      
+      - name: Install to package directory
+        run: cmake --install out/build --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
+      
+      - name: Create zip (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd out/package
+          zip -r gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip gecko-${{ needs.resolve-version.outputs.version }}
+      
+      - name: Create zip (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd out/package
+          Compress-Archive -Path gecko-${{ needs.resolve-version.outputs.version }} -DestinationPath gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}
+          path: out/package/*.zip
+          retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
+
+  # =============================================================================
+  # Release - create GitHub release after packaging (dev and main)
+  # =============================================================================
+  release:
+    name: Create Release
+    needs: [resolve-version, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: gecko-*
+      
+      - name: Collect packages
+        run: |
+          mkdir -p release
+          find artifacts -name "*.zip" -exec cp {} release/ \;
+          ls -la release/
+      
+      - name: Extract changelog (main only)
+        if: github.ref == 'refs/heads/main'
+        id: changelog
+        run: |
+          VERSION="${{ needs.resolve-version.outputs.version }}"
+          
+          if [ -f CHANGELOG.md ]; then
+            NOTES=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{ /^## \[${VERSION}\]/d; /^## \[/d; p; }" CHANGELOG.md)
+            if [ -z "$NOTES" ]; then
+              NOTES="No changelog entry for ${VERSION}."
+            fi
+          else
+            NOTES="No CHANGELOG.md found."
+          fi
+          
+          echo "$NOTES" > release_notes.md
+          echo "Release notes:"
+          cat release_notes.md
+      
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FLAGS=""
+          if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
+            FLAGS="--prerelease"
+          fi
+          
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            TITLE="Gecko Dev Build ${{ needs.resolve-version.outputs.version }}"
+            NOTES_FLAG="--generate-notes"
+          else
+            TITLE="Gecko ${{ needs.resolve-version.outputs.version }}"
+            NOTES_FLAG="--notes-file release_notes.md"
+          fi
+          
+          gh release create "${{ needs.resolve-version.outputs.tag }}" \
+            --title "${TITLE}" \
+            ${NOTES_FLAG} \
+            ${FLAGS} \
+            release/*.zip

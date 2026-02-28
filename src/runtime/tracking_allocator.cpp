@@ -1,75 +1,160 @@
-#include "gecko/runtime/tracking_allocator.h"
+﻿#include "gecko/runtime/tracking_allocator.h"
 
+#include "gecko/core/assert.h"
+#include "gecko/core/services/log.h"
+#include "gecko/core/services/profiler.h"
+#include "private/labels.h"
+
+#include <array>
 #include <atomic>
 #include <mutex>
-#include <tuple>
-
-#include "categories.h"
-#include "gecko/core/assert.h"
-#include "gecko/core/profiler.h"
 
 namespace gecko::runtime {
 
-MemCategoryStats &TrackingAllocator::EnsureCategoryLocked(Category category) {
-  auto result = m_ByCat.try_emplace(category.Id);
-  auto &stats = result.first->second;
-  if (result.second) { // new element was inserted
-    stats.Cat = category;
+//------------------------------------------------------------
+// Thread-local allocation context
+//------------------------------------------------------------
+
+namespace {
+constexpr Label g_DefaultLabel = MakeLabel("gecko.default");
+
+struct ThreadAllocContext
+{
+  std::array<Label, MaxLabelStackDepth> LabelStack {};
+  u32 StackDepth {0};
+};
+
+thread_local ThreadAllocContext g_AllocContext;
+
+}  // namespace
+
+//------------------------------------------------------------
+// Label Stack
+//------------------------------------------------------------
+
+void TrackingAllocator::PushLabel(Label label) noexcept
+{
+  if (g_AllocContext.StackDepth < MaxLabelStackDepth)
+  {
+    g_AllocContext.LabelStack[g_AllocContext.StackDepth] = label;
+    ++g_AllocContext.StackDepth;
+  }
+}
+
+void TrackingAllocator::PopLabel() noexcept
+{
+  if (g_AllocContext.StackDepth > 0)
+  {
+    --g_AllocContext.StackDepth;
+  }
+}
+
+Label TrackingAllocator::CurrentLabel() const noexcept
+{
+  if (g_AllocContext.StackDepth == 0)
+  {
+    return g_DefaultLabel;
+  }
+  return g_AllocContext.LabelStack[g_AllocContext.StackDepth - 1];
+}
+
+//------------------------------------------------------------
+// Alloc / Free
+//------------------------------------------------------------
+
+MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
+{
+  auto result = m_ByLabel.try_emplace(label.Id);
+  auto& stats = result.first->second;
+  if (result.second)
+  {
+    stats.StatsLabel = label;
   }
   return stats;
 }
 
-void *TrackingAllocator::Alloc(u64 size, u32 alignment,
-                               Category category) noexcept {
-  GECKO_ASSERT(m_Upstream && "Upstream allocator is required");
+void* TrackingAllocator::Alloc(u64 size, u32 alignment) noexcept
+{
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
 
-  void *ptr = m_Upstream->Alloc(size, alignment, category);
-  if (!ptr)
+  const Label label = CurrentLabel();
+  const u32 effAlign = EffectiveAlignment(alignment);
+  const u64 totalSize = TotalAllocSize(size, alignment);
+
+  void* rawPtr = PlatformAlloc(totalSize, effAlign);
+  if (!rawPtr)
     return nullptr;
+
+  void* userPtr =
+      PlaceAllocHeader(rawPtr, size, alignment, TrackingAllocMagic, label);
 
   m_TotalLive.fetch_add(size, std::memory_order_relaxed);
 
   {
     std::lock_guard<std::mutex> lk(m_Mutex);
-    auto &st = EnsureCategoryLocked(category);
+    auto& st = EnsureLabelLocked(label);
     st.LiveBytes.fetch_add(size, std::memory_order_relaxed);
     st.Allocs.fetch_add(1, std::memory_order_relaxed);
   }
 
-  return ptr;
+  return userPtr;
 }
 
-void TrackingAllocator::Free(void *ptr, u64 size, u32 alignment,
-                             Category category) noexcept {
+void TrackingAllocator::Free(void* ptr) noexcept
+{
   if (!ptr)
     return;
 
-  if (m_Upstream)
-    m_Upstream->Free(ptr, size, alignment, category);
+  auto* header = HeaderFromUserPtr(ptr);
 
-  m_TotalLive.fetch_sub(size, std::memory_order_relaxed);
-
+  if (header->Magic == TrackingAllocMagic)
   {
-    std::lock_guard<std::mutex> lk(m_Mutex);
-    auto it = m_ByCat.find(category.Id);
-    if (it != m_ByCat.end()) {
-      it->second.LiveBytes.fetch_sub(size, std::memory_order_relaxed);
-      it->second.Frees.fetch_add(1, std::memory_order_relaxed);
+    const u64 size = header->RequestedSize;
+    const Label label = header->AllocLabel;
+
+    void* rawPtr = RawPtrFromHeader(header);
+    u32 alignment = header->Alignment;
+    header->Magic = 0;  // Poison against double-free
+
+    PlatformFree(rawPtr, alignment);
+
+    m_TotalLive.fetch_sub(size, std::memory_order_relaxed);
+
+    {
+      std::lock_guard<std::mutex> lk(m_Mutex);
+      auto it = m_ByLabel.find(label.Id);
+      if (it != m_ByLabel.end())
+      {
+        it->second.LiveBytes.fetch_sub(size, std::memory_order_relaxed);
+        it->second.Frees.fetch_add(1, std::memory_order_relaxed);
+      }
     }
+  }
+  else if (header->Magic == SystemAllocMagic)
+  {
+    // Pre-boot allocation — header is valid, just free it.
+    void* rawPtr = RawPtrFromHeader(header);
+    u32 alignment = header->Alignment;
+    header->Magic = 0;
+    PlatformFree(rawPtr, alignment);
+  }
+  else
+  {
+    GECKO_ASSERT(false &&
+                 "TrackingAllocator::Free: unknown allocation or double-free");
   }
 }
 
-bool TrackingAllocator::StatsFor(Category category,
-                                 MemCategoryStats &outStats) const {
+bool TrackingAllocator::StatsFor(Label label, MemLabelStats& outStats) const
+{
   std::lock_guard<std::mutex> lk(m_Mutex);
-  auto it = m_ByCat.find(category.Id);
-  if (it == m_ByCat.end())
+  auto it = m_ByLabel.find(label.Id);
+  if (it == m_ByLabel.end())
     return false;
 
-  outStats.Cat = it->second.Cat;
+  outStats.StatsLabel = it->second.StatsLabel;
   outStats.LiveBytes.store(it->second.LiveBytes.load(std::memory_order_relaxed),
                            std::memory_order_relaxed);
   outStats.Allocs.store(it->second.Allocs.load(std::memory_order_relaxed),
@@ -81,14 +166,16 @@ bool TrackingAllocator::StatsFor(Category category,
 }
 
 void TrackingAllocator::Snapshot(
-    std::unordered_map<u32, MemCategoryStats> &out) const {
+    std::unordered_map<u64, MemLabelStats>& out) const
+{
   std::lock_guard<std::mutex> lk(m_Mutex);
   out.clear();
-  out.reserve(m_ByCat.size());
-  for (auto &[id, st] : m_ByCat) {
+  out.reserve(m_ByLabel.size());
+  for (auto& [id, st] : m_ByLabel)
+  {
     auto result = out.try_emplace(id);
-    auto &snap = result.first->second;
-    snap.Cat = st.Cat;
+    auto& snap = result.first->second;
+    snap.StatsLabel = st.StatsLabel;
     snap.LiveBytes.store(st.LiveBytes.load(std::memory_order_relaxed),
                          std::memory_order_relaxed);
     snap.Allocs.store(st.Allocs.load(std::memory_order_relaxed),
@@ -98,26 +185,14 @@ void TrackingAllocator::Snapshot(
   }
 }
 
-void TrackingAllocator::EmitCounters() noexcept {
-  if (!m_Profiler)
-    return;
+void TrackingAllocator::EmitCounters() noexcept
+{}
 
-  GECKO_PROF_COUNTER(categories::TrackingAllocator, "heap_live_bytes",
-                     TotalLiveBytes());
-
-  std::unordered_map<u32, MemCategoryStats> snap;
-  Snapshot(snap);
-  for (auto &[id, st] : snap) {
-    const char *name = st.Cat.Name ? st.Cat.Name : "mem";
-
-    GECKO_PROF_COUNTER(st.Cat, name,
-                       st.LiveBytes.load(std::memory_order_relaxed));
-  }
-}
-
-void TrackingAllocator::ResetCounters() noexcept {
+void TrackingAllocator::ResetCounters() noexcept
+{
   std::lock_guard<std::mutex> lk(m_Mutex);
-  for (auto &[id, st] : m_ByCat) {
+  for (auto& [id, st] : m_ByLabel)
+  {
     st.LiveBytes.store(0, std::memory_order_relaxed);
     st.Allocs.store(0, std::memory_order_relaxed);
     st.Frees.store(0, std::memory_order_relaxed);
@@ -125,8 +200,12 @@ void TrackingAllocator::ResetCounters() noexcept {
   m_TotalLive.store(0, std::memory_order_relaxed);
 }
 
-bool TrackingAllocator::Init() noexcept { return true; }
+bool TrackingAllocator::Init() noexcept
+{
+  return true;
+}
 
-void TrackingAllocator::Shutdown() noexcept {}
+void TrackingAllocator::Shutdown() noexcept
+{}
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

@@ -1,19 +1,20 @@
 #pragma once
 
-#include <cstdio>
+#include "gecko/core/services/log.h"
 
-#include "gecko/core/log.h"
+#include <cstdio>
 
 namespace gecko::runtime {
 
-class FileLogSink final : public ILogSink {
+class FileLogSink final : public ILogSink
+{
 public:
-  explicit FileLogSink(const char *path);
+  explicit FileLogSink(const char* path);
   ~FileLogSink();
-  virtual void Write(const LogMessage &message) noexcept override;
+  virtual void Write(const LogMessage& message) noexcept override;
 
 private:
-  std::FILE *m_File{nullptr};
+  std::FILE* m_File {nullptr};
 };
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

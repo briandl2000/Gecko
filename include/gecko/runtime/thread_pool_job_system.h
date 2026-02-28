@@ -1,4 +1,6 @@
-#pragma once
+﻿#pragma once
+
+#include "gecko/core/services/jobs.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -8,39 +10,43 @@
 #include <unordered_map>
 #include <vector>
 
-#include "gecko/core/jobs.h"
-
 namespace gecko::runtime {
 
-struct Job {
+struct Job
+{
   JobFunction Function;
   JobPriority Priority;
-  Category Cat;
+  Label JobLabel;
   JobHandle Handle;
   std::vector<JobHandle> Dependencies;
-  std::atomic<bool> Completed{false};
+  std::atomic<bool> Completed {false};
 
   Job() = default;
-  Job(JobFunction func, JobPriority prio, gecko::Category cat,
+  Job(JobFunction func, JobPriority prio, gecko::Label label,
       JobHandle handle) noexcept
-      : Function(std::move(func)), Priority(prio), Cat(cat), Handle(handle) {}
+      : Function(std::move(func)), Priority(prio), JobLabel(label),
+        Handle(handle)
+  {}
 
   // Make non-copyable to avoid atomic copy issues
-  Job(const Job &) = delete;
-  Job &operator=(const Job &) = delete;
+  Job(const Job&) = delete;
+  Job& operator=(const Job&) = delete;
 
   // Allow move operations
-  Job(Job &&other) noexcept
+  Job(Job&& other) noexcept
       : Function(std::move(other.Function)), Priority(other.Priority),
-        Cat(other.Cat), Handle(other.Handle),
+        JobLabel(other.JobLabel), Handle(other.Handle),
         Dependencies(std::move(other.Dependencies)),
-        Completed(other.Completed.load()) {}
+        Completed(other.Completed.load())
+  {}
 
-  Job &operator=(Job &&other) noexcept {
-    if (this != &other) {
+  Job& operator=(Job&& other) noexcept
+  {
+    if (this != &other)
+    {
       Function = std::move(other.Function);
       Priority = other.Priority;
-      Cat = other.Cat;
+      JobLabel = other.JobLabel;
       Handle = other.Handle;
       Dependencies = std::move(other.Dependencies);
       Completed.store(other.Completed.load());
@@ -49,20 +55,24 @@ struct Job {
   }
 };
 
-class ThreadPoolJobSystem final : public IJobSystem {
+class ThreadPoolJobSystem final : public IJobSystem
+{
 public:
   ThreadPoolJobSystem() = default;
-  virtual ~ThreadPoolJobSystem() = default;
+  virtual ~ThreadPoolJobSystem()
+  {
+    Shutdown();
+  }
 
   virtual JobHandle Submit(JobFunction job,
                            JobPriority priority = JobPriority::Normal,
-                           Category category = Category{0}) noexcept override;
-  virtual JobHandle Submit(JobFunction job, const JobHandle *dependencies,
+                           Label label = Label {}) noexcept override;
+  virtual JobHandle Submit(JobFunction job, const JobHandle* dependencies,
                            u32 dependencyCount,
                            JobPriority priority = JobPriority::Normal,
-                           Category category = Category{0}) noexcept override;
+                           Label label = Label {}) noexcept override;
   virtual void Wait(JobHandle handle) noexcept override;
-  virtual void WaitAll(const JobHandle *handles, u32 count) noexcept override;
+  virtual void WaitAll(const JobHandle* handles, u32 count) noexcept override;
   virtual bool IsComplete(JobHandle handle) noexcept override;
   virtual u32 WorkerThreadCount() const noexcept override;
   virtual void ProcessJobs(u32 maxJobs = 1) noexcept override;
@@ -70,14 +80,17 @@ public:
   virtual bool Init() noexcept override;
   virtual void Shutdown() noexcept override;
 
-  void SetWorkerThreadCount(u32 count) noexcept {
+  void SetWorkerThreadCount(u32 count) noexcept
+  {
     m_RequestedWorkerCount = count;
   }
 
 private:
-  struct JobCompare {
-    bool operator()(const std::shared_ptr<Job> &a,
-                    const std::shared_ptr<Job> &b) const {
+  struct JobCompare
+  {
+    bool operator()(const std::shared_ptr<Job>& a,
+                    const std::shared_ptr<Job>& b) const
+    {
       // Higher priority jobs should come first (reverse order for
       // priority_queue)
       return static_cast<int>(a->Priority) < static_cast<int>(b->Priority);
@@ -86,7 +99,7 @@ private:
 
   void WorkerThreadFunction() noexcept;
   std::shared_ptr<Job> GetNextReadyJob() noexcept;
-  bool AreJobDependenciesComplete(const std::shared_ptr<Job> &job) noexcept;
+  bool AreJobDependenciesComplete(const std::shared_ptr<Job>& job) noexcept;
   JobHandle GenerateJobHandle() noexcept;
 
   mutable std::mutex m_Mutex;
@@ -99,11 +112,11 @@ private:
   std::unordered_map<u64, std::shared_ptr<Job>> m_ActiveJobs;
 
   std::vector<std::thread> m_WorkerThreads;
-  std::atomic<bool> m_Shutdown{false};
-  std::atomic<u64> m_NextJobId{1};
+  std::atomic<bool> m_Shutdown {false};
+  std::atomic<u64> m_NextJobId {1};
 
-  u32 m_RequestedWorkerCount{0}; // 0 = auto-detect
-  bool m_Initialized{false};
+  u32 m_RequestedWorkerCount {0};  // 0 = auto-detect
+  bool m_Initialized {false};
 };
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

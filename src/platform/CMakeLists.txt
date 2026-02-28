@@ -1,9 +1,10 @@
-add_library(Platform)
+add_library(Platform STATIC)
 add_library(Gecko::Platform ALIAS Platform)
 
 target_sources(Platform
   PRIVATE
     window.cpp
+    platform_module.cpp
 )
 
 if(UNIX AND NOT APPLE)
@@ -19,6 +20,8 @@ if(UNIX AND NOT APPLE)
     endif()
     target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_X11)
   endif()
+elseif(WIN32)
+  target_sources(Platform PRIVATE windows/platform_context_windows.cpp)
 endif()
 
 target_include_directories(Platform
@@ -28,7 +31,7 @@ target_include_directories(Platform
 
 target_compile_definitions(Platform PUBLIC GECKO_PLATFORM_API)
 
-target_link_libraries(Platform PUBLIC Gecko::Core)
+target_link_libraries(Platform PUBLIC Gecko::Core Gecko::CoreServices)
 
 install(TARGETS Platform
   EXPORT ${GECKO_EXPORT_SET_NAME}

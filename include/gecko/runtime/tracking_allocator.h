@@ -1,130 +1,150 @@
 #pragma once
 
+#include "gecko/core/services/memory.h"
+#include "gecko/core/services/profiler.h"
+#include "gecko/core/types.h"
+
 #include <atomic>
 #include <cstddef>
+#include <cstdlib>
 #include <mutex>
+#include <new>
 #include <unordered_map>
 #include <utility>
 
-#include "gecko/core/category.h"
-#include "gecko/core/memory.h"
-#include "gecko/core/profiler.h"
-#include "gecko/core/types.h"
-
 namespace gecko::runtime {
 
-struct MemCategoryStats {
-  std::atomic<u64> LiveBytes{0};
-  std::atomic<u64> Allocs{0};
-  std::atomic<u64> Frees{0};
-  Category Cat{};
+//------------------------------------------------------------
+// Per-Label Stats
+//------------------------------------------------------------
 
-  MemCategoryStats() = default;
+struct MemLabelStats
+{
+  std::atomic<u64> LiveBytes {0};
+  std::atomic<u64> Allocs {0};
+  std::atomic<u64> Frees {0};
+  Label StatsLabel {};
 
-  // Make non-copyable to avoid atomic copy issues
-  MemCategoryStats(const MemCategoryStats &) = delete;
-  MemCategoryStats &operator=(const MemCategoryStats &) = delete;
+  MemLabelStats() = default;
 
-  // Allow move operations
-  MemCategoryStats(MemCategoryStats &&other) noexcept
+  MemLabelStats(const MemLabelStats&) = delete;
+  MemLabelStats& operator=(const MemLabelStats&) = delete;
+
+  MemLabelStats(MemLabelStats&& other) noexcept
       : LiveBytes(other.LiveBytes.load()), Allocs(other.Allocs.load()),
-        Frees(other.Frees.load()), Cat(other.Cat) {}
+        Frees(other.Frees.load()), StatsLabel(other.StatsLabel)
+  {}
 
-  MemCategoryStats &operator=(MemCategoryStats &&other) noexcept {
-    if (this != &other) {
+  MemLabelStats& operator=(MemLabelStats&& other) noexcept
+  {
+    if (this != &other)
+    {
       LiveBytes.store(other.LiveBytes.load());
       Allocs.store(other.Allocs.load());
       Frees.store(other.Frees.load());
-      Cat = other.Cat;
+      StatsLabel = other.StatsLabel;
     }
     return *this;
   }
 };
 
-// Custom allocator template that bypasses tracking for internal containers
-template <typename T> class UpstreamAllocator {
+//------------------------------------------------------------
+// MallocAllocator — STL allocator bypassing Gecko
+//------------------------------------------------------------
+// Avoids circular allocation in TrackingAllocator's internal containers.
+
+template <typename T>
+class MallocAllocator
+{
+  static_assert(alignof(T) <= alignof(::std::max_align_t),
+                "MallocAllocator does not support over-aligned types");
+
 public:
   using value_type = T;
 
-  explicit UpstreamAllocator(IAllocator *upstream) noexcept
-      : m_Upstream(upstream) {}
+  MallocAllocator() noexcept = default;
 
   template <typename U>
-  UpstreamAllocator(const UpstreamAllocator<U> &other) noexcept
-      : m_Upstream(other.m_Upstream) {}
+  MallocAllocator(const MallocAllocator<U>&) noexcept
+  {}
 
-  T *allocate(std::size_t n) {
-    if (!m_Upstream)
-      return nullptr;
-    auto *ptr = m_Upstream->Alloc(n * sizeof(T), alignof(T), {});
-    return static_cast<T *>(ptr);
+  T* allocate(::std::size_t n)
+  {
+    void* ptr = ::std::malloc(n * sizeof(T));
+    if (!ptr)
+      throw ::std::bad_alloc {};
+    return static_cast<T*>(ptr);
   }
 
-  void deallocate(T *ptr, std::size_t n) noexcept {
-    if (m_Upstream && ptr) {
-      m_Upstream->Free(ptr, n * sizeof(T), alignof(T), {});
-    }
-  }
-
-  template <typename U>
-  bool operator==(const UpstreamAllocator<U> &other) const noexcept {
-    return m_Upstream == other.m_Upstream;
+  void deallocate(T* ptr, ::std::size_t) noexcept
+  {
+    ::std::free(ptr);
   }
 
   template <typename U>
-  bool operator!=(const UpstreamAllocator<U> &other) const noexcept {
-    return !(*this == other);
+  bool operator==(const MallocAllocator<U>&) const noexcept
+  {
+    return true;
   }
 
-  template <typename U> friend class UpstreamAllocator;
-
-private:
-  IAllocator *m_Upstream;
+  template <typename U>
+  bool operator!=(const MallocAllocator<U>&) const noexcept
+  {
+    return false;
+  }
 };
 
-class TrackingAllocator final : public IAllocator {
+//------------------------------------------------------------
+// TrackingAllocator
+//------------------------------------------------------------
+// Per-label memory tracking. Uses PlatformAlloc/Free directly with
+// TrackingAllocMagic. Cross-allocator frees are handled: SystemAllocMagic
+// allocations (pre-boot) are forwarded to PlatformFree.
+
+constexpr u32 MaxLabelStackDepth = 64;
+
+class TrackingAllocator final : public IAllocator
+{
 public:
-  explicit TrackingAllocator(IAllocator *upstream) noexcept
-      : m_Upstream(upstream),
-        m_ByCat(UpstreamAllocator<std::pair<const u32, MemCategoryStats>>(
-            upstream)) {}
+  TrackingAllocator() noexcept = default;
 
-  virtual void *Alloc(u64 size, u32 alignment,
-                      Category category) noexcept override;
-  virtual void Free(void *ptr, u64 size, u32 alignment,
-                    Category category) noexcept override;
+  void* Alloc(u64 size, u32 alignment) noexcept override;
+  void Free(void* ptr) noexcept override;
 
-  void SetProfiler(IProfiler *profiler) noexcept { m_Profiler = profiler; }
+  void PushLabel(Label label) noexcept override;
+  void PopLabel() noexcept override;
+  Label CurrentLabel() const noexcept override;
 
-  u64 TotalLiveBytes() const noexcept {
+  bool Init() noexcept override;
+  void Shutdown() noexcept override;
+
+  void SetProfiler(IProfiler* profiler) noexcept
+  {
+    m_Profiler = profiler;
+  }
+
+  u64 TotalLiveBytes() const noexcept
+  {
     return m_TotalLive.load(std::memory_order_relaxed);
   }
 
-  bool StatsFor(Category category, MemCategoryStats &outStats) const;
-
-  void Snapshot(std::unordered_map<u32, MemCategoryStats> &out) const;
-
+  bool StatsFor(Label label, MemLabelStats& outStats) const;
+  void Snapshot(std::unordered_map<u64, MemLabelStats>& out) const;
   void EmitCounters() noexcept;
-
   void ResetCounters() noexcept;
 
-  virtual bool Init() noexcept override;
-  virtual void Shutdown() noexcept override;
-
 private:
-  IAllocator *m_Upstream{nullptr};
-
   mutable std::mutex m_Mutex;
 
-  std::unordered_map<u32, MemCategoryStats, std::hash<u32>, std::equal_to<u32>,
-                     UpstreamAllocator<std::pair<const u32, MemCategoryStats>>>
-      m_ByCat;
+  std::unordered_map<u64, MemLabelStats, std::hash<u64>, std::equal_to<u64>,
+                     MallocAllocator<std::pair<const u64, MemLabelStats>>>
+      m_ByLabel;
 
-  std::atomic<u64> m_TotalLive{0};
+  std::atomic<u64> m_TotalLive {0};
 
-  IProfiler *m_Profiler{nullptr};
+  IProfiler* m_Profiler {nullptr};
 
-  MemCategoryStats &EnsureCategoryLocked(Category category);
+  MemLabelStats& EnsureLabelLocked(Label label);
 };
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime

@@ -4,7 +4,8 @@
 
 namespace gecko::runtime {
 
-TraceFileSink::TraceFileSink(const char *path) {
+TraceFileSink::TraceFileSink(const char* path)
+{
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
 #if defined(_WIN32)
@@ -13,33 +14,38 @@ TraceFileSink::TraceFileSink(const char *path) {
   m_File = std::fopen(path, "w");
 #endif
 
-  if (m_File) {
+  if (m_File)
+  {
     // Write initial JSON structure - we'll buffer events and write them all at
     // once
     std::fputs("{\"traceEvents\":[\n", m_File);
     m_First = true;
     m_Time0Ns = 0;
-    m_BufferedEvents.reserve(1000); // Reserve space for better performance
+    m_BufferedEvents.reserve(1000);  // Reserve space for better performance
   }
 }
 
-TraceFileSink::~TraceFileSink() {
-  if (m_File) {
+TraceFileSink::~TraceFileSink()
+{
+  if (m_File)
+  {
     std::lock_guard<std::mutex> lock(m_Mutex);
     FlushBufferedEvents();
-    std::fputs("]}\n", m_File); // Close JSON structure
+    std::fputs("]}\n", m_File);  // Close JSON structure
     std::fclose(m_File);
   }
 }
 
-void TraceFileSink::Write(const ProfEvent &event) noexcept {
+void TraceFileSink::Write(const ProfEvent& event) noexcept
+{
   if (!m_File)
     return;
 
   std::lock_guard<std::mutex> lock(m_Mutex);
 
   // Set time reference on first event
-  if (m_Time0Ns == 0) {
+  if (m_Time0Ns == 0)
+  {
     m_Time0Ns = event.TimestampNs;
   }
 
@@ -47,51 +53,61 @@ void TraceFileSink::Write(const ProfEvent &event) noexcept {
   m_BufferedEvents.push_back(event);
 
   // Flush periodically to avoid using too much memory
-  if (m_BufferedEvents.size() >= 100) {
+  if (m_BufferedEvents.size() >= 100)
+  {
     FlushBufferedEvents();
   }
 }
 
-void TraceFileSink::WriteBatch(const ProfEvent *events, size_t count) noexcept {
+void TraceFileSink::WriteBatch(const ProfEvent* events, size_t count) noexcept
+{
   if (!m_File || !events)
     return;
 
-  for (size_t i = 0; i < count; ++i) {
+  for (size_t i = 0; i < count; ++i)
+  {
     Write(events[i]);
   }
 }
 
-void TraceFileSink::Flush() noexcept {
-  if (m_File) {
+void TraceFileSink::Flush() noexcept
+{
+  if (m_File)
+  {
     std::lock_guard<std::mutex> lock(m_Mutex);
     FlushBufferedEvents();
     std::fflush(m_File);
   }
 }
 
-void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
+void TraceFileSink::WriteJsonEvent(const ProfEvent& event) noexcept
+{
   const double timeUs = (double)(event.TimestampNs - m_Time0Ns) / 1000.0;
-  const char *name = event.Name ? event.Name : "Unknown";
-  const char *catName = event.Cat.Name ? event.Cat.Name : "Unknown";
+  const char* name = event.Name ? event.Name : "Unknown";
+  const char* label = event.EventLabel.Name ? event.EventLabel.Name : "label";
 
   // Add comma separator if not first event
-  if (!m_First) {
+  if (!m_First)
+  {
     std::fputs(",\n", m_File);
   }
   m_First = false;
 
-  switch (event.Kind) {
+  switch (event.Kind)
+  {
   case ProfEventKind::ZoneBegin:
     std::fprintf(m_File,
                  "  {\"name\":\"%s\",\"cat\":\"%s "
-                 "(%u)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, catName, event.Cat.Id, timeUs, event.ThreadId);
+                 "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+                 name, label, (unsigned long long)event.EventLabel.Id, timeUs,
+                 event.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
     std::fprintf(m_File,
                  "  {\"name\":\"%s\",\"cat\":\"%s "
-                 "(%u)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, catName, event.Cat.Id, timeUs, event.ThreadId);
+                 "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+                 name, label, (unsigned long long)event.EventLabel.Id, timeUs,
+                 event.ThreadId);
     break;
   case ProfEventKind::FrameMark:
     std::fprintf(m_File,
@@ -104,17 +120,20 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent &event) noexcept {
     std::fprintf(
         m_File,
         "  {\"name\":\"%s\",\"cat\":\"%s "
-        "(%u)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, catName, event.Cat.Id, timeUs, (unsigned long long)event.Value);
+        "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
+        name, label, (unsigned long long)event.EventLabel.Id, timeUs,
+        (unsigned long long)event.Value);
     break;
   }
 }
 
-void TraceFileSink::FlushBufferedEvents() noexcept {
-  for (const auto &event : m_BufferedEvents) {
+void TraceFileSink::FlushBufferedEvents() noexcept
+{
+  for (const auto& event : m_BufferedEvents)
+  {
     WriteJsonEvent(event);
   }
   m_BufferedEvents.clear();
 }
 
-} // namespace gecko::runtime
+}  // namespace gecko::runtime
