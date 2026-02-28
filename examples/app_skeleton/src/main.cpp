@@ -199,8 +199,7 @@ static int AppMain(int argc, char** argv)
   }
 
   // 1) Choose concrete implementations for core services.
-  SystemAllocator systemAlloc;
-  runtime::TrackingAllocator trackingAlloc(&systemAlloc);
+  runtime::TrackingAllocator trackingAlloc;
 
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);

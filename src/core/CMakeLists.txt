@@ -30,7 +30,9 @@ set_target_properties(CoreServices PROPERTIES
   WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
 
-target_compile_definitions(Core PRIVATE GECKO_OVERRIDE_NEW)
+if(GECKO_OVERRIDE_NEW)
+  target_compile_definitions(Core PRIVATE GECKO_OVERRIDE_NEW)
+endif()
 
 target_sources(CoreServices
   PRIVATE

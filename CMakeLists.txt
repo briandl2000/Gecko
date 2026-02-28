@@ -61,6 +61,7 @@ endforeach()
 
 option(GECKO_BUILD_EXAMPLES "Build examples" ON)
 option(GECKO_BUILD_TESTS "Build tests" OFF)
+option(GECKO_OVERRIDE_NEW "Override global operator new/delete to route through Gecko allocator" OFF)
 
 # CMake package/export naming (kept consistent with the project name).
 set(GECKO_EXPORT_SET_NAME "${PROJECT_NAME}Targets")

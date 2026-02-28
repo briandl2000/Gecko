@@ -401,15 +401,15 @@ int main()
 ```cpp
 #include "gecko/core/services/memory.h"
 
-// Basic byte allocation
-auto label = gecko::MakeLabel("my_system");
-void* ptr = gecko::AllocBytes(1024, 16, label);  // 1024 bytes, 16-byte aligned
-gecko::DeallocBytes(ptr, 1024, 16, label);
+// Basic byte allocation (label is set via GECKO_PUSH_LABEL scope)
+GECKO_PUSH_LABEL(gecko::MakeLabel("my_system"));
+void* ptr = gecko::AllocBytes(1024, 16);  // 1024 bytes, 16-byte aligned
+gecko::DeallocBytes(ptr);
 
 // Type-safe array allocation
-int* array = gecko::AllocArray<int>(100, label);  // 100 integers
+int* array = gecko::AllocArray<int>(100);  // 100 integers
 // Use array...
-gecko::DeallocBytes(array, sizeof(int) * 100, alignof(int), label);
+gecko::DeallocBytes(array);
 ```
 
 #### Custom Allocators
@@ -417,24 +417,30 @@ gecko::DeallocBytes(array, sizeof(int) * 100, alignof(int), label);
 class MyAllocator : public gecko::IAllocator
 {
 public:
-  virtual void* Alloc(gecko::u64 size, gecko::u32 alignment, gecko::Label label) noexcept override
+  void* Alloc(gecko::u64 size, gecko::u32 alignment) noexcept override
   {
     GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
     GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
     
+    // Must prepend AllocHeader — see PlaceAllocHeader() helper
     // Your allocation logic here
     return allocate_memory(size, alignment);
   }
   
-  virtual void Free(void* ptr, gecko::u64 size, gecko::u32 alignment, gecko::Label label) noexcept override
+  void Free(void* ptr) noexcept override
   {
     if (!ptr) return;
+    // Read AllocHeader via HeaderFromUserPtr() to recover raw pointer
     // Your deallocation logic here
     free_memory(ptr);
   }
+
+  void PushLabel(gecko::Label label) noexcept override { /* label stack */ }
+  void PopLabel() noexcept override { /* label stack */ }
+  gecko::Label CurrentLabel() const noexcept override { return {}; }
   
-  virtual bool Init() noexcept override { return true; }
-  virtual void Shutdown() noexcept override { /* cleanup */ }
+  bool Init() noexcept override { return true; }
+  void Shutdown() noexcept override { /* cleanup */ }
 };
 ```
 
@@ -659,10 +665,12 @@ namespace app::my_game::labels {
 #### Tracking Allocator
 ```cpp
 gecko::runtime::TrackingAllocator tracker;
-tracker.SetUpstream(&myBaseAllocator);  // Base allocator to wrap
 tracker.SetProfiler(gecko::GetProfiler());  // For counter emission
 
-// Use as normal allocator - automatically tracks statistics
+// Use as normal allocator - automatically tracks statistics per label
+// Labels are pushed/popped via GECKO_PUSH_LABEL or the allocator's
+// PushLabel/PopLabel methods.
+
 // Get statistics
 gecko::runtime::MemLabelStats stats;
 if (tracker.StatsFor(label, stats))

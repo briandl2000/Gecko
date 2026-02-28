@@ -6,6 +6,19 @@ import sys
 from pathlib import Path
 
 
+def _setup_git_hooks(repo_root: Path) -> None:
+    """Point git to the .githooks directory for pre-commit hooks."""
+    hooks_dir = repo_root / ".githooks"
+    if hooks_dir.is_dir():
+        subprocess.run(
+            ["git", "config", "core.hooksPath", ".githooks"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+        )
+        print("Git hooks configured (.githooks/)")
+
+
 def _configure_cmake(repo_root: Path) -> int:
     """Configure CMake if not already done."""
     build_dir = repo_root / "out" / "build"
@@ -64,6 +77,7 @@ def main() -> int:
         return result
     
     _setup_compile_commands(repo_root)
+    _setup_git_hooks(repo_root)
     _print_usage()
     return 0
 

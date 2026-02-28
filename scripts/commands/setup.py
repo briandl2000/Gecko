@@ -34,6 +34,17 @@ def _run(args) -> int:
         check=False,
     )
     
+    # Point git to our hooks directory
+    hooks_dir = repo_root / ".githooks"
+    if hooks_dir.is_dir():
+        subprocess.run(
+            ["git", "config", "core.hooksPath", ".githooks"],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+        )
+        print("Git hooks configured (.githooks/)")
+
     if result.returncode == 0:
         print("\nSetup complete! To use gecko commands:")
         print("  Linux/macOS: source scripts/setup.sh")

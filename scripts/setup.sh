@@ -11,6 +11,9 @@ gk() {
 }
 export -f gk
 
+# Point git to our hooks directory
+git -C "$REPO_ROOT" config core.hooksPath .githooks 2>/dev/null
+
 # Configure CMake if not already done
 if [ ! -d "$REPO_ROOT/out/build" ]; then
     echo "Configuring CMake..."
