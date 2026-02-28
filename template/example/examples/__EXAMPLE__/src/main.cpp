@@ -1,5 +1,3 @@
-#include <cstdio>
-
 #include "gecko/core/boot.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services.h"
@@ -15,6 +13,8 @@
 #include "gecko/runtime/runtime_module.h"
 #include "gecko/runtime/thread_pool_job_system.h"
 #include "gecko/runtime/tracking_allocator.h"
+
+#include <cstdio>
 
 namespace app::__EXAMPLE__::labels {
 inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.__EXAMPLE__");
@@ -66,8 +66,7 @@ static ::gecko::Services CreateServices(
 
 int main()
 {
-  ::gecko::SystemAllocator systemAlloc;
-  ::gecko::runtime::TrackingAllocator trackingAlloc(&systemAlloc);
+  ::gecko::runtime::TrackingAllocator trackingAlloc;
 
   ::gecko::runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);

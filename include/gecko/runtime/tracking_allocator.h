@@ -6,38 +6,17 @@
 
 #include <atomic>
 #include <cstddef>
+#include <cstdlib>
 #include <mutex>
+#include <new>
 #include <unordered_map>
 #include <utility>
 
 namespace gecko::runtime {
 
-constexpr u32 AllocHeaderMagic = 0x47454B4F;  // "GEKO"
-
-struct AllocHeader
-{
-  u32 Magic;
-  u32 Alignment;
-  u64 RequestedSize;
-  Label AllocLabel;
-  u64 RawOffset;
-};
-
-inline AllocHeader* HeaderFromUserPtr(void* userPtr) noexcept
-{
-  return reinterpret_cast<AllocHeader*>(static_cast<u8*>(userPtr) -
-                                        sizeof(AllocHeader));
-}
-
-inline void* RawPtrFromHeader(AllocHeader* header) noexcept
-{
-  return reinterpret_cast<u8*>(header) - header->RawOffset;
-}
-
-inline bool IsValidAllocHeader(const AllocHeader* header) noexcept
-{
-  return header && header->Magic == AllocHeaderMagic;
-}
+//------------------------------------------------------------
+// Per-Label Stats
+//------------------------------------------------------------
 
 struct MemLabelStats
 {
@@ -69,74 +48,69 @@ struct MemLabelStats
   }
 };
 
-// Custom allocator template that bypasses tracking for internal containers
-// Uses upstream directly without going through TrackingAllocator
+//------------------------------------------------------------
+// MallocAllocator — STL allocator bypassing Gecko
+//------------------------------------------------------------
+// Avoids circular allocation in TrackingAllocator's internal containers.
+
 template <typename T>
-class UpstreamAllocator
+class MallocAllocator
 {
+  static_assert(alignof(T) <= alignof(::std::max_align_t),
+                "MallocAllocator does not support over-aligned types");
+
 public:
   using value_type = T;
 
-  explicit UpstreamAllocator(IAllocator* upstream) noexcept
-      : m_Upstream(upstream)
+  MallocAllocator() noexcept = default;
+
+  template <typename U>
+  MallocAllocator(const MallocAllocator<U>&) noexcept
   {}
 
-  template <typename U>
-  UpstreamAllocator(const UpstreamAllocator<U>& other) noexcept
-      : m_Upstream(other.m_Upstream)
-  {}
-
-  T* allocate(std::size_t n)
+  T* allocate(::std::size_t n)
   {
-    if (!m_Upstream)
-      return nullptr;
-    return static_cast<T*>(m_Upstream->Alloc(n * sizeof(T), alignof(T)));
+    void* ptr = ::std::malloc(n * sizeof(T));
+    if (!ptr)
+      throw ::std::bad_alloc {};
+    return static_cast<T*>(ptr);
   }
 
-  void deallocate(T* ptr, std::size_t n) noexcept
+  void deallocate(T* ptr, ::std::size_t) noexcept
   {
-    (void)n;
-    if (m_Upstream && ptr)
-    {
-      m_Upstream->Free(ptr);
-    }
+    ::std::free(ptr);
   }
 
   template <typename U>
-  bool operator==(const UpstreamAllocator<U>& other) const noexcept
+  bool operator==(const MallocAllocator<U>&) const noexcept
   {
-    return m_Upstream == other.m_Upstream;
+    return true;
   }
 
   template <typename U>
-  bool operator!=(const UpstreamAllocator<U>& other) const noexcept
+  bool operator!=(const MallocAllocator<U>&) const noexcept
   {
-    return !(*this == other);
+    return false;
   }
-
-  template <typename U>
-  friend class UpstreamAllocator;
-
-private:
-  IAllocator* m_Upstream;
 };
+
+//------------------------------------------------------------
+// TrackingAllocator
+//------------------------------------------------------------
+// Per-label memory tracking. Uses PlatformAlloc/Free directly with
+// TrackingAllocMagic. Cross-allocator frees are handled: SystemAllocMagic
+// allocations (pre-boot) are forwarded to PlatformFree.
 
 constexpr u32 MaxLabelStackDepth = 64;
 
 class TrackingAllocator final : public IAllocator
 {
 public:
-  explicit TrackingAllocator(IAllocator* upstream) noexcept
-      : m_Upstream(upstream),
-        m_ByLabel(
-            UpstreamAllocator<std::pair<const u64, MemLabelStats>>(upstream))
-  {}
+  TrackingAllocator() noexcept = default;
 
-  // IAllocator interface
   void* Alloc(u64 size, u32 alignment) noexcept override;
   void Free(void* ptr) noexcept override;
 
-  // Label stack - thread-local, used by GECKO_SCOPE macros
   void PushLabel(Label label) noexcept override;
   void PopLabel() noexcept override;
   Label CurrentLabel() const noexcept override;
@@ -144,7 +118,6 @@ public:
   bool Init() noexcept override;
   void Shutdown() noexcept override;
 
-  // TrackingAllocator-specific methods
   void SetProfiler(IProfiler* profiler) noexcept
   {
     m_Profiler = profiler;
@@ -161,12 +134,10 @@ public:
   void ResetCounters() noexcept;
 
 private:
-  IAllocator* m_Upstream {nullptr};
-
   mutable std::mutex m_Mutex;
 
   std::unordered_map<u64, MemLabelStats, std::hash<u64>, std::equal_to<u64>,
-                     UpstreamAllocator<std::pair<const u64, MemLabelStats>>>
+                     MallocAllocator<std::pair<const u64, MemLabelStats>>>
       m_ByLabel;
 
   std::atomic<u64> m_TotalLive {0};

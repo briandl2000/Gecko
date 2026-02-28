@@ -26,17 +26,23 @@ def register(subparsers) -> None:
 
 def _run(args) -> int:
     if args.config == "all":
-        configs = ["debug", "release"]
-    else:
-        configs = [args.config]
-
-    for config in configs:
-        cmake_config = _CONFIGS[config]
+        # Build both configurations in parallel using multi-config generator
         result = subprocess.run(
-            ["cmake", "--build", "build", "--config", cmake_config],
+            ["cmake", "--build", "out/build", "--config", "Debug"],
             check=False,
         )
         if result.returncode != 0:
             return result.returncode
-
-    return 0
+        
+        result = subprocess.run(
+            ["cmake", "--build", "out/build", "--config", "Release"],
+            check=False,
+        )
+        return result.returncode
+    else:
+        cmake_config = _CONFIGS[args.config]
+        result = subprocess.run(
+            ["cmake", "--build", "out/build", "--config", cmake_config],
+            check=False,
+        )
+        return result.returncode

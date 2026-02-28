@@ -88,7 +88,18 @@ bool ModuleRegistry::Init() noexcept
 {
   if (!m_impl)
   {
-    m_impl.reset(new Impl());
+    try
+    {
+      m_impl.reset(new Impl());
+    }
+    catch (const std::exception&)
+    {
+      return false;
+    }
+    catch (...)
+    {
+      return false;
+    }
   }
   // Service init corresponds to "engine booted": newly registered modules
   // should be started immediately.

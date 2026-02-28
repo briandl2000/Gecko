@@ -1,91 +1,37 @@
 #if GECKO_OVERRIDE_NEW
-#include "gecko/core/assert.h"
 #include "gecko/core/services/memory.h"
-#include "gecko/core/types.h"
 
 #include <cstddef>
 #include <new>
 
-void* operator new(::gecko::usize size)
+void* operator new(::std::size_t size)
 {
-  GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
+  return ::gecko::AllocBytes(static_cast<::gecko::u64>(size));
+}
 
-  auto* allocator = ::gecko::GetAllocator();
-  GECKO_ASSERT(allocator &&
-               "Allocation before GECKO_BOOT or after UninstallServices()");
+void* operator new(::std::size_t size, ::std::align_val_t align)
+{
+  return ::gecko::AllocBytes(static_cast<::gecko::u64>(size),
+                             static_cast<::gecko::u32>(align));
+}
 
-  if (void* ptr = allocator->Alloc(static_cast<::gecko::u64>(size),
-                                   alignof(::std::max_align_t)))
-  {
-    return ptr;
-  }
-
-  throw ::std::bad_alloc {};
+void* operator new(::std::size_t size, const ::std::nothrow_t&) noexcept
+{
+  return ::gecko::AllocBytes(static_cast<::gecko::u64>(size));
 }
 
 void operator delete(void* ptr) noexcept
 {
-  if (!ptr)
-    return;
-
-  auto* allocator = ::gecko::GetAllocator();
-  GECKO_ASSERT(allocator &&
-               "Deallocation after UninstallServices() - memory leak");
-
-  allocator->Free(ptr);
+  ::gecko::DeallocBytes(ptr);
 }
 
-void* operator new(::gecko::usize size, ::std::align_val_t align)
+void operator delete(void* ptr, ::std::size_t) noexcept
 {
-  GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
-
-  auto* allocator = ::gecko::GetAllocator();
-  GECKO_ASSERT(allocator &&
-               "Allocation before GECKO_BOOT or after UninstallServices()");
-
-  if (void* ptr = allocator->Alloc(static_cast<::gecko::u64>(size),
-                                   static_cast<::gecko::u32>(align)))
-  {
-    return ptr;
-  }
-
-  throw ::std::bad_alloc {};
+  ::gecko::DeallocBytes(ptr);
 }
 
 void operator delete(void* ptr, ::std::align_val_t) noexcept
 {
-  if (!ptr)
-    return;
-
-  auto* allocator = ::gecko::GetAllocator();
-  GECKO_ASSERT(allocator &&
-               "Deallocation after UninstallServices() - memory leak");
-
-  allocator->Free(ptr);
+  ::gecko::DeallocBytes(ptr);
 }
-
-void operator delete(void* ptr, ::gecko::usize) noexcept
-{
-  if (!ptr)
-    return;
-
-  auto* allocator = ::gecko::GetAllocator();
-  GECKO_ASSERT(allocator &&
-               "Deallocation after UninstallServices() - memory leak");
-
-  allocator->Free(ptr);
-}
-
-void operator delete(void* ptr, ::gecko::usize, ::std::align_val_t) noexcept
-{
-  if (!ptr)
-    return;
-
-  auto* allocator = ::gecko::GetAllocator();
-  GECKO_ASSERT(allocator &&
-               "Deallocation after UninstallServices() - memory leak");
-
-  allocator->Free(ptr);
-}
-
 #endif

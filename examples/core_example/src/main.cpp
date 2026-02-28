@@ -54,12 +54,12 @@ public:
   }
 
   [[nodiscard]] bool Startup(
-      ::gecko::IModuleRegistry& modules) noexcept override
+      ::gecko::IModuleRegistry& /*modules*/) noexcept override
   {
     return true;
   }
 
-  void Shutdown(::gecko::IModuleRegistry& modules) noexcept override
+  void Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept override
   {}
 };
 
@@ -494,9 +494,7 @@ int main()
   std::printf("(As expected, no log output appeared above)\n\n");
 
   // Set up our services
-  std::printf("Setting up services...\n");
-  SystemAllocator systemAlloc;
-  runtime::TrackingAllocator trackingAlloc(&systemAlloc);
+  runtime::TrackingAllocator trackingAlloc;
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
   runtime::RingLogger ringLogger(1024);  // 1024 log entries in ring buffer
   runtime::ModuleRegistry moduleRegistry;

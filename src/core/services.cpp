@@ -10,12 +10,17 @@
 
 namespace gecko {
 
-// Null service implementations
 static NullJobSystem s_NullJobSystem;
 static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
 
-// Service globals
+// Function-local static avoids the static initialization order fiasco.
+static SystemAllocator& DefaultAllocator() noexcept
+{
+  static SystemAllocator instance;
+  return instance;
+}
+
 static std::atomic<IAllocator*> g_Allocator {nullptr};
 static std::atomic<IModuleRegistry*> g_Modules {nullptr};
 static std::atomic<IEventBus*> g_EventBus {nullptr};
@@ -65,7 +70,7 @@ static void RollbackServices(const Services& svc,
   if (st.allocator && svc.Allocator)
   {
     svc.Allocator->Shutdown();
-    g_Allocator.store(nullptr, std::memory_order_release);
+    g_Allocator.store(&DefaultAllocator(), std::memory_order_release);
   }
 }
 
@@ -144,6 +149,7 @@ bool InstallServices(const Services& svc) noexcept
   st.eventBus = true;
 
   g_Installed.store(true, std::memory_order_release);
+
   GECKO_INFO(core::labels::Services, "All services installed successfully");
 
   return true;
@@ -160,7 +166,7 @@ void UninstallServices() noexcept
   g_JobSystem.load(std::memory_order_relaxed)->Shutdown();
   g_Allocator.load(std::memory_order_relaxed)->Shutdown();
 
-  g_Allocator.store(nullptr, std::memory_order_release);
+  g_Allocator.store(&DefaultAllocator(), std::memory_order_release);
   g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
   g_Profiler.store(&s_NullProfiler, std::memory_order_release);
   g_Logger.store(&s_NullLogger, std::memory_order_release);
@@ -171,7 +177,8 @@ void UninstallServices() noexcept
 
 IAllocator* GetAllocator() noexcept
 {
-  return g_Allocator.load(std::memory_order_acquire);
+  auto* alloc = g_Allocator.load(std::memory_order_acquire);
+  return alloc ? alloc : &DefaultAllocator();
 }
 
 IJobSystem* GetJobSystem() noexcept

@@ -181,7 +181,9 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
 void RingLogger::ProcessLogEntries() noexcept
 {
   if (!m_Run.load(std::memory_order_acquire))
+  {
     return;
+  }
 
   // Copy sinks vector once to avoid holding lock during I/O
   std::vector<ILogSink*> sinks;

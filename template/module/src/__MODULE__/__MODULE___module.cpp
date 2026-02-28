@@ -19,7 +19,8 @@ bool __MODULE_CAMEL__Module::Startup(::gecko::IModuleRegistry& modules) noexcept
   return true;
 }
 
-void __MODULE_CAMEL__Module::Shutdown(::gecko::IModuleRegistry& modules) noexcept
+void __MODULE_CAMEL__Module::Shutdown(
+    ::gecko::IModuleRegistry& modules) noexcept
 {
   GECKO_FUNC(labels::__MODULE_CAMEL__);
 }

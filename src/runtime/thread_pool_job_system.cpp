@@ -1,4 +1,4 @@
-#include "gecko/runtime/thread_pool_job_system.h"
+﻿#include "gecko/runtime/thread_pool_job_system.h"
 
 #include "gecko/core/assert.h"
 #include "gecko/core/services/log.h"
