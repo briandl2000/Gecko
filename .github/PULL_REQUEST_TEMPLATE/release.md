@@ -18,5 +18,3 @@
 - Use **Create a merge commit** (not squash or rebase)
 - CI will automatically tag and create a GitHub release
 
-### Release Notes Preview
-<!-- Paste the CHANGELOG.md section for this version here -->
