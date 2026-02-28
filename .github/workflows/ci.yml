@@ -265,44 +265,27 @@ jobs:
           find artifacts -name "*.zip" -exec cp {} release/ \;
           ls -la release/
       
-      - name: Extract changelog (main only)
-        if: github.ref == 'refs/heads/main'
-        id: changelog
-        run: |
-          VERSION="${{ needs.resolve-version.outputs.version }}"
-          
-          if [ -f CHANGELOG.md ]; then
-            NOTES=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{ /^## \[${VERSION}\]/d; /^## \[/d; p; }" CHANGELOG.md)
-            if [ -z "$NOTES" ]; then
-              NOTES="No changelog entry for ${VERSION}."
-            fi
-          else
-            NOTES="No CHANGELOG.md found."
-          fi
-          
-          echo "$NOTES" > release_notes.md
-          echo "Release notes:"
-          cat release_notes.md
-      
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FLAGS=""
-          if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
-            FLAGS="--prerelease"
-          fi
-          
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            TITLE="Gecko Dev Build ${{ needs.resolve-version.outputs.version }}"
-            NOTES_FLAG="--generate-notes"
+            # Dev: prerelease, not shown as latest, no description
+            gh release create "${{ needs.resolve-version.outputs.tag }}" \
+              --title "Gecko Dev Build ${{ needs.resolve-version.outputs.version }}" \
+              --prerelease \
+              --latest=false \
+              --notes "" \
+              release/*.zip
           else
-            TITLE="Gecko ${{ needs.resolve-version.outputs.version }}"
-            NOTES_FLAG="--notes-file release_notes.md"
+            # Main: auto-generated notes from commits since last release tag
+            FLAGS=""
+            if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
+              FLAGS="--prerelease"
+            fi
+            gh release create "${{ needs.resolve-version.outputs.tag }}" \
+              --title "Gecko ${{ needs.resolve-version.outputs.version }}" \
+              ${FLAGS} \
+              --generate-notes \
+              release/*.zip
           fi
-          
-          gh release create "${{ needs.resolve-version.outputs.tag }}" \
-            --title "${TITLE}" \
-            ${NOTES_FLAG} \
-            ${FLAGS} \
-            release/*.zip
