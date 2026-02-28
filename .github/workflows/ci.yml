@@ -278,31 +278,23 @@ jobs:
           find artifacts -name "*.zip" -exec cp {} release/ \;
           ls -la release/
       
-      - name: Extract changelog
+      - name: Extract changelog (main only)
+        if: github.ref == 'refs/heads/main'
         id: changelog
         run: |
           VERSION="${{ needs.resolve-version.outputs.version }}"
-          # For dev builds, use the base version (without -dev.timestamp)
-          BASE_VERSION=$(echo "$VERSION" | sed 's/-dev\.[0-9]*//')
           
           if [ -f CHANGELOG.md ]; then
-            # Extract the section for this version (between ## [x.y.z] headers)
-            NOTES=$(sed -n "/^## \[${BASE_VERSION}\]/,/^## \[/{ /^## \[${BASE_VERSION}\]/d; /^## \[/d; p; }" CHANGELOG.md)
+            NOTES=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{ /^## \[${VERSION}\]/d; /^## \[/d; p; }" CHANGELOG.md)
             if [ -z "$NOTES" ]; then
-              NOTES="No changelog entry for ${BASE_VERSION}."
+              NOTES="No changelog entry for ${VERSION}."
             fi
           else
             NOTES="No CHANGELOG.md found."
           fi
           
-          # Write to file for gh release
           echo "$NOTES" > release_notes.md
-          
-          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            echo -e "**Dev build from \`dev\` branch — may be unstable.**\n" | cat - release_notes.md > tmp && mv tmp release_notes.md
-          fi
-          
-          echo "Generated release notes:"
+          echo "Release notes:"
           cat release_notes.md
       
       - name: Create GitHub Release
@@ -316,12 +308,14 @@ jobs:
           
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
             TITLE="Gecko Dev Build ${{ needs.resolve-version.outputs.version }}"
+            NOTES_FLAG="--generate-notes"
           else
             TITLE="Gecko ${{ needs.resolve-version.outputs.version }}"
+            NOTES_FLAG="--notes-file release_notes.md"
           fi
           
           gh release create "${{ needs.resolve-version.outputs.tag }}" \
             --title "${TITLE}" \
-            --notes-file release_notes.md \
+            ${NOTES_FLAG} \
             ${FLAGS} \
             release/*.zip
