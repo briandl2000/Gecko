@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.0-alpha.1]
+
+### Added
+- Automated CI releases for both dev and main branches
+- PR templates (feature and release) with checklists
+- PR checks: version bump and changelog enforcement for main merges
+- Consistent version strings across Linux/Windows packages
+- CHANGELOG.md for tracking changes
+
+### Fixed
+- CI version extraction failing on Windows (`grep -oP` replaced with portable `sed`)
+- Linux/Windows packages having mismatched timestamps
+
 ## [0.0.0-alpha.0]
 
 ### Added

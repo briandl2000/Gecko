@@ -15,7 +15,7 @@ endif()
 
 # Optional SemVer prerelease identifier (repo-controlled).
 # Examples: "alpha.1", "beta.2", "rc.1". Set to "" for a normal release.
-set(GECKO_VERSION_PRERELEASE "alpha.0")
+set(GECKO_VERSION_PRERELEASE "alpha.1")
 
 if(GECKO_VERSION_PRERELEASE STREQUAL "")
   set(GECKO_VERSION_FULL "${PROJECT_VERSION}")
