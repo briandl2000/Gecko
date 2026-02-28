@@ -123,8 +123,8 @@ jobs:
         id: version
         shell: bash
         run: |
-          VERSION=$(grep -oP 'project\(Gecko VERSION \K[\d.]+' CMakeLists.txt || grep -o 'VERSION [0-9.]*' CMakeLists.txt | cut -d' ' -f2)
-          PRERELEASE=$(grep -oP 'GECKO_VERSION_PRERELEASE "\K[^"]+' CMakeLists.txt || echo "")
+          VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
           
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
             TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
@@ -181,8 +181,8 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(grep -oP 'project\(Gecko VERSION \K[\d.]+' CMakeLists.txt)
-          PRERELEASE=$(grep -oP 'GECKO_VERSION_PRERELEASE "\K[^"]+' CMakeLists.txt || echo "")
+          VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
           if [ -n "$PRERELEASE" ]; then
             echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
             echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
