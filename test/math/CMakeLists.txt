@@ -15,4 +15,4 @@ endif()
 
 # Discover and register tests with CTest
 include(Catch)
-catch_discover_tests(math_tests)
+catch_discover_tests(math_tests DISCOVER_TESTS FALSE)

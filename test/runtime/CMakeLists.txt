@@ -22,4 +22,4 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
 endif()
 
 include(Catch)
-catch_discover_tests(runtime_tests)
+catch_discover_tests(runtime_tests DISCOVER_TESTS FALSE)
