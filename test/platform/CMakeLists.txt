@@ -17,6 +17,3 @@ target_include_directories(platform_tests PRIVATE ${CMAKE_SOURCE_DIR}/include)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(platform_tests PRIVATE -Wno-pedantic)
 endif()
-
-include(Catch)
-catch_discover_tests(platform_tests DISCOVER_TESTS FALSE)
