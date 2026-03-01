@@ -42,12 +42,14 @@ def _run(args) -> int:
     
     # Build tests only (not everything)
     print(f"Building tests ({config})...")
-    build_result = subprocess.run(
-        ["cmake", "--build", "out/build", "--config", config, "--target", "math_tests"],
-        check=False,
-    )
-    if build_result.returncode != 0:
-        return build_result.returncode
+    test_targets = ["core_tests", "platform_tests", "runtime_tests", "math_tests"]
+    for target in test_targets:
+        build_result = subprocess.run(
+            ["cmake", "--build", "out/build", "--config", config, "--target", target],
+            check=False,
+        )
+        if build_result.returncode != 0:
+            return build_result.returncode
     
     if args.build_only:
         print(f"\nTests built successfully in out/bin/{config}/tests/")
@@ -56,10 +58,14 @@ def _run(args) -> int:
     # Run tests directly (Catch2 handles test discovery and reporting)
     print(f"\nRunning tests...")
     exe_suffix = ".exe" if os.name == "nt" else ""
-    test_executable = Path(f"out/bin/{config}/tests/math_tests{exe_suffix}")
-    test_result = subprocess.run(
-        [str(test_executable)],
-        check=False,
-    )
+    overall_result = 0
+    for test_target in test_targets:
+        test_executable = Path(f"out/bin/{config}/tests/{test_target}{exe_suffix}")
+        test_result = subprocess.run(
+            [str(test_executable)],
+            check=False,
+        )
+        if test_result.returncode != 0:
+            overall_result = test_result.returncode
     
-    return test_result.returncode
+    return overall_result
