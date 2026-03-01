@@ -73,7 +73,7 @@ TEST_CASE("EventBus subscribe and publish immediate", "[runtime][events]")
   int received = 0;
   auto sub = scope.eventBus.Subscribe(
       TestEvent1,
-      [](void* user, const EventMeta&, EventView payload) {
+      [](void* user, const EventMeta&, EventView) {
         auto* count = static_cast<int*>(user);
         *count += 1;
       },
