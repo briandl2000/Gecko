@@ -26,4 +26,5 @@ foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
 endforeach()
 
 # Add test subdirectories
+add_subdirectory(core)
 add_subdirectory(math)
