@@ -10,8 +10,6 @@ target_sources(Platform
 )
 
 if(UNIX AND NOT APPLE)
-  target_compile_definitions(Platform PUBLIC GECKO_PLATFORM_LINUX)
-
   find_package(X11)
   if(X11_FOUND)
     target_sources(Platform PRIVATE
@@ -37,7 +35,6 @@ if(UNIX AND NOT APPLE)
 elseif(WIN32)
   target_sources(Platform PRIVATE
   )
-  target_compile_definitions(Platform PUBLIC GECKO_PLATFORM_WINDOWS)
 endif()
 
 target_include_directories(Platform
