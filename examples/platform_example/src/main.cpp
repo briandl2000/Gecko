@@ -110,9 +110,9 @@ int main()
     (void)InstallModule(g_AppModule);
 
     PlatformConfig cfg = {};
-    cfg.WindowBackend = WindowBackendKind::Auto;
+    cfg.Backend = DisplayBackendKind::Auto;
 
-    Unique<PlatformContext> ctx = PlatformContext::Create(cfg);
+    PlatformContext ctx = PlatformContext(cfg);
 
     WindowDesc windowDesc;
     windowDesc.Title = "Gecko Platform Example";
@@ -124,7 +124,7 @@ int main()
     WindowHandle window;
     GECKO_INFO(app::platform_example::labels::Main,
                "Creating application window...");
-    if (!ctx->CreateWindow(windowDesc, window))
+    if (!ctx.Windows().CreateWindow(windowDesc, window))
     {
       GECKO_ERROR(app::platform_example::labels::Main,
                   "Failed to create window\n");
@@ -139,19 +139,19 @@ int main()
     // Run up to ~10 seconds unless a close is requested.
     u32 frameCount = 0;
     GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
-    while (running && ctx->IsWindowAlive(window) && frameCount < 600)
+    while (running && ctx.Windows().IsWindowAlive(window) && frameCount < 600)
     {
       GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "MainLoop");
 
       {
         GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "PumpEvents");
-        ctx->PumpEvents();
+        ctx.Windows().PumpEvents();
       }
 
       {
         GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "ProcessEvents");
         WindowEvent ev {};
-        while (ctx->PollEvent(ev))
+        while (ctx.Windows().PollEvent(ev))
         {
           if (ev.Kind == WindowEventKind::CloseRequested)
           {
@@ -178,11 +178,11 @@ int main()
       // Headless/timeout fallback: request a clean shutdown.
       GECKO_INFO(app::platform_example::labels::Main,
                  "Timeout reached, requesting clean shutdown");
-      ctx->RequestClose(window);
+      ctx.Windows().RequestClose(window);
     }
 
     GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
-    ctx->DestroyWindow(window);
+    ctx.Windows().DestroyWindow(window);
 
     // Unregister sinks before shutting down services
   }

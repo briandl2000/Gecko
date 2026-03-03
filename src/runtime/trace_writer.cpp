@@ -1,7 +1,7 @@
 #include "gecko/runtime/trace_writer.h"
 
 #include <cstdio>
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 #include <corecrt_share.h>
 #endif
 
@@ -21,7 +21,7 @@ bool TraceWriter::Open(const char* path)
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
   Close();
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   m_File = _fsopen(path, "wb", _SH_DENYNO);
 #else
   m_File = std::fopen(path, "wb");

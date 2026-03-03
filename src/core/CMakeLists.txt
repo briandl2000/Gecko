@@ -48,6 +48,17 @@ target_include_directories(Core
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR})
 
+# ── OS / platform feature macros ────────────────────────────────────────────
+# Exposed as PUBLIC so every target that links Gecko::Core receives them
+# automatically – no header inclusion required.
+if(WIN32)
+  target_compile_definitions(Core PUBLIC GECKO_PLATFORM_WINDOWS=1)
+elseif(UNIX AND NOT APPLE)
+  target_compile_definitions(Core PUBLIC GECKO_PLATFORM_LINUX=1)
+elseif(APPLE)
+  target_compile_definitions(Core PUBLIC GECKO_PLATFORM_APPLE=1)
+endif()
+
 target_compile_definitions(Core
   PUBLIC
     GECKO_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}

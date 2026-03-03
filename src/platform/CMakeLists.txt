@@ -3,15 +3,18 @@ add_library(Gecko::Platform ALIAS Platform)
 
 target_sources(Platform
   PRIVATE
-    window.cpp
+    null_windows_interface.cpp
+    platform_context.cpp
     platform_module.cpp
+    windows_interface.cpp
 )
 
 if(UNIX AND NOT APPLE)
-  target_sources(Platform PRIVATE linux/platform_context_linux.cpp)
   find_package(X11)
   if(X11_FOUND)
-    target_sources(Platform PRIVATE linux/x11_window_backend.cpp)
+    target_sources(Platform PRIVATE
+      linux/x11_windows_interface.cpp
+    )
     if(TARGET X11::X11)
       target_link_libraries(Platform PRIVATE X11::X11)
     else()
@@ -20,8 +23,18 @@ if(UNIX AND NOT APPLE)
     endif()
     target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_X11)
   endif()
+
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(Wayland QUIET wayland-client)
+    if(Wayland_FOUND)
+      target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_WAYLAND)
+      message(STATUS "Gecko: Wayland client found – GECKO_PLATFORM_LINUX_WAYLAND enabled")
+    endif()
+  endif()
 elseif(WIN32)
-  target_sources(Platform PRIVATE windows/platform_context_windows.cpp)
+  target_sources(Platform PRIVATE
+  )
 endif()
 
 target_include_directories(Platform

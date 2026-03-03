@@ -1,11 +1,11 @@
 #include "gecko/platform/window.h"
 
-#if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
 
 #include "../private/labels.h"
-#include "../window_backend.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
+#include "gecko/platform/windows_interface.h"
 
 #include <cstdint>
 #include <deque>
@@ -45,10 +45,10 @@ constexpr unsigned long MWM_HINTS_DECORATIONS = 1UL << 1;
 constexpr unsigned long MWM_DECOR_ALL = 1UL;
 }  // namespace
 
-class X11WindowBackend final : public IWindowBackend
+class X11WindowsBackend final : public IWindowsBackend
 {
 public:
-  X11WindowBackend() noexcept = default;
+  X11WindowsBackend() noexcept = default;
 
   bool CreateWindow(const WindowDesc& desc,
                     WindowHandle& outWindow) noexcept override
@@ -388,7 +388,7 @@ public:
       return NativeWindowHandle {};
 
     NativeWindowHandle nh;
-    nh.Backend = WindowBackendKind::Xlib;
+    nh.Backend = DisplayBackendKind::Xlib;
     nh.Display = m_Display;
     nh.Handle =
         reinterpret_cast<void*>(static_cast<uintptr_t>(it->second.WindowId));
@@ -527,11 +527,11 @@ private:
   std::deque<WindowEvent> m_Events;
 };
 
-Unique<IWindowBackend> CreateXlibWindowBackend() noexcept
+Unique<IWindowsBackend> CreateXlibWindowsBackend() noexcept
 {
-  return CreateUnique<X11WindowBackend>();
+  return CreateUnique<X11WindowsBackend>();
 }
 
 }  // namespace gecko::platform
 
-#endif  // __linux__ && GECKO_PLATFORM_LINUX_X11
+#endif  // GECKO_PLATFORM_LINUX && GECKO_PLATFORM_LINUX_X11

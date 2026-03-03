@@ -1,23 +1,9 @@
 #pragma once
 
 #include "gecko/core/types.h"
+#include "gecko/platform/platform_config.h"
 
 namespace gecko::platform {
-
-// Identifies (a) the selected backend or (b) the native window system used.
-// `Auto` and `Null` are selection-only.
-enum class WindowBackendKind : u8
-{
-  Unknown,
-  Auto,
-  Null,
-
-  Win32,
-  Xlib,
-  Xcb,
-  Wayland,
-  Cocoa,
-};
 
 struct WindowHandle
 {
@@ -111,7 +97,7 @@ struct WindowDesc
 
 struct NativeWindowHandle
 {
-  WindowBackendKind Backend {WindowBackendKind::Unknown};
+  DisplayBackendKind Backend {DisplayBackendKind::Unknown};
   void* Handle {nullptr};
   void* Display {nullptr};
 };
