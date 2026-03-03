@@ -63,6 +63,17 @@ option(GECKO_BUILD_EXAMPLES "Build examples" ON)
 option(GECKO_BUILD_TESTS "Build tests" OFF)
 option(GECKO_OVERRIDE_NEW "Override global operator new/delete to route through Gecko allocator" OFF)
 
+# Copy the compilation database to the repo root on build for editor tooling.
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+  add_custom_target(gecko_copy_compile_commands ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_BINARY_DIR}/compile_commands.json"
+            "${CMAKE_SOURCE_DIR}/compile_commands.json"
+    BYPRODUCTS "${CMAKE_SOURCE_DIR}/compile_commands.json"
+    COMMENT "Copy compile_commands.json to project root"
+  )
+endif()
+
 # CMake package/export naming (kept consistent with the project name).
 set(GECKO_EXPORT_SET_NAME "${PROJECT_NAME}Targets")
 
