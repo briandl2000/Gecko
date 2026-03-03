@@ -1,6 +1,10 @@
 # Build outputs
 /out/
 
+# Compilation database
+compile_commands.json
+.cache/
+
 # IDE (user-specific)
 .vscode/
 .idea/
