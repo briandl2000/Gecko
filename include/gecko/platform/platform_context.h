@@ -19,7 +19,10 @@ public:
     return *m_Windows;
   };
 
-  GECKO_API virtual void PumpEvents() noexcept {};
+  GECKO_API virtual void PumpEvents() noexcept
+  {
+    m_Windows->PumpEvents();
+  }
 
 private:
   Unique<IWindowsBackend> m_Windows;
