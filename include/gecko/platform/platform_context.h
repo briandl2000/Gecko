@@ -14,12 +14,12 @@ public:
 
   GECKO_API ~PlatformContext() = default;
 
-  GECKO_API virtual IWindowsBackend& Windows()
+  GECKO_API IWindowsBackend& Windows()
   {
     return *m_Windows;
   };
 
-  GECKO_API virtual void PumpEvents() noexcept
+  GECKO_API void PumpEvents() noexcept
   {
     m_Windows->PumpEvents();
   }
