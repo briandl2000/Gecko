@@ -10,7 +10,7 @@ namespace gecko::platform {
 class PlatformContext
 {
 public:
-  PlatformContext(const PlatformConfig& cfg);
+  GECKO_API PlatformContext(const PlatformConfig& cfg);
 
   GECKO_API ~PlatformContext() = default;
 
