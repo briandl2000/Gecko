@@ -60,7 +60,7 @@ struct AppConfig
   const char* title = "Gecko App";
   bool windowed = true;
   u32 maxFrames = 0;  // 0 = run until close
-  WindowBackendKind backend = WindowBackendKind::Auto;
+  DisplayBackendKind backend = DisplayBackendKind::Auto;
 };
 
 static void PrintUsage(const char* exe)
@@ -142,15 +142,15 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
       std::string_view value = arg.substr(std::strlen("--backend="));
       if (value == "auto")
       {
-        cfg.backend = WindowBackendKind::Auto;
+        cfg.backend = DisplayBackendKind::Auto;
       }
       else if (value == "null")
       {
-        cfg.backend = WindowBackendKind::Null;
+        cfg.backend = DisplayBackendKind::Null;
       }
       else if (value == "xlib")
       {
-        cfg.backend = WindowBackendKind::Xlib;
+        cfg.backend = DisplayBackendKind::Xlib;
       }
       else
       {
@@ -258,15 +258,9 @@ static int AppMain(int argc, char** argv)
   else
   {
     PlatformConfig platformCfg {};
-    platformCfg.WindowBackend = cfg.backend;
+    platformCfg.Backend = cfg.backend;
 
-    Unique<PlatformContext> ctx = PlatformContext::Create(platformCfg);
-    if (!ctx)
-    {
-      GECKO_ERROR(app::app_skeleton::labels::Main,
-                  "Failed to create PlatformContext");
-      return 1;
-    }
+    PlatformContext ctx = PlatformContext(platformCfg);
 
     WindowDesc windowDesc {};
     windowDesc.Title = cfg.title;
@@ -275,7 +269,7 @@ static int AppMain(int argc, char** argv)
     windowDesc.Resizable = true;
 
     WindowHandle window {};
-    if (!ctx->CreateWindow(windowDesc, window))
+    if (!ctx.Windows().CreateWindow(windowDesc, window))
     {
       GECKO_ERROR(app::app_skeleton::labels::Main, "Failed to create window");
       return 1;
@@ -284,13 +278,13 @@ static int AppMain(int argc, char** argv)
     bool running = true;
     u32 frames = 0;
 
-    while (running && ctx->IsWindowAlive(window))
+    while (running && ctx.Windows().IsWindowAlive(window))
     {
       GECKO_SCOPE_NAMED(app::app_skeleton::labels::Main, "Frame");
 
-      ctx->PumpEvents();
+      ctx.Windows().PumpEvents();
       WindowEvent ev {};
-      while (ctx->PollEvent(ev))
+      while (ctx.Windows().PollEvent(ev))
       {
         if (ev.Kind == WindowEventKind::CloseRequested)
         {
@@ -309,7 +303,7 @@ static int AppMain(int argc, char** argv)
       }
     }
 
-    ctx->DestroyWindow(window);
+    ctx.Windows().DestroyWindow(window);
   }
 
   // Unregister sinks before shutting down services
@@ -322,7 +316,7 @@ static int AppMain(int argc, char** argv)
   return result;
 }
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 // On Windows, you typically choose ONE of:
 // - main(int,char**) for a console subsystem app
 // - wmain(int,wchar_t**) to preserve Unicode arguments

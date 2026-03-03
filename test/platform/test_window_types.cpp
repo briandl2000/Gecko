@@ -73,7 +73,7 @@ TEST_CASE("WindowDesc defaults", "[platform][window]")
 TEST_CASE("NativeWindowHandle defaults", "[platform][window]")
 {
   NativeWindowHandle nh;
-  REQUIRE(nh.Backend == WindowBackendKind::Unknown);
+  REQUIRE(nh.Backend == DisplayBackendKind::Unknown);
   REQUIRE(nh.Handle == nullptr);
   REQUIRE(nh.Display == nullptr);
 }

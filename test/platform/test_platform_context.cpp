@@ -1,4 +1,5 @@
 #include "gecko/core/services.h"
+#include "gecko/platform/platform_config.h"
 #include "gecko/platform/platform_context.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -45,135 +46,133 @@ struct TestServiceScope
 
 }  // namespace
 
-TEST_CASE("PlatformContext::Create with Null backend", "[platform][context]")
-{
-  TestServiceScope scope;
-
-  PlatformConfig cfg {.WindowBackend = WindowBackendKind::Null};
-  auto ctx = PlatformContext::Create(cfg);
-  REQUIRE(ctx != nullptr);
-}
-
 TEST_CASE("Null backend: create and destroy window", "[platform][context]")
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
-  REQUIRE(ctx != nullptr);
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
 
   WindowHandle win;
-  REQUIRE(ctx->CreateWindow({}, win));
+  REQUIRE(ctx.Windows().CreateWindow({}, win));
   REQUIRE(win.IsValid());
-  REQUIRE(ctx->IsWindowAlive(win));
+  REQUIRE(ctx.Windows().IsWindowAlive(win));
 
-  ctx->DestroyWindow(win);
-  REQUIRE_FALSE(ctx->IsWindowAlive(win));
+  ctx.Windows().DestroyWindow(win);
+  REQUIRE_FALSE(ctx.Windows().IsWindowAlive(win));
 }
 
 TEST_CASE("Null backend: client size matches desc", "[platform][context]")
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
 
   WindowDesc desc;
   desc.Size = {800, 600};
   WindowHandle win;
-  REQUIRE(ctx->CreateWindow(desc, win));
+  REQUIRE(ctx.Windows().CreateWindow(desc, win));
 
-  Extent2D size = ctx->GetClientSize(win);
+  Extent2D size = ctx.Windows().GetClientSize(win);
   REQUIRE(size.Width == 800);
   REQUIRE(size.Height == 600);
 
-  ctx->DestroyWindow(win);
+  ctx.Windows().DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: set title doesn't crash", "[platform][context]")
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
 
   WindowHandle win;
-  ctx->CreateWindow({}, win);
-  ctx->SetTitle(win, "Test Title");
-  ctx->DestroyWindow(win);
+  ctx.Windows().CreateWindow({}, win);
+  ctx.Windows().SetTitle(win, "Test Title");
+  ctx.Windows().DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: request close enqueues event", "[platform][context]")
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
 
   WindowHandle win;
-  ctx->CreateWindow({}, win);
-  REQUIRE(ctx->RequestClose(win));
+  ctx.Windows().CreateWindow({}, win);
+  REQUIRE(ctx.Windows().RequestClose(win));
 
   WindowEvent ev;
-  REQUIRE(ctx->PollEvent(ev));
+  REQUIRE(ctx.Windows().PollEvent(ev));
   REQUIRE(ev.Kind == WindowEventKind::CloseRequested);
   REQUIRE(ev.Window == win);
 
-  ctx->DestroyWindow(win);
+  ctx.Windows().DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: multiple windows", "[platform][context]")
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
 
   WindowHandle w1, w2, w3;
-  REQUIRE(ctx->CreateWindow({}, w1));
-  REQUIRE(ctx->CreateWindow({}, w2));
-  REQUIRE(ctx->CreateWindow({}, w3));
+  REQUIRE(ctx.Windows().CreateWindow({}, w1));
+  REQUIRE(ctx.Windows().CreateWindow({}, w2));
+  REQUIRE(ctx.Windows().CreateWindow({}, w3));
 
   REQUIRE(w1 != w2);
   REQUIRE(w2 != w3);
 
-  REQUIRE(ctx->IsWindowAlive(w1));
-  REQUIRE(ctx->IsWindowAlive(w2));
-  REQUIRE(ctx->IsWindowAlive(w3));
+  REQUIRE(ctx.Windows().IsWindowAlive(w1));
+  REQUIRE(ctx.Windows().IsWindowAlive(w2));
+  REQUIRE(ctx.Windows().IsWindowAlive(w3));
 
-  ctx->DestroyWindow(w2);
-  REQUIRE(ctx->IsWindowAlive(w1));
-  REQUIRE_FALSE(ctx->IsWindowAlive(w2));
-  REQUIRE(ctx->IsWindowAlive(w3));
+  ctx.Windows().DestroyWindow(w2);
+  REQUIRE(ctx.Windows().IsWindowAlive(w1));
+  REQUIRE_FALSE(ctx.Windows().IsWindowAlive(w2));
+  REQUIRE(ctx.Windows().IsWindowAlive(w3));
 
-  ctx->DestroyWindow(w1);
-  ctx->DestroyWindow(w3);
+  ctx.Windows().DestroyWindow(w1);
+  ctx.Windows().DestroyWindow(w3);
 }
 
 TEST_CASE("Null backend: DPI info has defaults", "[platform][context]")
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
 
   WindowHandle win;
-  ctx->CreateWindow({}, win);
+  ctx.Windows().CreateWindow({}, win);
 
-  DpiInfo dpi = ctx->GetDpi(win);
+  DpiInfo dpi = ctx.Windows().GetDpi(win);
   REQUIRE(dpi.Dpi > 0);
   REQUIRE(dpi.Scale > 0.0f);
 
-  ctx->DestroyWindow(win);
+  ctx.Windows().DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: PumpEvents doesn't crash", "[platform][context]")
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
-  ctx->PumpEvents();
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  ctx.Windows().PumpEvents();
 }
 
 TEST_CASE("Null backend: invalid window operations are safe",
@@ -181,11 +180,12 @@ TEST_CASE("Null backend: invalid window operations are safe",
 {
   TestServiceScope scope;
 
-  auto ctx =
-      PlatformContext::Create({.WindowBackend = WindowBackendKind::Null});
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
 
   WindowHandle invalid;
-  REQUIRE_FALSE(ctx->IsWindowAlive(invalid));
-  REQUIRE_FALSE(ctx->RequestClose(invalid));
-  ctx->DestroyWindow(invalid);
+  REQUIRE_FALSE(ctx.Windows().IsWindowAlive(invalid));
+  REQUIRE_FALSE(ctx.Windows().RequestClose(invalid));
+  ctx.Windows().DestroyWindow(invalid);
 }

@@ -151,25 +151,25 @@ Unique<IWindowBackend> CreateNullWindowBackend() noexcept
 }
 
 // Provided by src/platform/linux/x11_window_backend.cpp when enabled.
-#if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
 Unique<IWindowBackend> CreateXlibWindowBackend() noexcept;
 #endif
 
 Unique<IWindowBackend> CreateWindowBackend(WindowBackendKind requested) noexcept
 {
-#if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
   constexpr bool hasX11 = true;
 #else
   constexpr bool hasX11 = false;
 #endif
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   constexpr bool hasWin32 = false;  // not implemented yet
 #else
   constexpr bool hasWin32 = false;
 #endif
 
-#if defined(__APPLE__)
+#if defined(GECKO_PLATFORM_APPLE)
   constexpr bool hasCocoa = false;  // not implemented yet
 #else
   constexpr bool hasCocoa = false;
@@ -183,7 +183,7 @@ Unique<IWindowBackend> CreateWindowBackend(WindowBackendKind requested) noexcept
   case WindowBackendKind::Xlib:
     if (hasX11)
     {
-#if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
       return CreateXlibWindowBackend();
 #endif
     }
@@ -221,7 +221,7 @@ Unique<IWindowBackend> CreateWindowBackend(WindowBackendKind requested) noexcept
   default:
     if (hasX11)
     {
-#if defined(__linux__) && defined(GECKO_PLATFORM_LINUX_X11)
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
       return CreateXlibWindowBackend();
 #endif
     }

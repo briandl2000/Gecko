@@ -1,7 +1,7 @@
 #include "gecko/runtime/file_log_sink.h"
 
 #include <cstdio>
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 #include <corecrt_share.h>
 #include <stdio.h>
 #endif
@@ -14,7 +14,7 @@ FileLogSink::FileLogSink(const char* path)
 {
   GECKO_ASSERT(path && "File path cannot be null");
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   m_File = _fsopen(path, "wb", _SH_DENYNO);
 #else
   m_File = std::fopen(path, "wb");
