@@ -8,3 +8,4 @@
 - [ ] CI passes (build + tests on both platforms)
 - [ ] Code follows [coding standards](docs/CODING_STANDARDS.md)
 - [ ] Added/updated tests (if applicable)
+- [ ] Change log updated
