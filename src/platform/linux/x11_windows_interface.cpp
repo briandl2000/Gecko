@@ -232,8 +232,8 @@ public:
 
     // Flush deferred events from RequestClose / DestroyWindow first.
     for (const auto& ev : m_Staged)
-      gecko::PublishEvent(emitter, ev.Code,
-                          gecko::EventView {ev.PayloadStorage, ev.PayloadSize});
+      gecko::SendEvent(emitter, ev.Code,
+                       gecko::EventView {ev.PayloadStorage, ev.PayloadSize});
     m_Staged.clear();
 
     if (!m_Display)
@@ -258,7 +258,7 @@ public:
           const u64 id = FindWindowId(event.xclient.window);
           if (id != 0)
           {
-            gecko::PublishEvent(
+            gecko::SendEvent(
                 emitter, events::WindowCloseRequested,
                 events::WindowCloseRequestedPayload {WindowHandle {id}, now});
           }
@@ -281,9 +281,9 @@ public:
             it->second.ClientSize.Height != newH)
         {
           it->second.ClientSize = Extent2D {newW, newH};
-          gecko::PublishEvent(emitter, events::WindowResized,
-                              events::WindowResizedPayload {WindowHandle {id},
-                                                            now, newW, newH});
+          gecko::SendEvent(emitter, events::WindowResized,
+                           events::WindowResizedPayload {WindowHandle {id}, now,
+                                                         newW, newH});
         }
       }
       break;
@@ -297,10 +297,10 @@ public:
         const bool down = (event.type == KeyPress);
         const KeySym keysym = XLookupKeysym(&event.xkey, 0);
 
-        gecko::PublishEvent(emitter, events::WindowKey,
-                            events::WindowKeyPayload {WindowHandle {id}, now,
-                                                      static_cast<u32>(keysym),
-                                                      down ? u8(1) : u8(0), 0});
+        gecko::SendEvent(emitter, events::WindowKey,
+                         events::WindowKeyPayload {WindowHandle {id}, now,
+                                                   static_cast<u32>(keysym),
+                                                   down ? u8(1) : u8(0), 0});
 
         if (down)
         {
@@ -314,10 +314,10 @@ public:
             const unsigned char c = static_cast<unsigned char>(buf[0]);
             if (c >= 32)
             {
-              gecko::PublishEvent(
-                  emitter, events::WindowChar,
-                  events::WindowCharPayload {WindowHandle {id}, now,
-                                             static_cast<u32>(c)});
+              gecko::SendEvent(emitter, events::WindowChar,
+                               events::WindowCharPayload {WindowHandle {id},
+                                                          now,
+                                                          static_cast<u32>(c)});
             }
           }
         }
@@ -329,7 +329,7 @@ public:
         if (id == 0)
           break;
 
-        gecko::PublishEvent(
+        gecko::SendEvent(
             emitter, events::WindowMouseMove,
             events::WindowMouseMovePayload {WindowHandle {id}, now,
                                             static_cast<i32>(event.xmotion.x),
@@ -361,17 +361,17 @@ public:
             else if (btn == 7)
               dx = -1.0F;
 
-            gecko::PublishEvent(emitter, events::WindowMouseWheel,
-                                events::WindowMouseWheelPayload {
-                                    WindowHandle {id}, now, dx, dy});
+            gecko::SendEvent(emitter, events::WindowMouseWheel,
+                             events::WindowMouseWheelPayload {WindowHandle {id},
+                                                              now, dx, dy});
           }
         }
         else
         {
-          gecko::PublishEvent(emitter, events::WindowMouseButton,
-                              events::WindowMouseButtonPayload {
-                                  WindowHandle {id}, now, static_cast<u8>(btn),
-                                  down ? u8(1) : u8(0)});
+          gecko::SendEvent(emitter, events::WindowMouseButton,
+                           events::WindowMouseButtonPayload {
+                               WindowHandle {id}, now, static_cast<u8>(btn),
+                               down ? u8(1) : u8(0)});
         }
       }
       break;

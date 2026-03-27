@@ -127,36 +127,10 @@ void EventBus::Unsubscribe(u64 id) noexcept
   }
 }
 
-void EventBus::PublishImmediate(const EventEmitter& emitter, EventCode code,
-                                EventView payload) noexcept
+void EventBus::Send(const EventEmitter& emitter, EventCode code,
+                    EventView payload) noexcept
 {
-  GECKO_SCOPE_NAMED(runtime::labels::General, "PublishImmediate");
-
-  [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
-  [[maybe_unused]] const u32 emitterModuleHash =
-      static_cast<u32>(emitter.moduleId >> 32);
-  GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
-               "Event code module mismatch with emitter module");
-  GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
-               "Invalid emitter capability");
-
-  GECKO_TRACE(runtime::labels::General,
-              "Publishing immediate event code=%u, moduleId=%llu", code,
-              (unsigned long long)emitter.moduleId);
-
-  EventMeta meta {};
-  meta.code = code;
-  meta.moduleId = emitter.moduleId;
-  meta.sender = emitter.sender;
-  meta.seq = m_NextSequence.fetch_add(1, std::memory_order_relaxed);
-
-  PublishToSubscribers(code, meta, payload);
-}
-
-void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
-                       EventView payload) noexcept
-{
-  GECKO_SCOPE_NAMED(runtime::labels::General, "EnqueueEvent");
+  GECKO_SCOPE_NAMED(runtime::labels::General, "SendEvent");
 
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
   [[maybe_unused]] const u32 emitterModuleHash =
@@ -169,7 +143,7 @@ void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
                "Payload too large for queue");
 
   GECKO_TRACE(runtime::labels::General,
-              "Enqueuing event code=%u, moduleId=%llu, size=%zu", code,
+              "Sending event code=%u, moduleId=%llu, size=%zu", code,
               (unsigned long long)emitter.moduleId, payload.size);
 
   QueuedEvent qEvent {};
@@ -185,11 +159,10 @@ void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
     std::memcpy(qEvent.payloadStorage, data, payload.size);
   }
 
-  // Notify OnPublish subscribers immediately on the caller's stack.
+  // Notify Immediate subscribers on the caller's stack.
   {
     EventView view {qEvent.payloadStorage, qEvent.payloadSize};
-    PublishToSubscribers(code, qEvent.meta, view,
-                         SubscriptionDelivery::OnPublish);
+    NotifySubscribers(code, qEvent.meta, view, SubscriptionDelivery::Immediate);
   }
 
   std::lock_guard<std::mutex> lock(m_QueueMutex);
@@ -197,7 +170,7 @@ void EventBus::Enqueue(const EventEmitter& emitter, EventCode code,
     m_EventQueue->push_back(qEvent);
 }
 
-std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
+std::size_t EventBus::Dispatch(std::size_t maxCount) noexcept
 {
   GECKO_FUNC(runtime::labels::General);
 
@@ -226,8 +199,8 @@ std::size_t EventBus::DispatchQueued(std::size_t maxCount) noexcept
   for (const auto& qEvent : events)
   {
     EventView view {qEvent.payloadStorage, qEvent.payloadSize};
-    PublishToSubscribers(qEvent.meta.code, qEvent.meta, view,
-                         SubscriptionDelivery::Queued);
+    NotifySubscribers(qEvent.meta.code, qEvent.meta, view,
+                      SubscriptionDelivery::Queued);
   }
 
   return events.size();
@@ -252,9 +225,9 @@ bool EventBus::ValidateEmitter(const EventEmitter& emitter,
   return emitter.capability == expectedCapability;
 }
 
-void EventBus::PublishToSubscribers(EventCode code, const EventMeta& meta,
-                                    EventView payload,
-                                    SubscriptionDelivery deliveryFilter)
+void EventBus::NotifySubscribers(EventCode code, const EventMeta& meta,
+                                 EventView payload,
+                                 SubscriptionDelivery deliveryFilter)
 {
   std::vector<Subscriber> subscribers;
   {
@@ -272,32 +245,6 @@ void EventBus::PublishToSubscribers(EventCode code, const EventMeta& meta,
   {
     if (sub.delivery != deliveryFilter)
       continue;
-    if (sub.callback)
-    {
-      sub.callback(sub.user, meta, payload);
-    }
-  }
-}
-
-void EventBus::PublishToSubscribers(EventCode code, const EventMeta& meta,
-                                    EventView payload)
-{
-  // Notify ALL subscribers regardless of delivery type (used by
-  // PublishImmediate)
-  std::vector<Subscriber> subscribers;
-  {
-    std::lock_guard<std::mutex> lock(m_SubscribersMutex);
-    if (!m_Subscribers)
-      return;
-
-    auto it = m_Subscribers->find(code);
-    if (it == m_Subscribers->end())
-      return;
-    subscribers = it->second;
-  }
-
-  for (const auto& sub : subscribers)
-  {
     if (sub.callback)
     {
       sub.callback(sub.user, meta, payload);

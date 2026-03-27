@@ -120,7 +120,7 @@ TEST_CASE("Null backend: request close enqueues event", "[platform][context]")
       &received);
 
   ctx.PumpEvents();
-  (void)gecko::DispatchQueuedEvents();
+  (void)gecko::DispatchEvents();
 
   REQUIRE(received == 1);
 
@@ -323,7 +323,7 @@ TEST_CASE("Null backend: destroy window enqueues WindowClosed event",
 
   ctx.Windows().DestroyWindow(win);
   ctx.PumpEvents();
-  (void)gecko::DispatchQueuedEvents();
+  (void)gecko::DispatchEvents();
 
   REQUIRE(received == 1);
 }

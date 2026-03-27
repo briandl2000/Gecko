@@ -34,8 +34,8 @@ public:
   }
 
   /// Pump all pending OS events for windows and monitors.
-  /// Events are enqueued on the global event bus — call
-  /// DispatchQueuedEvents() afterwards to deliver them to subscribers.
+  /// Events are sent to the global event bus — call
+  /// DispatchEvents() afterwards to deliver them to Queued subscribers.
   GECKO_API void PumpEvents() noexcept
   {
     m_Windows->PumpEvents(m_Emitter);

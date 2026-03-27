@@ -168,7 +168,7 @@ int main()
       {
         GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "PumpEvents");
         ctx.PumpEvents();
-        (void)gecko::DispatchQueuedEvents();
+        (void)gecko::DispatchEvents();
       }
 
       GECKO_SLEEP_MS(16);

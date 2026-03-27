@@ -290,7 +290,7 @@ static int AppMain(int argc, char** argv)
       GECKO_SCOPE_NAMED(app::app_skeleton::labels::Main, "Frame");
 
       ctx.PumpEvents();
-      (void)gecko::DispatchQueuedEvents();
+      (void)gecko::DispatchEvents();
 
       // Your update/render work goes here.
       GECKO_SLEEP_MS(16);

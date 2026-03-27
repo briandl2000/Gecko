@@ -76,8 +76,8 @@ bool NullWindowsBackend::RequestClose(WindowHandle window) noexcept
 void NullWindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 {
   for (const auto& ev : m_Staged)
-    gecko::PublishEvent(emitter, ev.Code,
-                        gecko::EventView {&ev.Data, ev.PayloadSize});
+    gecko::SendEvent(emitter, ev.Code,
+                     gecko::EventView {&ev.Data, ev.PayloadSize});
   m_Staged.clear();
 }
 
