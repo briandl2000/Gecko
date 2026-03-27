@@ -3,10 +3,14 @@ add_library(Gecko::Platform ALIAS Platform)
 
 target_sources(Platform
   PRIVATE
-    null_windows_interface.cpp
+    monitors_interface.cpp
+    platform_config.cpp
     platform_context.cpp
     platform_module.cpp
     windows_interface.cpp
+
+    private/null_monitors_backend.cpp
+    private/null_windows_interface.cpp
 )
 
 if(UNIX AND NOT APPLE)
@@ -44,7 +48,7 @@ target_include_directories(Platform
 
 target_compile_definitions(Platform PUBLIC GECKO_PLATFORM_API)
 
-target_link_libraries(Platform PUBLIC Gecko::Core Gecko::CoreServices)
+target_link_libraries(Platform PUBLIC Gecko::Core Gecko::CoreServices Gecko::Math)
 
 install(TARGETS Platform
   EXPORT ${GECKO_EXPORT_SET_NAME}

@@ -2,9 +2,10 @@
 
 #include "gecko/core/ptr.h"
 #include "gecko/core/scope.h"
+#include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
-#include "gecko/platform/window.h"
-#include "private/labels.h"
+#include "gecko/core/services/profiler.h"
+#include "labels.h"
 
 namespace gecko::platform {
 
@@ -18,12 +19,13 @@ bool NullWindowsBackend::CreateWindow(const WindowDesc& desc,
 
   WindowState st;
   st.Desc = desc;
-  st.ClientSize = desc.Size;
+  st.ClientSize = {static_cast<u32>(desc.Size.X),
+                   static_cast<u32>(desc.Size.Y)};
   st.Alive = true;
 
   m_Windows.emplace(id, st);
 
-  GECKO_INFO(labels::General, "Created null window id=%llu\n",
+  GECKO_INFO(labels::General, "Created null window id=%llu",
              static_cast<unsigned long long>(id));
   return true;
 }
@@ -40,11 +42,11 @@ void NullWindowsBackend::DestroyWindow(WindowHandle window) noexcept
 
   it->second.Alive = false;
 
-  WindowEvent ev {};
-  ev.Kind = WindowEventKind::Closed;
-  ev.Window = window;
-  ev.TimeNs = NowNsSafe();
-  m_Events.push_back(ev);
+  StagedEvent ev;
+  ev.Code = events::WindowClosed;
+  ev.Data.Closed = {window, NowNsSafe()};
+  ev.PayloadSize = static_cast<u32>(sizeof(events::WindowClosedPayload));
+  m_Staged.push_back(ev);
 
   m_Windows.erase(it);
 }
@@ -59,32 +61,24 @@ bool NullWindowsBackend::IsWindowAlive(WindowHandle window) const noexcept
 bool NullWindowsBackend::RequestClose(WindowHandle window) noexcept
 {
   GECKO_FUNC(labels::General);
-  if (!window.IsValid())
-    return false;
-  if (!IsWindowAlive(window))
+  if (!window.IsValid() || !IsWindowAlive(window))
     return false;
 
-  WindowEvent ev {};
-  ev.Kind = WindowEventKind::CloseRequested;
-  ev.Window = window;
-  ev.TimeNs = NowNsSafe();
-  m_Events.push_back(ev);
+  StagedEvent ev;
+  ev.Code = events::WindowCloseRequested;
+  ev.Data.CloseRequested = {window, NowNsSafe()};
+  ev.PayloadSize =
+      static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
+  m_Staged.push_back(ev);
   return true;
 }
 
-void NullWindowsBackend::PumpEvents() noexcept
+void NullWindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 {
-  GECKO_FUNC(labels::General);
-  // Null backend: no OS events.
-}
-
-bool NullWindowsBackend::PollEvent(WindowEvent& outEvent) noexcept
-{
-  if (m_Events.empty())
-    return false;
-  outEvent = m_Events.front();
-  m_Events.pop_front();
-  return true;
+  for (const auto& ev : m_Staged)
+    gecko::PublishEvent(emitter, ev.Code,
+                        gecko::EventView {&ev.Data, ev.PayloadSize});
+  m_Staged.clear();
 }
 
 Extent2D NullWindowsBackend::GetClientSize(WindowHandle window) const noexcept

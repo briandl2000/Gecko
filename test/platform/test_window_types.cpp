@@ -1,3 +1,4 @@
+#include "gecko/platform/monitor.h"
 #include "gecko/platform/window.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -62,8 +63,8 @@ TEST_CASE("Extent2D default is zero", "[platform][window]")
 TEST_CASE("WindowDesc defaults", "[platform][window]")
 {
   WindowDesc desc;
-  REQUIRE(desc.Size.Width == 1280);
-  REQUIRE(desc.Size.Height == 720);
+  REQUIRE(desc.Size.X == 1280);
+  REQUIRE(desc.Size.Y == 720);
   REQUIRE(desc.Resizable == true);
   REQUIRE(desc.Visible == true);
   REQUIRE(desc.HighDpi == true);
@@ -76,10 +77,4 @@ TEST_CASE("NativeWindowHandle defaults", "[platform][window]")
   REQUIRE(nh.Backend == DisplayBackendKind::Unknown);
   REQUIRE(nh.Handle == nullptr);
   REQUIRE(nh.Display == nullptr);
-}
-
-TEST_CASE("WindowEvent default kind is None", "[platform][window]")
-{
-  WindowEvent ev;
-  REQUIRE(ev.Kind == WindowEventKind::None);
 }

@@ -1,6 +1,8 @@
 #include "gecko/core/services.h"
 #include "gecko/platform/platform_config.h"
 #include "gecko/platform/platform_context.h"
+#include "gecko/platform/platform_events.h"
+#include "gecko/runtime/event_bus.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -16,7 +18,7 @@ struct TestServiceScope
   NullProfiler profiler;
   NullLogger logger;
   NullModuleRegistry modules;
-  NullEventBus events;
+  runtime::EventBus events;
 
   TestServiceScope()
   {
@@ -25,7 +27,7 @@ struct TestServiceScope
     profiler.Init();
     logger.Init();
     (void)modules.Init();
-    events.Init();
+    (void)events.Init();
 
     Services svc {
         .Allocator = &alloc,
@@ -109,10 +111,18 @@ TEST_CASE("Null backend: request close enqueues event", "[platform][context]")
   ctx.Windows().CreateWindow({}, win);
   REQUIRE(ctx.Windows().RequestClose(win));
 
-  WindowEvent ev;
-  REQUIRE(ctx.Windows().PollEvent(ev));
-  REQUIRE(ev.Kind == WindowEventKind::CloseRequested);
-  REQUIRE(ev.Window == win);
+  int received = 0;
+  auto sub = gecko::SubscribeEvent(
+      events::WindowCloseRequested,
+      [](void* user, const gecko::EventMeta&, gecko::EventView) {
+        (*static_cast<int*>(user))++;
+      },
+      &received);
+
+  ctx.PumpEvents();
+  (void)gecko::DispatchQueuedEvents();
+
+  REQUIRE(received == 1);
 
   ctx.Windows().DestroyWindow(win);
 }
@@ -172,7 +182,7 @@ TEST_CASE("Null backend: PumpEvents doesn't crash", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  ctx.Windows().PumpEvents();
+  ctx.PumpEvents();
 }
 
 TEST_CASE("Null backend: invalid window operations are safe",
@@ -188,4 +198,164 @@ TEST_CASE("Null backend: invalid window operations are safe",
   REQUIRE_FALSE(ctx.Windows().IsWindowAlive(invalid));
   REQUIRE_FALSE(ctx.Windows().RequestClose(invalid));
   ctx.Windows().DestroyWindow(invalid);
+}
+
+// ── Monitor backend tests ──────────────────────────────────────────────
+
+TEST_CASE("Null monitor backend: enumerates one virtual monitor",
+          "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  REQUIRE(ctx.Monitors().GetMonitorCount() == 1);
+}
+
+TEST_CASE("Null monitor backend: primary monitor exists", "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  MonitorHandle primary;
+  REQUIRE(ctx.Monitors().GetPrimaryMonitor(primary));
+  REQUIRE(primary.IsValid());
+}
+
+TEST_CASE("Null monitor backend: get handle by index", "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  MonitorHandle h;
+  REQUIRE(ctx.Monitors().GetMonitorHandle(0, h));
+  REQUIRE(h.IsValid());
+
+  MonitorHandle invalid;
+  REQUIRE_FALSE(ctx.Monitors().GetMonitorHandle(99, invalid));
+}
+
+TEST_CASE("Null monitor backend: monitor properties are valid",
+          "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  MonitorHandle h;
+  REQUIRE(ctx.Monitors().GetMonitorHandle(0, h));
+
+  MonitorInfo info {};
+  REQUIRE(ctx.Monitors().GetMonitorProperties(h, info));
+  REQUIRE(info.IsPrimary);
+  REQUIRE(info.Dpi > 0);
+  REQUIRE(info.RefreshRateMilliHz > 0);
+  REQUIRE_FALSE(info.Bounds.IsEmpty());
+}
+
+TEST_CASE("Null monitor backend: bounds and work area", "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  MonitorHandle h;
+  REQUIRE(ctx.Monitors().GetMonitorHandle(0, h));
+
+  math::Rect2D bounds {};
+  math::Rect2D workArea {};
+  REQUIRE(ctx.Monitors().GetMonitorBounds(h, bounds, workArea));
+  REQUIRE_FALSE(bounds.IsEmpty());
+  REQUIRE_FALSE(workArea.IsEmpty());
+}
+
+TEST_CASE("Null monitor backend: invalid handle returns false",
+          "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  MonitorHandle invalid;
+  MonitorInfo info {};
+  REQUIRE_FALSE(ctx.Monitors().GetMonitorProperties(invalid, info));
+
+  math::Rect2D bounds {};
+  math::Rect2D workArea {};
+  REQUIRE_FALSE(ctx.Monitors().GetMonitorBounds(invalid, bounds, workArea));
+}
+
+// ── Event delivery tests ───────────────────────────────────────────────
+
+TEST_CASE("Null backend: destroy window enqueues WindowClosed event",
+          "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+
+  WindowHandle win;
+  ctx.Windows().CreateWindow({}, win);
+
+  int received = 0;
+  auto sub = gecko::SubscribeEvent(
+      events::WindowClosed,
+      [](void* user, const gecko::EventMeta&, gecko::EventView) {
+        (*static_cast<int*>(user))++;
+      },
+      &received);
+
+  ctx.Windows().DestroyWindow(win);
+  ctx.PumpEvents();
+  (void)gecko::DispatchQueuedEvents();
+
+  REQUIRE(received == 1);
+}
+
+// ── Config resolution tests ────────────────────────────────────────────
+
+TEST_CASE("Resolve: explicit backend is preserved", "[platform][config]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  PlatformConfig resolved = Resolve(cfg);
+  REQUIRE(resolved.Backend == DisplayBackendKind::Null);
+}
+
+TEST_CASE("Resolve: Auto resolves to concrete backend", "[platform][config]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Auto;
+  PlatformConfig resolved = Resolve(cfg);
+  REQUIRE(resolved.Backend != DisplayBackendKind::Auto);
+}
+
+TEST_CASE("PlatformContext stores resolved config", "[platform][context]")
+{
+  TestServiceScope scope;
+
+  PlatformConfig cfg = {};
+  cfg.Backend = DisplayBackendKind::Null;
+  auto ctx = PlatformContext(cfg);
+  REQUIRE(ctx.Config().Backend == DisplayBackendKind::Null);
 }
