@@ -46,7 +46,7 @@ if(MSVC)
     add_compile_options(/W4 /WX)
 else()
     # clang on Linux/macOS
-    add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter -Wno-c2y-extensions)
+    add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
 
 # All outputs go to out/ at project root
