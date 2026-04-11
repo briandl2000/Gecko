@@ -49,14 +49,10 @@ EventSubscription NullEventBus::Subscribe(EventCode, CallbackFn, void*,
   return {};
 }
 
-void NullEventBus::PublishImmediate(const EventEmitter&, EventCode,
-                                    EventView) noexcept
+void NullEventBus::Send(const EventEmitter&, EventCode, EventView) noexcept
 {}
 
-void NullEventBus::Enqueue(const EventEmitter&, EventCode, EventView) noexcept
-{}
-
-std::size_t NullEventBus::DispatchQueued(std::size_t) noexcept
+std::size_t NullEventBus::Dispatch(std::size_t) noexcept
 {
   return 0;
 }

@@ -10,8 +10,8 @@
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
+#include <gecko/runtime/immediate_logger.h>
 #include <gecko/runtime/module_registry.h>
-#include <gecko/runtime/ring_logger.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
@@ -56,7 +56,7 @@ int main()
 {
   runtime::TrackingAllocator trackingAlloc;
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
-  runtime::RingLogger ringLogger(1024);  // 1024 log entries in ring buffer
+  runtime::ImmediateLogger immediateLogger;     // Immediate logging
 
   runtime::ModuleRegistry moduleRegistry;
   runtime::EventBus eventBus;
@@ -71,7 +71,7 @@ int main()
   GECKO_BOOT((Services {.Allocator = &trackingAlloc,
                         .JobSystem = &jobSystem,
                         .Profiler = &ringProfiler,
-                        .Logger = &ringLogger,
+                        .Logger = &immediateLogger,
                         .Modules = &moduleRegistry,
                         .EventBus = &eventBus}));
   // Set up trace file sink for profiling data after services are available
@@ -116,7 +116,7 @@ int main()
 
     WindowDesc windowDesc;
     windowDesc.Title = "Gecko Platform Example";
-    windowDesc.Size = Extent2D {1280, 720};
+    windowDesc.Size = {1280, 720};
     windowDesc.Visible = true;
     windowDesc.Resizable = false;
     windowDesc.Mode = WindowMode::Windowed;
@@ -138,6 +138,29 @@ int main()
     // Avoid hanging forever in headless/Null-backend runs.
     // Run up to ~10 seconds unless a close is requested.
     u32 frameCount = 0;
+
+    // Subscribe to window close-requested events.
+    auto closeSub = gecko::SubscribeEvent(
+        events::WindowCloseRequested,
+        [](void* user, const gecko::EventMeta&, gecko::EventView) {
+          *static_cast<bool*>(user) = false;
+        },
+        &running);
+
+    // print the window key events to demonstrate event handling
+    auto keyPressedSub = gecko::SubscribeEvent(
+        events::WindowKey,
+        [](void* /*user*/, const gecko::EventMeta& /*meta*/,
+           gecko::EventView view) {
+          const auto* payload =
+              reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
+          std::printf("WindowKey event: windowId=%llu, key=%u, down=%u\n",
+                      static_cast<unsigned long long>(payload->Window.Id),
+                      static_cast<unsigned>(payload->Key),
+                      static_cast<unsigned>(payload->Down));
+        },
+        nullptr);
+
     GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
     while (running && ctx.Windows().IsWindowAlive(window) && frameCount < 600)
     {
@@ -145,22 +168,8 @@ int main()
 
       {
         GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "PumpEvents");
-        ctx.Windows().PumpEvents();
-      }
-
-      {
-        GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "ProcessEvents");
-        WindowEvent ev {};
-        while (ctx.Windows().PollEvent(ev))
-        {
-          if (ev.Kind == WindowEventKind::CloseRequested)
-          {
-            GECKO_INFO(app::platform_example::labels::Main,
-                       "Close requested, exiting main loop");
-            running = false;
-            break;
-          }
-        }
+        ctx.PumpEvents();
+        (void)gecko::DispatchEvents();
       }
 
       GECKO_SLEEP_MS(16);

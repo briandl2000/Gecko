@@ -52,11 +52,9 @@ TEST_CASE("NullEventBus operations don't crash", "[core][events]")
   EventEmitter emitter = bus.CreateEmitter(1, 0);
 
   int payload = 42;
-  bus.Enqueue(emitter, MakeEvent(1, 1), EventView {&payload, sizeof(payload)});
-  bus.PublishImmediate(emitter, MakeEvent(1, 2),
-                       EventView {&payload, sizeof(payload)});
+  bus.Send(emitter, MakeEvent(1, 1), EventView {&payload, sizeof(payload)});
 
-  REQUIRE(bus.DispatchQueued(100) == 0);
+  REQUIRE(bus.Dispatch(100) == 0);
 
   bus.Shutdown();
 }

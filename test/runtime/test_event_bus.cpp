@@ -63,7 +63,7 @@ TEST_CASE("EventBus Init/Shutdown", "[runtime][events]")
   TestServiceScope scope;
 }
 
-TEST_CASE("EventBus subscribe and publish immediate", "[runtime][events]")
+TEST_CASE("EventBus subscribe and immediate delivery", "[runtime][events]")
 {
   TestServiceScope scope;
 
@@ -77,10 +77,10 @@ TEST_CASE("EventBus subscribe and publish immediate", "[runtime][events]")
         auto* count = static_cast<int*>(user);
         *count += 1;
       },
-      &received, {.delivery = SubscriptionDelivery::OnPublish});
+      &received, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {42};
-  scope.eventBus.PublishImmediate(emitter, TestEvent1, MakePayload(data));
+  scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
 
   REQUIRE(received == 1);
 
@@ -104,12 +104,12 @@ TEST_CASE("EventBus queued events", "[runtime][events]")
       &received);
 
   PayloadData data {10};
-  scope.eventBus.Enqueue(emitter, TestEvent1, MakePayload(data));
-  scope.eventBus.Enqueue(emitter, TestEvent1, MakePayload(data));
+  scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
+  scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
 
   REQUIRE(received == 0);
 
-  auto dispatched = scope.eventBus.DispatchQueued(100);
+  auto dispatched = scope.eventBus.Dispatch(100);
   REQUIRE(dispatched == 2);
   REQUIRE(received == 2);
 
@@ -130,15 +130,15 @@ TEST_CASE("EventBus unsubscribe via RAII", "[runtime][events]")
         [](void* user, const EventMeta&, EventView) {
           *static_cast<int*>(user) += 1;
         },
-        &received, {.delivery = SubscriptionDelivery::OnPublish});
+        &received, {.delivery = SubscriptionDelivery::Immediate});
 
     PayloadData data {1};
-    scope.eventBus.PublishImmediate(emitter, TestEvent1, MakePayload(data));
+    scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
     REQUIRE(received == 1);
   }
 
   PayloadData data {2};
-  scope.eventBus.PublishImmediate(emitter, TestEvent1, MakePayload(data));
+  scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
   REQUIRE(received == 1);
 
   scope.eventBus.UnregisterModule(1);
@@ -159,17 +159,17 @@ TEST_CASE("EventBus multiple subscribers", "[runtime][events]")
       [](void* user, const EventMeta&, EventView) {
         *static_cast<int*>(user) += 1;
       },
-      &count1, {.delivery = SubscriptionDelivery::OnPublish});
+      &count1, {.delivery = SubscriptionDelivery::Immediate});
 
   auto sub2 = scope.eventBus.Subscribe(
       TestEvent1,
       [](void* user, const EventMeta&, EventView) {
         *static_cast<int*>(user) += 1;
       },
-      &count2, {.delivery = SubscriptionDelivery::OnPublish});
+      &count2, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {1};
-  scope.eventBus.PublishImmediate(emitter, TestEvent1, MakePayload(data));
+  scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
 
   REQUIRE(count1 == 1);
   REQUIRE(count2 == 1);
@@ -192,17 +192,17 @@ TEST_CASE("EventBus different event codes stay separate", "[runtime][events]")
       [](void* user, const EventMeta&, EventView) {
         *static_cast<int*>(user) += 1;
       },
-      &count1, {.delivery = SubscriptionDelivery::OnPublish});
+      &count1, {.delivery = SubscriptionDelivery::Immediate});
 
   auto sub2 = scope.eventBus.Subscribe(
       TestEvent2,
       [](void* user, const EventMeta&, EventView) {
         *static_cast<int*>(user) += 1;
       },
-      &count2, {.delivery = SubscriptionDelivery::OnPublish});
+      &count2, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {1};
-  scope.eventBus.PublishImmediate(emitter, TestEvent1, MakePayload(data));
+  scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
 
   REQUIRE(count1 == 1);
   REQUIRE(count2 == 0);
@@ -224,10 +224,10 @@ TEST_CASE("EventBus payload delivery", "[runtime][events]")
         auto* data = static_cast<const PayloadData*>(payload.Data());
         *static_cast<int*>(user) = data->Value;
       },
-      &capturedValue, {.delivery = SubscriptionDelivery::OnPublish});
+      &capturedValue, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {999};
-  scope.eventBus.PublishImmediate(emitter, TestEvent1, MakePayload(data));
+  scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
 
   REQUIRE(capturedValue == 999);
 

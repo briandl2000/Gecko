@@ -10,7 +10,7 @@ from pathlib import Path
 
 def gather_files(root: Path) -> list[Path]:
     targets: list[Path] = []
-    for folder in ("src", "include", "examples"):
+    for folder in ("src", "include", "examples", "test"):
         base = root / folder
         if not base.exists():
             continue

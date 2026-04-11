@@ -264,7 +264,7 @@ static int AppMain(int argc, char** argv)
 
     WindowDesc windowDesc {};
     windowDesc.Title = cfg.title;
-    windowDesc.Size = Extent2D {1280, 720};
+    windowDesc.Size = {1280, 720};
     windowDesc.Visible = true;
     windowDesc.Resizable = true;
 
@@ -278,20 +278,19 @@ static int AppMain(int argc, char** argv)
     bool running = true;
     u32 frames = 0;
 
+    auto closeSub = gecko::SubscribeEvent(
+        events::WindowCloseRequested,
+        [](void* user, const gecko::EventMeta&, gecko::EventView) {
+          *static_cast<bool*>(user) = false;
+        },
+        &running);
+
     while (running && ctx.Windows().IsWindowAlive(window))
     {
       GECKO_SCOPE_NAMED(app::app_skeleton::labels::Main, "Frame");
 
-      ctx.Windows().PumpEvents();
-      WindowEvent ev {};
-      while (ctx.Windows().PollEvent(ev))
-      {
-        if (ev.Kind == WindowEventKind::CloseRequested)
-        {
-          running = false;
-          break;
-        }
-      }
+      ctx.PumpEvents();
+      (void)gecko::DispatchEvents();
 
       // Your update/render work goes here.
       GECKO_SLEEP_MS(16);
