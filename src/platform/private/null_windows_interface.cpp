@@ -4,8 +4,8 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
-#include "gecko/core/services/profiler.h"
 #include "labels.h"
+#include "platform_utils.h"
 
 namespace gecko::platform {
 
@@ -113,9 +113,7 @@ NativeWindowHandle NullWindowsBackend::GetNativeWindowHandle(
 
 u64 NullWindowsBackend::NowNsSafe() noexcept
 {
-  if (auto* profiler = GetProfiler())
-    return profiler->NowNs();
-  return 0;
+  return gecko::platform::NowNsSafe();
 }
 
 Unique<IWindowsBackend> CreateNullWindowsBackend() noexcept

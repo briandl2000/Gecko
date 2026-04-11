@@ -18,12 +18,22 @@ if(UNIX AND NOT APPLE)
   if(X11_FOUND)
     target_sources(Platform PRIVATE
       linux/x11_windows_interface.cpp
+      linux/x11_monitors_backend.cpp
     )
     if(TARGET X11::X11)
       target_link_libraries(Platform PRIVATE X11::X11)
     else()
       target_include_directories(Platform PRIVATE ${X11_INCLUDE_DIR})
       target_link_libraries(Platform PRIVATE ${X11_LIBRARIES})
+    endif()
+    # XRandR for monitor enumeration
+    if(X11_Xrandr_FOUND)
+      target_link_libraries(Platform PRIVATE ${X11_Xrandr_LIB})
+    else()
+      find_library(XRANDR_LIB Xrandr)
+      if(XRANDR_LIB)
+        target_link_libraries(Platform PRIVATE ${XRANDR_LIB})
+      endif()
     endif()
     target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_X11)
   endif()
@@ -32,12 +42,18 @@ if(UNIX AND NOT APPLE)
   if(PkgConfig_FOUND)
     pkg_check_modules(Wayland QUIET wayland-client)
     if(Wayland_FOUND)
+      target_sources(Platform PRIVATE
+        linux/wayland_monitors_backend.cpp
+      )
+      target_link_libraries(Platform PRIVATE ${Wayland_LINK_LIBRARIES})
+      target_include_directories(Platform PRIVATE ${Wayland_INCLUDE_DIRS})
       target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_WAYLAND)
       message(STATUS "Gecko: Wayland client found – GECKO_PLATFORM_LINUX_WAYLAND enabled")
     endif()
   endif()
 elseif(WIN32)
   target_sources(Platform PRIVATE
+    win32/win32_monitors_backend.cpp
   )
 endif()
 

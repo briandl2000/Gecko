@@ -16,12 +16,13 @@ void NullMonitorsBackend::EnumerateMonitors() noexcept
   entry.Handle = MonitorHandle {1};
 
   MonitorInfo& info = entry.Info;
+  info.SetName("Virtual Monitor");
   info.Bounds = math::Rect2D {0, 0, 1920, 1080};
   info.WorkArea = math::Rect2D {0, 0, 1920, 1040};
   info.RefreshRateMilliHz = 60000;
   info.Dpi = 96;
   info.DpiScale = 1.0F;
-  info.ColorSpace = ColorSpace::SRGB;
+  info.ColorSpace = ColorSpace::Srgb;
   info.IsPrimary = true;
 
   m_Monitors.push_back(entry);

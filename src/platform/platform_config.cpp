@@ -12,7 +12,7 @@ namespace {
 [[nodiscard]] bool IsXlibAvailable() noexcept
 {
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
-  const char* d = std::getenv("DISPLAY");
+  const char* d = ::std::getenv("DISPLAY");
   return d && d[0] != '\0';
 #else
   return false;
@@ -22,7 +22,7 @@ namespace {
 [[nodiscard]] bool IsWaylandAvailable() noexcept
 {
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
-  const char* d = std::getenv("WAYLAND_DISPLAY");
+  const char* d = ::std::getenv("WAYLAND_DISPLAY");
   return d && d[0] != '\0';
 #else
   return false;
@@ -52,6 +52,29 @@ namespace {
   }
 }
 
+/// Returns true if the given concrete backend is available at runtime.
+[[nodiscard]] bool IsBackendAvailable(DisplayBackendKind kind) noexcept
+{
+  switch (kind)
+  {
+  case DisplayBackendKind::Xlib:
+  case DisplayBackendKind::Xcb:
+    return IsXlibAvailable();
+  case DisplayBackendKind::Wayland:
+    return IsWaylandAvailable();
+  case DisplayBackendKind::Win32:
+#if defined(_WIN32)
+    return true;
+#else
+    return false;
+#endif
+  case DisplayBackendKind::Null:
+    return true;
+  default:
+    return false;
+  }
+}
+
 /// Probe the runtime environment and return the best available concrete
 /// backend.
 [[nodiscard]] DisplayBackendKind ProbeBackend() noexcept
@@ -71,18 +94,29 @@ PlatformConfig Resolve(const PlatformConfig& requested) noexcept
 {
   PlatformConfig resolved = requested;
 
-  if (resolved.Backend != DisplayBackendKind::Auto)
+  if (resolved.Backend == DisplayBackendKind::Auto ||
+      resolved.Backend == DisplayBackendKind::Unknown)
   {
-    GECKO_INFO(labels::General, "Platform backend: %s (explicit)",
+    resolved.Backend = ProbeBackend();
+    GECKO_INFO(labels::General, "Platform backend: Auto resolved to %s",
                BackendName(resolved.Backend));
     return resolved;
   }
 
-  resolved.Backend = ProbeBackend();
+  // Explicit backend requested — verify it's available.
+  if (!IsBackendAvailable(resolved.Backend))
+  {
+    const DisplayBackendKind fallback = ProbeBackend();
+    GECKO_WARN(labels::General,
+               "Platform backend: %s requested but not available, "
+               "falling back to %s",
+               BackendName(resolved.Backend), BackendName(fallback));
+    resolved.Backend = fallback;
+    return resolved;
+  }
 
-  GECKO_INFO(labels::General, "Platform backend: Auto resolved to %s",
+  GECKO_INFO(labels::General, "Platform backend: %s (explicit)",
              BackendName(resolved.Backend));
-
   return resolved;
 }
 

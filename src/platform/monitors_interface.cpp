@@ -9,11 +9,21 @@ namespace gecko::platform {
 
 Unique<IMonitorsBackend> CreateNullMonitorsBackend() noexcept;
 
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
+Unique<IMonitorsBackend> CreateXlibMonitorsBackend() noexcept;
+#endif
+
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
+Unique<IMonitorsBackend> CreateWaylandMonitorsBackend() noexcept;
+#endif
+
+#if defined(_WIN32)
+Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept;
+#endif
+
 Unique<IMonitorsBackend> IMonitorsBackend::Create(
     const PlatformConfig& config) noexcept
 {
-  // config.Backend is guaranteed to be a concrete value;
-  // PlatformContext calls Resolve() before passing the config here.
   switch (config.Backend)
   {
   case DisplayBackendKind::Null:
@@ -21,22 +31,32 @@ Unique<IMonitorsBackend> IMonitorsBackend::Create(
 
   case DisplayBackendKind::Xlib:
   case DisplayBackendKind::Xcb:
-    // TODO: implement X11 monitor backend (XRandR)
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
+    return CreateXlibMonitorsBackend();
+#else
     GECKO_WARN(labels::General,
-               "Xlib monitor backend not yet implemented; using Null");
+               "Xlib monitor backend not available in this build; using Null");
     return CreateNullMonitorsBackend();
+#endif
 
   case DisplayBackendKind::Wayland:
-    // TODO: implement Wayland monitor backend (wl_output)
-    GECKO_WARN(labels::General,
-               "Wayland monitor backend not yet implemented; using Null");
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
+    return CreateWaylandMonitorsBackend();
+#else
+    GECKO_WARN(
+        labels::General,
+        "Wayland monitor backend not available in this build; using Null");
     return CreateNullMonitorsBackend();
+#endif
 
   case DisplayBackendKind::Win32:
-    // TODO: implement Win32 monitor backend (EnumDisplayMonitors)
+#if defined(_WIN32)
+    return CreateWin32MonitorsBackend();
+#else
     GECKO_WARN(labels::General,
-               "Win32 monitor backend not yet implemented; using Null");
+               "Win32 monitor backend not available in this build; using Null");
     return CreateNullMonitorsBackend();
+#endif
 
   case DisplayBackendKind::Cocoa:
     // TODO: implement Cocoa monitor backend (NSScreen)

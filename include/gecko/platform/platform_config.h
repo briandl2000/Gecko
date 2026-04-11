@@ -19,10 +19,14 @@ enum class DisplayBackendKind : u8
 };
 
 struct WindowConfig
-{};
+{
+  bool EnableHighDpi {true};
+};
 
 struct MonitorConfig
-{};
+{
+  bool EnableHotplugEvents {true};
+};
 
 struct PlatformConfig
 {
@@ -35,16 +39,8 @@ struct PlatformConfig
 // Config resolution
 // ──────────────────────────────────────────────────────────────
 
-/// Resolve a PlatformConfig into a fully concrete configuration.
-///
-/// Handles Auto backend detection: probes the runtime environment
-/// (WAYLAND_DISPLAY, DISPLAY, etc.) and compile-time availability
-/// to pick the best concrete backend.  The returned config always
-/// has Backend != Auto and != Unknown, so downstream factories can
-/// assume they receive a verified, actionable value.
-///
-/// Call this once before constructing backends; PlatformContext
-/// does this automatically.
+/// Resolve Auto/Unknown backends to a concrete backend for the
+/// current platform.  PlatformContext calls this automatically.
 GECKO_API PlatformConfig Resolve(const PlatformConfig& requested) noexcept;
 
 }  // namespace gecko::platform

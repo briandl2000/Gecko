@@ -3,7 +3,11 @@
 #include "gecko/core/types.h"
 #include "gecko/math/rect.h"
 
+#include <cstring>
+
 namespace gecko::platform {
+
+static constexpr u32 MaxMonitorNameLength = 128;
 
 struct MonitorHandle
 {
@@ -35,20 +39,30 @@ struct MonitorHandle
 enum class ColorSpace : u8
 {
   Unknown,
-  SRGB,
-  HDR10,
+  Srgb,
+  Hdr10,
   DolbyVision,
 };
 
 struct MonitorInfo
 {
+  char Name[MaxMonitorNameLength] {};
   math::Rect2D Bounds {};
   math::Rect2D WorkArea {};
   u32 RefreshRateMilliHz {60000};
   u32 Dpi {96};
   float DpiScale {1.0F};
-  ColorSpace ColorSpace {ColorSpace::SRGB};
+  ColorSpace ColorSpace {ColorSpace::Srgb};
   bool IsPrimary {false};
+
+  void SetName(const char* name) noexcept
+  {
+    if (name)
+    {
+      ::std::strncpy(Name, name, MaxMonitorNameLength - 1);
+      Name[MaxMonitorNameLength - 1] = '\0';
+    }
+  }
 };
 
 }  // namespace gecko::platform

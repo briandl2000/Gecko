@@ -3,6 +3,7 @@
 #include "gecko/core/labels.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/types.h"
+#include "gecko/platform/input_codes.h"
 #include "gecko/platform/monitor.h"
 #include "gecko/platform/window.h"
 
@@ -40,6 +41,8 @@ inline constexpr gecko::EventCode WindowMouseButton =
     gecko::MakeEventCode(detail::PlatformModuleId, 0x0008);
 inline constexpr gecko::EventCode WindowMouseWheel =
     gecko::MakeEventCode(detail::PlatformModuleId, 0x0009);
+inline constexpr gecko::EventCode WindowFocusChanged =
+    gecko::MakeEventCode(detail::PlatformModuleId, 0x000A);
 
 // Monitor
 inline constexpr gecko::EventCode MonitorConnected =
@@ -88,7 +91,7 @@ struct WindowKeyPayload
 {
   WindowHandle Window;
   u64 TimeNs;
-  u32 Key;
+  KeyCode Key;
   u8 Down;
   u8 Repeat;
 };
@@ -112,7 +115,7 @@ struct WindowMouseButtonPayload
 {
   WindowHandle Window;
   u64 TimeNs;
-  u8 Button;
+  MouseButton Button;
   u8 Down;
 };
 
@@ -122,6 +125,13 @@ struct WindowMouseWheelPayload
   u64 TimeNs;
   float DeltaX;
   float DeltaY;
+};
+
+struct WindowFocusChangedPayload
+{
+  WindowHandle Window;
+  u64 TimeNs;
+  u8 Focused;
 };
 
 // ──────────────────────────────────────────────────────────────────────────

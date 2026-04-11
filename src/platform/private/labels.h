@@ -1,10 +1,12 @@
 #pragma once
 
 #include "gecko/core/labels.h"
+#include "gecko/platform/platform_module.h"
 
 namespace gecko::platform::labels {
 
-inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
+// labels::Platform is defined in platform_module.h (public API)
+
 inline constexpr ::gecko::Label Window =
     ::gecko::MakeLabel("gecko.platform.window");
 inline constexpr ::gecko::Label Input =
