@@ -59,8 +59,11 @@ struct MonitorInfo
   {
     if (name)
     {
-      ::std::strncpy(Name, name, MaxMonitorNameLength - 1);
-      Name[MaxMonitorNameLength - 1] = '\0';
+      const auto len = ::std::strlen(name);
+      const auto count =
+          len < MaxMonitorNameLength - 1 ? len : MaxMonitorNameLength - 1;
+      ::std::memcpy(Name, name, count);
+      Name[count] = '\0';
     }
   }
 };
