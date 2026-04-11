@@ -110,7 +110,7 @@ int main()
     (void)InstallModule(g_AppModule);
 
     PlatformConfig cfg = {};
-    cfg.Backend = DisplayBackendKind::Xlib;
+    cfg.Backend = DisplayBackendKind::Auto;
 
     PlatformContext ctx = PlatformContext(cfg);
 

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <deque>
 #include <vector>
@@ -29,6 +30,10 @@ struct WaylandMonitorEntry
   wl_output* Output {nullptr};
   u32 GlobalName {0};
   bool Done {false};
+  bool Announced {false};
+
+  // Snapshot of last-emitted state for reconfigured detection.
+  MonitorInfo LastInfo {};
 
   // Pending state accumulated from wl_output events before "done".
   i32 PendingX {0};
@@ -312,12 +317,30 @@ private:
     }
     m_RemovedHandles.clear();
 
-    for (const auto& entry : m_Monitors)
+    for (auto& entry : m_Monitors)
     {
       if (!entry.Done)
         continue;
-      // For now, emit connected for any newly-done monitors.
-      // A more sophisticated approach would track which were already emitted.
+
+      if (!entry.Announced)
+      {
+        gecko::SendEvent(
+            emitter, events::MonitorConnected,
+            events::MonitorConnectedPayload {entry.Handle, now, entry.Info});
+        entry.Announced = true;
+        entry.LastInfo = entry.Info;
+      }
+      else if (entry.Info.Bounds != entry.LastInfo.Bounds ||
+               entry.Info.RefreshRateMilliHz !=
+                   entry.LastInfo.RefreshRateMilliHz ||
+               entry.Info.Dpi != entry.LastInfo.Dpi ||
+               entry.Info.IsPrimary != entry.LastInfo.IsPrimary)
+      {
+        gecko::SendEvent(
+            emitter, events::MonitorReconfigured,
+            events::MonitorReconfiguredPayload {entry.Handle, now, entry.Info});
+        entry.LastInfo = entry.Info;
+      }
     }
   }
 

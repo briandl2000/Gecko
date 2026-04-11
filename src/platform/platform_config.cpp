@@ -79,11 +79,14 @@ namespace {
 /// backend.
 [[nodiscard]] DisplayBackendKind ProbeBackend() noexcept
 {
-  // Priority: Wayland > X11 > Null
+#if defined(_WIN32)
+  return DisplayBackendKind::Win32;
+#elif defined(GECKO_PLATFORM_LINUX)
   if (IsWaylandAvailable())
     return DisplayBackendKind::Wayland;
   if (IsXlibAvailable())
     return DisplayBackendKind::Xlib;
+#endif
 
   return DisplayBackendKind::Null;
 }
