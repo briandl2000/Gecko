@@ -156,7 +156,8 @@ int main()
               reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
           std::printf("WindowKey event: windowId=%llu, key=%u, down=%u\n",
                       static_cast<unsigned long long>(payload->Window.Id),
-                      payload->Key, payload->Down);
+                      static_cast<unsigned>(payload->Key),
+                      static_cast<unsigned>(payload->Down));
         },
         nullptr);
 
