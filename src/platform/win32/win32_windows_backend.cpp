@@ -1,0 +1,991 @@
+#include "gecko/platform/platform_config.h"
+
+#if defined(_WIN32)
+
+#include "../private/labels.h"
+#include "../private/platform_utils.h"
+#include "gecko/core/ptr.h"
+#include "gecko/core/scope.h"
+#include "gecko/core/services/events.h"
+#include "gecko/core/services/log.h"
+#include "gecko/platform/input_codes.h"
+#include "gecko/platform/platform_events.h"
+#include "gecko/platform/window.h"
+#include "gecko/platform/windows_interface.h"
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <cstring>
+#include <shellscalingapi.h>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <Windows.h>
+#include <windowsx.h>
+
+#pragma comment(lib, "Shcore.lib")
+#pragma comment(lib, "User32.lib")
+
+namespace gecko::platform {
+
+namespace {
+
+// ── Key mapping ────────────────────────────────────────────────────────
+// KeyCode values match Win32 Virtual-Key codes, so mapping is identity
+// for all defined codes. Unknown VK codes map to KeyCode::Unknown.
+
+KeyCode VkToKeyCode(WPARAM vk) noexcept
+{
+  const auto code = static_cast<u16>(vk);
+  // Verify the code falls within a recognised range.
+  // Letters/digits, function keys, OEM keys, numpad, control keys:
+  // instead of an exhaustive switch we check the enum is valid via a
+  // quick bounds check and rely on the 1:1 mapping.
+  switch (code)
+  {
+  case 0x08:  // VK_BACK
+  case 0x09:  // VK_TAB
+  case 0x0C:  // VK_CLEAR
+  case 0x0D:  // VK_RETURN
+  case 0x10:  // VK_SHIFT
+  case 0x11:  // VK_CONTROL
+  case 0x12:  // VK_MENU (Alt)
+  case 0x13:  // VK_PAUSE
+  case 0x14:  // VK_CAPITAL
+  case 0x1B:  // VK_ESCAPE
+  case 0x20:  // VK_SPACE
+  case 0x21:  // VK_PRIOR
+  case 0x22:  // VK_NEXT
+  case 0x23:  // VK_END
+  case 0x24:  // VK_HOME
+  case 0x25:  // VK_LEFT
+  case 0x26:  // VK_UP
+  case 0x27:  // VK_RIGHT
+  case 0x28:  // VK_DOWN
+  case 0x2C:  // VK_SNAPSHOT (PrintScreen)
+  case 0x2D:  // VK_INSERT
+  case 0x2E:  // VK_DELETE
+  case 0x5B:  // VK_LWIN
+  case 0x5C:  // VK_RWIN
+  case 0x5D:  // VK_APPS (Menu)
+  case 0x90:  // VK_NUMLOCK
+  case 0x91:  // VK_SCROLL
+  case 0xA0:  // VK_LSHIFT
+  case 0xA1:  // VK_RSHIFT
+  case 0xA2:  // VK_LCONTROL
+  case 0xA3:  // VK_RCONTROL
+  case 0xA4:  // VK_LMENU
+  case 0xA5:  // VK_RMENU
+  case 0xBA:  // VK_OEM_1 (Semicolon)
+  case 0xBB:  // VK_OEM_PLUS
+  case 0xBC:  // VK_OEM_COMMA
+  case 0xBD:  // VK_OEM_MINUS
+  case 0xBE:  // VK_OEM_PERIOD
+  case 0xBF:  // VK_OEM_2 (Slash)
+  case 0xC0:  // VK_OEM_3 (GraveAccent)
+  case 0xDB:  // VK_OEM_4 (LeftBracket)
+  case 0xDC:  // VK_OEM_5 (Backslash)
+  case 0xDD:  // VK_OEM_6 (RightBracket)
+  case 0xDE:  // VK_OEM_7 (Apostrophe)
+    return static_cast<KeyCode>(code);
+
+  default:
+    // Digits 0x30–0x39, Letters 0x41–0x5A
+    if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5A))
+      return static_cast<KeyCode>(code);
+    // Numpad 0x60–0x6F
+    if (code >= 0x60 && code <= 0x6F)
+      return static_cast<KeyCode>(code);
+    // Function keys F1–F12 (0x70–0x7B)
+    if (code >= 0x70 && code <= 0x7B)
+      return static_cast<KeyCode>(code);
+    return KeyCode::Unknown;
+  }
+}
+
+MouseButton WmButtonToMouseButton(UINT msg) noexcept
+{
+  switch (msg)
+  {
+  case WM_LBUTTONDOWN:
+  case WM_LBUTTONUP:
+    return MouseButton::Left;
+  case WM_RBUTTONDOWN:
+  case WM_RBUTTONUP:
+    return MouseButton::Right;
+  case WM_MBUTTONDOWN:
+  case WM_MBUTTONUP:
+    return MouseButton::Middle;
+  case WM_XBUTTONDOWN:
+  case WM_XBUTTONUP:
+    return MouseButton::X1;  // refined in caller via HIWORD(wParam)
+  default:
+    return MouseButton::Left;
+  }
+}
+
+constexpr wchar_t kWndClassName[] = L"GeckoWindowClass";
+
+}  // namespace
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║  Win32WindowsBackend                                                ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+class Win32WindowsBackend final : public IWindowsBackend
+{
+public:
+  Win32WindowsBackend() noexcept;
+  ~Win32WindowsBackend() noexcept override;
+
+  bool CreateWindow(const WindowDesc& desc,
+                    WindowHandle& outWindow) noexcept override;
+  void DestroyWindow(WindowHandle window) noexcept override;
+  bool IsWindowAlive(WindowHandle window) const noexcept override;
+  bool RequestClose(WindowHandle window) noexcept override;
+
+  Extent2D GetClientSize(WindowHandle window) const noexcept override;
+  void SetClientSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetTitle(WindowHandle window, const char* title) noexcept override;
+  const char* GetTitle(WindowHandle window) const noexcept override;
+  void SetPosition(WindowHandle window, math::Int2 pos) noexcept override;
+  math::Int2 GetPosition(WindowHandle window) const noexcept override;
+  DpiInfo GetDpi(WindowHandle window) const noexcept override;
+  NativeWindowHandle GetNativeWindowHandle(
+      WindowHandle window) const noexcept override;
+
+  void SetWindowState(WindowHandle window,
+                      platform::WindowState state) noexcept override;
+  platform::WindowState GetWindowState(
+      WindowHandle window) const noexcept override;
+  void SetDecorated(WindowHandle window, bool decorated) noexcept override;
+  bool IsDecorated(WindowHandle window) const noexcept override;
+  void RequestFocus(WindowHandle window) noexcept override;
+
+  void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override;
+  CursorMode GetCursorMode(WindowHandle window) const noexcept override;
+
+  void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
+
+private:
+  struct Win32WindowEntry
+  {
+    WindowDesc Desc {};
+    HWND Hwnd {nullptr};
+    Extent2D ClientSize {};
+    math::Int2 Position {};
+    platform::WindowState State {platform::WindowState::Normal};
+    CursorMode Cursor {CursorMode::Normal};
+    bool Decorated {true};
+    bool Alive {true};
+    std::string TitleStorage;
+  };
+
+  struct StagedEvent
+  {
+    gecko::EventCode Code {};
+    union PayloadUnion
+    {
+      events::WindowClosedPayload Closed;
+      events::WindowCloseRequestedPayload CloseRequested;
+      events::WindowResizedPayload Resized;
+      events::WindowDpiChangedPayload DpiChanged;
+      events::WindowKeyPayload Key;
+      events::WindowCharPayload Char;
+      events::WindowMouseMovePayload MouseMove;
+      events::WindowMouseButtonPayload MouseButton;
+      events::WindowMouseWheelPayload MouseWheel;
+      events::WindowFocusChangedPayload FocusChanged;
+      events::WindowMovedPayload Moved;
+      events::WindowStateChangedPayload StateChanged;
+      PayloadUnion() noexcept
+      {
+        std::memset(this, 0, sizeof(PayloadUnion));
+      }
+    } Data;
+    u32 PayloadSize {0};
+  };
+
+  Win32WindowEntry* FindEntry(WindowHandle window) noexcept;
+  const Win32WindowEntry* FindEntry(WindowHandle window) const noexcept;
+  Win32WindowEntry* FindByHwnd(HWND hwnd) noexcept;
+  WindowHandle HandleFromHwnd(HWND hwnd) const noexcept;
+
+  void StageEvent(const StagedEvent& ev) noexcept;
+  static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam,
+                                  LPARAM lParam);
+
+  void ApplyDecorations(HWND hwnd, bool decorated, bool resizable) noexcept;
+  DWORD MakeStyle(const WindowDesc& desc) const noexcept;
+
+  u64 m_NextId {0};
+  ATOM m_WndClass {0};
+  std::unordered_map<u64, Win32WindowEntry> m_Windows;
+  std::vector<StagedEvent> m_Staged;
+
+  // We need the backend pointer inside the static WndProc.
+  // We store a global instance pointer because all windows share one backend.
+  static Win32WindowsBackend* s_Instance;
+};
+
+Win32WindowsBackend* Win32WindowsBackend::s_Instance = nullptr;
+
+// ── Constructor / Destructor ───────────────────────────────────────────
+
+Win32WindowsBackend::Win32WindowsBackend() noexcept
+{
+  s_Instance = this;
+
+  WNDCLASSEXW wc {};
+  wc.cbSize = sizeof(wc);
+  wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+  wc.lpfnWndProc = WndProc;
+  wc.hInstance = ::GetModuleHandleW(nullptr);
+  wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
+  wc.lpszClassName = kWndClassName;
+  m_WndClass = ::RegisterClassExW(&wc);
+
+  GECKO_INFO(labels::General, "Win32WindowsBackend: initialized");
+}
+
+Win32WindowsBackend::~Win32WindowsBackend() noexcept
+{
+  for (auto& [id, entry] : m_Windows)
+  {
+    if (entry.Hwnd)
+      ::DestroyWindow(entry.Hwnd);
+  }
+  m_Windows.clear();
+
+  if (m_WndClass)
+    ::UnregisterClassW(kWndClassName, ::GetModuleHandleW(nullptr));
+
+  if (s_Instance == this)
+    s_Instance = nullptr;
+}
+
+// ── Window management ──────────────────────────────────────────────────
+
+DWORD Win32WindowsBackend::MakeStyle(const WindowDesc& desc) const noexcept
+{
+  DWORD style = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+
+  if (desc.Mode == WindowMode::Fullscreen ||
+      desc.Mode == WindowMode::BorderlessFullscreen)
+  {
+    style |= WS_POPUP;
+  }
+  else if (desc.Decorated)
+  {
+    style |= WS_OVERLAPPEDWINDOW;
+    if (!desc.Resizable)
+      style &= ~(WS_THICKFRAME | WS_MAXIMIZEBOX);
+  }
+  else
+  {
+    style |= WS_POPUP;
+    if (desc.Resizable)
+      style |= WS_THICKFRAME;
+  }
+
+  if (desc.Visible)
+    style |= WS_VISIBLE;
+
+  return style;
+}
+
+void Win32WindowsBackend::ApplyDecorations(HWND hwnd, bool decorated,
+                                           bool resizable) noexcept
+{
+  DWORD style = static_cast<DWORD>(::GetWindowLongPtrW(hwnd, GWL_STYLE));
+
+  if (decorated)
+  {
+    style |= WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+    if (resizable)
+      style |= WS_THICKFRAME | WS_MAXIMIZEBOX;
+  }
+  else
+  {
+    style &= ~(WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME |
+               WS_MAXIMIZEBOX);
+    style |= WS_POPUP;
+  }
+
+  ::SetWindowLongPtrW(hwnd, GWL_STYLE, static_cast<LONG_PTR>(style));
+  ::SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+}
+
+bool Win32WindowsBackend::CreateWindow(const WindowDesc& desc,
+                                       WindowHandle& outWindow) noexcept
+{
+  GECKO_FUNC(labels::General);
+
+  const DWORD style = MakeStyle(desc);
+  const DWORD exStyle = WS_EX_APPWINDOW;
+
+  // Adjust from client size to window size
+  RECT rect {};
+  rect.right = desc.Size.X;
+  rect.bottom = desc.Size.Y;
+  ::AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+  const int windowWidth = rect.right - rect.left;
+  const int windowHeight = rect.bottom - rect.top;
+
+  // Convert title to wide string
+  const int titleLen =
+      ::MultiByteToWideChar(CP_UTF8, 0, desc.Title, -1, nullptr, 0);
+  std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));
+  ::MultiByteToWideChar(CP_UTF8, 0, desc.Title, -1, wTitle.data(), titleLen);
+
+  HWND hwnd =
+      ::CreateWindowExW(exStyle, kWndClassName, wTitle.data(), style,
+                        CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,
+                        nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+
+  if (!hwnd)
+  {
+    GECKO_ERROR(labels::General, "Win32WindowsBackend: CreateWindowExW failed");
+    return false;
+  }
+
+  const u64 id = ++m_NextId;
+  outWindow = WindowHandle {id};
+
+  Win32WindowEntry entry;
+  entry.Desc = desc;
+  entry.Hwnd = hwnd;
+  entry.ClientSize = {static_cast<u32>(desc.Size.X),
+                      static_cast<u32>(desc.Size.Y)};
+  entry.Decorated = desc.Decorated;
+  entry.State = desc.Visible ? platform::WindowState::Normal
+                             : platform::WindowState::Hidden;
+  entry.Alive = true;
+  entry.TitleStorage = desc.Title ? desc.Title : "";
+
+  // Query actual position
+  RECT winRect;
+  if (::GetWindowRect(hwnd, &winRect))
+    entry.Position = {static_cast<i32>(winRect.left),
+                      static_cast<i32>(winRect.top)};
+
+  m_Windows.emplace(id, std::move(entry));
+
+  // Store the handle id in the window user data for WndProc lookup
+  ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, static_cast<LONG_PTR>(id));
+
+  if (desc.Visible)
+    ::ShowWindow(hwnd, SW_SHOW);
+
+  GECKO_INFO(labels::General,
+             "Win32WindowsBackend: created window id=%llu hwnd=%p",
+             static_cast<unsigned long long>(id), static_cast<void*>(hwnd));
+  return true;
+}
+
+void Win32WindowsBackend::DestroyWindow(WindowHandle window) noexcept
+{
+  GECKO_FUNC(labels::General);
+  auto* entry = FindEntry(window);
+  if (!entry)
+    return;
+
+  if (entry->Hwnd)
+    ::DestroyWindow(entry->Hwnd);
+
+  entry->Alive = false;
+
+  StagedEvent ev;
+  ev.Code = events::WindowClosed;
+  ev.Data.Closed = {window, NowNsSafe()};
+  ev.PayloadSize = static_cast<u32>(sizeof(events::WindowClosedPayload));
+  m_Staged.push_back(ev);
+
+  m_Windows.erase(window.Id);
+}
+
+bool Win32WindowsBackend::IsWindowAlive(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  return entry && entry->Alive;
+}
+
+bool Win32WindowsBackend::RequestClose(WindowHandle window) noexcept
+{
+  GECKO_FUNC(labels::General);
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Alive)
+    return false;
+
+  StagedEvent ev;
+  ev.Code = events::WindowCloseRequested;
+  ev.Data.CloseRequested = {window, NowNsSafe()};
+  ev.PayloadSize =
+      static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
+  m_Staged.push_back(ev);
+  return true;
+}
+
+// ── Window properties ──────────────────────────────────────────────────
+
+Extent2D Win32WindowsBackend::GetClientSize(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return Extent2D {};
+  return entry->ClientSize;
+}
+
+void Win32WindowsBackend::SetClientSize(WindowHandle window,
+                                        Extent2D size) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  entry->ClientSize = size;
+
+  DWORD style = static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
+  DWORD exStyle =
+      static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
+
+  RECT rect {};
+  rect.right = static_cast<LONG>(size.Width);
+  rect.bottom = static_cast<LONG>(size.Height);
+  ::AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+
+  ::SetWindowPos(entry->Hwnd, nullptr, 0, 0, rect.right - rect.left,
+                 rect.bottom - rect.top,
+                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void Win32WindowsBackend::SetTitle(WindowHandle window,
+                                   const char* title) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  entry->TitleStorage = title ? title : "";
+
+  const int len = ::MultiByteToWideChar(CP_UTF8, 0, title, -1, nullptr, 0);
+  std::vector<wchar_t> wTitle(static_cast<size_t>(len));
+  ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), len);
+  ::SetWindowTextW(entry->Hwnd, wTitle.data());
+}
+
+const char* Win32WindowsBackend::GetTitle(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return "";
+  return entry->TitleStorage.c_str();
+}
+
+void Win32WindowsBackend::SetPosition(WindowHandle window,
+                                      math::Int2 pos) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  entry->Position = pos;
+  ::SetWindowPos(entry->Hwnd, nullptr, pos.X, pos.Y, 0, 0,
+                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+math::Int2 Win32WindowsBackend::GetPosition(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return math::Int2 {0, 0};
+  return entry->Position;
+}
+
+DpiInfo Win32WindowsBackend::GetDpi(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return DpiInfo {};
+
+  HMONITOR hMon = ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
+  UINT dpiX = 96;
+  UINT dpiY = 96;
+  if (SUCCEEDED(::GetDpiForMonitor(hMon, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)))
+    return DpiInfo {static_cast<u32>(dpiX), static_cast<float>(dpiX) / 96.0F};
+  return DpiInfo {};
+}
+
+NativeWindowHandle Win32WindowsBackend::GetNativeWindowHandle(
+    WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return NativeWindowHandle {};
+
+  NativeWindowHandle native;
+  native.Backend = DisplayBackendKind::Win32;
+  native.Handle = static_cast<void*>(entry->Hwnd);
+  native.Display = nullptr;
+  return native;
+}
+
+// ── Window state ───────────────────────────────────────────────────────
+
+void Win32WindowsBackend::SetWindowState(WindowHandle window,
+                                         platform::WindowState state) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  const auto oldState = entry->State;
+  if (oldState == state)
+    return;
+
+  switch (state)
+  {
+  case platform::WindowState::Normal:
+    ::ShowWindow(entry->Hwnd, SW_RESTORE);
+    break;
+  case platform::WindowState::Minimized:
+    ::ShowWindow(entry->Hwnd, SW_MINIMIZE);
+    break;
+  case platform::WindowState::Maximized:
+    ::ShowWindow(entry->Hwnd, SW_MAXIMIZE);
+    break;
+  case platform::WindowState::Hidden:
+    ::ShowWindow(entry->Hwnd, SW_HIDE);
+    break;
+  }
+
+  entry->State = state;
+
+  StagedEvent ev;
+  ev.Code = events::WindowStateChanged;
+  ev.Data.StateChanged = {window, NowNsSafe(), oldState, state};
+  ev.PayloadSize = static_cast<u32>(sizeof(events::WindowStateChangedPayload));
+  m_Staged.push_back(ev);
+}
+
+platform::WindowState Win32WindowsBackend::GetWindowState(
+    WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return platform::WindowState::Normal;
+  return entry->State;
+}
+
+void Win32WindowsBackend::SetDecorated(WindowHandle window,
+                                       bool decorated) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  entry->Decorated = decorated;
+  ApplyDecorations(entry->Hwnd, decorated, entry->Desc.Resizable);
+}
+
+bool Win32WindowsBackend::IsDecorated(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return true;
+  return entry->Decorated;
+}
+
+void Win32WindowsBackend::RequestFocus(WindowHandle window) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  ::SetForegroundWindow(entry->Hwnd);
+  ::SetFocus(entry->Hwnd);
+}
+
+// ── Cursor ─────────────────────────────────────────────────────────────
+
+void Win32WindowsBackend::SetCursorMode(WindowHandle window,
+                                        CursorMode mode) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  const auto oldMode = entry->Cursor;
+  entry->Cursor = mode;
+
+  // Undo previous lock clip
+  if (oldMode == CursorMode::Locked)
+    ::ClipCursor(nullptr);
+
+  switch (mode)
+  {
+  case CursorMode::Normal:
+    ::ShowCursor(TRUE);
+    break;
+
+  case CursorMode::Hidden:
+    ::ShowCursor(FALSE);
+    break;
+
+  case CursorMode::Locked: {
+    ::ShowCursor(FALSE);
+    RECT clipRect;
+    if (::GetClientRect(entry->Hwnd, &clipRect))
+    {
+      POINT topLeft {clipRect.left, clipRect.top};
+      POINT bottomRight {clipRect.right, clipRect.bottom};
+      ::ClientToScreen(entry->Hwnd, &topLeft);
+      ::ClientToScreen(entry->Hwnd, &bottomRight);
+      RECT screenRect {topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
+      ::ClipCursor(&screenRect);
+    }
+    break;
+  }
+  }
+}
+
+CursorMode Win32WindowsBackend::GetCursorMode(
+    WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return CursorMode::Normal;
+  return entry->Cursor;
+}
+
+// ── Event pump ─────────────────────────────────────────────────────────
+
+void Win32WindowsBackend::PumpEvents(
+    const gecko::EventEmitter& emitter) noexcept
+{
+  MSG msg;
+  while (::PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
+  {
+    ::TranslateMessage(&msg);
+    ::DispatchMessageW(&msg);
+  }
+
+  for (const auto& ev : m_Staged)
+    gecko::SendEvent(emitter, ev.Code,
+                     gecko::EventView {&ev.Data, ev.PayloadSize});
+  m_Staged.clear();
+}
+
+// ── WndProc ────────────────────────────────────────────────────────────
+
+LRESULT CALLBACK Win32WindowsBackend::WndProc(HWND hwnd, UINT msg,
+                                              WPARAM wParam, LPARAM lParam)
+{
+  if (!s_Instance)
+    return ::DefWindowProcW(hwnd, msg, wParam, lParam);
+
+  auto* self = s_Instance;
+  const WindowHandle wh = self->HandleFromHwnd(hwnd);
+  auto* entry = self->FindByHwnd(hwnd);
+
+  switch (msg)
+  {
+  case WM_CLOSE: {
+    if (wh.IsValid())
+    {
+      StagedEvent ev;
+      ev.Code = events::WindowCloseRequested;
+      ev.Data.CloseRequested = {wh, NowNsSafe()};
+      ev.PayloadSize =
+          static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
+      self->m_Staged.push_back(ev);
+    }
+    return 0;  // prevent default DestroyWindow
+  }
+
+  case WM_SIZE: {
+    if (!entry)
+      break;
+    const u32 w = LOWORD(lParam);
+    const u32 h = HIWORD(lParam);
+    entry->ClientSize = {w, h};
+
+    StagedEvent ev;
+    ev.Code = events::WindowResized;
+    ev.Data.Resized = {wh, NowNsSafe(), w, h};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowResizedPayload));
+    self->m_Staged.push_back(ev);
+
+    // Track state changes from WM_SIZE wParam
+    platform::WindowState newState = entry->State;
+    if (wParam == SIZE_MINIMIZED)
+      newState = platform::WindowState::Minimized;
+    else if (wParam == SIZE_MAXIMIZED)
+      newState = platform::WindowState::Maximized;
+    else if (wParam == SIZE_RESTORED)
+      newState = platform::WindowState::Normal;
+
+    if (newState != entry->State)
+    {
+      const auto oldState = entry->State;
+      entry->State = newState;
+
+      StagedEvent stEv;
+      stEv.Code = events::WindowStateChanged;
+      stEv.Data.StateChanged = {wh, NowNsSafe(), oldState, newState};
+      stEv.PayloadSize =
+          static_cast<u32>(sizeof(events::WindowStateChangedPayload));
+      self->m_Staged.push_back(stEv);
+    }
+    break;
+  }
+
+  case WM_MOVE: {
+    if (!entry)
+      break;
+    const i32 x = static_cast<i32>(static_cast<short>(LOWORD(lParam)));
+    const i32 y = static_cast<i32>(static_cast<short>(HIWORD(lParam)));
+    entry->Position = {x, y};
+
+    StagedEvent ev;
+    ev.Code = events::WindowMoved;
+    ev.Data.Moved = {wh, NowNsSafe(), x, y};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMovedPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_KEYDOWN:
+  case WM_SYSKEYDOWN: {
+    if (!entry)
+      break;
+    const KeyCode key = VkToKeyCode(wParam);
+    const u8 repeat = (lParam & 0x40000000) ? 1 : 0;
+
+    StagedEvent ev;
+    ev.Code = events::WindowKey;
+    ev.Data.Key = {wh, NowNsSafe(), key, 1, repeat};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowKeyPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_KEYUP:
+  case WM_SYSKEYUP: {
+    if (!entry)
+      break;
+    const KeyCode key = VkToKeyCode(wParam);
+
+    StagedEvent ev;
+    ev.Code = events::WindowKey;
+    ev.Data.Key = {wh, NowNsSafe(), key, 0, 0};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowKeyPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_CHAR: {
+    if (!entry)
+      break;
+    // Skip control characters
+    if (wParam < 32 && wParam != '\t' && wParam != '\n' && wParam != '\r')
+      break;
+
+    StagedEvent ev;
+    ev.Code = events::WindowChar;
+    ev.Data.Char = {wh, NowNsSafe(), static_cast<u32>(wParam)};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowCharPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_MOUSEMOVE: {
+    if (!entry)
+      break;
+    const i32 x = GET_X_LPARAM(lParam);
+    const i32 y = GET_Y_LPARAM(lParam);
+
+    StagedEvent ev;
+    ev.Code = events::WindowMouseMove;
+    ev.Data.MouseMove = {wh, NowNsSafe(), x, y};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseMovePayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_LBUTTONDOWN:
+  case WM_RBUTTONDOWN:
+  case WM_MBUTTONDOWN:
+  case WM_XBUTTONDOWN: {
+    if (!entry)
+      break;
+    MouseButton btn = WmButtonToMouseButton(msg);
+    if (msg == WM_XBUTTONDOWN && GET_XBUTTON_WPARAM(wParam) == XBUTTON2)
+      btn = MouseButton::X2;
+
+    StagedEvent ev;
+    ev.Code = events::WindowMouseButton;
+    ev.Data.MouseButton = {wh, NowNsSafe(), btn, 1};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseButtonPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_LBUTTONUP:
+  case WM_RBUTTONUP:
+  case WM_MBUTTONUP:
+  case WM_XBUTTONUP: {
+    if (!entry)
+      break;
+    MouseButton btn = WmButtonToMouseButton(msg);
+    if (msg == WM_XBUTTONUP && GET_XBUTTON_WPARAM(wParam) == XBUTTON2)
+      btn = MouseButton::X2;
+
+    StagedEvent ev;
+    ev.Code = events::WindowMouseButton;
+    ev.Data.MouseButton = {wh, NowNsSafe(), btn, 0};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseButtonPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_MOUSEWHEEL: {
+    if (!entry)
+      break;
+    const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) /
+                        static_cast<float>(WHEEL_DELTA);
+
+    StagedEvent ev;
+    ev.Code = events::WindowMouseWheel;
+    ev.Data.MouseWheel = {wh, NowNsSafe(), 0.0F, delta};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseWheelPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_MOUSEHWHEEL: {
+    if (!entry)
+      break;
+    const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) /
+                        static_cast<float>(WHEEL_DELTA);
+
+    StagedEvent ev;
+    ev.Code = events::WindowMouseWheel;
+    ev.Data.MouseWheel = {wh, NowNsSafe(), delta, 0.0F};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseWheelPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_SETFOCUS: {
+    if (!entry)
+      break;
+    StagedEvent ev;
+    ev.Code = events::WindowFocusChanged;
+    ev.Data.FocusChanged = {wh, NowNsSafe(), 1};
+    ev.PayloadSize =
+        static_cast<u32>(sizeof(events::WindowFocusChangedPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_KILLFOCUS: {
+    if (!entry)
+      break;
+    // Release cursor lock when losing focus
+    if (entry->Cursor == CursorMode::Locked)
+      ::ClipCursor(nullptr);
+
+    StagedEvent ev;
+    ev.Code = events::WindowFocusChanged;
+    ev.Data.FocusChanged = {wh, NowNsSafe(), 0};
+    ev.PayloadSize =
+        static_cast<u32>(sizeof(events::WindowFocusChangedPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_DPICHANGED: {
+    if (!entry)
+      break;
+    const u32 dpi = HIWORD(wParam);
+    const float scale = static_cast<float>(dpi) / 96.0F;
+
+    // Resize to suggested rect
+    const RECT* suggested = reinterpret_cast<const RECT*>(lParam);
+    ::SetWindowPos(entry->Hwnd, nullptr, suggested->left, suggested->top,
+                   suggested->right - suggested->left,
+                   suggested->bottom - suggested->top,
+                   SWP_NOZORDER | SWP_NOACTIVATE);
+
+    StagedEvent ev;
+    ev.Code = events::WindowDpiChanged;
+    ev.Data.DpiChanged = {wh, NowNsSafe(), dpi, scale};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowDpiChangedPayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  default:
+    break;
+  }
+
+  return ::DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+
+Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
+    WindowHandle window) noexcept
+{
+  if (!window.IsValid())
+    return nullptr;
+  auto it = m_Windows.find(window.Id);
+  return (it != m_Windows.end()) ? &it->second : nullptr;
+}
+
+const Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
+    WindowHandle window) const noexcept
+{
+  if (!window.IsValid())
+    return nullptr;
+  auto it = m_Windows.find(window.Id);
+  return (it != m_Windows.end()) ? &it->second : nullptr;
+}
+
+Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindByHwnd(
+    HWND hwnd) noexcept
+{
+  const u64 id = static_cast<u64>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+  if (id == 0)
+    return nullptr;
+  auto it = m_Windows.find(id);
+  return (it != m_Windows.end()) ? &it->second : nullptr;
+}
+
+WindowHandle Win32WindowsBackend::HandleFromHwnd(HWND hwnd) const noexcept
+{
+  const u64 id = static_cast<u64>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+  return WindowHandle {id};
+}
+
+void Win32WindowsBackend::StageEvent(const StagedEvent& ev) noexcept
+{
+  m_Staged.push_back(ev);
+}
+
+// ── Factory ────────────────────────────────────────────────────────────
+
+Unique<IWindowsBackend> CreateWin32WindowsBackend() noexcept
+{
+  return CreateUnique<Win32WindowsBackend>();
+}
+
+}  // namespace gecko::platform
+
+#endif  // _WIN32

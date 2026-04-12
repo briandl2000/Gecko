@@ -132,6 +132,7 @@ if(UNIX AND NOT APPLE)
 elseif(WIN32)
   target_sources(Platform PRIVATE
     win32/win32_monitors_backend.cpp
+    win32/win32_windows_backend.cpp
   )
 endif()
 

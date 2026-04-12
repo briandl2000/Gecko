@@ -17,6 +17,10 @@ Unique<IWindowsBackend> CreateXlibWindowsBackend() noexcept;
 Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;
 #endif
 
+#if defined(_WIN32)
+Unique<IWindowsBackend> CreateWin32WindowsBackend() noexcept;
+#endif
+
 Unique<IWindowsBackend> IWindowsBackend::Create(
     const PlatformConfig& config) noexcept
 {
@@ -48,10 +52,13 @@ Unique<IWindowsBackend> IWindowsBackend::Create(
 #endif
 
   case DisplayBackendKind::Win32:
-    // TODO: implement Win32 window backend
+#if defined(_WIN32)
+    return CreateWin32WindowsBackend();
+#else
     GECKO_WARN(labels::General,
-               "Win32 window backend not yet implemented; using Null");
+               "Win32 window backend not available in this build; using Null");
     return CreateUnique<NullWindowsBackend>();
+#endif
 
   case DisplayBackendKind::Cocoa:
     // TODO: implement Cocoa window backend
