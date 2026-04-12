@@ -225,8 +225,7 @@ public:
   ~WaylandWindowsBackend() noexcept override;
 
   // IWindowsBackend
-  bool CreateWindow(const WindowDesc& desc,
-                    WindowHandle& outWindow) noexcept override;
+  WindowHandle CreateWindow(const WindowDesc& desc) noexcept override;
   void DestroyWindow(WindowHandle window) noexcept override;
   bool IsWindowAlive(WindowHandle window) const noexcept override;
   bool RequestClose(WindowHandle window) noexcept override;
@@ -684,16 +683,15 @@ void WaylandWindowsBackend::OnToplevelClose(WaylandWindowState* ws) noexcept
 
 // ── Window management ──────────────────────────────────────────────────
 
-bool WaylandWindowsBackend::CreateWindow(const WindowDesc& desc,
-                                         WindowHandle& outWindow) noexcept
+WindowHandle WaylandWindowsBackend::CreateWindow(
+    const WindowDesc& desc) noexcept
 {
   GECKO_FUNC(labels::General);
 
   if (!m_Display || !m_Compositor || !m_WmBase)
-    return false;
+    return {};
 
   const u64 id = ++m_NextId;
-  outWindow = WindowHandle {id};
 
   auto& ws = m_Windows[id];
   ws.GeckoId = id;
@@ -711,7 +709,7 @@ bool WaylandWindowsBackend::CreateWindow(const WindowDesc& desc,
   {
     GECKO_ERROR(labels::General, "Failed to create wl_surface");
     m_Windows.erase(id);
-    return false;
+    return {};
   }
   m_WindowBySurface.emplace(ws.Surface, id);
 
@@ -768,7 +766,7 @@ bool WaylandWindowsBackend::CreateWindow(const WindowDesc& desc,
       labels::Window, "Created Wayland window id=%llu, surface=%p, size=%ux%u",
       static_cast<unsigned long long>(id), static_cast<void*>(ws.Surface),
       ws.ClientSize.Width, ws.ClientSize.Height);
-  return true;
+  return WindowHandle {id};
 }
 
 void WaylandWindowsBackend::DestroyWindow(WindowHandle window) noexcept

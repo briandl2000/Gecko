@@ -112,13 +112,12 @@ public:
     }
   }
 
-  bool CreateWindow(const WindowDesc& desc,
-                    WindowHandle& outWindow) noexcept override
+  WindowHandle CreateWindow(const WindowDesc& desc) noexcept override
   {
     GECKO_FUNC(labels::General);
 
     if (!m_Display)
-      return false;
+      return {};
 
     const int screen = DefaultScreen(m_Display);
     const ::Window root = RootWindow(m_Display, screen);
@@ -138,7 +137,7 @@ public:
     if (w == 0)
     {
       GECKO_ERROR(labels::General, "XCreateSimpleWindow failed");
-      return false;
+      return {};
     }
 
     long mask = ExposureMask | StructureNotifyMask | KeyPressMask |
@@ -170,7 +169,6 @@ public:
     ::XFlush(m_Display);
 
     const u64 id = ++m_NextId;
-    outWindow = WindowHandle {id};
 
     X11WindowState st;
     st.Desc = appliedDesc;
@@ -187,7 +185,7 @@ public:
     GECKO_INFO(labels::Window,
                "Created X11 window id=%llu, xid=%lu, size=%ux%u",
                (unsigned long long)id, (unsigned long)w, width, height);
-    return true;
+    return WindowHandle {id};
   }
 
   void DestroyWindow(WindowHandle window) noexcept override

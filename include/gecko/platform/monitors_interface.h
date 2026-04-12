@@ -23,20 +23,22 @@ public:
   GECKO_API virtual void EnumerateMonitors() noexcept = 0;
   GECKO_API virtual u32 GetMonitorCount() const noexcept = 0;
 
-  GECKO_API virtual bool GetMonitorHandle(
-      u32 index, MonitorHandle& outHandle) const noexcept = 0;
+  [[nodiscard]]
+  GECKO_API virtual MonitorHandle GetMonitorHandle(
+      u32 index) const noexcept = 0;
 
   // ── Properties ───────────────────────────────────────────────
 
-  GECKO_API virtual bool GetMonitorProperties(
-      MonitorHandle handle, MonitorInfo& outInfo) const noexcept = 0;
+  [[nodiscard]]
+  GECKO_API virtual MonitorInfo GetMonitorProperties(
+      MonitorHandle handle) const noexcept = 0;
 
-  GECKO_API virtual bool GetPrimaryMonitor(
-      MonitorHandle& outHandle) const noexcept = 0;
+  [[nodiscard]]
+  GECKO_API virtual MonitorHandle GetPrimaryMonitor() const noexcept = 0;
 
-  GECKO_API virtual bool GetMonitorBounds(
-      MonitorHandle handle, math::Rect2D& outBounds,
-      math::Rect2D& outWorkArea) const noexcept = 0;
+  [[nodiscard]]
+  GECKO_API virtual MonitorBounds GetMonitorBounds(
+      MonitorHandle handle) const noexcept = 0;
 
   // ── Event pump ───────────────────────────────────────────────
 

@@ -142,8 +142,7 @@ public:
   Win32WindowsBackend() noexcept;
   ~Win32WindowsBackend() noexcept override;
 
-  bool CreateWindow(const WindowDesc& desc,
-                    WindowHandle& outWindow) noexcept override;
+  WindowHandle CreateWindow(const WindowDesc& desc) noexcept override;
   void DestroyWindow(WindowHandle window) noexcept override;
   bool IsWindowAlive(WindowHandle window) const noexcept override;
   bool RequestClose(WindowHandle window) noexcept override;
@@ -321,8 +320,7 @@ void Win32WindowsBackend::ApplyDecorations(HWND hwnd, bool decorated,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 }
 
-bool Win32WindowsBackend::CreateWindow(const WindowDesc& desc,
-                                       WindowHandle& outWindow) noexcept
+WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 {
   GECKO_FUNC(labels::General);
 
@@ -351,11 +349,10 @@ bool Win32WindowsBackend::CreateWindow(const WindowDesc& desc,
   if (!hwnd)
   {
     GECKO_ERROR(labels::General, "Win32WindowsBackend: CreateWindowExW failed");
-    return false;
+    return {};
   }
 
   const u64 id = ++m_NextId;
-  outWindow = WindowHandle {id};
 
   Win32WindowEntry entry;
   entry.Desc = desc;
@@ -385,7 +382,7 @@ bool Win32WindowsBackend::CreateWindow(const WindowDesc& desc,
   GECKO_INFO(labels::General,
              "Win32WindowsBackend: created window id=%llu hwnd=%p",
              static_cast<unsigned long long>(id), static_cast<void*>(hwnd));
-  return true;
+  return WindowHandle {id};
 }
 
 void Win32WindowsBackend::DestroyWindow(WindowHandle window) noexcept

@@ -25,8 +25,7 @@ TEST_CASE("Live backend: primary monitor exists",
 
   scope.Ctx.Monitors().EnumerateMonitors();
 
-  MonitorHandle primary;
-  REQUIRE(scope.Ctx.Monitors().GetPrimaryMonitor(primary));
+  MonitorHandle primary = scope.Ctx.Monitors().GetPrimaryMonitor();
   REQUIRE(primary.IsValid());
 }
 
@@ -40,13 +39,12 @@ TEST_CASE("Live backend: monitor handle by index is valid",
   const u32 count = scope.Ctx.Monitors().GetMonitorCount();
   REQUIRE(count >= 1);
 
-  MonitorHandle h;
-  REQUIRE(scope.Ctx.Monitors().GetMonitorHandle(0, h));
+  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
   REQUIRE(h.IsValid());
 
   // Out-of-range index fails cleanly
-  MonitorHandle invalid;
-  REQUIRE_FALSE(scope.Ctx.Monitors().GetMonitorHandle(count, invalid));
+  MonitorHandle invalid = scope.Ctx.Monitors().GetMonitorHandle(count);
+  REQUIRE_FALSE(invalid.IsValid());
 }
 
 TEST_CASE("Live backend: monitor properties are populated",
@@ -56,11 +54,9 @@ TEST_CASE("Live backend: monitor properties are populated",
 
   scope.Ctx.Monitors().EnumerateMonitors();
 
-  MonitorHandle h;
-  REQUIRE(scope.Ctx.Monitors().GetMonitorHandle(0, h));
+  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
 
-  MonitorInfo info {};
-  REQUIRE(scope.Ctx.Monitors().GetMonitorProperties(h, info));
+  MonitorInfo info = scope.Ctx.Monitors().GetMonitorProperties(h);
   REQUIRE(info.Bounds.Width() > 0);
   REQUIRE(info.Bounds.Height() > 0);
   REQUIRE(info.Dpi > 0);
@@ -75,11 +71,9 @@ TEST_CASE("Live backend: monitor name is non-empty",
 
   scope.Ctx.Monitors().EnumerateMonitors();
 
-  MonitorHandle h;
-  REQUIRE(scope.Ctx.Monitors().GetMonitorHandle(0, h));
+  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
 
-  MonitorInfo info {};
-  REQUIRE(scope.Ctx.Monitors().GetMonitorProperties(h, info));
+  MonitorInfo info = scope.Ctx.Monitors().GetMonitorProperties(h);
   REQUIRE(info.Name[0] != '\0');
 }
 
@@ -90,14 +84,11 @@ TEST_CASE("Live backend: monitor bounds and work area are valid",
 
   scope.Ctx.Monitors().EnumerateMonitors();
 
-  MonitorHandle h;
-  REQUIRE(scope.Ctx.Monitors().GetMonitorHandle(0, h));
+  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
 
-  math::Rect2D bounds {};
-  math::Rect2D workArea {};
-  REQUIRE(scope.Ctx.Monitors().GetMonitorBounds(h, bounds, workArea));
-  REQUIRE_FALSE(bounds.IsEmpty());
-  REQUIRE_FALSE(workArea.IsEmpty());
+  MonitorBounds mb = scope.Ctx.Monitors().GetMonitorBounds(h);
+  REQUIRE_FALSE(mb.Bounds.IsEmpty());
+  REQUIRE_FALSE(mb.WorkArea.IsEmpty());
 }
 
 TEST_CASE("Live backend: all monitors have consistent data",
@@ -112,11 +103,10 @@ TEST_CASE("Live backend: all monitors have consistent data",
 
   for (u32 i = 0; i < count; ++i)
   {
-    MonitorHandle h;
-    REQUIRE(scope.Ctx.Monitors().GetMonitorHandle(i, h));
+    MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(i);
+    REQUIRE(h.IsValid());
 
-    MonitorInfo info {};
-    REQUIRE(scope.Ctx.Monitors().GetMonitorProperties(h, info));
+    MonitorInfo info = scope.Ctx.Monitors().GetMonitorProperties(h);
     REQUIRE(info.Bounds.Width() > 0);
     REQUIRE(info.Bounds.Height() > 0);
     REQUIRE(info.Dpi > 0);

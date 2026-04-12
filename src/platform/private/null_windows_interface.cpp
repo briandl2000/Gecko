@@ -9,13 +9,11 @@
 
 namespace gecko::platform {
 
-bool NullWindowsBackend::CreateWindow(const WindowDesc& desc,
-                                      WindowHandle& outWindow) noexcept
+WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 {
   GECKO_FUNC(labels::General);
 
   const u64 id = ++m_NextId;
-  outWindow = WindowHandle {id};
 
   NullWindowEntry entry;
   entry.Desc = desc;
@@ -30,7 +28,7 @@ bool NullWindowsBackend::CreateWindow(const WindowDesc& desc,
 
   GECKO_INFO(labels::General, "Created null window id=%llu",
              static_cast<unsigned long long>(id));
-  return true;
+  return WindowHandle {id};
 }
 
 void NullWindowsBackend::DestroyWindow(WindowHandle window) noexcept

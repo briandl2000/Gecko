@@ -268,8 +268,8 @@ static int AppMain(int argc, char** argv)
     windowDesc.Visible = true;
     windowDesc.Resizable = true;
 
-    WindowHandle window {};
-    if (!ctx.Windows().CreateWindow(windowDesc, window))
+    WindowHandle window = ctx.Windows().CreateWindow(windowDesc);
+    if (!window.IsValid())
     {
       GECKO_ERROR(app::app_skeleton::labels::Main, "Failed to create window");
       return 1;

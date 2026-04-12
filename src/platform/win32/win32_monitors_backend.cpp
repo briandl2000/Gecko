@@ -65,58 +65,41 @@ public:
     return static_cast<u32>(m_Monitors.size());
   }
 
-  bool GetMonitorHandle(u32 index,
-                        MonitorHandle& outHandle) const noexcept override
+  MonitorHandle GetMonitorHandle(u32 index) const noexcept override
   {
     if (index >= static_cast<u32>(m_Monitors.size()))
-      return false;
-    outHandle = m_Monitors[index].Handle;
-    return true;
+      return {};
+    return m_Monitors[index].Handle;
   }
 
-  bool GetMonitorProperties(MonitorHandle handle,
-                            MonitorInfo& outInfo) const noexcept override
+  MonitorInfo GetMonitorProperties(MonitorHandle handle) const noexcept override
   {
     if (!handle.IsValid())
-      return false;
+      return {};
     for (const auto& entry : m_Monitors)
     {
       if (entry.Handle == handle)
-      {
-        outInfo = entry.Info;
-        return true;
-      }
+        return entry.Info;
     }
-    return false;
+    return {};
   }
 
-  bool GetPrimaryMonitor(MonitorHandle& outHandle) const noexcept override
+  MonitorHandle GetPrimaryMonitor() const noexcept override
   {
     for (const auto& entry : m_Monitors)
     {
       if (entry.Info.IsPrimary)
-      {
-        outHandle = entry.Handle;
-        return true;
-      }
+        return entry.Handle;
     }
     if (!m_Monitors.empty())
-    {
-      outHandle = m_Monitors[0].Handle;
-      return true;
-    }
-    return false;
+      return m_Monitors[0].Handle;
+    return {};
   }
 
-  bool GetMonitorBounds(MonitorHandle handle, math::Rect2D& outBounds,
-                        math::Rect2D& outWorkArea) const noexcept override
+  MonitorBounds GetMonitorBounds(MonitorHandle handle) const noexcept override
   {
-    MonitorInfo info;
-    if (!GetMonitorProperties(handle, info))
-      return false;
-    outBounds = info.Bounds;
-    outWorkArea = info.WorkArea;
-    return true;
+    MonitorInfo info = GetMonitorProperties(handle);
+    return {info.Bounds, info.WorkArea};
   }
 
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override

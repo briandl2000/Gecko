@@ -121,10 +121,10 @@ int main()
     windowDesc.Resizable = false;
     windowDesc.Mode = WindowMode::Windowed;
 
-    WindowHandle window;
+    WindowHandle window = ctx.Windows().CreateWindow(windowDesc);
     GECKO_INFO(app::platform_example::labels::Main,
                "Creating application window...");
-    if (!ctx.Windows().CreateWindow(windowDesc, window))
+    if (!window.IsValid())
     {
       GECKO_ERROR(app::platform_example::labels::Main,
                   "Failed to create window\n");

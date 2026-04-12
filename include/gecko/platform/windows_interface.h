@@ -20,8 +20,9 @@ public:
 
   // ── Window management ────────────────────────────────────────
 
-  GECKO_API virtual bool CreateWindow(const WindowDesc& desc,
-                                      WindowHandle& outWindow) noexcept = 0;
+  [[nodiscard]]
+  GECKO_API virtual WindowHandle CreateWindow(
+      const WindowDesc& desc) noexcept = 0;
 
   GECKO_API virtual void DestroyWindow(WindowHandle window) noexcept = 0;
 

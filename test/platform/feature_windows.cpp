@@ -18,8 +18,7 @@ TEST_CASE("Live backend: create and destroy window",
   desc.Size = {320, 240};
   desc.Visible = false;  // Don't flash a window on screen
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow(desc, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(desc);
   REQUIRE(win.IsValid());
   REQUIRE(scope.Ctx.Windows().IsWindowAlive(win));
 
@@ -37,8 +36,8 @@ TEST_CASE("Live backend: client size matches requested size",
   desc.Size = {800, 600};
   desc.Visible = false;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow(desc, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(desc);
+  REQUIRE(win.IsValid());
 
   Extent2D size = scope.Ctx.Windows().GetClientSize(win);
   // On Wayland the compositor may override the requested size in the
@@ -55,8 +54,7 @@ TEST_CASE("Live backend: set title does not crash",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
   scope.Ctx.Windows().SetTitle(win, "New Title");
   scope.Ctx.Windows().DestroyWindow(win);
 }
@@ -65,9 +63,10 @@ TEST_CASE("Live backend: multiple windows", "[feature][platform][window]")
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle w1, w2;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = false}, w1));
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = false}, w2));
+  WindowHandle w1 = scope.Ctx.Windows().CreateWindow({.Visible = false});
+  WindowHandle w2 = scope.Ctx.Windows().CreateWindow({.Visible = false});
+  REQUIRE(w1.IsValid());
+  REQUIRE(w2.IsValid());
   REQUIRE(w1 != w2);
   REQUIRE(scope.Ctx.Windows().IsWindowAlive(w1));
   REQUIRE(scope.Ctx.Windows().IsWindowAlive(w2));
@@ -84,8 +83,7 @@ TEST_CASE("Live backend: request close fires event",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
   REQUIRE(scope.Ctx.Windows().RequestClose(win));
 
   int received = 0;
@@ -109,8 +107,7 @@ TEST_CASE("Live backend: destroy fires WindowClosed event",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   int received = 0;
   auto sub = SubscribeEvent(
@@ -132,8 +129,7 @@ TEST_CASE("Live backend: native handle is populated",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   NativeWindowHandle nh = scope.Ctx.Windows().GetNativeWindowHandle(win);
 
@@ -150,8 +146,7 @@ TEST_CASE("Live backend: pump events does not crash",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   for (int i = 0; i < 10; ++i)
     scope.Ctx.PumpEvents();
@@ -164,8 +159,7 @@ TEST_CASE("Live backend: set and get client size",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   scope.Ctx.Windows().SetClientSize(win, {640, 480});
   // Size may be adjusted by the WM, so we just verify the call doesn't crash.
@@ -181,8 +175,7 @@ TEST_CASE("Live backend: get title returns desc title",
   WindowDesc desc;
   desc.Title = "Title Test";
   desc.Visible = false;
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow(desc, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(desc);
 
   const char* title = scope.Ctx.Windows().GetTitle(win);
   REQUIRE(title != nullptr);
@@ -194,8 +187,7 @@ TEST_CASE("Live backend: set and get position", "[feature][platform][window]")
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   scope.Ctx.Windows().SetPosition(win, {100, 200});
   // Actual repositioning may not be reflected immediately.
@@ -208,8 +200,7 @@ TEST_CASE("Live backend: set and get window state",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   scope.Ctx.Windows().SetWindowState(win, WindowState::Hidden);
   REQUIRE(scope.Ctx.Windows().GetWindowState(win) == WindowState::Hidden);
@@ -222,8 +213,7 @@ TEST_CASE("Live backend: decorated flag defaults true",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   REQUIRE(scope.Ctx.Windows().IsDecorated(win) == true);
 
@@ -237,8 +227,7 @@ TEST_CASE("Live backend: cursor mode get/set", "[feature][platform][window]")
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   REQUIRE(scope.Ctx.Windows().GetCursorMode(win) == CursorMode::Normal);
 
@@ -253,8 +242,7 @@ TEST_CASE("Live backend: request focus does not crash",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
 
   scope.Ctx.Windows().RequestFocus(win);
 
@@ -276,8 +264,7 @@ TEST_CASE("Live backend: visible window create and pump",
   desc.Size = {400, 300};
   desc.Visible = true;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow(desc, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(desc);
   REQUIRE(win.IsValid());
 
   // Pump a few frames — processes map/configure events
@@ -304,8 +291,8 @@ TEST_CASE("Live backend: visible window resize and pump",
   desc.Visible = true;
   desc.Resizable = true;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow(desc, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(desc);
+  REQUIRE(win.IsValid());
 
   // Pump to process initial map
   for (int i = 0; i < 3; ++i)
@@ -329,9 +316,9 @@ TEST_CASE("Live backend: visible window set title and read back",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow(
-      {.Title = "Original Title", .Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(
+      {.Title = "Original Title", .Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -351,8 +338,8 @@ TEST_CASE("Live backend: visible window position set/get",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -375,8 +362,8 @@ TEST_CASE("Live backend: visible window state transitions",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -401,9 +388,9 @@ TEST_CASE("Live backend: visible window decoration toggle",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = true, .Decorated = true},
-                                           win));
+  WindowHandle win =
+      scope.Ctx.Windows().CreateWindow({.Visible = true, .Decorated = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -424,8 +411,8 @@ TEST_CASE("Live backend: visible window DPI query",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -442,8 +429,8 @@ TEST_CASE("Live backend: visible window native handle",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -461,8 +448,8 @@ TEST_CASE("Live backend: visible window cursor mode transitions",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -483,9 +470,9 @@ TEST_CASE("Live backend: visible window resized event fires",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow(
-      {.Size = {400, 300}, .Resizable = true, .Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(
+      {.Size = {400, 300}, .Resizable = true, .Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
@@ -514,13 +501,15 @@ TEST_CASE("Live backend: multiple visible windows simultaneously",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle w1, w2, w3;
-  REQUIRE(scope.Ctx.Windows().CreateWindow(
-      {.Title = "Window 1", .Size = {300, 200}, .Visible = true}, w1));
-  REQUIRE(scope.Ctx.Windows().CreateWindow(
-      {.Title = "Window 2", .Size = {300, 200}, .Visible = true}, w2));
-  REQUIRE(scope.Ctx.Windows().CreateWindow(
-      {.Title = "Window 3", .Size = {300, 200}, .Visible = true}, w3));
+  WindowHandle w1 = scope.Ctx.Windows().CreateWindow(
+      {.Title = "Window 1", .Size = {300, 200}, .Visible = true});
+  WindowHandle w2 = scope.Ctx.Windows().CreateWindow(
+      {.Title = "Window 2", .Size = {300, 200}, .Visible = true});
+  WindowHandle w3 = scope.Ctx.Windows().CreateWindow(
+      {.Title = "Window 3", .Size = {300, 200}, .Visible = true});
+  REQUIRE(w1.IsValid());
+  REQUIRE(w2.IsValid());
+  REQUIRE(w3.IsValid());
 
   REQUIRE(w1 != w2);
   REQUIRE(w2 != w3);
@@ -548,8 +537,8 @@ TEST_CASE("Live backend: visible window focus request",
 {
   test::FeaturePlatformScope scope;
 
-  WindowHandle win;
-  REQUIRE(scope.Ctx.Windows().CreateWindow({.Visible = true}, win));
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = true});
+  REQUIRE(win.IsValid());
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();

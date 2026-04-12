@@ -57,8 +57,7 @@ TEST_CASE("Null backend: create and destroy window", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  REQUIRE(ctx.Windows().CreateWindow({}, win));
+  WindowHandle win = ctx.Windows().CreateWindow({});
   REQUIRE(win.IsValid());
   REQUIRE(ctx.Windows().IsWindowAlive(win));
 
@@ -76,8 +75,8 @@ TEST_CASE("Null backend: client size matches desc", "[platform][context]")
 
   WindowDesc desc;
   desc.Size = {800, 600};
-  WindowHandle win;
-  REQUIRE(ctx.Windows().CreateWindow(desc, win));
+  WindowHandle win = ctx.Windows().CreateWindow(desc);
+  REQUIRE(win.IsValid());
 
   Extent2D size = ctx.Windows().GetClientSize(win);
   REQUIRE(size.Width == 800);
@@ -94,8 +93,7 @@ TEST_CASE("Null backend: set title doesn't crash", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
   ctx.Windows().SetTitle(win, "Test Title");
   ctx.Windows().DestroyWindow(win);
 }
@@ -108,8 +106,7 @@ TEST_CASE("Null backend: request close enqueues event", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
   REQUIRE(ctx.Windows().RequestClose(win));
 
   int received = 0;
@@ -136,10 +133,12 @@ TEST_CASE("Null backend: multiple windows", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle w1, w2, w3;
-  REQUIRE(ctx.Windows().CreateWindow({}, w1));
-  REQUIRE(ctx.Windows().CreateWindow({}, w2));
-  REQUIRE(ctx.Windows().CreateWindow({}, w3));
+  WindowHandle w1 = ctx.Windows().CreateWindow({});
+  WindowHandle w2 = ctx.Windows().CreateWindow({});
+  WindowHandle w3 = ctx.Windows().CreateWindow({});
+  REQUIRE(w1.IsValid());
+  REQUIRE(w2.IsValid());
+  REQUIRE(w3.IsValid());
 
   REQUIRE(w1 != w2);
   REQUIRE(w2 != w3);
@@ -165,8 +164,7 @@ TEST_CASE("Null backend: DPI info has defaults", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   DpiInfo dpi = ctx.Windows().GetDpi(win);
   REQUIRE(dpi.Dpi > 0);
@@ -209,8 +207,7 @@ TEST_CASE("Null backend: set and get client size", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   ctx.Windows().SetClientSize(win, {1024, 768});
   Extent2D size = ctx.Windows().GetClientSize(win);
@@ -230,8 +227,7 @@ TEST_CASE("Null backend: get title returns desc title", "[platform][context]")
 
   WindowDesc desc;
   desc.Title = "My Window";
-  WindowHandle win;
-  ctx.Windows().CreateWindow(desc, win);
+  WindowHandle win = ctx.Windows().CreateWindow(desc);
 
   const char* title = ctx.Windows().GetTitle(win);
   REQUIRE(::std::strcmp(title, "My Window") == 0);
@@ -250,8 +246,7 @@ TEST_CASE("Null backend: set and get position", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   ctx.Windows().SetPosition(win, {100, 200});
   auto pos = ctx.Windows().GetPosition(win);
@@ -270,8 +265,7 @@ TEST_CASE("Null backend: set position fires WindowMoved event",
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
@@ -298,8 +292,7 @@ TEST_CASE("Null backend: set and get window state", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   REQUIRE(ctx.Windows().GetWindowState(win) == WindowState::Normal);
 
@@ -321,8 +314,7 @@ TEST_CASE("Null backend: set state fires WindowStateChanged event",
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
@@ -349,8 +341,7 @@ TEST_CASE("Null backend: decorated get/set", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   REQUIRE(ctx.Windows().IsDecorated(win) == true);
 
@@ -371,8 +362,7 @@ TEST_CASE("Null backend: cursor mode get/set", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   REQUIRE(ctx.Windows().GetCursorMode(win) == CursorMode::Normal);
 
@@ -393,8 +383,7 @@ TEST_CASE("Null backend: request focus does not crash", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   ctx.Windows().RequestFocus(win);
 
@@ -411,8 +400,7 @@ TEST_CASE("Null backend: hidden window has Hidden state", "[platform][context]")
 
   WindowDesc desc;
   desc.Visible = false;
-  WindowHandle win;
-  ctx.Windows().CreateWindow(desc, win);
+  WindowHandle win = ctx.Windows().CreateWindow(desc);
 
   REQUIRE(ctx.Windows().GetWindowState(win) == WindowState::Hidden);
 
@@ -441,8 +429,7 @@ TEST_CASE("Null monitor backend: primary monitor exists", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  MonitorHandle primary;
-  REQUIRE(ctx.Monitors().GetPrimaryMonitor(primary));
+  MonitorHandle primary = ctx.Monitors().GetPrimaryMonitor();
   REQUIRE(primary.IsValid());
 }
 
@@ -454,12 +441,11 @@ TEST_CASE("Null monitor backend: get handle by index", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  MonitorHandle h;
-  REQUIRE(ctx.Monitors().GetMonitorHandle(0, h));
+  MonitorHandle h = ctx.Monitors().GetMonitorHandle(0);
   REQUIRE(h.IsValid());
 
-  MonitorHandle invalid;
-  REQUIRE_FALSE(ctx.Monitors().GetMonitorHandle(99, invalid));
+  MonitorHandle invalid = ctx.Monitors().GetMonitorHandle(99);
+  REQUIRE_FALSE(invalid.IsValid());
 }
 
 TEST_CASE("Null monitor backend: monitor properties are valid",
@@ -471,11 +457,9 @@ TEST_CASE("Null monitor backend: monitor properties are valid",
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  MonitorHandle h;
-  REQUIRE(ctx.Monitors().GetMonitorHandle(0, h));
+  MonitorHandle h = ctx.Monitors().GetMonitorHandle(0);
 
-  MonitorInfo info {};
-  REQUIRE(ctx.Monitors().GetMonitorProperties(h, info));
+  MonitorInfo info = ctx.Monitors().GetMonitorProperties(h);
   REQUIRE(info.IsPrimary);
   REQUIRE(info.Dpi > 0);
   REQUIRE(info.RefreshRateMilliHz > 0);
@@ -490,14 +474,11 @@ TEST_CASE("Null monitor backend: bounds and work area", "[platform][context]")
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  MonitorHandle h;
-  REQUIRE(ctx.Monitors().GetMonitorHandle(0, h));
+  MonitorHandle h = ctx.Monitors().GetMonitorHandle(0);
 
-  math::Rect2D bounds {};
-  math::Rect2D workArea {};
-  REQUIRE(ctx.Monitors().GetMonitorBounds(h, bounds, workArea));
-  REQUIRE_FALSE(bounds.IsEmpty());
-  REQUIRE_FALSE(workArea.IsEmpty());
+  MonitorBounds mb = ctx.Monitors().GetMonitorBounds(h);
+  REQUIRE_FALSE(mb.Bounds.IsEmpty());
+  REQUIRE_FALSE(mb.WorkArea.IsEmpty());
 }
 
 TEST_CASE("Null monitor backend: invalid handle returns false",
@@ -510,12 +491,12 @@ TEST_CASE("Null monitor backend: invalid handle returns false",
   auto ctx = PlatformContext(cfg);
 
   MonitorHandle invalid;
-  MonitorInfo info {};
-  REQUIRE_FALSE(ctx.Monitors().GetMonitorProperties(invalid, info));
+  MonitorInfo info = ctx.Monitors().GetMonitorProperties(invalid);
+  REQUIRE(info.Bounds.IsEmpty());
 
-  math::Rect2D bounds {};
-  math::Rect2D workArea {};
-  REQUIRE_FALSE(ctx.Monitors().GetMonitorBounds(invalid, bounds, workArea));
+  MonitorBounds mb = ctx.Monitors().GetMonitorBounds(invalid);
+  REQUIRE(mb.Bounds.IsEmpty());
+  REQUIRE(mb.WorkArea.IsEmpty());
 }
 
 // ── Event delivery tests ───────────────────────────────────────────────
@@ -529,8 +510,7 @@ TEST_CASE("Null backend: destroy window enqueues WindowClosed event",
   cfg.Backend = DisplayBackendKind::Null;
   auto ctx = PlatformContext(cfg);
 
-  WindowHandle win;
-  ctx.Windows().CreateWindow({}, win);
+  WindowHandle win = ctx.Windows().CreateWindow({});
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(

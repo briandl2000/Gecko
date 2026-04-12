@@ -23,8 +23,7 @@ struct NullWindowEntry
 class NullWindowsBackend final : public IWindowsBackend
 {
 public:
-  bool CreateWindow(const WindowDesc& desc,
-                    WindowHandle& outWindow) noexcept override;
+  WindowHandle CreateWindow(const WindowDesc& desc) noexcept override;
   void DestroyWindow(WindowHandle window) noexcept override;
   bool IsWindowAlive(WindowHandle window) const noexcept override;
   bool RequestClose(WindowHandle window) noexcept override;
