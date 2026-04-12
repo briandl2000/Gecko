@@ -27,6 +27,10 @@ struct X11WindowState
 {
   WindowDesc Desc {};
   Extent2D ClientSize {};
+  math::Int2 Position {0, 0};
+  platform::WindowState State {platform::WindowState::Normal};
+  CursorMode Cursor {CursorMode::Normal};
+  bool Decorated {true};
   ::Window WindowId {0};
 };
 
@@ -78,6 +82,12 @@ public:
     m_NetWmState = ::XInternAtom(m_Display, "_NET_WM_STATE", False);
     m_NetWmStateFullscreen =
         ::XInternAtom(m_Display, "_NET_WM_STATE_FULLSCREEN", False);
+    m_NetWmStateMaximizedHorz =
+        ::XInternAtom(m_Display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+    m_NetWmStateMaximizedVert =
+        ::XInternAtom(m_Display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+    m_NetWmStateHidden =
+        ::XInternAtom(m_Display, "_NET_WM_STATE_HIDDEN", False);
     m_MotifWmHints = ::XInternAtom(m_Display, "_MOTIF_WM_HINTS", False);
 
     GECKO_INFO(labels::General, "Initialized X11 windows backend (display=%p)",
@@ -141,6 +151,10 @@ public:
     ApplyResizableHint(w, appliedDesc);
     ApplyInitialWindowMode(w, root, appliedDesc);
 
+    // Apply decoration setting from the window description.
+    if (!desc.Decorated && appliedDesc.Mode == WindowMode::Windowed)
+      ApplyMotifDecorations(w, false);
+
     // Enable window manager close events.
     ::XSetWMProtocols(m_Display, w, &m_WmDeleteWindow, 1);
 
@@ -162,6 +176,9 @@ public:
     st.Desc = appliedDesc;
     st.ClientSize =
         Extent2D {static_cast<u32>(width), static_cast<u32>(height)};
+    st.Decorated = desc.Decorated;
+    st.State = desc.Visible ? platform::WindowState::Normal
+                            : platform::WindowState::Hidden;
     st.WindowId = w;
 
     m_Windows.emplace(id, st);
@@ -279,6 +296,16 @@ public:
           gecko::SendEvent(emitter, events::WindowResized,
                            events::WindowResizedPayload {WindowHandle {id}, now,
                                                          newW, newH});
+        }
+
+        const i32 newX = static_cast<i32>(event.xconfigure.x);
+        const i32 newY = static_cast<i32>(event.xconfigure.y);
+        if (it->second.Position.X != newX || it->second.Position.Y != newY)
+        {
+          it->second.Position = math::Int2 {newX, newY};
+          gecko::SendEvent(
+              emitter, events::WindowMoved,
+              events::WindowMovedPayload {WindowHandle {id}, now, newX, newY});
         }
       }
       break;
@@ -433,6 +460,180 @@ public:
     return nh;
   }
 
+  void SetClientSize(WindowHandle window, Extent2D size) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    ::XResizeWindow(m_Display, it->second.WindowId, size.Width, size.Height);
+    ::XFlush(m_Display);
+    // Actual size update happens via ConfigureNotify in PumpEvents.
+  }
+
+  const char* GetTitle(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return "";
+    return it->second.Desc.Title;
+  }
+
+  void SetPosition(WindowHandle window, math::Int2 pos) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    ::XMoveWindow(m_Display, it->second.WindowId, pos.X, pos.Y);
+    ::XFlush(m_Display);
+    // Actual position update happens via ConfigureNotify in PumpEvents.
+  }
+
+  math::Int2 GetPosition(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return math::Int2 {0, 0};
+    return it->second.Position;
+  }
+
+  void SetWindowState(WindowHandle window,
+                      platform::WindowState state) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    const auto oldState = it->second.State;
+    if (oldState == state)
+      return;
+
+    const ::Window xid = it->second.WindowId;
+    const int screen = DefaultScreen(m_Display);
+    const ::Window root = RootWindow(m_Display, screen);
+
+    switch (state)
+    {
+    case platform::WindowState::Normal:
+      // Remove maximized state if previously maximized.
+      if (oldState == platform::WindowState::Maximized)
+      {
+        SendNetWmStateMessage(root, xid, /*remove*/ 0,
+                              m_NetWmStateMaximizedHorz);
+        SendNetWmStateMessage(root, xid, /*remove*/ 0,
+                              m_NetWmStateMaximizedVert);
+      }
+      ::XMapWindow(m_Display, xid);
+      break;
+
+    case platform::WindowState::Minimized:
+      ::XIconifyWindow(m_Display, xid, screen);
+      break;
+
+    case platform::WindowState::Maximized:
+      ::XMapWindow(m_Display, xid);
+      SendNetWmStateMessage(root, xid, /*add*/ 1, m_NetWmStateMaximizedHorz);
+      SendNetWmStateMessage(root, xid, /*add*/ 1, m_NetWmStateMaximizedVert);
+      break;
+
+    case platform::WindowState::Hidden:
+      ::XUnmapWindow(m_Display, xid);
+      break;
+    }
+
+    ::XFlush(m_Display);
+    it->second.State = state;
+
+    m_Staged.push_back(MakeStagedEvent(
+        events::WindowStateChanged, events::WindowStateChangedPayload {
+                                        window, NowNsSafe(), oldState, state}));
+  }
+
+  platform::WindowState GetWindowState(
+      WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return platform::WindowState::Normal;
+    return it->second.State;
+  }
+
+  void SetDecorated(WindowHandle window, bool decorated) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    it->second.Decorated = decorated;
+    ApplyMotifDecorations(it->second.WindowId, decorated);
+    ::XFlush(m_Display);
+  }
+
+  bool IsDecorated(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return true;
+    return it->second.Decorated;
+  }
+
+  void RequestFocus(WindowHandle window) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    ::XRaiseWindow(m_Display, it->second.WindowId);
+    ::XSetInputFocus(m_Display, it->second.WindowId, RevertToParent,
+                     CurrentTime);
+    ::XFlush(m_Display);
+  }
+
+  void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    it->second.Cursor = mode;
+
+    const ::Window xid = it->second.WindowId;
+    if (mode == CursorMode::Hidden || mode == CursorMode::Locked)
+    {
+      // Create an invisible cursor.
+      Pixmap blank = ::XCreatePixmap(m_Display, xid, 1, 1, 1);
+      XColor dummy {};
+      Cursor invisible =
+          ::XCreatePixmapCursor(m_Display, blank, blank, &dummy, &dummy, 0, 0);
+      ::XDefineCursor(m_Display, xid, invisible);
+      ::XFreeCursor(m_Display, invisible);
+      ::XFreePixmap(m_Display, blank);
+
+      if (mode == CursorMode::Locked)
+      {
+        ::XGrabPointer(m_Display, xid, True,
+                       PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
+                       GrabModeAsync, GrabModeAsync, xid, None, CurrentTime);
+      }
+    }
+    else
+    {
+      ::XUndefineCursor(m_Display, xid);
+      ::XUngrabPointer(m_Display, CurrentTime);
+    }
+
+    ::XFlush(m_Display);
+  }
+
+  CursorMode GetCursorMode(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return CursorMode::Normal;
+    return it->second.Cursor;
+  }
+
 private:
   void ApplyResizableHint(::Window w, const WindowDesc& desc) noexcept
   {
@@ -536,6 +737,9 @@ private:
   Atom m_WmProtocols {0};
   Atom m_NetWmState {0};
   Atom m_NetWmStateFullscreen {0};
+  Atom m_NetWmStateMaximizedHorz {0};
+  Atom m_NetWmStateMaximizedVert {0};
+  Atom m_NetWmStateHidden {0};
   Atom m_MotifWmHints {0};
   u64 m_NextId {0};
 

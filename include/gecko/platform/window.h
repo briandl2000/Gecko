@@ -53,6 +53,14 @@ enum class CursorMode : u8
   Locked,
 };
 
+enum class WindowState : u8
+{
+  Normal,
+  Minimized,
+  Maximized,
+  Hidden,
+};
+
 struct DpiInfo
 {
   u32 Dpi {96};
@@ -66,6 +74,7 @@ struct WindowDesc
   WindowMode Mode {WindowMode::Windowed};
   bool Resizable {true};
   bool Visible {true};
+  bool Decorated {true};
   bool HighDpi {true};
 };
 

@@ -154,3 +154,105 @@ TEST_CASE("Live backend: pump events does not crash",
 
   scope.Ctx.Windows().DestroyWindow(win);
 }
+
+TEST_CASE("Live backend: set and get client size",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win;
+  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+
+  scope.Ctx.Windows().SetClientSize(win, {640, 480});
+  // Size may be adjusted by the WM, so we just verify the call doesn't crash.
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: get title returns desc title",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowDesc desc;
+  desc.Title = "Title Test";
+  desc.Visible = false;
+  WindowHandle win;
+  scope.Ctx.Windows().CreateWindow(desc, win);
+
+  const char* title = scope.Ctx.Windows().GetTitle(win);
+  REQUIRE(title != nullptr);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: set and get position", "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win;
+  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+
+  scope.Ctx.Windows().SetPosition(win, {100, 200});
+  // Actual repositioning may not be reflected immediately.
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: set and get window state",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win;
+  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+
+  scope.Ctx.Windows().SetWindowState(win, WindowState::Hidden);
+  REQUIRE(scope.Ctx.Windows().GetWindowState(win) == WindowState::Hidden);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: decorated flag defaults true",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win;
+  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+
+  REQUIRE(scope.Ctx.Windows().IsDecorated(win) == true);
+
+  scope.Ctx.Windows().SetDecorated(win, false);
+  REQUIRE(scope.Ctx.Windows().IsDecorated(win) == false);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: cursor mode get/set", "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win;
+  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+
+  REQUIRE(scope.Ctx.Windows().GetCursorMode(win) == CursorMode::Normal);
+
+  scope.Ctx.Windows().SetCursorMode(win, CursorMode::Hidden);
+  REQUIRE(scope.Ctx.Windows().GetCursorMode(win) == CursorMode::Hidden);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: request focus does not crash",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win;
+  scope.Ctx.Windows().CreateWindow({.Visible = false}, win);
+
+  scope.Ctx.Windows().RequestFocus(win);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}

@@ -78,3 +78,17 @@ TEST_CASE("NativeWindowHandle defaults", "[platform][window]")
   REQUIRE(nh.Handle == nullptr);
   REQUIRE(nh.Display == nullptr);
 }
+
+TEST_CASE("WindowDesc Decorated defaults to true", "[platform][window]")
+{
+  WindowDesc desc;
+  REQUIRE(desc.Decorated == true);
+}
+
+TEST_CASE("WindowState enum values", "[platform][window]")
+{
+  REQUIRE(WindowState::Normal != WindowState::Minimized);
+  REQUIRE(WindowState::Normal != WindowState::Maximized);
+  REQUIRE(WindowState::Normal != WindowState::Hidden);
+  REQUIRE(WindowState::Minimized != WindowState::Maximized);
+}
