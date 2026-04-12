@@ -13,9 +13,9 @@ Unique<IWindowsBackend> CreateNullWindowsBackend() noexcept;
 Unique<IWindowsBackend> CreateXlibWindowsBackend() noexcept;
 #endif
 
-// #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
-// Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;
-// #endif
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
+Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;
+#endif
 
 Unique<IWindowsBackend> IWindowsBackend::Create(
     const PlatformConfig& config) noexcept
@@ -38,10 +38,14 @@ Unique<IWindowsBackend> IWindowsBackend::Create(
 #endif
 
   case DisplayBackendKind::Wayland:
-    // TODO: implement Wayland window backend
-    GECKO_WARN(labels::General,
-               "Wayland window backend not yet implemented; using Null");
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
+    return CreateWaylandWindowsBackend();
+#else
+    GECKO_WARN(
+        labels::General,
+        "Wayland window backend not available in this build; using Null");
     return CreateUnique<NullWindowsBackend>();
+#endif
 
   case DisplayBackendKind::Win32:
     // TODO: implement Win32 window backend

@@ -42,12 +42,90 @@ if(UNIX AND NOT APPLE)
   if(PkgConfig_FOUND)
     pkg_check_modules(Wayland QUIET wayland-client)
     if(Wayland_FOUND)
-      target_sources(Platform PRIVATE
-        linux/wayland_monitors_backend.cpp
-      )
+      # ── Wayland protocol code generation ──────────────────────────
+      find_program(WAYLAND_SCANNER wayland-scanner)
+      pkg_check_modules(XkbCommon QUIET xkbcommon)
+      pkg_check_modules(WaylandCursor QUIET wayland-cursor)
+
+      if(WAYLAND_SCANNER)
+        execute_process(
+          COMMAND pkg-config --variable=pkgdatadir wayland-protocols
+          OUTPUT_VARIABLE WAYLAND_PROTOCOLS_DIR
+          OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+
+        set(_wl_gen_dir "${CMAKE_CURRENT_BINARY_DIR}/wayland-gen")
+        file(MAKE_DIRECTORY ${_wl_gen_dir})
+
+        # xdg-shell (stable)
+        set(_xdg_shell_xml
+            "${WAYLAND_PROTOCOLS_DIR}/stable/xdg-shell/xdg-shell.xml")
+        add_custom_command(
+          OUTPUT "${_wl_gen_dir}/xdg-shell-client-protocol.h"
+          COMMAND ${WAYLAND_SCANNER} client-header
+                  ${_xdg_shell_xml}
+                  "${_wl_gen_dir}/xdg-shell-client-protocol.h"
+          DEPENDS ${_xdg_shell_xml}
+          COMMENT "Generating xdg-shell client header"
+        )
+        add_custom_command(
+          OUTPUT "${_wl_gen_dir}/xdg-shell-protocol.c"
+          COMMAND ${WAYLAND_SCANNER} private-code
+                  ${_xdg_shell_xml}
+                  "${_wl_gen_dir}/xdg-shell-protocol.c"
+          DEPENDS ${_xdg_shell_xml}
+          COMMENT "Generating xdg-shell protocol code"
+        )
+
+        # xdg-decoration (unstable v1)
+        set(_xdg_deco_xml
+            "${WAYLAND_PROTOCOLS_DIR}/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml")
+        add_custom_command(
+          OUTPUT "${_wl_gen_dir}/xdg-decoration-client-protocol.h"
+          COMMAND ${WAYLAND_SCANNER} client-header
+                  ${_xdg_deco_xml}
+                  "${_wl_gen_dir}/xdg-decoration-client-protocol.h"
+          DEPENDS ${_xdg_deco_xml}
+          COMMENT "Generating xdg-decoration client header"
+        )
+        add_custom_command(
+          OUTPUT "${_wl_gen_dir}/xdg-decoration-protocol.c"
+          COMMAND ${WAYLAND_SCANNER} private-code
+                  ${_xdg_deco_xml}
+                  "${_wl_gen_dir}/xdg-decoration-protocol.c"
+          DEPENDS ${_xdg_deco_xml}
+          COMMENT "Generating xdg-decoration protocol code"
+        )
+
+        target_sources(Platform PRIVATE
+          linux/wayland_monitors_backend.cpp
+          linux/wayland_windows_backend.cpp
+          "${_wl_gen_dir}/xdg-shell-protocol.c"
+          "${_wl_gen_dir}/xdg-shell-client-protocol.h"
+          "${_wl_gen_dir}/xdg-decoration-protocol.c"
+          "${_wl_gen_dir}/xdg-decoration-client-protocol.h"
+        )
+        target_include_directories(Platform PRIVATE ${_wl_gen_dir})
+      else()
+        target_sources(Platform PRIVATE
+          linux/wayland_monitors_backend.cpp
+        )
+      endif()
+
       target_link_libraries(Platform PRIVATE ${Wayland_LINK_LIBRARIES})
       target_include_directories(Platform PRIVATE ${Wayland_INCLUDE_DIRS})
       target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_WAYLAND)
+
+      if(WaylandCursor_FOUND)
+        target_link_libraries(Platform PRIVATE ${WaylandCursor_LINK_LIBRARIES})
+      endif()
+
+      if(XkbCommon_FOUND)
+        target_link_libraries(Platform PRIVATE ${XkbCommon_LINK_LIBRARIES})
+        target_include_directories(Platform PRIVATE ${XkbCommon_INCLUDE_DIRS})
+        target_compile_definitions(Platform PRIVATE GECKO_HAS_XKBCOMMON)
+      endif()
+
       message(STATUS "Gecko: Wayland client found – GECKO_PLATFORM_LINUX_WAYLAND enabled")
     endif()
   endif()
