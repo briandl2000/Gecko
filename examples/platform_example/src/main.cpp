@@ -180,17 +180,18 @@ int main()
         },
         &running);
 
-    // print the window key events to demonstrate event handling
+    // Log window key events to demonstrate event handling
     auto keyPressedSub = gecko::SubscribeEvent(
         events::WindowKey,
         [](void* /*user*/, const gecko::EventMeta& /*meta*/,
            gecko::EventView view) {
           const auto* payload =
               reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
-          std::printf("WindowKey event: windowId=%llu, key=%u, down=%u\n",
-                      static_cast<unsigned long long>(payload->Window.Id),
-                      static_cast<unsigned>(payload->Key),
-                      static_cast<unsigned>(payload->Down));
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "WindowKey: windowId=%llu, key=%u, down=%u",
+                     static_cast<unsigned long long>(payload->Window.Id),
+                     static_cast<unsigned>(payload->Key),
+                     static_cast<unsigned>(payload->Down));
         },
         nullptr);
 
@@ -201,9 +202,10 @@ int main()
           const auto* payload =
               reinterpret_cast<const events::WindowFocusChangedPayload*>(
                   view.Data());
-          std::printf("WindowFocus: windowId=%llu, focused=%u\n",
-                      static_cast<unsigned long long>(payload->Window.Id),
-                      static_cast<unsigned>(payload->Focused));
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "WindowFocus: windowId=%llu, focused=%u",
+                     static_cast<unsigned long long>(payload->Window.Id),
+                     static_cast<unsigned>(payload->Focused));
         },
         nullptr);
 
@@ -213,9 +215,10 @@ int main()
            gecko::EventView view) {
           const auto* payload =
               reinterpret_cast<const events::WindowMovedPayload*>(view.Data());
-          std::printf("WindowMoved: windowId=%llu, pos=(%d, %d)\n",
-                      static_cast<unsigned long long>(payload->Window.Id),
-                      payload->X, payload->Y);
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "WindowMoved: windowId=%llu, pos=(%d, %d)",
+                     static_cast<unsigned long long>(payload->Window.Id),
+                     payload->X, payload->Y);
         },
         nullptr);
 
@@ -226,9 +229,10 @@ int main()
           const auto* payload =
               reinterpret_cast<const events::WindowResizedPayload*>(
                   view.Data());
-          std::printf("WindowResized: windowId=%llu, size=%ux%u\n",
-                      static_cast<unsigned long long>(payload->Window.Id),
-                      payload->Width, payload->Height);
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "WindowResized: windowId=%llu, size=%ux%u",
+                     static_cast<unsigned long long>(payload->Window.Id),
+                     payload->Width, payload->Height);
         },
         nullptr);
 
