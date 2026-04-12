@@ -293,6 +293,7 @@ public:
 private:
   u64 FindWindowBySurface(wl_surface* surface) const noexcept;
   void ApplyCursorVisibility(WaylandWindowState& ws) noexcept;
+  void AttachBlankBuffer(WaylandWindowState& ws) noexcept;
 
   wl_display* m_Display {nullptr};
   wl_registry* m_Registry {nullptr};
@@ -759,6 +760,10 @@ bool WaylandWindowsBackend::CreateWindow(const WindowDesc& desc,
     ws.Configured = true;
   }
 
+  // Attach a blank buffer so the compositor will actually map the window.
+  if (desc.Visible)
+    AttachBlankBuffer(ws);
+
   GECKO_INFO(
       labels::Window, "Created Wayland window id=%llu, surface=%p, size=%ux%u",
       static_cast<unsigned long long>(id), static_cast<void*>(ws.Surface),
@@ -1052,6 +1057,58 @@ void WaylandWindowsBackend::ApplyCursorVisibility(
       }
     }
   }
+}
+
+void WaylandWindowsBackend::AttachBlankBuffer(WaylandWindowState& ws) noexcept
+{
+  if (!m_Shm || !ws.Surface)
+    return;
+
+  const i32 w = static_cast<i32>(ws.ClientSize.Width);
+  const i32 h = static_cast<i32>(ws.ClientSize.Height);
+  const i32 stride = w * 4;
+  const i32 size = stride * h;
+
+  // Create a temporary anonymous file for the shared-memory buffer.
+  int fd = -1;
+#if defined(__linux__)
+  fd = memfd_create("gecko-wl-buffer", MFD_CLOEXEC);
+#endif
+  if (fd < 0)
+    return;
+  if (ftruncate(fd, size) < 0)
+  {
+    close(fd);
+    return;
+  }
+
+  void* data = mmap(nullptr, static_cast<size_t>(size), PROT_READ | PROT_WRITE,
+                    MAP_SHARED, fd, 0);
+  if (data == MAP_FAILED)
+  {
+    close(fd);
+    return;
+  }
+
+  // Fill with dark grey (ARGB 0xFF333333).
+  auto* pixels = static_cast<u32*>(data);
+  const i32 count = w * h;
+  for (i32 i = 0; i < count; ++i)
+    pixels[i] = 0xFF333333;
+
+  wl_shm_pool* pool = wl_shm_create_pool(m_Shm, fd, size);
+  wl_buffer* buffer =
+      wl_shm_pool_create_buffer(pool, 0, w, h, stride, WL_SHM_FORMAT_ARGB8888);
+  wl_shm_pool_destroy(pool);
+  munmap(data, static_cast<size_t>(size));
+  close(fd);
+
+  wl_surface_attach(ws.Surface, buffer, 0, 0);
+  wl_surface_damage(ws.Surface, 0, 0, w, h);
+  wl_surface_commit(ws.Surface);
+
+  // The buffer can be destroyed after commit — the compositor keeps a ref.
+  wl_buffer_destroy(buffer);
 }
 
 // ── Event pump ─────────────────────────────────────────────────────────

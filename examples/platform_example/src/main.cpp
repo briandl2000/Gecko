@@ -134,6 +134,39 @@ int main()
     GECKO_INFO(app::platform_example::labels::Main,
                "Window created successfully");
 
+    // ── Demonstrate new window APIs ────────────────────────────────
+    {
+      // DPI
+      DpiInfo dpi = ctx.Windows().GetDpi(window);
+      GECKO_INFO(app::platform_example::labels::Main,
+                 "Window DPI: %u (scale %.2f)", dpi.Dpi,
+                 static_cast<double>(dpi.Scale));
+
+      // Client size
+      Extent2D size = ctx.Windows().GetClientSize(window);
+      GECKO_INFO(app::platform_example::labels::Main, "Client size: %ux%u",
+                 size.Width, size.Height);
+
+      // Position
+      math::Int2 pos = ctx.Windows().GetPosition(window);
+      GECKO_INFO(app::platform_example::labels::Main,
+                 "Window position: (%d, %d)", pos.X, pos.Y);
+
+      // Native handle
+      NativeWindowHandle native = ctx.Windows().GetNativeWindowHandle(window);
+      GECKO_INFO(app::platform_example::labels::Main,
+                 "Native handle: backend=%u, handle=%p",
+                 static_cast<unsigned>(native.Backend), native.Handle);
+
+      // Decoration state
+      GECKO_INFO(app::platform_example::labels::Main, "Decorated: %s",
+                 ctx.Windows().IsDecorated(window) ? "true" : "false");
+
+      // Window state
+      GECKO_INFO(app::platform_example::labels::Main, "Window state: %u",
+                 static_cast<unsigned>(ctx.Windows().GetWindowState(window)));
+    }
+
     bool running = true;
     // Avoid hanging forever in headless/Null-backend runs.
     // Run up to ~10 seconds unless a close is requested.
@@ -158,6 +191,44 @@ int main()
                       static_cast<unsigned long long>(payload->Window.Id),
                       static_cast<unsigned>(payload->Key),
                       static_cast<unsigned>(payload->Down));
+        },
+        nullptr);
+
+    auto focusSub = gecko::SubscribeEvent(
+        events::WindowFocusChanged,
+        [](void* /*user*/, const gecko::EventMeta& /*meta*/,
+           gecko::EventView view) {
+          const auto* payload =
+              reinterpret_cast<const events::WindowFocusChangedPayload*>(
+                  view.Data());
+          std::printf("WindowFocus: windowId=%llu, focused=%u\n",
+                      static_cast<unsigned long long>(payload->Window.Id),
+                      static_cast<unsigned>(payload->Focused));
+        },
+        nullptr);
+
+    auto movedSub = gecko::SubscribeEvent(
+        events::WindowMoved,
+        [](void* /*user*/, const gecko::EventMeta& /*meta*/,
+           gecko::EventView view) {
+          const auto* payload =
+              reinterpret_cast<const events::WindowMovedPayload*>(view.Data());
+          std::printf("WindowMoved: windowId=%llu, pos=(%d, %d)\n",
+                      static_cast<unsigned long long>(payload->Window.Id),
+                      payload->X, payload->Y);
+        },
+        nullptr);
+
+    auto resizedSub = gecko::SubscribeEvent(
+        events::WindowResized,
+        [](void* /*user*/, const gecko::EventMeta& /*meta*/,
+           gecko::EventView view) {
+          const auto* payload =
+              reinterpret_cast<const events::WindowResizedPayload*>(
+                  view.Data());
+          std::printf("WindowResized: windowId=%llu, size=%ux%u\n",
+                      static_cast<unsigned long long>(payload->Window.Id),
+                      payload->Width, payload->Height);
         },
         nullptr);
 
