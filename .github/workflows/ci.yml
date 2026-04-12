@@ -25,7 +25,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev
+          sudo apt-get install -y ninja-build clang \
+            libx11-dev libxext-dev libxrandr-dev \
+            libwayland-dev wayland-protocols libwayland-cursor0 \
+            libxkbcommon-dev
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -60,14 +63,28 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
-          if [ -f "./out/bin/Release/tests/math_tests.exe" ]; then
-            ./out/bin/Release/tests/math_tests.exe
-          elif [ -f "./out/bin/Release/tests/math_tests" ]; then
-            ./out/bin/Release/tests/math_tests
-          else
-            echo "Test executable not found!"
-            exit 1
-          fi
+          EXT=""
+          if [ "${{ runner.os }}" = "Windows" ]; then EXT=".exe"; fi
+          TEST_DIR="./out/bin/Release/tests"
+          FAILED=0
+          for TEST in core_tests math_tests platform_tests runtime_tests; do
+            BINARY="${TEST_DIR}/${TEST}${EXT}"
+            if [ -f "$BINARY" ]; then
+              echo "=== Running ${TEST} ==="
+              "$BINARY" || FAILED=1
+            else
+              echo "Warning: ${BINARY} not found, skipping"
+            fi
+          done
+          # Feature tests require a live display; run but allow skip
+          for TEST in platform_feature_tests; do
+            BINARY="${TEST_DIR}/${TEST}${EXT}"
+            if [ -f "$BINARY" ]; then
+              echo "=== Running ${TEST} ==="
+              "$BINARY" || FAILED=1
+            fi
+          done
+          if [ $FAILED -ne 0 ]; then exit 1; fi
 
   # =============================================================================
   # PR checks - enforce version bump and changelog for PRs to main
@@ -193,7 +210,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev zip
+          sudo apt-get install -y ninja-build clang \
+            libx11-dev libxext-dev libxrandr-dev \
+            libwayland-dev wayland-protocols libwayland-cursor0 \
+            libxkbcommon-dev zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
