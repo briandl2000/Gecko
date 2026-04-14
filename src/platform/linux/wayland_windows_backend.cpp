@@ -730,13 +730,35 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
   // Set title.
   xdg_toplevel_set_title(ws.Toplevel, desc.Title ? desc.Title : "Gecko");
 
+  // Apply resize constraints.
+  if (!desc.Resizable)
+  {
+    xdg_toplevel_set_min_size(ws.Toplevel,
+                              static_cast<i32>(ws.ClientSize.Width),
+                              static_cast<i32>(ws.ClientSize.Height));
+    xdg_toplevel_set_max_size(ws.Toplevel,
+                              static_cast<i32>(ws.ClientSize.Width),
+                              static_cast<i32>(ws.ClientSize.Height));
+  }
+
+  // Apply window mode (fullscreen).
+  if (desc.Mode == WindowMode::Fullscreen ||
+      desc.Mode == WindowMode::BorderlessFullscreen)
+  {
+    xdg_toplevel_set_fullscreen(ws.Toplevel, nullptr);
+  }
+
   // Request decoration mode.
+  // BorderlessFullscreen implies no decorations.
+  const bool wantDecorations =
+      desc.Decorated && desc.Mode != WindowMode::BorderlessFullscreen;
+  ws.Decorated = wantDecorations;
   if (m_DecorationManager)
   {
     ws.Decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
         m_DecorationManager, ws.Toplevel);
     zxdg_toplevel_decoration_v1_set_mode(
-        ws.Decoration, desc.Decorated
+        ws.Decoration, wantDecorations
                            ? ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
                            : ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
   }

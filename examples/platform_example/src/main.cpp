@@ -17,6 +17,7 @@
 #include <gecko/runtime/thread_pool_job_system.h>
 #include <gecko/runtime/trace_file_sink.h>
 #include <gecko/runtime/tracking_allocator.h>
+#include <vector>
 
 using namespace gecko;
 using namespace gecko::platform;
@@ -167,34 +168,207 @@ int main()
                  static_cast<unsigned>(ctx.Windows().GetWindowState(window)));
     }
 
-    bool running = true;
+    // ── App state for event callbacks ───────────────────────────────
+    struct AppState
+    {
+      PlatformContext* Ctx;
+      WindowHandle MainWindow;
+      std::vector<WindowHandle> Spawned;
+      bool Running {true};
+    };
+
+    AppState appState;
+    appState.Ctx = &ctx;
+    appState.MainWindow = window;
+
+    // ── Log keybindings ────────────────────────────────────────────
+    GECKO_INFO(app::platform_example::labels::Main,
+               "─────────────────────────────────────────");
+    GECKO_INFO(app::platform_example::labels::Main, "  Window Keybindings:");
+    GECKO_INFO(app::platform_example::labels::Main,
+               "  [1] Open small window        (400x300)");
+    GECKO_INFO(app::platform_example::labels::Main,
+               "  [2] Open large window        (1600x900, resizable)");
+    GECKO_INFO(app::platform_example::labels::Main,
+               "  [3] Open borderless window   (800x600, no decorations)");
+    GECKO_INFO(app::platform_example::labels::Main,
+               "  [4] Open fullscreen window");
+    GECKO_INFO(app::platform_example::labels::Main,
+               "  [W] Close last spawned window");
+    GECKO_INFO(app::platform_example::labels::Main, "  [Escape] Quit");
+    GECKO_INFO(app::platform_example::labels::Main,
+               "─────────────────────────────────────────");
+
     // Avoid hanging forever in headless/Null-backend runs.
-    // Run up to ~10 seconds unless a close is requested.
     u32 frameCount = 0;
 
-    // Subscribe to window close-requested events.
+    // ── Close handler ──────────────────────────────────────────────
+    // Main window close → quit.  Child window close → destroy it.
     auto closeSub = gecko::SubscribeEvent(
         events::WindowCloseRequested,
-        [](void* user, const gecko::EventMeta&, gecko::EventView) {
-          *static_cast<bool*>(user) = false;
-        },
-        &running);
+        [](void* user, const gecko::EventMeta&, gecko::EventView view) {
+          auto* state = static_cast<AppState*>(user);
+          const auto* payload =
+              reinterpret_cast<const events::WindowCloseRequestedPayload*>(
+                  view.Data());
 
-    // Log window key events to demonstrate event handling
+          if (payload->Window == state->MainWindow)
+          {
+            state->Running = false;
+            return;
+          }
+
+          // Child window closed — remove from spawned list
+          auto& spawned = state->Spawned;
+          for (auto it = spawned.begin(); it != spawned.end(); ++it)
+          {
+            if (*it == payload->Window)
+            {
+              GECKO_INFO(app::platform_example::labels::Main,
+                         "Child window %llu closed",
+                         static_cast<unsigned long long>(it->Id));
+              state->Ctx->Windows().DestroyWindow(*it);
+              spawned.erase(it);
+              break;
+            }
+          }
+        },
+        &appState);
+
+    // ── Key handler — spawn / close windows ────────────────────────
     auto keyPressedSub = gecko::SubscribeEvent(
         events::WindowKey,
-        [](void* /*user*/, const gecko::EventMeta& /*meta*/,
+        [](void* user, const gecko::EventMeta& /*meta*/,
            gecko::EventView view) {
+          auto* state = static_cast<AppState*>(user);
           const auto* payload =
               reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
-          GECKO_INFO(app::platform_example::labels::Main,
-                     "WindowKey: windowId=%llu, key=%u, down=%u",
-                     static_cast<unsigned long long>(payload->Window.Id),
-                     static_cast<unsigned>(payload->Key),
-                     static_cast<unsigned>(payload->Down));
-        },
-        nullptr);
 
+          // Only act on initial key-down, not repeats
+          if (!payload->Down || payload->Repeat)
+            return;
+
+          auto& windows = state->Ctx->Windows();
+          WindowDesc desc;
+
+          switch (payload->Key)
+          {
+          case KeyCode::D1: {
+            desc.Title = "Gecko - Small";
+            desc.Size = {400, 300};
+            desc.Resizable = false;
+            desc.Mode = WindowMode::Windowed;
+
+            WindowHandle h = windows.CreateWindow(desc);
+            if (h.IsValid())
+            {
+              state->Spawned.push_back(h);
+              GECKO_INFO(app::platform_example::labels::Main,
+                         "Opened small window (id=%llu, 400x300)",
+                         static_cast<unsigned long long>(h.Id));
+            }
+            else
+            {
+              GECKO_ERROR(app::platform_example::labels::Main,
+                          "Failed to open small window");
+            }
+            break;
+          }
+
+          case KeyCode::D2: {
+            desc.Title = "Gecko - Large";
+            desc.Size = {1600, 900};
+            desc.Resizable = true;
+            desc.Mode = WindowMode::Windowed;
+
+            WindowHandle h = windows.CreateWindow(desc);
+            if (h.IsValid())
+            {
+              state->Spawned.push_back(h);
+              GECKO_INFO(app::platform_example::labels::Main,
+                         "Opened large resizable window (id=%llu, 1600x900)",
+                         static_cast<unsigned long long>(h.Id));
+            }
+            else
+            {
+              GECKO_ERROR(app::platform_example::labels::Main,
+                          "Failed to open large window");
+            }
+            break;
+          }
+
+          case KeyCode::D3: {
+            desc.Title = "Gecko - Borderless";
+            desc.Size = {800, 600};
+            desc.Decorated = false;
+            desc.Mode = WindowMode::Windowed;
+
+            WindowHandle h = windows.CreateWindow(desc);
+            if (h.IsValid())
+            {
+              state->Spawned.push_back(h);
+              GECKO_INFO(
+                  app::platform_example::labels::Main,
+                  "Opened borderless window (id=%llu, 800x600, no decor)",
+                  static_cast<unsigned long long>(h.Id));
+            }
+            else
+            {
+              GECKO_ERROR(app::platform_example::labels::Main,
+                          "Failed to open borderless window");
+            }
+            break;
+          }
+
+          case KeyCode::D4: {
+            desc.Title = "Gecko - Fullscreen";
+            desc.Mode = WindowMode::BorderlessFullscreen;
+
+            WindowHandle h = windows.CreateWindow(desc);
+            if (h.IsValid())
+            {
+              state->Spawned.push_back(h);
+              GECKO_INFO(app::platform_example::labels::Main,
+                         "Opened borderless-fullscreen window (id=%llu)",
+                         static_cast<unsigned long long>(h.Id));
+            }
+            else
+            {
+              GECKO_ERROR(app::platform_example::labels::Main,
+                          "Failed to open fullscreen window");
+            }
+            break;
+          }
+
+          case KeyCode::W: {
+            if (state->Spawned.empty())
+            {
+              GECKO_INFO(app::platform_example::labels::Main,
+                         "No spawned windows to close");
+            }
+            else
+            {
+              WindowHandle last = state->Spawned.back();
+              GECKO_INFO(app::platform_example::labels::Main,
+                         "Closing last spawned window (id=%llu)",
+                         static_cast<unsigned long long>(last.Id));
+              windows.DestroyWindow(last);
+              state->Spawned.pop_back();
+            }
+            break;
+          }
+
+          case KeyCode::Escape:
+            state->Running = false;
+            break;
+
+          default:
+            break;
+          }
+        },
+        &appState);
+
+    // ── Other event logging ────────────────────────────────────────
     auto focusSub = gecko::SubscribeEvent(
         events::WindowFocusChanged,
         [](void* /*user*/, const gecko::EventMeta& /*meta*/,
@@ -236,8 +410,10 @@ int main()
         },
         nullptr);
 
+    // ── Main loop ──────────────────────────────────────────────────
     GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
-    while (running && ctx.Windows().IsWindowAlive(window) && frameCount < 600)
+    while (appState.Running && ctx.Windows().IsWindowAlive(window) &&
+           frameCount < 600)
     {
       GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "MainLoop");
 
@@ -257,7 +433,7 @@ int main()
       }
     }
 
-    if (running)
+    if (appState.Running)
     {
       // Headless/timeout fallback: request a clean shutdown.
       GECKO_INFO(app::platform_example::labels::Main,
@@ -265,7 +441,21 @@ int main()
       ctx.Windows().RequestClose(window);
     }
 
-    GECKO_INFO(app::platform_example::labels::Main, "Destroying window...");
+    // ── Cleanup — destroy all spawned windows, then main ───────────
+    for (auto& h : appState.Spawned)
+    {
+      if (ctx.Windows().IsWindowAlive(h))
+      {
+        GECKO_INFO(app::platform_example::labels::Main,
+                   "Destroying spawned window (id=%llu)",
+                   static_cast<unsigned long long>(h.Id));
+        ctx.Windows().DestroyWindow(h);
+      }
+    }
+    appState.Spawned.clear();
+
+    GECKO_INFO(app::platform_example::labels::Main,
+               "Destroying main window...");
     ctx.Windows().DestroyWindow(window);
 
     // Unregister sinks before shutting down services
