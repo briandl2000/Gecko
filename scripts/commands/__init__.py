@@ -7,7 +7,9 @@ _ARCH_MAP = {"AMD64": "x86_64", "ARM64": "aarch64"}
 _arch = _ARCH_MAP.get(platform.machine(), platform.machine())
 
 # Repo root derived from this file's location (scripts/commands/__init__.py)
-_REPO_ROOT = str(Path(__file__).resolve().parents[2])
+# Use absolute() not resolve() — resolve() converts mapped drives to UNC paths
+# which cmd.exe cannot use as working directories.
+_REPO_ROOT = str(Path(__file__).absolute().parents[2])
 
 PLATFORM_ID = f"{platform.system()}-{_arch}"
 BUILD_DIR = os.environ.get("GECKO_BUILD_DIR", os.path.join(_REPO_ROOT, "out", "build", PLATFORM_ID))
