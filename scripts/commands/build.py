@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 
-from scripts.commands import BUILD_DIR
+from scripts.commands import BUILD_DIR, _REPO_ROOT
 
 
 _CONFIGS = {
@@ -35,24 +35,31 @@ def _run(args) -> int:
         print("  Windows:     . .\\scripts\\setup.ps1")
         return 1
 
+    # Use a path relative to the repo root for cmake --build so that on Windows
+    # mapped drives, cmake/ninja don't resolve to UNC paths (which cmd.exe
+    # cannot use as a working directory).
+    build_dir_rel = os.path.relpath(BUILD_DIR, _REPO_ROOT)
+
     if args.config == "all":
-        # Build both configurations in parallel using multi-config generator
         result = subprocess.run(
-            ["cmake", "--build", BUILD_DIR, "--config", "Debug"],
+            ["cmake", "--build", build_dir_rel, "--config", "Debug"],
+            cwd=_REPO_ROOT,
             check=False,
         )
         if result.returncode != 0:
             return result.returncode
-        
+
         result = subprocess.run(
-            ["cmake", "--build", BUILD_DIR, "--config", "Release"],
+            ["cmake", "--build", build_dir_rel, "--config", "Release"],
+            cwd=_REPO_ROOT,
             check=False,
         )
         return result.returncode
     else:
         cmake_config = _CONFIGS[args.config]
         result = subprocess.run(
-            ["cmake", "--build", BUILD_DIR, "--config", cmake_config],
+            ["cmake", "--build", build_dir_rel, "--config", cmake_config],
+            cwd=_REPO_ROOT,
             check=False,
         )
         return result.returncode

@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.commands import BUILD_DIR, OUTPUT_DIR, is_network_path
+from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, is_network_path
 
 # Unit test targets (headless, always run)
 UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests"]
@@ -65,8 +65,10 @@ def _run(args) -> int:
         targets = list(UNIT_TARGETS)
 
     # Ensure tests are enabled in the build configuration
+    build_dir_rel = os.path.relpath(BUILD_DIR, _REPO_ROOT)
     enable_result = subprocess.run(
-        ["cmake", "-B", BUILD_DIR, "-DGECKO_BUILD_TESTS=ON"],
+        ["cmake", "-B", build_dir_rel, "-DGECKO_BUILD_TESTS=ON"],
+        cwd=_REPO_ROOT,
         check=False,
         capture_output=True,
     )
@@ -78,7 +80,8 @@ def _run(args) -> int:
     print(f"Building tests ({config})...")
     for target in targets:
         build_result = subprocess.run(
-            ["cmake", "--build", BUILD_DIR, "--config", config, "--target", target],
+            ["cmake", "--build", build_dir_rel, "--config", config, "--target", target],
+            cwd=_REPO_ROOT,
             check=False,
         )
         if build_result.returncode != 0:
