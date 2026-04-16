@@ -14,9 +14,12 @@ export -f gk
 # Point git to our hooks directory
 git -C "$REPO_ROOT" config core.hooksPath .githooks 2>/dev/null
 
+# Platform identifier for build/output directory separation
+export GECKO_PLATFORM_ID="$(uname -s)-$(uname -m)"
+
 # Configure CMake if not already done
-if [ ! -d "$REPO_ROOT/out/build" ]; then
-    echo "Configuring CMake..."
+if [ ! -d "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" ]; then
+    echo "Configuring CMake for $GECKO_PLATFORM_ID..."
     
     # Require Clang compiler
     if command -v clang &> /dev/null && command -v clang++ &> /dev/null; then
@@ -32,7 +35,10 @@ if [ ! -d "$REPO_ROOT/out/build" ]; then
         return 1
     fi
     
-    cmake -S "$REPO_ROOT" -B "$REPO_ROOT/out/build" -G "Ninja Multi-Config"
+    cmake -S "$REPO_ROOT" -B "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" \
+        -G "Ninja Multi-Config" \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+        -DGECKO_BUILD_TESTS=ON
 fi
 
 echo "Gecko dev environment ready. Commands: gk build, gk test, gk package"

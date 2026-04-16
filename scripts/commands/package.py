@@ -7,6 +7,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from scripts.commands import BUILD_DIR
+
 
 def register(subparsers) -> None:
     parser = subparsers.add_parser(
@@ -77,7 +79,7 @@ def _run(args) -> int:
     # Build
     print(f"Building ({config})...")
     build_result = subprocess.run(
-        ["cmake", "--build", "out/build", "--config", config],
+        ["cmake", "--build", BUILD_DIR, "--config", config],
         cwd=repo_root,
         check=False,
     )
@@ -87,7 +89,7 @@ def _run(args) -> int:
     # Install to package directory
     print(f"Creating package: {package_name}")
     install_result = subprocess.run(
-        ["cmake", "--install", "out/build", "--prefix", str(install_dir), "--config", config],
+        ["cmake", "--install", BUILD_DIR, "--prefix", str(install_dir), "--config", config],
         cwd=repo_root,
         check=False,
     )

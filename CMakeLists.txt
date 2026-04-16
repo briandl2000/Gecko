@@ -49,9 +49,21 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
 
-# All outputs go to out/ at project root
-# CMake internals stay in out/build/
-set(GECKO_OUT_DIR "${CMAKE_SOURCE_DIR}/out")
+# All outputs go to out/<PlatformID>/ at project root, separated by platform
+# CMake internals stay in out/build/<PlatformID>/
+# Normalize architecture names across platforms (AMD64 → x86_64, ARM64 → aarch64)
+set(_gecko_arch "${CMAKE_SYSTEM_PROCESSOR}")
+if(_gecko_arch STREQUAL "AMD64")
+  set(_gecko_arch "x86_64")
+elseif(_gecko_arch STREQUAL "ARM64")
+  set(_gecko_arch "aarch64")
+endif()
+set(GECKO_PLATFORM_ID "${CMAKE_SYSTEM_NAME}-${_gecko_arch}")
+if(GECKO_OUTPUT_DIR)
+  set(GECKO_OUT_DIR "${GECKO_OUTPUT_DIR}")
+else()
+  set(GECKO_OUT_DIR "${CMAKE_SOURCE_DIR}/out/${GECKO_PLATFORM_ID}")
+endif()
 foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
   string(TOUPPER ${cfg} CFGU)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CFGU} "${GECKO_OUT_DIR}/bin/${cfg}")
@@ -85,8 +97,10 @@ if (GECKO_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()
 
-# Always add test directory so targets exist, but they won't build unless requested
-add_subdirectory(test)
+# Test targets exist but are excluded from the default build.
+# 'gk build' builds only the engine and examples.
+# 'gk test' explicitly builds and runs test targets.
+add_subdirectory(test EXCLUDE_FROM_ALL)
 
 include(CMakePackageConfigHelpers)
 
