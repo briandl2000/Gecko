@@ -27,6 +27,10 @@
 #include <Windows.h>
 #include <windowsx.h>
 
+// Windows.h defines CreateWindow as a macro (CreateWindowA/W), which collides
+// with our IWindowsBackend::CreateWindow virtual method.
+#undef CreateWindow
+
 #pragma comment(lib, "Shcore.lib")
 #pragma comment(lib, "User32.lib")
 
@@ -244,7 +248,7 @@ Win32WindowsBackend::Win32WindowsBackend() noexcept
   wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
   wc.lpfnWndProc = WndProc;
   wc.hInstance = ::GetModuleHandleW(nullptr);
-  wc.hCursor = ::LoadCursorW(nullptr, IDC_ARROW);
+  wc.hCursor = ::LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
   wc.lpszClassName = kWndClassName;
   m_WndClass = ::RegisterClassExW(&wc);
 
