@@ -5,6 +5,14 @@
 
 #include <cstdlib>
 
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
+#include <X11/Xlib.h>
+#endif
+
+#if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
+#include <wayland-client.h>
+#endif
+
 namespace gecko::platform {
 
 namespace {
@@ -12,8 +20,25 @@ namespace {
 [[nodiscard]] bool IsXlibAvailable() noexcept
 {
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
-  const char* d = ::std::getenv("DISPLAY");
-  return d && d[0] != '\0';
+  // Try the DISPLAY env var first, then fall back to ":0" (covers SSH sessions
+  // where the desktop environment variables aren't inherited).
+  Display* dpy = ::XOpenDisplay(nullptr);
+  if (!dpy)
+  {
+    dpy = ::XOpenDisplay(":0");
+    if (dpy)
+    {
+      // Propagate to the process environment so all subsequent XOpenDisplay(NULL)
+      // calls in the backend code pick it up automatically.
+      ::setenv("DISPLAY", ":0", 0);
+    }
+  }
+  if (dpy)
+  {
+    ::XCloseDisplay(dpy);
+    return true;
+  }
+  return false;
 #else
   return false;
 #endif
@@ -22,8 +47,13 @@ namespace {
 [[nodiscard]] bool IsWaylandAvailable() noexcept
 {
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
-  const char* d = ::std::getenv("WAYLAND_DISPLAY");
-  return d && d[0] != '\0';
+  struct wl_display* dpy = ::wl_display_connect(nullptr);
+  if (dpy)
+  {
+    ::wl_display_disconnect(dpy);
+    return true;
+  }
+  return false;
 #else
   return false;
 #endif
