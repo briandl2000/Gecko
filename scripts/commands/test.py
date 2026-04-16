@@ -66,15 +66,24 @@ def _run(args) -> int:
 
     # Ensure tests are enabled in the build configuration
     build_dir_rel = os.path.relpath(BUILD_DIR, _REPO_ROOT)
-    enable_result = subprocess.run(
-        ["cmake", "-B", build_dir_rel, "-DGECKO_BUILD_TESTS=ON"],
-        cwd=_REPO_ROOT,
-        check=False,
-        capture_output=True,
-    )
-    if enable_result.returncode != 0:
-        print(enable_result.stderr.decode(), file=sys.stderr)
-        return enable_result.returncode
+    cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
+    tests_enabled = False
+    if os.path.isfile(cache_file):
+        with open(cache_file) as f:
+            for line in f:
+                if line.strip() == "GECKO_BUILD_TESTS:BOOL=ON":
+                    tests_enabled = True
+                    break
+
+    if not tests_enabled:
+        print("Enabling tests in build configuration...")
+        enable_result = subprocess.run(
+            ["cmake", "-B", build_dir_rel, "-DGECKO_BUILD_TESTS=ON"],
+            cwd=_REPO_ROOT,
+            check=False,
+        )
+        if enable_result.returncode != 0:
+            return enable_result.returncode
 
     # Build selected test targets
     print(f"Building tests ({config})...")
