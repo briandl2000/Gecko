@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
+from scripts.commands import BUILD_DIR, _REPO_ROOT
 
 
 def register(subparsers) -> None:
@@ -19,18 +19,20 @@ def register(subparsers) -> None:
 
 
 def _run(args) -> int:
-    repo_root = Path(__file__).resolve().parents[2]
-    build_dir = repo_root / "out" / "build"
-    
-    if args.clean and build_dir.exists():
+    import os
+    from pathlib import Path
+
+    repo_root = Path(_REPO_ROOT)
+
+    if args.clean and os.path.isdir(BUILD_DIR):
         import shutil
         print("Cleaning build directory...")
-        shutil.rmtree(repo_root / "out")
-    
+        shutil.rmtree(os.path.join(_REPO_ROOT, "out"))
+
     print("Configuring CMake...")
     result = subprocess.run(
         ["cmake", "--preset", "debug"],
-        cwd=repo_root,
+        cwd=_REPO_ROOT,
         check=False,
     )
     
@@ -39,7 +41,7 @@ def _run(args) -> int:
     if hooks_dir.is_dir():
         subprocess.run(
             ["git", "config", "core.hooksPath", ".githooks"],
-            cwd=repo_root,
+            cwd=_REPO_ROOT,
             check=False,
             capture_output=True,
         )

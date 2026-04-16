@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, is_network_path
+
 # Unit test targets (headless, always run)
 UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests"]
 
@@ -62,44 +64,83 @@ def _run(args) -> int:
         # Default: unit only
         targets = list(UNIT_TARGETS)
 
-    # Enable tests via cache variable (fast, no reconfigure)
-    enable_tests = subprocess.run(
-        ["cmake", "-B", "out/build", "-DGECKO_BUILD_TESTS=ON"],
-        check=False,
-        capture_output=True,
-    )
-    if enable_tests.returncode != 0:
-        print(enable_tests.stderr.decode(), file=sys.stderr)
-        return enable_tests.returncode
+    # Ensure tests are enabled in the build configuration
+    build_dir_rel = os.path.relpath(BUILD_DIR, _REPO_ROOT)
+    cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
+    tests_enabled = False
+    if os.path.isfile(cache_file):
+        with open(cache_file) as f:
+            for line in f:
+                if line.strip() == "GECKO_BUILD_TESTS:BOOL=ON":
+                    tests_enabled = True
+                    break
+
+    if not tests_enabled:
+        print("Enabling tests in build configuration...")
+        enable_result = subprocess.run(
+            ["cmake", "-B", build_dir_rel, "-DGECKO_BUILD_TESTS=ON"],
+            cwd=_REPO_ROOT,
+            check=False,
+        )
+        if enable_result.returncode != 0:
+            return enable_result.returncode
 
     # Build selected test targets
     print(f"Building tests ({config})...")
     for target in targets:
         build_result = subprocess.run(
-            ["cmake", "--build", "out/build", "--config", config, "--target", target],
+            ["cmake", "--build", build_dir_rel, "--config", config, "--target", target],
+            cwd=_REPO_ROOT,
             check=False,
         )
         if build_result.returncode != 0:
             return build_result.returncode
 
     if args.build_only:
-        print(f"\nTests built successfully in out/bin/{config}/tests/")
+        print(f"\nTests built successfully in {OUTPUT_DIR}/bin/{config}/tests/")
         return 0
 
     # Run tests directly (Catch2 handles test discovery and reporting)
     print(f"\nRunning tests...")
     exe_suffix = ".exe" if os.name == "nt" else ""
     overall_result = 0
-    for test_target in targets:
-        test_executable = Path(f"out/bin/{config}/tests/{test_target}{exe_suffix}")
-        if not test_executable.exists():
-            print(f"  Warning: {test_executable} not found, skipping")
-            continue
-        test_result = subprocess.run(
-            [str(test_executable)],
-            check=False,
-        )
-        if test_result.returncode != 0:
-            overall_result = test_result.returncode
+
+    # On Windows network shares, SmartScreen blocks unsigned executables in
+    # non-interactive mode. Copy to a local temp dir so they run without prompts.
+    # On local drives this is skipped — executables run directly.
+    use_temp_copy = is_network_path(os.path.abspath(OUTPUT_DIR))
+
+    if use_temp_copy:
+        import shutil
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="gecko_tests_") as tmpdir:
+            # Copy all DLLs from the output bin dir so tests can find them
+            bin_dir = Path(f"{OUTPUT_DIR}/bin/{config}")
+            for dll in bin_dir.glob("*.dll"):
+                shutil.copy2(dll, Path(tmpdir) / dll.name)
+
+            for test_target in targets:
+                test_executable = Path(f"{OUTPUT_DIR}/bin/{config}/tests/{test_target}{exe_suffix}")
+                if not test_executable.exists():
+                    print(f"  Warning: {test_executable} not found, skipping")
+                    continue
+                local_exe = Path(tmpdir) / test_executable.name
+                shutil.copy2(test_executable, local_exe)
+                print(f"\n--- {test_target} ---")
+                test_result = subprocess.run([str(local_exe)], check=False)
+                if test_result.returncode != 0:
+                    print(f"  {test_target} exited with code {test_result.returncode}")
+                    overall_result = test_result.returncode
+    else:
+        for test_target in targets:
+            test_executable = Path(f"{OUTPUT_DIR}/bin/{config}/tests/{test_target}{exe_suffix}")
+            if not test_executable.exists():
+                print(f"  Warning: {test_executable} not found, skipping")
+                continue
+            print(f"\n--- {test_target} ---")
+            test_result = subprocess.run([str(test_executable)], check=False)
+            if test_result.returncode != 0:
+                overall_result = test_result.returncode
 
     return overall_result

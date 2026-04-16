@@ -7,7 +7,7 @@
       "name": "base",
       "hidden": true,
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/out/build",
+      "binaryDir": "${sourceDir}/out/build/$penv{GECKO_PLATFORM_ID}",
       "cacheVariables": {
         "CMAKE_EXPORT_COMPILE_COMMANDS": true
       }

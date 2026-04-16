@@ -7,6 +7,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from scripts.commands import BUILD_DIR, _REPO_ROOT
+
 
 def register(subparsers) -> None:
     parser = subparsers.add_parser(
@@ -47,7 +49,7 @@ def _get_version(repo_root: Path) -> tuple[str, str]:
 
 
 def _run(args) -> int:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(_REPO_ROOT)
     config = "Release" if args.config == "release" else "Debug"
     
     version, prerelease = _get_version(repo_root)
@@ -76,8 +78,9 @@ def _run(args) -> int:
     
     # Build
     print(f"Building ({config})...")
+    build_dir_rel = os.path.relpath(BUILD_DIR, _REPO_ROOT)
     build_result = subprocess.run(
-        ["cmake", "--build", "out/build", "--config", config],
+        ["cmake", "--build", build_dir_rel, "--config", config],
         cwd=repo_root,
         check=False,
     )
@@ -87,7 +90,7 @@ def _run(args) -> int:
     # Install to package directory
     print(f"Creating package: {package_name}")
     install_result = subprocess.run(
-        ["cmake", "--install", "out/build", "--prefix", str(install_dir), "--config", config],
+        ["cmake", "--install", build_dir_rel, "--prefix", str(install_dir), "--config", config],
         cwd=repo_root,
         check=False,
     )
