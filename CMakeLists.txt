@@ -97,9 +97,8 @@ if (GECKO_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()
 
-# Test targets exist but are excluded from the default build.
-# 'gk build' builds only the engine and examples.
-# 'gk test' explicitly builds and runs test targets.
+# Test targets require GECKO_BUILD_TESTS=ON (set by setup scripts and gk test).
+# EXCLUDE_FROM_ALL keeps them out of the default 'gk build' target.
 add_subdirectory(test EXCLUDE_FROM_ALL)
 
 include(CMakePackageConfigHelpers)

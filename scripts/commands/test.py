@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.commands import BUILD_DIR, OUTPUT_DIR, PLATFORM_ID, is_network_path
+from scripts.commands import BUILD_DIR, OUTPUT_DIR, is_network_path
 
 # Unit test targets (headless, always run)
 UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests"]
@@ -63,6 +63,16 @@ def _run(args) -> int:
     else:
         # Default: unit only
         targets = list(UNIT_TARGETS)
+
+    # Ensure tests are enabled in the build configuration
+    enable_result = subprocess.run(
+        ["cmake", "-B", BUILD_DIR, "-DGECKO_BUILD_TESTS=ON"],
+        check=False,
+        capture_output=True,
+    )
+    if enable_result.returncode != 0:
+        print(enable_result.stderr.decode(), file=sys.stderr)
+        return enable_result.returncode
 
     # Build selected test targets
     print(f"Building tests ({config})...")
