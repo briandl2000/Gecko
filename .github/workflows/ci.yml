@@ -25,10 +25,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang \
-            libx11-dev libxext-dev libxrandr-dev \
-            libwayland-dev wayland-protocols libwayland-cursor0 \
-            libxkbcommon-dev
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -45,8 +42,20 @@ jobs:
         with:
           python-version: '3.x'
       
+      - name: Set platform ID
+        id: platform
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            echo "id=Windows-x86_64" >> $GITHUB_OUTPUT
+          else
+            echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
+          fi
+
       - name: Configure
         shell: bash
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
           if [ "${{ runner.os }}" = "Windows" ]; then
             export CC=clang-cl
@@ -55,36 +64,46 @@ jobs:
             export CC=clang
             export CXX=clang++
           fi
-          cmake -S . -B out/build -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
       
       - name: Build
-        run: cmake --build out/build --config Release
+        shell: bash
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
       
+      - name: Build tests
+        shell: bash
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          for target in core_tests platform_tests runtime_tests math_tests; do
+            cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
+          done
+
       - name: Run tests
         shell: bash
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
-          EXT=""
-          if [ "${{ runner.os }}" = "Windows" ]; then EXT=".exe"; fi
-          TEST_DIR="./out/bin/Release/tests"
-          FAILED=0
-          for TEST in core_tests math_tests platform_tests runtime_tests; do
-            BINARY="${TEST_DIR}/${TEST}${EXT}"
-            if [ -f "$BINARY" ]; then
-              echo "=== Running ${TEST} ==="
-              "$BINARY" || FAILED=1
+          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
+          bin_dir="./out/$GECKO_PLATFORM_ID/bin/Release"
+          exe_suffix=""
+          [ "${{ runner.os }}" = "Windows" ] && exe_suffix=".exe"
+          # Add shared library dir to PATH so tests find CoreServices.dll (Windows)
+          export PATH="$(cd "$bin_dir" && pwd):$PATH"
+          failed=0
+          for test in core_tests platform_tests runtime_tests math_tests; do
+            exe="$test_dir/${test}${exe_suffix}"
+            if [ -f "$exe" ]; then
+              echo "--- $test ---"
+              "$exe" || failed=1
             else
-              echo "Warning: ${BINARY} not found, skipping"
+              echo "Test executable not found: $exe"
+              failed=1
             fi
           done
-          # Feature tests require a live display; run but allow skip
-          for TEST in platform_feature_tests; do
-            BINARY="${TEST_DIR}/${TEST}${EXT}"
-            if [ -f "$BINARY" ]; then
-              echo "=== Running ${TEST} ==="
-              "$BINARY" || FAILED=1
-            fi
-          done
-          if [ $FAILED -ne 0 ]; then exit 1; fi
+          exit $failed
 
   # =============================================================================
   # PR checks - enforce version bump and changelog for PRs to main
@@ -210,10 +229,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang \
-            libx11-dev libxext-dev libxrandr-dev \
-            libwayland-dev wayland-protocols libwayland-cursor0 \
-            libxkbcommon-dev zip
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -223,8 +239,20 @@ jobs:
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
       
+      - name: Set platform ID
+        id: platform
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            echo "id=Windows-x86_64" >> $GITHUB_OUTPUT
+          else
+            echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
+          fi
+
       - name: Configure
         shell: bash
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
           if [ "${{ runner.os }}" = "Windows" ]; then
             export CC=clang-cl
@@ -233,13 +261,19 @@ jobs:
             export CC=clang
             export CXX=clang++
           fi
-          cmake -S . -B out/build -G "Ninja Multi-Config"
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
       
       - name: Build Release
-        run: cmake --build out/build --config Release
+        shell: bash
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
       
       - name: Install to package directory
-        run: cmake --install out/build --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
+        shell: bash
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --install out/build/$GECKO_PLATFORM_ID --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
       
       - name: Create zip (Linux)
         if: runner.os == 'Linux'

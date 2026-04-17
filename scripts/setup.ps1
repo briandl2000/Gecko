@@ -101,40 +101,63 @@ function global:gk {
     python "$global:GeckoRepoRoot/scripts/cli.py" $args
 }
 
-# Configure CMake if not already done
-if (-not (Test-Path "$script:RepoRoot/out/build")) {
-    Write-Host "Configuring CMake..."
+# Platform identifier for build/output directory separation
+# Normalize architecture names to match Linux conventions
+$arch = switch ($env:PROCESSOR_ARCHITECTURE) {
+    "AMD64" { "x86_64" }
+    "ARM64" { "aarch64" }
+    default { $env:PROCESSOR_ARCHITECTURE }
+}
+$env:GECKO_PLATFORM_ID = "Windows-$arch"
+
+# Clear stale env vars from previous setups
+Remove-Item Env:\GECKO_BUILD_DIR -ErrorAction SilentlyContinue
+Remove-Item Env:\GECKO_OUTPUT_DIR -ErrorAction SilentlyContinue
+
+# Build and output directories live in the project folder
+$buildDir = "$script:RepoRoot\out\build\$env:GECKO_PLATFORM_ID"
+
+# Find and configure compiler
+$clangPath = Find-ClangCl
+
+if ($clangPath) {
+    Write-Host "Using Clang compiler: $clangPath" -ForegroundColor Green
     
-    $clangPath = Find-ClangCl
-    
-    if ($clangPath) {
-        Write-Host "Using Clang compiler: $clangPath" -ForegroundColor Green
-        
-        # Add to PATH if not already there
-        $clangDir = Split-Path $clangPath
-        if ($env:PATH -notlike "*$clangDir*") {
-            $env:PATH = "$clangDir;$env:PATH"
-        }
-        
-        $env:CC = "clang-cl"
-        $env:CXX = "clang-cl"
-    } else {
-        Write-Host ""
-        Write-Host "ERROR: Clang compiler (clang-cl) not found!" -ForegroundColor Red
-        Write-Host ""
-        Write-Host "Gecko requires the Clang compiler. To install via Visual Studio:" -ForegroundColor Yellow
-        Write-Host ""
-        Write-Host "  1. Open 'Visual Studio Installer'" -ForegroundColor White
-        Write-Host "  2. Click 'Modify' on your Build Tools or VS installation" -ForegroundColor White
-        Write-Host "  3. Go to 'Individual Components' tab" -ForegroundColor White
-        Write-Host "  4. Search for 'C++ Clang Compiler' and check it" -ForegroundColor White
-        Write-Host "  5. Click 'Modify' to install" -ForegroundColor White
-        Write-Host ""
-        Write-Host "After installing, run this script again." -ForegroundColor Cyan
-        return
+    # Add to PATH if not already there
+    $clangDir = Split-Path $clangPath
+    if ($env:PATH -notlike "*$clangDir*") {
+        $env:PATH = "$clangDir;$env:PATH"
     }
     
-    cmake -S "$script:RepoRoot" -B "$script:RepoRoot/out/build" -G "Ninja Multi-Config"
+    $env:CC = "clang-cl"
+    $env:CXX = "clang-cl"
+} else {
+    Write-Host ""
+    Write-Host "ERROR: Clang compiler (clang-cl) not found!" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Gecko requires the Clang compiler. To install via Visual Studio:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  1. Open 'Visual Studio Installer'" -ForegroundColor White
+    Write-Host "  2. Click 'Modify' on your Build Tools or VS installation" -ForegroundColor White
+    Write-Host "  3. Go to 'Individual Components' tab" -ForegroundColor White
+    Write-Host "  4. Search for 'C++ Clang Compiler' and check it" -ForegroundColor White
+    Write-Host "  5. Click 'Modify' to install" -ForegroundColor White
+    Write-Host ""
+    Write-Host "After installing, run this script again." -ForegroundColor Cyan
+    return
 }
 
-Write-Host "Gecko dev environment ready. Commands: gk build, gk test, gk package"
+# Configure CMake if not already done
+if (-not (Test-Path "$buildDir\CMakeCache.txt")) {
+    Write-Host "Configuring CMake for $env:GECKO_PLATFORM_ID..."
+    Write-Host "Build directory: $buildDir" -ForegroundColor Cyan
+    
+    cmake -S "$script:RepoRoot" -B "$buildDir" `
+        -G "Ninja Multi-Config" `
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
+        -DGECKO_BUILD_TESTS=ON
+}
+
+Write-Host "Gecko dev environment ready ($env:GECKO_PLATFORM_ID). Commands: gk build, gk test, gk package"
+Write-Host "Build dir:  $buildDir" -ForegroundColor DarkGray
+Write-Host "Output dir: $script:RepoRoot\out\$env:GECKO_PLATFORM_ID" -ForegroundColor DarkGray

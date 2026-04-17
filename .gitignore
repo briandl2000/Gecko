@@ -12,6 +12,9 @@ compile_commands.json
 *.swo
 *~
 
+# Local dev scripts
+scripts/copy_debug.py
+
 # OS
 .DS_Store
 Thumbs.db
