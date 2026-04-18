@@ -219,7 +219,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   int eventCount = 0;
   while (::XPending(m_Display) > 0)
   {
-    XEvent event;
+    ::XEvent event;
     ::XNextEvent(m_Display, &event);
     eventCount++;
 
@@ -903,7 +903,7 @@ void X11WindowsBackend::SendNetWmStateMessage(::Window root, ::Window w,
   if (!m_Display || root == 0 || w == 0 || m_NetWmState == 0 || state1 == 0)
     return;
 
-  XEvent ev {};
+  ::XEvent ev {};
   ev.xclient.type = ClientMessage;
   ev.xclient.serial = 0;
   ev.xclient.send_event = True;

@@ -75,7 +75,7 @@ private:
   struct Win32WindowEntry
   {
     WindowDesc Desc {};
-    HWND Hwnd {nullptr};
+    ::HWND Hwnd {nullptr};
     Extent2D ClientSize {};
     math::Int2 Position {};
     platform::WindowState State {platform::WindowState::Normal};
@@ -90,9 +90,9 @@ private:
     bool Alive {true};
     ::std::string TitleStorage;
     // Saved style/position for fullscreen restoration.
-    DWORD SavedStyle {0};
-    DWORD SavedExStyle {0};
-    RECT SavedRect {};
+    ::DWORD SavedStyle {0};
+    ::DWORD SavedExStyle {0};
+    ::RECT SavedRect {};
   };
 
   struct StagedEvent
@@ -122,22 +122,22 @@ private:
 
   Win32WindowEntry* FindEntry(WindowHandle window) noexcept;
   const Win32WindowEntry* FindEntry(WindowHandle window) const noexcept;
-  Win32WindowEntry* FindByHwnd(HWND hwnd) noexcept;
-  WindowHandle HandleFromHwnd(HWND hwnd) const noexcept;
+  Win32WindowEntry* FindByHwnd(::HWND hwnd) noexcept;
+  WindowHandle HandleFromHwnd(::HWND hwnd) const noexcept;
 
   void StageEvent(const StagedEvent& ev) noexcept;
   void FlushStagedEvents() noexcept;
-  static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam,
-                                  LPARAM lParam);
+  static ::LRESULT CALLBACK WndProc(::HWND hwnd, ::UINT msg, ::WPARAM wParam,
+                                    ::LPARAM lParam);
 
-  void ApplyDecorations(HWND hwnd, bool decorated, bool resizable) noexcept;
-  DWORD MakeStyle(const WindowDesc& desc) const noexcept;
+  void ApplyDecorations(::HWND hwnd, bool decorated, bool resizable) noexcept;
+  ::DWORD MakeStyle(const WindowDesc& desc) const noexcept;
 
   static constexpr UINT_PTR kModalTimerId {1};
-  static constexpr UINT kModalTimerIntervalMs {16};
+  static constexpr ::UINT kModalTimerIntervalMs {16};
 
   u64 m_NextId {0};
-  ATOM m_WndClass {0};
+  ::ATOM m_WndClass {0};
   ::std::unordered_map<u64, Win32WindowEntry> m_Windows;
   ::std::vector<StagedEvent> m_Staged;
 

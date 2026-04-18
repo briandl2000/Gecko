@@ -15,7 +15,7 @@ struct WaylandMonitorEntry
 {
   MonitorHandle Handle {};
   MonitorInfo Info {};
-  wl_output* Output {nullptr};
+  ::wl_output* Output {nullptr};
   u32 GlobalName {0};
   bool Done {false};
   bool Announced {false};
@@ -23,7 +23,7 @@ struct WaylandMonitorEntry
   // Snapshot of last-emitted state for reconfigured detection.
   MonitorInfo LastInfo {};
 
-  // Pending state accumulated from wl_output events before "done".
+  // Pending state accumulated from ::wl_output events before "done".
   i32 PendingX {0};
   i32 PendingY {0};
   i32 PendingPhysicalW {0};
@@ -51,22 +51,23 @@ public:
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
 
 private:
-  void HandleGlobal(wl_registry* registry, u32 name,
+  void HandleGlobal(::wl_registry* registry, u32 name,
                     const char* interface) noexcept;
   void HandleGlobalRemove(u32 name) noexcept;
   void EmitChanges(const gecko::EventEmitter& emitter) noexcept;
 
-  static void RegistryGlobal(void* data, wl_registry* registry, u32 name,
+  static void RegistryGlobal(void* data, ::wl_registry* registry, u32 name,
                              const char* interface, u32 version);
-  static void RegistryGlobalRemove(void* data, wl_registry* registry, u32 name);
+  static void RegistryGlobalRemove(void* data, ::wl_registry* registry,
+                                   u32 name);
 
   static constexpr wl_registry_listener s_RegistryListener = {
       RegistryGlobal,
       RegistryGlobalRemove,
   };
 
-  wl_display* m_Display {nullptr};
-  wl_registry* m_Registry {nullptr};
+  ::wl_display* m_Display {nullptr};
+  ::wl_registry* m_Registry {nullptr};
   ::std::list<WaylandMonitorEntry> m_Monitors;
   ::std::vector<MonitorHandle> m_RemovedHandles;
   bool m_Dirty {false};

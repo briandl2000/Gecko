@@ -18,7 +18,7 @@ struct MonitorEntry
 {
   MonitorHandle Handle {};
   MonitorInfo Info {};
-  RROutput OutputId {0};
+  ::RROutput OutputId {0};
 };
 
 class X11MonitorsBackend final : public IMonitorsBackend
@@ -39,7 +39,7 @@ public:
 private:
   void HandleScreenChange(const gecko::EventEmitter& emitter) noexcept;
 
-  Display* m_Display {nullptr};
+  ::Display* m_Display {nullptr};
   int m_RREventBase {-1};
   ::std::vector<MonitorEntry> m_Monitors;
 };

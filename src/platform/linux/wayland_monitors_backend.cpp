@@ -19,7 +19,7 @@
 namespace gecko::platform {
 
 namespace {
-static void OutputGeometry(void* data, wl_output* /*output*/, i32 x, i32 y,
+static void OutputGeometry(void* data, ::wl_output* /*output*/, i32 x, i32 y,
                            i32 physW, i32 physH, i32 /*subpixel*/,
                            const char* make, const char* model,
                            i32 /*transform*/)
@@ -41,8 +41,8 @@ static void OutputGeometry(void* data, wl_output* /*output*/, i32 x, i32 y,
   ::std::strncpy(entry->PendingName, name, sizeof(entry->PendingName) - 1);
 }
 
-static void OutputMode(void* data, wl_output* /*output*/, u32 flags, i32 width,
-                       i32 height, i32 refresh)
+static void OutputMode(void* data, ::wl_output* /*output*/, u32 flags,
+                       i32 width, i32 height, i32 refresh)
 {
   if (!(flags & WL_OUTPUT_MODE_CURRENT))
     return;
@@ -52,7 +52,7 @@ static void OutputMode(void* data, wl_output* /*output*/, u32 flags, i32 width,
   entry->PendingRefreshMHz = static_cast<u32>(refresh);
 }
 
-static void OutputDone(void* data, wl_output* /*output*/)
+static void OutputDone(void* data, ::wl_output* /*output*/)
 {
   auto* entry = static_cast<WaylandMonitorEntry*>(data);
   entry->Done = true;
@@ -78,26 +78,26 @@ static void OutputDone(void* data, wl_output* /*output*/)
   }
 }
 
-static void OutputScale(void* data, wl_output* /*output*/, i32 factor)
+static void OutputScale(void* data, ::wl_output* /*output*/, i32 factor)
 {
   auto* entry = static_cast<WaylandMonitorEntry*>(data);
   entry->PendingScale = factor;
 }
 
-static void OutputName(void* data, wl_output* /*output*/, const char* name)
+static void OutputName(void* data, ::wl_output* /*output*/, const char* name)
 {
   auto* entry = static_cast<WaylandMonitorEntry*>(data);
   if (name)
     ::std::strncpy(entry->PendingName, name, MaxMonitorNameLength - 1);
 }
 
-static void OutputDescription(void* /*data*/, wl_output* /*output*/,
+static void OutputDescription(void* /*data*/, ::wl_output* /*output*/,
                               const char* /*description*/)
 {
   // Not used — we prefer the short name.
 }
 
-static constexpr wl_output_listener OutputListener = {
+static constexpr ::wl_output_listener OutputListener = {
     OutputGeometry, OutputMode, OutputDone,
     OutputScale,    OutputName, OutputDescription,
 };
@@ -146,7 +146,7 @@ void WaylandMonitorsBackend::EnumerateMonitors() noexcept
   if (!m_Display)
     return;
 
-  // Second roundtrip to ensure all wl_output events (including done) arrive
+  // Second roundtrip to ensure all ::wl_output events (including done) arrive
   ::wl_display_roundtrip(m_Display);
 
   // Mark first monitor as primary (Wayland has no primary concept)
@@ -222,13 +222,13 @@ void WaylandMonitorsBackend::PumpEvents(
   }
 }
 
-void WaylandMonitorsBackend::HandleGlobal(wl_registry* registry, u32 name,
+void WaylandMonitorsBackend::HandleGlobal(::wl_registry* registry, u32 name,
                                           const char* interface) noexcept
 {
   if (::std::strcmp(interface, wl_output_interface.name) != 0)
     return;
 
-  auto* output = static_cast<wl_output*>(
+  auto* output = static_cast<::wl_output*>(
       ::wl_registry_bind(registry, name, &wl_output_interface, 4));
   if (!output)
     return;
@@ -300,7 +300,7 @@ void WaylandMonitorsBackend::EmitChanges(
   }
 }
 
-void WaylandMonitorsBackend::RegistryGlobal(void* data, wl_registry* registry,
+void WaylandMonitorsBackend::RegistryGlobal(void* data, ::wl_registry* registry,
                                             u32 name, const char* interface,
                                             u32 /*version*/)
 {
@@ -309,7 +309,7 @@ void WaylandMonitorsBackend::RegistryGlobal(void* data, wl_registry* registry,
 }
 
 void WaylandMonitorsBackend::RegistryGlobalRemove(void* data,
-                                                  wl_registry* /*registry*/,
+                                                  ::wl_registry* /*registry*/,
                                                   u32 name)
 {
   auto* self = static_cast<WaylandMonitorsBackend*>(data);

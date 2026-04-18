@@ -22,7 +22,7 @@ namespace {
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
   // Try the DISPLAY env var first, then fall back to ":0" (covers SSH sessions
   // where the desktop environment variables aren't inherited).
-  Display* dpy = ::XOpenDisplay(nullptr);
+  ::Display* dpy = ::XOpenDisplay(nullptr);
   if (!dpy)
   {
     dpy = ::XOpenDisplay(":0");
@@ -50,7 +50,7 @@ namespace {
 [[nodiscard]] bool IsWaylandAvailable() noexcept
 {
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
-  struct wl_display* dpy = ::wl_display_connect(nullptr);
+  struct ::wl_display* dpy = ::wl_display_connect(nullptr);
   if (dpy)
   {
     ::wl_display_disconnect(dpy);

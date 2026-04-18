@@ -19,7 +19,7 @@ struct MonitorEntry
 {
   MonitorHandle Handle {};
   MonitorInfo Info {};
-  HMONITOR HMonitor {nullptr};
+  ::HMONITOR HMonitor {nullptr};
 };
 
 class Win32MonitorsBackend final : public IMonitorsBackend
@@ -38,8 +38,8 @@ public:
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
 
 private:
-  static BOOL CALLBACK EnumProc(HMONITOR hMonitor, HDC hdc, LPRECT lpRect,
-                                LPARAM lParam) noexcept;
+  static ::BOOL CALLBACK EnumProc(::HMONITOR hMonitor, ::HDC hdc, LPRECT lpRect,
+                                  ::LPARAM lParam) noexcept;
 
   ::std::vector<MonitorEntry> m_Monitors;
 };

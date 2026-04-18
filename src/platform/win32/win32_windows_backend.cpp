@@ -24,7 +24,7 @@ namespace {
 // KeyCode values match Win32 Virtual-Key codes, so mapping is identity
 // for all defined codes. Unknown VK codes map to KeyCode::Unknown.
 
-KeyCode VkToKeyCode(WPARAM vk) noexcept
+KeyCode VkToKeyCode(::WPARAM vk) noexcept
 {
   const auto code = static_cast<u16>(vk);
   // Verify the code falls within a recognised range.
@@ -93,7 +93,7 @@ KeyCode VkToKeyCode(WPARAM vk) noexcept
   }
 }
 
-MouseButton WmButtonToMouseButton(UINT msg) noexcept
+MouseButton WmButtonToMouseButton(::UINT msg) noexcept
 {
   switch (msg)
   {
@@ -126,7 +126,7 @@ Win32WindowsBackend::Win32WindowsBackend() noexcept
 {
   s_Instance = this;
 
-  WNDCLASSEXW wc {};
+  ::WNDCLASSEXW wc {};
   wc.cbSize = sizeof(wc);
   wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
   wc.lpfnWndProc = WndProc;
@@ -156,9 +156,9 @@ Win32WindowsBackend::~Win32WindowsBackend() noexcept
 
 // ── Window management ──────────────────────────────────────────────────
 
-DWORD Win32WindowsBackend::MakeStyle(const WindowDesc& desc) const noexcept
+::DWORD Win32WindowsBackend::MakeStyle(const WindowDesc& desc) const noexcept
 {
-  DWORD style = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+  ::DWORD style = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
   if (desc.Mode == WindowMode::Fullscreen ||
       desc.Mode == WindowMode::BorderlessFullscreen)
@@ -184,10 +184,10 @@ DWORD Win32WindowsBackend::MakeStyle(const WindowDesc& desc) const noexcept
   return style;
 }
 
-void Win32WindowsBackend::ApplyDecorations(HWND hwnd, bool decorated,
+void Win32WindowsBackend::ApplyDecorations(::HWND hwnd, bool decorated,
                                            bool resizable) noexcept
 {
-  DWORD style = static_cast<DWORD>(::GetWindowLongPtrW(hwnd, GWL_STYLE));
+  ::DWORD style = static_cast<::DWORD>(::GetWindowLongPtrW(hwnd, GWL_STYLE));
 
   if (decorated)
   {
@@ -211,11 +211,11 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 {
   GECKO_FUNC(labels::General);
 
-  const DWORD style = MakeStyle(desc);
-  const DWORD exStyle = WS_EX_APPWINDOW;
+  const ::DWORD style = MakeStyle(desc);
+  const ::DWORD exStyle = WS_EX_APPWINDOW;
 
   // Adjust from client size to window size
-  RECT rect {};
+  ::RECT rect {};
   rect.right = desc.Size.X;
   rect.bottom = desc.Size.Y;
   ::AdjustWindowRectEx(&rect, style, FALSE, exStyle);
@@ -228,7 +228,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   ::std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));
   ::MultiByteToWideChar(CP_UTF8, 0, desc.Title, -1, wTitle.data(), titleLen);
 
-  HWND hwnd =
+  ::HWND hwnd =
       ::CreateWindowExW(exStyle, kWndClassName, wTitle.data(), style,
                         CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,
                         nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
@@ -256,7 +256,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   entry.TitleStorage = desc.Title ? desc.Title : "";
 
   // Query actual position
-  RECT winRect;
+  ::RECT winRect;
   if (::GetWindowRect(hwnd, &winRect))
     entry.Position = {static_cast<i32>(winRect.left),
                       static_cast<i32>(winRect.top)};
@@ -337,13 +337,14 @@ void Win32WindowsBackend::SetClientSize(WindowHandle window,
 
   entry->ClientSize = size;
 
-  DWORD style = static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
-  DWORD exStyle =
-      static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
+  ::DWORD style =
+      static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
+  ::DWORD exStyle =
+      static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
 
-  RECT rect {};
-  rect.right = static_cast<LONG>(size.Width);
-  rect.bottom = static_cast<LONG>(size.Height);
+  ::RECT rect {};
+  rect.right = static_cast<::LONG>(size.Width);
+  rect.bottom = static_cast<::LONG>(size.Height);
   ::AdjustWindowRectEx(&rect, style, FALSE, exStyle);
 
   ::SetWindowPos(entry->Hwnd, nullptr, 0, 0, rect.right - rect.left,
@@ -400,9 +401,9 @@ DpiInfo Win32WindowsBackend::GetDpi(WindowHandle window) const noexcept
   if (!entry || !entry->Hwnd)
     return DpiInfo {};
 
-  HMONITOR hMon = ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
-  UINT dpiX = 96;
-  UINT dpiY = 96;
+  ::HMONITOR hMon = ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
+  ::UINT dpiX = 96;
+  ::UINT dpiY = 96;
   if (SUCCEEDED(::GetDpiForMonitor(hMon, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)))
     return DpiInfo {static_cast<u32>(dpiX), static_cast<float>(dpiX) / 96.0F};
   return DpiInfo {};
@@ -533,13 +534,14 @@ void Win32WindowsBackend::SetWindowMode(WindowHandle window,
   {
     // Save current style and position for restoration.
     entry->SavedStyle =
-        static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
+        static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
     entry->SavedExStyle =
-        static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
+        static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
     ::GetWindowRect(entry->Hwnd, &entry->SavedRect);
 
     // Go borderless fullscreen on the current monitor.
-    HMONITOR hMon = ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
+    ::HMONITOR hMon =
+        ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
     MONITORINFO mi {};
     mi.cbSize = sizeof(mi);
     ::GetMonitorInfoW(hMon, &mi);
@@ -699,14 +701,14 @@ void Win32WindowsBackend::SetCursorMode(WindowHandle window,
 
   if (mode == CursorMode::Locked)
   {
-    RECT clipRect;
+    ::RECT clipRect;
     if (::GetClientRect(entry->Hwnd, &clipRect))
     {
-      POINT topLeft {clipRect.left, clipRect.top};
-      POINT bottomRight {clipRect.right, clipRect.bottom};
+      ::POINT topLeft {clipRect.left, clipRect.top};
+      ::POINT bottomRight {clipRect.right, clipRect.bottom};
       ::ClientToScreen(entry->Hwnd, &topLeft);
       ::ClientToScreen(entry->Hwnd, &bottomRight);
-      RECT screenRect {topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
+      ::RECT screenRect {topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
       ::ClipCursor(&screenRect);
     }
   }
@@ -728,7 +730,7 @@ void Win32WindowsBackend::PumpEvents(
 {
   m_CurrentEmitter = &emitter;
 
-  MSG msg;
+  ::MSG msg;
   while (::PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
   {
     ::TranslateMessage(&msg);
@@ -741,8 +743,9 @@ void Win32WindowsBackend::PumpEvents(
 
 // ── WndProc ────────────────────────────────────────────────────────────
 
-LRESULT CALLBACK Win32WindowsBackend::WndProc(HWND hwnd, UINT msg,
-                                              WPARAM wParam, LPARAM lParam)
+::LRESULT CALLBACK Win32WindowsBackend::WndProc(::HWND hwnd, ::UINT msg,
+                                                ::WPARAM wParam,
+                                                ::LPARAM lParam)
 {
   if (!s_Instance)
     return ::DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -975,7 +978,7 @@ LRESULT CALLBACK Win32WindowsBackend::WndProc(HWND hwnd, UINT msg,
     const float scale = static_cast<float>(dpi) / 96.0F;
 
     // Resize to suggested rect
-    const RECT* suggested = reinterpret_cast<const RECT*>(lParam);
+    const ::RECT* suggested = reinterpret_cast<const ::RECT*>(lParam);
     ::SetWindowPos(entry->Hwnd, nullptr, suggested->left, suggested->top,
                    suggested->right - suggested->left,
                    suggested->bottom - suggested->top,
@@ -1040,7 +1043,7 @@ const Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
 }
 
 Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindByHwnd(
-    HWND hwnd) noexcept
+    ::HWND hwnd) noexcept
 {
   const u64 id = static_cast<u64>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   if (id == 0)
@@ -1049,7 +1052,7 @@ Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindByHwnd(
   return (it != m_Windows.end()) ? &it->second : nullptr;
 }
 
-WindowHandle Win32WindowsBackend::HandleFromHwnd(HWND hwnd) const noexcept
+WindowHandle Win32WindowsBackend::HandleFromHwnd(::HWND hwnd) const noexcept
 {
   const u64 id = static_cast<u64>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   return WindowHandle {id};

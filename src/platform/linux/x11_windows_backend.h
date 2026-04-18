@@ -141,7 +141,7 @@ private:
                              Atom state1) noexcept;
   u64 FindWindowId(::Window xid) const noexcept;
 
-  Display* m_Display {nullptr};
+  ::Display* m_Display {nullptr};
   Atom m_WmDeleteWindow {0};
   Atom m_WmProtocols {0};
   Atom m_NetWmState {0};

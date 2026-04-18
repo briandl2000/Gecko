@@ -67,7 +67,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
   const int screen = DefaultScreen(m_Display);
   const ::Window root = RootWindow(m_Display, screen);
 
-  XRRScreenResources* resources = ::XRRGetScreenResources(m_Display, root);
+  ::XRRScreenResources* resources = ::XRRGetScreenResources(m_Display, root);
   if (!resources)
   {
     GECKO_WARN(labels::General,
@@ -75,11 +75,11 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     return;
   }
 
-  const RROutput primaryOutput = ::XRRGetOutputPrimary(m_Display, root);
+  const ::RROutput primaryOutput = ::XRRGetOutputPrimary(m_Display, root);
 
   for (int i = 0; i < resources->noutput; ++i)
   {
-    XRROutputInfo* outInfo =
+    ::XRROutputInfo* outInfo =
         ::XRRGetOutputInfo(m_Display, resources, resources->outputs[i]);
     if (!outInfo)
       continue;
@@ -95,7 +95,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     // RR_Disconnected even when a CRTC is actively driving a display.
     // Trust the CRTC assignment over the connection flag.
 
-    XRRCrtcInfo* crtcInfo =
+    ::XRRCrtcInfo* crtcInfo =
         ::XRRGetCrtcInfo(m_Display, resources, outInfo->crtc);
     if (!crtcInfo)
     {
@@ -211,7 +211,7 @@ void X11MonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 
   while (::XPending(m_Display) > 0)
   {
-    XEvent event;
+    ::XEvent event;
     ::XNextEvent(m_Display, &event);
 
     if (event.type == m_RREventBase + RRScreenChangeNotify)

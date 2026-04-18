@@ -28,7 +28,7 @@ void Win32MonitorsBackend::EnumerateMonitors() noexcept
   GECKO_FUNC(labels::General);
   m_Monitors.clear();
   ::EnumDisplayMonitors(nullptr, nullptr, EnumProc,
-                        reinterpret_cast<LPARAM>(this));
+                        reinterpret_cast<::LPARAM>(this));
 
   GECKO_INFO(labels::General, "Win32MonitorsBackend: enumerated %u monitor(s)",
              static_cast<u32>(m_Monitors.size()));
@@ -88,9 +88,9 @@ void Win32MonitorsBackend::PumpEvents(
   (void)emitter;
 }
 
-BOOL CALLBACK Win32MonitorsBackend::EnumProc(HMONITOR hMonitor, HDC /*hdc*/,
-                                             LPRECT /*lpRect*/,
-                                             LPARAM lParam) noexcept
+::BOOL CALLBACK Win32MonitorsBackend::EnumProc(::HMONITOR hMonitor,
+                                               ::HDC /*hdc*/, LPRECT /*lpRect*/,
+                                               ::LPARAM lParam) noexcept
 {
   auto* self = reinterpret_cast<Win32MonitorsBackend*>(lParam);
 
@@ -119,8 +119,8 @@ BOOL CALLBACK Win32MonitorsBackend::EnumProc(HMONITOR hMonitor, HDC /*hdc*/,
       static_cast<i32>(mi.rcWork.bottom - mi.rcWork.top)};
 
   // DPI via Shcore
-  UINT dpiX = 96;
-  UINT dpiY = 96;
+  ::UINT dpiX = 96;
+  ::UINT dpiY = 96;
   if (SUCCEEDED(::GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY)))
   {
     info.Dpi = static_cast<u32>(dpiX);

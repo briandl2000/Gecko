@@ -20,8 +20,8 @@
 #ifdef GECKO_HAVE_XDG_DECORATION
 #include "xdg-decoration-client-protocol.h"
 #else
-struct zxdg_decoration_manager_v1;
-struct zxdg_toplevel_decoration_v1;
+struct ::zxdg_decoration_manager_v1;
+struct ::zxdg_toplevel_decoration_v1;
 #endif
 #include "xdg-shell-client-protocol.h"
 
@@ -48,10 +48,10 @@ struct WaylandWindowState
   u64 GeckoId {0};
 
   // Wayland objects for this window.
-  wl_surface* Surface {nullptr};
-  xdg_surface* XdgSurface {nullptr};
-  xdg_toplevel* Toplevel {nullptr};
-  zxdg_toplevel_decoration_v1* Decoration {nullptr};
+  ::wl_surface* Surface {nullptr};
+  ::xdg_surface* XdgSurface {nullptr};
+  ::xdg_toplevel* Toplevel {nullptr};
+  ::zxdg_toplevel_decoration_v1* Decoration {nullptr};
 
   // Pending configure state from the compositor.
   i32 PendingWidth {0};
@@ -140,61 +140,62 @@ public:
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
 
   // Wayland callbacks need access to internals.
-  void OnRegistryGlobal(wl_registry* registry, u32 name, const char* interface,
-                        u32 version) noexcept;
-  void OnRegistryGlobalRemove(wl_registry* registry, u32 name) noexcept;
+  void OnRegistryGlobal(::wl_registry* registry, u32 name,
+                        const char* interface, u32 version) noexcept;
+  void OnRegistryGlobalRemove(::wl_registry* registry, u32 name) noexcept;
 
   void OnXdgSurfaceConfigure(WaylandWindowState* ws, u32 serial) noexcept;
   void OnToplevelConfigure(WaylandWindowState* ws, i32 width, i32 height,
                            wl_array* states) noexcept;
   void OnToplevelClose(WaylandWindowState* ws) noexcept;
 
-  void OnSeatCapabilities(wl_seat* seat, u32 caps) noexcept;
+  void OnSeatCapabilities(::wl_seat* seat, u32 caps) noexcept;
 
   // Keyboard callbacks
-  void OnKeyboardKeymap(wl_keyboard* kb, u32 format, i32 fd, u32 size) noexcept;
-  void OnKeyboardEnter(wl_keyboard* kb, u32 serial, wl_surface* surface,
+  void OnKeyboardKeymap(::wl_keyboard* kb, u32 format, i32 fd,
+                        u32 size) noexcept;
+  void OnKeyboardEnter(::wl_keyboard* kb, u32 serial, ::wl_surface* surface,
                        wl_array* keys) noexcept;
-  void OnKeyboardLeave(wl_keyboard* kb, u32 serial,
-                       wl_surface* surface) noexcept;
-  void OnKeyboardKey(wl_keyboard* kb, u32 serial, u32 time, u32 key,
+  void OnKeyboardLeave(::wl_keyboard* kb, u32 serial,
+                       ::wl_surface* surface) noexcept;
+  void OnKeyboardKey(::wl_keyboard* kb, u32 serial, u32 time, u32 key,
                      u32 state) noexcept;
-  void OnKeyboardModifiers(wl_keyboard* kb, u32 serial, u32 modsDepressed,
+  void OnKeyboardModifiers(::wl_keyboard* kb, u32 serial, u32 modsDepressed,
                            u32 modsLatched, u32 modsLocked, u32 group) noexcept;
 
   // Pointer callbacks
-  void OnPointerEnter(wl_pointer* pointer, u32 serial, wl_surface* surface,
+  void OnPointerEnter(::wl_pointer* pointer, u32 serial, ::wl_surface* surface,
                       wl_fixed_t sx, wl_fixed_t sy) noexcept;
-  void OnPointerLeave(wl_pointer* pointer, u32 serial,
-                      wl_surface* surface) noexcept;
-  void OnPointerMotion(wl_pointer* pointer, u32 time, wl_fixed_t sx,
+  void OnPointerLeave(::wl_pointer* pointer, u32 serial,
+                      ::wl_surface* surface) noexcept;
+  void OnPointerMotion(::wl_pointer* pointer, u32 time, wl_fixed_t sx,
                        wl_fixed_t sy) noexcept;
-  void OnPointerButton(wl_pointer* pointer, u32 serial, u32 time, u32 button,
+  void OnPointerButton(::wl_pointer* pointer, u32 serial, u32 time, u32 button,
                        u32 state) noexcept;
-  void OnPointerAxis(wl_pointer* pointer, u32 time, u32 axis,
+  void OnPointerAxis(::wl_pointer* pointer, u32 time, u32 axis,
                      wl_fixed_t value) noexcept;
 
 private:
-  u64 FindWindowBySurface(wl_surface* surface) const noexcept;
+  u64 FindWindowBySurface(::wl_surface* surface) const noexcept;
   void ApplyCursorVisibility(WaylandWindowState& ws) noexcept;
   void AttachBlankBuffer(WaylandWindowState& ws) noexcept;
 
-  wl_display* m_Display {nullptr};
-  wl_registry* m_Registry {nullptr};
-  wl_compositor* m_Compositor {nullptr};
-  xdg_wm_base* m_WmBase {nullptr};
-  wl_seat* m_Seat {nullptr};
-  wl_shm* m_Shm {nullptr};
-  wl_keyboard* m_Keyboard {nullptr};
-  wl_pointer* m_Pointer {nullptr};
-  zxdg_decoration_manager_v1* m_DecorationManager {nullptr};
-  wl_cursor_theme* m_CursorTheme {nullptr};
-  wl_surface* m_CursorSurface {nullptr};
+  ::wl_display* m_Display {nullptr};
+  ::wl_registry* m_Registry {nullptr};
+  ::wl_compositor* m_Compositor {nullptr};
+  ::xdg_wm_base* m_WmBase {nullptr};
+  ::wl_seat* m_Seat {nullptr};
+  ::wl_shm* m_Shm {nullptr};
+  ::wl_keyboard* m_Keyboard {nullptr};
+  ::wl_pointer* m_Pointer {nullptr};
+  ::zxdg_decoration_manager_v1* m_DecorationManager {nullptr};
+  ::wl_cursor_theme* m_CursorTheme {nullptr};
+  ::wl_surface* m_CursorSurface {nullptr};
 
 #if defined(GECKO_HAS_XKBCOMMON)
-  xkb_context* m_XkbContext {nullptr};
-  xkb_keymap* m_XkbKeymap {nullptr};
-  xkb_state* m_XkbState {nullptr};
+  ::xkb_context* m_XkbContext {nullptr};
+  ::xkb_keymap* m_XkbKeymap {nullptr};
+  ::xkb_state* m_XkbState {nullptr};
 #endif
 
   u64 m_NextId {0};
@@ -203,7 +204,7 @@ private:
   u64 m_FocusedPointer {0};
 
   ::std::unordered_map<u64, WaylandWindowState> m_Windows;
-  ::std::unordered_map<wl_surface*, u64> m_WindowBySurface;
+  ::std::unordered_map<::wl_surface*, u64> m_WindowBySurface;
   ::std::vector<StagedEvent> m_Staged;
 };
 
