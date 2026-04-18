@@ -226,10 +226,16 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   const int windowHeight = rect.bottom - rect.top;
 
   // Convert title to wide string
+  const char* title = desc.Title ? desc.Title : "Gecko";
   const int titleLen =
-      ::MultiByteToWideChar(CP_UTF8, 0, desc.Title, -1, nullptr, 0);
+      ::MultiByteToWideChar(CP_UTF8, 0, title, -1, nullptr, 0);
+  if (titleLen <= 0)
+  {
+    GECKO_WARN(labels::Window, "CreateWindow: failed to convert title to UTF-16");
+    return WindowHandle {};
+  }
   ::std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));
-  ::MultiByteToWideChar(CP_UTF8, 0, desc.Title, -1, wTitle.data(), titleLen);
+  ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), titleLen);
 
   ::HWND hwnd =
       ::CreateWindowExW(exStyle, kWndClassName, wTitle.data(), style,
@@ -256,7 +262,8 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   entry.State = desc.Visible ? platform::WindowState::Normal
                              : platform::WindowState::Hidden;
   entry.Alive = true;
-  entry.TitleStorage = desc.Title ? desc.Title : "";
+  entry.TitleStorage = title;
+  entry.Desc.Title = entry.TitleStorage.c_str();
 
   // Query actual position
   ::RECT winRect;
@@ -264,7 +271,8 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
     entry.Position = {static_cast<i32>(winRect.left),
                       static_cast<i32>(winRect.top)};
 
-  m_Windows.emplace(id, ::std::move(entry));
+  auto [it, ok] = m_Windows.emplace(id, ::std::move(entry));
+  it->second.Desc.Title = it->second.TitleStorage.c_str();
 
   // Store the handle id in the window user data for WndProc lookup
   ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, static_cast<LONG_PTR>(id));
@@ -363,10 +371,15 @@ void Win32WindowsBackend::SetTitle(WindowHandle window,
     return;
 
   entry->TitleStorage = title ? title : "";
+  entry->Desc.Title = entry->TitleStorage.c_str();
 
-  const int len = ::MultiByteToWideChar(CP_UTF8, 0, title, -1, nullptr, 0);
+  const int len = ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(),
+                                        -1, nullptr, 0);
+  if (len <= 0)
+    return;
   ::std::vector<wchar_t> wTitle(static_cast<size_t>(len));
-  ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), len);
+  ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(), -1,
+                        wTitle.data(), len);
   ::SetWindowTextW(entry->Hwnd, wTitle.data());
 }
 

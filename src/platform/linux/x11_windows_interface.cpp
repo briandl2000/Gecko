@@ -144,7 +144,8 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
                           : platform::WindowState::Hidden;
   st.WindowId = w;
 
-  m_Windows.emplace(id, st);
+  auto [it, ok] = m_Windows.emplace(id, ::std::move(st));
+  it->second.Desc.Title = it->second.TitleStorage.c_str();
   m_WindowByXid.emplace(w, id);
 
   // Apply button restrictions (Motif functions) after mapping.

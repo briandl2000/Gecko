@@ -255,9 +255,9 @@ You can create and manage multiple windows simultaneously:
 
 ```cpp
 WindowHandle mainWindow, toolWindow, previewWindow;
-ctx.Windows().CreateWindow(mainDesc,    mainWindow);
-ctx.Windows().CreateWindow(toolDesc,    toolWindow);
-ctx.Windows().CreateWindow(previewDesc, previewWindow);
+mainWindow = ctx.Windows().CreateWindow(mainDesc);
+toolWindow = ctx.Windows().CreateWindow(toolDesc);
+previewWindow = ctx.Windows().CreateWindow(previewDesc);
 
 // Each window has its own handle — all events include a WindowHandle
 // so you can tell which window they came from
@@ -598,7 +598,7 @@ The module handles internal initialization and cleanup. `PlatformContext` can be
 
 ### X11
 
-- Uses XCB for the connection and event handling.
+- Uses Xlib for the connection and event handling.
 - RandR is used for monitor enumeration and hotplug detection.
 
 ### Null backend

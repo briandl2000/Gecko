@@ -8,7 +8,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <Windows.h>
-// neds to be after Windows.h to avoid macro conflicts (e.g. with CreateWindow).
+// needs to be after Windows.h to avoid macro conflicts (e.g. with CreateWindow).
 #include <timeapi.h>
 #pragma comment(lib, "Winmm.lib")
 #endif
@@ -24,7 +24,9 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 #if defined(GECKO_PLATFORM_WINDOWS)
   // Request 1ms timer resolution so sleep/timer functions are accurate.
   // Without this, Sleep(16) rounds up to ~31ms on default 15.6ms ticks.
-  ::timeBeginPeriod(1);
+  // Note: increases power usage slightly; restored in Shutdown.
+  if (::timeBeginPeriod(1) != TIMERR_NOERROR)
+    GECKO_WARN(labels::Platform, "timeBeginPeriod(1) failed");
 #endif
 
   return true;

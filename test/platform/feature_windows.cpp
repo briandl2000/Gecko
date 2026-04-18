@@ -256,7 +256,7 @@ TEST_CASE("Live backend: request focus does not crash",
 // ══════════════════════════════════════════════════════════════════════════
 
 TEST_CASE("Live backend: visible window create and pump",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -282,7 +282,7 @@ TEST_CASE("Live backend: visible window create and pump",
 }
 
 TEST_CASE("Live backend: visible window resize and pump",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -313,7 +313,7 @@ TEST_CASE("Live backend: visible window resize and pump",
 }
 
 TEST_CASE("Live backend: visible window set title and read back",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -335,7 +335,7 @@ TEST_CASE("Live backend: visible window set title and read back",
 }
 
 TEST_CASE("Live backend: visible window position set/get",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -359,7 +359,7 @@ TEST_CASE("Live backend: visible window position set/get",
 }
 
 TEST_CASE("Live backend: visible window state transitions",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -385,7 +385,7 @@ TEST_CASE("Live backend: visible window state transitions",
 }
 
 TEST_CASE("Live backend: visible window decoration toggle",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -408,7 +408,7 @@ TEST_CASE("Live backend: visible window decoration toggle",
 }
 
 TEST_CASE("Live backend: visible window DPI query",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -426,7 +426,7 @@ TEST_CASE("Live backend: visible window DPI query",
 }
 
 TEST_CASE("Live backend: visible window native handle",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -445,7 +445,7 @@ TEST_CASE("Live backend: visible window native handle",
 }
 
 TEST_CASE("Live backend: visible window cursor mode transitions",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -467,7 +467,7 @@ TEST_CASE("Live backend: visible window cursor mode transitions",
 }
 
 TEST_CASE("Live backend: visible window resized event fires",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -498,7 +498,7 @@ TEST_CASE("Live backend: visible window resized event fires",
 }
 
 TEST_CASE("Live backend: multiple visible windows simultaneously",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -534,7 +534,7 @@ TEST_CASE("Live backend: multiple visible windows simultaneously",
 }
 
 TEST_CASE("Live backend: visible window focus request",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -745,7 +745,7 @@ TEST_CASE("Live backend: create window with custom buttons",
 // ── Visible window tests for new APIs ──────────────────────────────────
 
 TEST_CASE("Live backend: visible window borderless fullscreen toggle",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -777,7 +777,7 @@ TEST_CASE("Live backend: visible window borderless fullscreen toggle",
 }
 
 TEST_CASE("Live backend: visible window resizable toggle",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
@@ -798,7 +798,7 @@ TEST_CASE("Live backend: visible window resizable toggle",
 }
 
 TEST_CASE("Live backend: visible window button manipulation",
-          "[feature][platform][window][visible]")
+          "[feature][platform][window][.visible]")
 {
   test::FeaturePlatformScope scope;
 
