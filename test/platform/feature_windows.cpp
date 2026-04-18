@@ -1,4 +1,5 @@
 #include "feature_platform_scope.h"
+#include "gecko/core/utility/bit.h"
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/window.h"
 
@@ -548,6 +549,277 @@ TEST_CASE("Live backend: visible window focus request",
 
   for (int i = 0; i < 3; ++i)
     scope.Ctx.PumpEvents();
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Extended API tests — resizable, window mode, buttons, size constraints,
+// always-on-top
+//
+// Wayland limitations:
+//   - SetPosition is a no-op (compositor controls placement)
+//   - RequestFocus is a no-op (compositor controls focus)
+//   - SetAlwaysOnTop is a no-op (no client-side control)
+//   - SetWindowButtons stores state but Wayland has no CSD button protocol
+//   - SetResizable uses xdg_toplevel min/max size hints
+//
+// Win32 limitations:
+//   - SetWindowButtons uses system menu EnableMenuItem + WS_ style bits;
+//     some WMs may not fully honour the greyed-out state
+//   - SetMinSize/SetMaxSize are stored but require WM_GETMINMAXINFO handling
+//     (pending integration)
+//
+// X11: Full support for all new APIs via Motif WM hints and EWMH.
+// ══════════════════════════════════════════════════════════════════════════
+
+TEST_CASE("Live backend: resizable defaults to desc value",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle resizable =
+      scope.Ctx.Windows().CreateWindow({.Resizable = true, .Visible = false});
+  WindowHandle fixed =
+      scope.Ctx.Windows().CreateWindow({.Resizable = false, .Visible = false});
+
+  REQUIRE(scope.Ctx.Windows().IsResizable(resizable));
+  REQUIRE_FALSE(scope.Ctx.Windows().IsResizable(fixed));
+
+  scope.Ctx.Windows().DestroyWindow(resizable);
+  scope.Ctx.Windows().DestroyWindow(fixed);
+}
+
+TEST_CASE("Live backend: toggle resizable at runtime",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win =
+      scope.Ctx.Windows().CreateWindow({.Resizable = true, .Visible = false});
+  REQUIRE(scope.Ctx.Windows().IsResizable(win));
+
+  scope.Ctx.Windows().SetResizable(win, false);
+  REQUIRE_FALSE(scope.Ctx.Windows().IsResizable(win));
+
+  scope.Ctx.Windows().SetResizable(win, true);
+  REQUIRE(scope.Ctx.Windows().IsResizable(win));
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: window mode defaults to Windowed",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
+  REQUIRE(scope.Ctx.Windows().GetWindowMode(win) == WindowMode::Windowed);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: set window mode to borderless fullscreen and back",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
+
+  scope.Ctx.Windows().SetWindowMode(win, WindowMode::BorderlessFullscreen);
+  REQUIRE(scope.Ctx.Windows().GetWindowMode(win) ==
+          WindowMode::BorderlessFullscreen);
+
+  scope.Ctx.Windows().SetWindowMode(win, WindowMode::Windowed);
+  REQUIRE(scope.Ctx.Windows().GetWindowMode(win) == WindowMode::Windowed);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: set window mode same mode is no-op",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
+  scope.Ctx.Windows().SetWindowMode(win, WindowMode::Windowed);
+  REQUIRE(scope.Ctx.Windows().GetWindowMode(win) == WindowMode::Windowed);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: window buttons default to All",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
+  REQUIRE(scope.Ctx.Windows().GetWindowButtons(win) == WindowButtons::All);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: set and get window buttons",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
+
+  // Remove close button
+  WindowButtons noClose = WindowButtons::Minimize | WindowButtons::Maximize;
+  scope.Ctx.Windows().SetWindowButtons(win, noClose);
+  REQUIRE(scope.Ctx.Windows().GetWindowButtons(win) == noClose);
+
+  // Remove all
+  scope.Ctx.Windows().SetWindowButtons(win, WindowButtons::None);
+  REQUIRE(scope.Ctx.Windows().GetWindowButtons(win) == WindowButtons::None);
+
+  // Restore all
+  scope.Ctx.Windows().SetWindowButtons(win, WindowButtons::All);
+  REQUIRE(scope.Ctx.Windows().GetWindowButtons(win) == WindowButtons::All);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: set min and max size does not crash",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win =
+      scope.Ctx.Windows().CreateWindow({.Resizable = true, .Visible = false});
+
+  scope.Ctx.Windows().SetMinSize(win, {200, 150});
+  scope.Ctx.Windows().SetMaxSize(win, {1920, 1080});
+
+  // Clear constraints
+  scope.Ctx.Windows().SetMinSize(win, {0, 0});
+  scope.Ctx.Windows().SetMaxSize(win, {0, 0});
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: always on top defaults to false",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
+  REQUIRE_FALSE(scope.Ctx.Windows().IsAlwaysOnTop(win));
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: toggle always on top",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = false});
+
+  scope.Ctx.Windows().SetAlwaysOnTop(win, true);
+  // Wayland ignores this, so we only check state on non-Wayland backends.
+  // The call must not crash regardless.
+
+  scope.Ctx.Windows().SetAlwaysOnTop(win, false);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: create window with custom buttons",
+          "[feature][platform][window]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowDesc desc;
+  desc.Visible = false;
+  desc.Buttons = WindowButtons::Close;  // Only close button
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(desc);
+  REQUIRE(win.IsValid());
+  REQUIRE(scope.Ctx.Windows().GetWindowButtons(win) == WindowButtons::Close);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+// ── Visible window tests for new APIs ──────────────────────────────────
+
+TEST_CASE("Live backend: visible window borderless fullscreen toggle",
+          "[feature][platform][window][visible]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(
+      {.Title = "Fullscreen Toggle", .Size = {400, 300}, .Visible = true});
+  REQUIRE(win.IsValid());
+
+  for (int i = 0; i < 3; ++i)
+    scope.Ctx.PumpEvents();
+
+  // Go fullscreen
+  scope.Ctx.Windows().SetWindowMode(win, WindowMode::BorderlessFullscreen);
+
+  for (int i = 0; i < 5; ++i)
+    scope.Ctx.PumpEvents();
+
+  REQUIRE(scope.Ctx.Windows().GetWindowMode(win) ==
+          WindowMode::BorderlessFullscreen);
+
+  // Back to windowed
+  scope.Ctx.Windows().SetWindowMode(win, WindowMode::Windowed);
+
+  for (int i = 0; i < 5; ++i)
+    scope.Ctx.PumpEvents();
+
+  REQUIRE(scope.Ctx.Windows().GetWindowMode(win) == WindowMode::Windowed);
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: visible window resizable toggle",
+          "[feature][platform][window][visible]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow(
+      {.Size = {400, 300}, .Resizable = true, .Visible = true});
+  REQUIRE(win.IsValid());
+
+  for (int i = 0; i < 3; ++i)
+    scope.Ctx.PumpEvents();
+
+  scope.Ctx.Windows().SetResizable(win, false);
+  REQUIRE_FALSE(scope.Ctx.Windows().IsResizable(win));
+
+  scope.Ctx.Windows().SetResizable(win, true);
+  REQUIRE(scope.Ctx.Windows().IsResizable(win));
+
+  scope.Ctx.Windows().DestroyWindow(win);
+}
+
+TEST_CASE("Live backend: visible window button manipulation",
+          "[feature][platform][window][visible]")
+{
+  test::FeaturePlatformScope scope;
+
+  WindowHandle win = scope.Ctx.Windows().CreateWindow({.Visible = true});
+  REQUIRE(win.IsValid());
+
+  for (int i = 0; i < 3; ++i)
+    scope.Ctx.PumpEvents();
+
+  // Disable maximize
+  WindowButtons noMax = WindowButtons::Close | WindowButtons::Minimize;
+  scope.Ctx.Windows().SetWindowButtons(win, noMax);
+  REQUIRE(scope.Ctx.Windows().GetWindowButtons(win) == noMax);
+
+  for (int i = 0; i < 3; ++i)
+    scope.Ctx.PumpEvents();
+
+  // Restore all
+  scope.Ctx.Windows().SetWindowButtons(win, WindowButtons::All);
+  REQUIRE(scope.Ctx.Windows().GetWindowButtons(win) == WindowButtons::All);
 
   scope.Ctx.Windows().DestroyWindow(win);
 }

@@ -20,6 +20,9 @@ WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   entry.ClientSize = {static_cast<u32>(desc.Size.X),
                       static_cast<u32>(desc.Size.Y)};
   entry.Decorated = desc.Decorated;
+  entry.Resizable = desc.Resizable;
+  entry.Mode = desc.Mode;
+  entry.Buttons = desc.Buttons;
   entry.State = desc.Visible ? platform::WindowState::Normal
                              : platform::WindowState::Hidden;
   entry.Alive = true;
@@ -208,6 +211,94 @@ void NullWindowsBackend::RequestFocus(WindowHandle window) noexcept
 {
   (void)window;
   // Null backend: no-op, focus is not meaningful without a display.
+}
+
+void NullWindowsBackend::SetResizable(WindowHandle window,
+                                      bool resizable) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+  it->second.Resizable = resizable;
+}
+
+bool NullWindowsBackend::IsResizable(WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return true;
+  return it->second.Resizable;
+}
+
+void NullWindowsBackend::SetWindowMode(WindowHandle window,
+                                       WindowMode mode) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+  it->second.Mode = mode;
+}
+
+WindowMode NullWindowsBackend::GetWindowMode(
+    WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return WindowMode::Windowed;
+  return it->second.Mode;
+}
+
+void NullWindowsBackend::SetWindowButtons(WindowHandle window,
+                                          WindowButtons buttons) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+  it->second.Buttons = buttons;
+}
+
+WindowButtons NullWindowsBackend::GetWindowButtons(
+    WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return WindowButtons::All;
+  return it->second.Buttons;
+}
+
+void NullWindowsBackend::SetMinSize(WindowHandle window,
+                                    Extent2D size) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+  it->second.MinSize = size;
+}
+
+void NullWindowsBackend::SetMaxSize(WindowHandle window,
+                                    Extent2D size) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+  it->second.MaxSize = size;
+}
+
+void NullWindowsBackend::SetAlwaysOnTop(WindowHandle window,
+                                        bool topmost) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+  it->second.AlwaysOnTop = topmost;
+}
+
+bool NullWindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return false;
+  return it->second.AlwaysOnTop;
 }
 
 void NullWindowsBackend::SetCursorMode(WindowHandle window,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/types.h"
+#include "gecko/core/utility/bit.h"
 #include "gecko/math/vector.h"
 #include "gecko/platform/platform_config.h"
 
@@ -61,6 +62,18 @@ enum class WindowState : u8
   Hidden,
 };
 
+enum class WindowButtons : u8
+{
+  None = 0,
+  Close = 1 << 0,
+  Minimize = 1 << 1,
+  Maximize = 1 << 2,
+  All = Close | Minimize | Maximize,
+};
+
+// Bitwise operators (|, &, ^, |=, ^=) and Any() are provided by
+// gecko/core/utility/bit.h for all enum classes.
+
 struct DpiInfo
 {
   u32 Dpi {96};
@@ -72,6 +85,7 @@ struct WindowDesc
   const char* Title {"Gecko"};
   math::Int2 Size {1280, 720};
   WindowMode Mode {WindowMode::Windowed};
+  WindowButtons Buttons {WindowButtons::All};
   bool Resizable {true};
   bool Visible {true};
   bool Decorated {true};

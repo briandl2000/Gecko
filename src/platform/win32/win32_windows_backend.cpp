@@ -169,6 +169,19 @@ public:
   bool IsDecorated(WindowHandle window) const noexcept override;
   void RequestFocus(WindowHandle window) noexcept override;
 
+  void SetResizable(WindowHandle window, bool resizable) noexcept override;
+  bool IsResizable(WindowHandle window) const noexcept override;
+  void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override;
+  WindowMode GetWindowMode(WindowHandle window) const noexcept override;
+  void SetWindowButtons(WindowHandle window,
+                        WindowButtons buttons) noexcept override;
+  WindowButtons GetWindowButtons(
+      WindowHandle window) const noexcept override;
+  void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override;
+  bool IsAlwaysOnTop(WindowHandle window) const noexcept override;
+
   void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override;
   CursorMode GetCursorMode(WindowHandle window) const noexcept override;
 
@@ -183,9 +196,19 @@ private:
     math::Int2 Position {};
     platform::WindowState State {platform::WindowState::Normal};
     CursorMode Cursor {CursorMode::Normal};
+    WindowMode Mode {WindowMode::Windowed};
+    WindowButtons Buttons {WindowButtons::All};
+    Extent2D MinSize {0, 0};
+    Extent2D MaxSize {0, 0};
     bool Decorated {true};
+    bool Resizable {true};
+    bool AlwaysOnTop {false};
     bool Alive {true};
     std::string TitleStorage;
+    // Saved style/position for fullscreen restoration.
+    DWORD SavedStyle {0};
+    DWORD SavedExStyle {0};
+    RECT SavedRect {};
   };
 
   struct StagedEvent
@@ -610,6 +633,179 @@ void Win32WindowsBackend::RequestFocus(WindowHandle window) noexcept
 
   ::SetForegroundWindow(entry->Hwnd);
   ::SetFocus(entry->Hwnd);
+}
+
+void Win32WindowsBackend::SetResizable(WindowHandle window,
+                                       bool resizable) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  entry->Resizable = resizable;
+  ApplyDecorations(entry->Hwnd, entry->Decorated, resizable);
+}
+
+bool Win32WindowsBackend::IsResizable(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return true;
+  return entry->Resizable;
+}
+
+void Win32WindowsBackend::SetWindowMode(WindowHandle window,
+                                        WindowMode mode) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  const WindowMode old = entry->Mode;
+  if (old == mode)
+    return;
+
+  if (mode == WindowMode::Fullscreen || mode == WindowMode::BorderlessFullscreen)
+  {
+    // Save current style and position for restoration.
+    entry->SavedStyle =
+        static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
+    entry->SavedExStyle =
+        static_cast<DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
+    ::GetWindowRect(entry->Hwnd, &entry->SavedRect);
+
+    // Go borderless fullscreen on the current monitor.
+    HMONITOR hMon = ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO mi {};
+    mi.cbSize = sizeof(mi);
+    ::GetMonitorInfoW(hMon, &mi);
+
+    ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE,
+                        WS_POPUP | WS_VISIBLE);
+    ::SetWindowPos(entry->Hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
+                   mi.rcMonitor.right - mi.rcMonitor.left,
+                   mi.rcMonitor.bottom - mi.rcMonitor.top,
+                   SWP_FRAMECHANGED | SWP_NOACTIVATE);
+  }
+  else
+  {
+    // Restore saved style and position.
+    if (entry->SavedStyle != 0)
+    {
+      ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE, entry->SavedStyle);
+      ::SetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE, entry->SavedExStyle);
+      ::SetWindowPos(
+          entry->Hwnd, nullptr, entry->SavedRect.left, entry->SavedRect.top,
+          entry->SavedRect.right - entry->SavedRect.left,
+          entry->SavedRect.bottom - entry->SavedRect.top,
+          SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    else
+    {
+      ApplyDecorations(entry->Hwnd, entry->Decorated, entry->Resizable);
+    }
+  }
+
+  entry->Mode = mode;
+}
+
+WindowMode Win32WindowsBackend::GetWindowMode(
+    WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return WindowMode::Windowed;
+  return entry->Mode;
+}
+
+void Win32WindowsBackend::SetWindowButtons(WindowHandle window,
+                                           WindowButtons buttons) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  entry->Buttons = buttons;
+
+  HMENU sysMenu = ::GetSystemMenu(entry->Hwnd, FALSE);
+  if (!sysMenu)
+    return;
+
+  // Reset the system menu first.
+  ::GetSystemMenu(entry->Hwnd, TRUE);
+  sysMenu = ::GetSystemMenu(entry->Hwnd, FALSE);
+  if (!sysMenu)
+    return;
+
+  if (!::gecko::Any(buttons & WindowButtons::Close))
+    ::EnableMenuItem(sysMenu, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
+  if (!::gecko::Any(buttons & WindowButtons::Minimize))
+    ::EnableMenuItem(sysMenu, SC_MINIMIZE, MF_BYCOMMAND | MF_GRAYED);
+  if (!::gecko::Any(buttons & WindowButtons::Maximize))
+    ::EnableMenuItem(sysMenu, SC_MAXIMIZE, MF_BYCOMMAND | MF_GRAYED);
+
+  // Also toggle the WS_MINIMIZEBOX/WS_MAXIMIZEBOX style bits.
+  LONG_PTR style = ::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE);
+  if (::gecko::Any(buttons & WindowButtons::Minimize))
+    style |= WS_MINIMIZEBOX;
+  else
+    style &= ~WS_MINIMIZEBOX;
+  if (::gecko::Any(buttons & WindowButtons::Maximize))
+    style |= WS_MAXIMIZEBOX;
+  else
+    style &= ~WS_MAXIMIZEBOX;
+  ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE, style);
+
+  ::DrawMenuBar(entry->Hwnd);
+  ::SetWindowPos(entry->Hwnd, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+}
+
+WindowButtons Win32WindowsBackend::GetWindowButtons(
+    WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return WindowButtons::All;
+  return entry->Buttons;
+}
+
+void Win32WindowsBackend::SetMinSize(WindowHandle window,
+                                     Extent2D size) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry)
+    return;
+  entry->MinSize = size;
+}
+
+void Win32WindowsBackend::SetMaxSize(WindowHandle window,
+                                     Extent2D size) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry)
+    return;
+  entry->MaxSize = size;
+}
+
+void Win32WindowsBackend::SetAlwaysOnTop(WindowHandle window,
+                                         bool topmost) noexcept
+{
+  auto* entry = FindEntry(window);
+  if (!entry || !entry->Hwnd)
+    return;
+
+  entry->AlwaysOnTop = topmost;
+  ::SetWindowPos(entry->Hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0,
+                 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+}
+
+bool Win32WindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
+{
+  const auto* entry = FindEntry(window);
+  if (!entry)
+    return false;
+  return entry->AlwaysOnTop;
 }
 
 // ── Cursor ─────────────────────────────────────────────────────────────

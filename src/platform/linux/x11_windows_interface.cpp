@@ -30,7 +30,13 @@ struct X11WindowState
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
   CursorMode Cursor {CursorMode::Normal};
+  WindowMode Mode {WindowMode::Windowed};
+  WindowButtons Buttons {WindowButtons::All};
+  Extent2D MinSize {0, 0};
+  Extent2D MaxSize {0, 0};
   bool Decorated {true};
+  bool Resizable {true};
+  bool AlwaysOnTop {false};
   ::Window WindowId {0};
 };
 
@@ -44,7 +50,13 @@ struct MwmHints
 };
 
 constexpr unsigned long MwmHintsDecorations = 1UL << 1;
+constexpr unsigned long MwmHintsFunctions = 1UL << 0;
 constexpr unsigned long MwmDecorAll = 1UL;
+constexpr unsigned long MwmFuncResize = 1UL << 1;
+constexpr unsigned long MwmFuncMove = 1UL << 2;
+constexpr unsigned long MwmFuncMinimize = 1UL << 3;
+constexpr unsigned long MwmFuncMaximize = 1UL << 4;
+constexpr unsigned long MwmFuncClose = 1UL << 5;
 
 struct StagedEvent
 {
@@ -88,6 +100,8 @@ public:
         ::XInternAtom(m_Display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
     m_NetWmStateHidden =
         ::XInternAtom(m_Display, "_NET_WM_STATE_HIDDEN", False);
+    m_NetWmStateAbove =
+        ::XInternAtom(m_Display, "_NET_WM_STATE_ABOVE", False);
     m_MotifWmHints = ::XInternAtom(m_Display, "_MOTIF_WM_HINTS", False);
 
     GECKO_INFO(labels::General, "Initialized X11 windows backend (display=%p)",
@@ -175,12 +189,19 @@ public:
     st.ClientSize =
         Extent2D {static_cast<u32>(width), static_cast<u32>(height)};
     st.Decorated = desc.Decorated;
+    st.Resizable = desc.Resizable;
+    st.Mode = desc.Mode;
+    st.Buttons = desc.Buttons;
     st.State = desc.Visible ? platform::WindowState::Normal
                             : platform::WindowState::Hidden;
     st.WindowId = w;
 
     m_Windows.emplace(id, st);
     m_WindowByXid.emplace(w, id);
+
+    // Apply button restrictions (Motif functions) after mapping.
+    if (desc.Buttons != WindowButtons::All)
+      ApplyMotifFunctions(w, desc.Buttons, desc.Resizable);
 
     GECKO_INFO(labels::Window,
                "Created X11 window id=%llu, xid=%lu, size=%ux%u",
@@ -588,6 +609,167 @@ public:
     ::XFlush(m_Display);
   }
 
+  void SetResizable(WindowHandle window, bool resizable) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    it->second.Resizable = resizable;
+
+    XSizeHints hints {};
+    if (resizable)
+    {
+      // Remove min=max constraint by setting to wide-open range.
+      hints.flags = PMinSize | PMaxSize;
+      hints.min_width = 1;
+      hints.min_height = 1;
+      hints.max_width = 32767;
+      hints.max_height = 32767;
+
+      // Restore any user-specified constraints.
+      if (it->second.MinSize.Width > 0)
+        hints.min_width = static_cast<int>(it->second.MinSize.Width);
+      if (it->second.MinSize.Height > 0)
+        hints.min_height = static_cast<int>(it->second.MinSize.Height);
+      if (it->second.MaxSize.Width > 0)
+        hints.max_width = static_cast<int>(it->second.MaxSize.Width);
+      if (it->second.MaxSize.Height > 0)
+        hints.max_height = static_cast<int>(it->second.MaxSize.Height);
+    }
+    else
+    {
+      // Lock to current size.
+      hints.flags = PMinSize | PMaxSize;
+      hints.min_width = static_cast<int>(it->second.ClientSize.Width);
+      hints.min_height = static_cast<int>(it->second.ClientSize.Height);
+      hints.max_width = static_cast<int>(it->second.ClientSize.Width);
+      hints.max_height = static_cast<int>(it->second.ClientSize.Height);
+    }
+    ::XSetWMNormalHints(m_Display, it->second.WindowId, &hints);
+    ApplyMotifFunctions(it->second.WindowId, it->second.Buttons, resizable);
+    ::XFlush(m_Display);
+  }
+
+  bool IsResizable(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return true;
+    return it->second.Resizable;
+  }
+
+  void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    const WindowMode old = it->second.Mode;
+    if (old == mode)
+      return;
+
+    const int screen = DefaultScreen(m_Display);
+    const ::Window root = RootWindow(m_Display, screen);
+    const ::Window xid = it->second.WindowId;
+
+    // Remove current fullscreen state if active.
+    if (old == WindowMode::Fullscreen ||
+        old == WindowMode::BorderlessFullscreen)
+    {
+      SendNetWmStateMessage(root, xid, /*remove*/ 0, m_NetWmStateFullscreen);
+    }
+
+    switch (mode)
+    {
+    case WindowMode::Windowed:
+      ApplyMotifDecorations(xid, it->second.Decorated);
+      break;
+
+    case WindowMode::Fullscreen:
+    case WindowMode::BorderlessFullscreen:
+      ApplyMotifDecorations(xid, false);
+      SendNetWmStateMessage(root, xid, /*add*/ 1, m_NetWmStateFullscreen);
+      break;
+    }
+
+    ::XFlush(m_Display);
+    it->second.Mode = mode;
+  }
+
+  WindowMode GetWindowMode(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return WindowMode::Windowed;
+    return it->second.Mode;
+  }
+
+  void SetWindowButtons(WindowHandle window,
+                        WindowButtons buttons) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    it->second.Buttons = buttons;
+    ApplyMotifFunctions(it->second.WindowId, buttons, it->second.Resizable);
+    ::XFlush(m_Display);
+  }
+
+  WindowButtons GetWindowButtons(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return WindowButtons::All;
+    return it->second.Buttons;
+  }
+
+  void SetMinSize(WindowHandle window, Extent2D size) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    it->second.MinSize = size;
+    if (it->second.Resizable)
+      ApplySizeConstraints(it->second);
+  }
+
+  void SetMaxSize(WindowHandle window, Extent2D size) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    it->second.MaxSize = size;
+    if (it->second.Resizable)
+      ApplySizeConstraints(it->second);
+  }
+
+  void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end() || !m_Display)
+      return;
+
+    it->second.AlwaysOnTop = topmost;
+
+    const int screen = DefaultScreen(m_Display);
+    const ::Window root = RootWindow(m_Display, screen);
+    SendNetWmStateMessage(root, it->second.WindowId,
+                          topmost ? 1 : 0, m_NetWmStateAbove);
+    ::XFlush(m_Display);
+  }
+
+  bool IsAlwaysOnTop(WindowHandle window) const noexcept override
+  {
+    auto it = m_Windows.find(window.Id);
+    if (it == m_Windows.end())
+      return false;
+    return it->second.AlwaysOnTop;
+  }
+
   void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override
   {
     auto it = m_Windows.find(window.Id);
@@ -665,6 +847,69 @@ private:
                       static_cast<int>(sizeof(hints) / sizeof(long)));
   }
 
+  void ApplyMotifFunctions(::Window w, WindowButtons buttons,
+                           bool resizable) noexcept
+  {
+    if (!m_Display || w == 0 || m_MotifWmHints == 0)
+      return;
+
+    // Read existing hints so we preserve decorations flags.
+    MwmHints hints {};
+    Atom actualType {};
+    int actualFormat {};
+    unsigned long nItems {};
+    unsigned long bytesAfter {};
+    unsigned char* propData {};
+
+    if (::XGetWindowProperty(m_Display, w, m_MotifWmHints, 0,
+                             sizeof(MwmHints) / sizeof(long), False,
+                             m_MotifWmHints, &actualType, &actualFormat,
+                             &nItems, &bytesAfter, &propData) == Success &&
+        propData && nItems >= 5)
+    {
+      hints = *reinterpret_cast<MwmHints*>(propData);
+      ::XFree(propData);
+    }
+
+    hints.flags |= MwmHintsFunctions;
+    // Start with move (always allowed).
+    unsigned long funcs = MwmFuncMove;
+    if (resizable)
+      funcs |= MwmFuncResize;
+    if (::gecko::Any(buttons & WindowButtons::Minimize))
+      funcs |= MwmFuncMinimize;
+    if (::gecko::Any(buttons & WindowButtons::Maximize))
+      funcs |= MwmFuncMaximize;
+    if (::gecko::Any(buttons & WindowButtons::Close))
+      funcs |= MwmFuncClose;
+    hints.functions = funcs;
+
+    ::XChangeProperty(m_Display, w, m_MotifWmHints, m_MotifWmHints, 32,
+                      PropModeReplace,
+                      reinterpret_cast<const unsigned char*>(&hints),
+                      static_cast<int>(sizeof(hints) / sizeof(long)));
+  }
+
+  void ApplySizeConstraints(const X11WindowState& state) noexcept
+  {
+    if (!m_Display || state.WindowId == 0)
+      return;
+
+    XSizeHints hints {};
+    hints.flags = PMinSize | PMaxSize;
+    hints.min_width =
+        state.MinSize.Width > 0 ? static_cast<int>(state.MinSize.Width) : 1;
+    hints.min_height =
+        state.MinSize.Height > 0 ? static_cast<int>(state.MinSize.Height) : 1;
+    hints.max_width =
+        state.MaxSize.Width > 0 ? static_cast<int>(state.MaxSize.Width) : 32767;
+    hints.max_height = state.MaxSize.Height > 0
+                           ? static_cast<int>(state.MaxSize.Height)
+                           : 32767;
+    ::XSetWMNormalHints(m_Display, state.WindowId, &hints);
+    ::XFlush(m_Display);
+  }
+
   void ApplyInitialWindowMode(::Window w, ::Window root,
                               const WindowDesc& desc) noexcept
   {
@@ -738,6 +983,7 @@ private:
   Atom m_NetWmStateMaximizedHorz {0};
   Atom m_NetWmStateMaximizedVert {0};
   Atom m_NetWmStateHidden {0};
+  Atom m_NetWmStateAbove {0};
   Atom m_MotifWmHints {0};
   u64 m_NextId {0};
 

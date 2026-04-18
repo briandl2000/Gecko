@@ -174,7 +174,13 @@ struct WaylandWindowState
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
   CursorMode Cursor {CursorMode::Normal};
+  WindowMode Mode {WindowMode::Windowed};
+  WindowButtons Buttons {WindowButtons::All};
+  Extent2D MinSize {0, 0};
+  Extent2D MaxSize {0, 0};
   bool Decorated {true};
+  bool Resizable {true};
+  bool AlwaysOnTop {false};
   bool Alive {true};
   u64 GeckoId {0};
 
@@ -247,6 +253,19 @@ public:
   void SetDecorated(WindowHandle window, bool decorated) noexcept override;
   bool IsDecorated(WindowHandle window) const noexcept override;
   void RequestFocus(WindowHandle window) noexcept override;
+
+  void SetResizable(WindowHandle window, bool resizable) noexcept override;
+  bool IsResizable(WindowHandle window) const noexcept override;
+  void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override;
+  WindowMode GetWindowMode(WindowHandle window) const noexcept override;
+  void SetWindowButtons(WindowHandle window,
+                        WindowButtons buttons) noexcept override;
+  WindowButtons GetWindowButtons(
+      WindowHandle window) const noexcept override;
+  void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override;
+  bool IsAlwaysOnTop(WindowHandle window) const noexcept override;
 
   void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override;
   CursorMode GetCursorMode(WindowHandle window) const noexcept override;
@@ -699,6 +718,9 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
   ws.ClientSize = {static_cast<u32>(desc.Size.X > 0 ? desc.Size.X : 1280),
                    static_cast<u32>(desc.Size.Y > 0 ? desc.Size.Y : 720)};
   ws.Decorated = desc.Decorated;
+  ws.Resizable = desc.Resizable;
+  ws.Mode = desc.Mode;
+  ws.Buttons = desc.Buttons;
   ws.State = desc.Visible ? platform::WindowState::Normal
                           : platform::WindowState::Hidden;
   ws.Alive = true;
@@ -1024,6 +1046,162 @@ void WaylandWindowsBackend::RequestFocus(WindowHandle /*window*/) noexcept
 {
   // Wayland does not allow clients to steal focus.
   // This is a no-op by design.
+}
+
+void WaylandWindowsBackend::SetResizable(WindowHandle window,
+                                         bool resizable) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+
+  it->second.Resizable = resizable;
+
+  if (it->second.Toplevel)
+  {
+    if (resizable)
+    {
+      Extent2D mn = it->second.MinSize;
+      Extent2D mx = it->second.MaxSize;
+      xdg_toplevel_set_min_size(it->second.Toplevel,
+                                mn.Width > 0 ? static_cast<i32>(mn.Width) : 1,
+                                mn.Height > 0 ? static_cast<i32>(mn.Height) : 1);
+      xdg_toplevel_set_max_size(it->second.Toplevel,
+                                mx.Width > 0 ? static_cast<i32>(mx.Width) : 0,
+                                mx.Height > 0 ? static_cast<i32>(mx.Height) : 0);
+    }
+    else
+    {
+      // Lock to current size.
+      const i32 w = static_cast<i32>(it->second.ClientSize.Width);
+      const i32 h = static_cast<i32>(it->second.ClientSize.Height);
+      xdg_toplevel_set_min_size(it->second.Toplevel, w, h);
+      xdg_toplevel_set_max_size(it->second.Toplevel, w, h);
+    }
+    if (m_Display)
+      wl_display_flush(m_Display);
+  }
+}
+
+bool WaylandWindowsBackend::IsResizable(WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return true;
+  return it->second.Resizable;
+}
+
+void WaylandWindowsBackend::SetWindowMode(WindowHandle window,
+                                          WindowMode mode) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end() || !it->second.Toplevel)
+    return;
+
+  const WindowMode old = it->second.Mode;
+  if (old == mode)
+    return;
+
+  // Unset current mode.
+  if (old == WindowMode::Fullscreen || old == WindowMode::BorderlessFullscreen)
+    xdg_toplevel_unset_fullscreen(it->second.Toplevel);
+
+  switch (mode)
+  {
+  case WindowMode::Windowed:
+    break;
+  case WindowMode::Fullscreen:
+  case WindowMode::BorderlessFullscreen:
+    xdg_toplevel_set_fullscreen(it->second.Toplevel, nullptr);
+    break;
+  }
+
+  it->second.Mode = mode;
+  if (m_Display)
+    wl_display_flush(m_Display);
+}
+
+WindowMode WaylandWindowsBackend::GetWindowMode(
+    WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return WindowMode::Windowed;
+  return it->second.Mode;
+}
+
+void WaylandWindowsBackend::SetWindowButtons(WindowHandle window,
+                                             WindowButtons buttons) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+
+  it->second.Buttons = buttons;
+  // Wayland does not expose per-button CSD control directly.
+  // This is stored for API consistency and can be used by CSD renderers.
+}
+
+WindowButtons WaylandWindowsBackend::GetWindowButtons(
+    WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return WindowButtons::All;
+  return it->second.Buttons;
+}
+
+void WaylandWindowsBackend::SetMinSize(WindowHandle window,
+                                       Extent2D size) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+
+  it->second.MinSize = size;
+  if (it->second.Toplevel && it->second.Resizable)
+  {
+    xdg_toplevel_set_min_size(
+        it->second.Toplevel,
+        size.Width > 0 ? static_cast<i32>(size.Width) : 1,
+        size.Height > 0 ? static_cast<i32>(size.Height) : 1);
+    if (m_Display)
+      wl_display_flush(m_Display);
+  }
+}
+
+void WaylandWindowsBackend::SetMaxSize(WindowHandle window,
+                                       Extent2D size) noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return;
+
+  it->second.MaxSize = size;
+  if (it->second.Toplevel && it->second.Resizable)
+  {
+    xdg_toplevel_set_max_size(
+        it->second.Toplevel,
+        size.Width > 0 ? static_cast<i32>(size.Width) : 0,
+        size.Height > 0 ? static_cast<i32>(size.Height) : 0);
+    if (m_Display)
+      wl_display_flush(m_Display);
+  }
+}
+
+void WaylandWindowsBackend::SetAlwaysOnTop(WindowHandle /*window*/,
+                                           bool /*topmost*/) noexcept
+{
+  // Wayland does not support always-on-top from the client side.
+  // This is a no-op by design.
+}
+
+bool WaylandWindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
+{
+  auto it = m_Windows.find(window.Id);
+  if (it == m_Windows.end())
+    return false;
+  return it->second.AlwaysOnTop;
 }
 
 void WaylandWindowsBackend::SetCursorMode(WindowHandle window,

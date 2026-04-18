@@ -11,7 +11,7 @@ _arch = _ARCH_MAP.get(platform.machine(), platform.machine())
 # which cmd.exe cannot use as working directories.
 _REPO_ROOT = str(Path(__file__).absolute().parents[2])
 
-PLATFORM_ID = f"{platform.system()}-{_arch}"
+PLATFORM_ID = os.environ.get("GECKO_PLATFORM_ID", f"{platform.system()}-{_arch}")
 BUILD_DIR = os.environ.get("GECKO_BUILD_DIR", os.path.join(_REPO_ROOT, "out", "build", PLATFORM_ID))
 OUTPUT_DIR = os.environ.get("GECKO_OUTPUT_DIR", os.path.join(_REPO_ROOT, "out", PLATFORM_ID))
 

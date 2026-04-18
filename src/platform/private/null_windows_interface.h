@@ -16,7 +16,13 @@ struct NullWindowEntry
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
   CursorMode Cursor {CursorMode::Normal};
+  WindowMode Mode {WindowMode::Windowed};
+  WindowButtons Buttons {WindowButtons::All};
+  Extent2D MinSize {0, 0};
+  Extent2D MaxSize {0, 0};
   bool Decorated {true};
+  bool Resizable {true};
+  bool AlwaysOnTop {false};
   bool Alive {true};
 };
 
@@ -45,6 +51,19 @@ public:
   void SetDecorated(WindowHandle window, bool decorated) noexcept override;
   bool IsDecorated(WindowHandle window) const noexcept override;
   void RequestFocus(WindowHandle window) noexcept override;
+
+  void SetResizable(WindowHandle window, bool resizable) noexcept override;
+  bool IsResizable(WindowHandle window) const noexcept override;
+  void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override;
+  WindowMode GetWindowMode(WindowHandle window) const noexcept override;
+  void SetWindowButtons(WindowHandle window,
+                        WindowButtons buttons) noexcept override;
+  WindowButtons GetWindowButtons(
+      WindowHandle window) const noexcept override;
+  void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override;
+  bool IsAlwaysOnTop(WindowHandle window) const noexcept override;
 
   void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override;
   CursorMode GetCursorMode(WindowHandle window) const noexcept override;
