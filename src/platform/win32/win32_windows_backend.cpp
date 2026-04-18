@@ -126,6 +126,9 @@ Win32WindowsBackend::Win32WindowsBackend() noexcept
 {
   s_Instance = this;
 
+  // Enable per-monitor DPI awareness so Windows sends WM_DPICHANGED.
+  ::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
   ::WNDCLASSEXW wc {};
   wc.cbSize = sizeof(wc);
   wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
