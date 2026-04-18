@@ -874,12 +874,12 @@ void WaylandWindowsBackend::SetResizable(WindowHandle window,
     {
       Extent2D mn = it->second.MinSize;
       Extent2D mx = it->second.MaxSize;
-      xdg_toplevel_set_min_size(it->second.Toplevel,
-                                mn.Width > 0 ? static_cast<i32>(mn.Width) : 1,
-                                mn.Height > 0 ? static_cast<i32>(mn.Height) : 1);
-      xdg_toplevel_set_max_size(it->second.Toplevel,
-                                mx.Width > 0 ? static_cast<i32>(mx.Width) : 0,
-                                mx.Height > 0 ? static_cast<i32>(mx.Height) : 0);
+      xdg_toplevel_set_min_size(
+          it->second.Toplevel, mn.Width > 0 ? static_cast<i32>(mn.Width) : 1,
+          mn.Height > 0 ? static_cast<i32>(mn.Height) : 1);
+      xdg_toplevel_set_max_size(
+          it->second.Toplevel, mx.Width > 0 ? static_cast<i32>(mx.Width) : 0,
+          mx.Height > 0 ? static_cast<i32>(mx.Height) : 0);
     }
     else
     {
@@ -973,8 +973,7 @@ void WaylandWindowsBackend::SetMinSize(WindowHandle window,
   if (it->second.Toplevel && it->second.Resizable)
   {
     xdg_toplevel_set_min_size(
-        it->second.Toplevel,
-        size.Width > 0 ? static_cast<i32>(size.Width) : 1,
+        it->second.Toplevel, size.Width > 0 ? static_cast<i32>(size.Width) : 1,
         size.Height > 0 ? static_cast<i32>(size.Height) : 1);
     if (m_Display)
       wl_display_flush(m_Display);
@@ -992,8 +991,7 @@ void WaylandWindowsBackend::SetMaxSize(WindowHandle window,
   if (it->second.Toplevel && it->second.Resizable)
   {
     xdg_toplevel_set_max_size(
-        it->second.Toplevel,
-        size.Width > 0 ? static_cast<i32>(size.Width) : 0,
+        it->second.Toplevel, size.Width > 0 ? static_cast<i32>(size.Width) : 0,
         size.Height > 0 ? static_cast<i32>(size.Height) : 0);
     if (m_Display)
       wl_display_flush(m_Display);

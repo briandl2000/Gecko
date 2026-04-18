@@ -11,7 +11,8 @@
 #include <vector>
 
 // Forward-declare X11 types to avoid macro conflicts (X11 defines "Always"
-// which clashes with gecko enums).  The actual headers are included in the .cpp.
+// which clashes with gecko enums).  The actual headers are included in the
+// .cpp.
 struct _XDisplay;
 using Display = _XDisplay;
 using Atom = unsigned long;
@@ -115,8 +116,7 @@ public:
   WindowMode GetWindowMode(WindowHandle window) const noexcept override;
   void SetWindowButtons(WindowHandle window,
                         WindowButtons buttons) noexcept override;
-  WindowButtons GetWindowButtons(
-      WindowHandle window) const noexcept override;
+  WindowButtons GetWindowButtons(WindowHandle window) const noexcept override;
   void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
   void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
   void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override;

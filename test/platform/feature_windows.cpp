@@ -711,8 +711,7 @@ TEST_CASE("Live backend: always on top defaults to false",
   scope.Ctx.Windows().DestroyWindow(win);
 }
 
-TEST_CASE("Live backend: toggle always on top",
-          "[feature][platform][window]")
+TEST_CASE("Live backend: toggle always on top", "[feature][platform][window]")
 {
   test::FeaturePlatformScope scope;
 

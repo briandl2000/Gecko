@@ -528,7 +528,8 @@ void Win32WindowsBackend::SetWindowMode(WindowHandle window,
   if (old == mode)
     return;
 
-  if (mode == WindowMode::Fullscreen || mode == WindowMode::BorderlessFullscreen)
+  if (mode == WindowMode::Fullscreen ||
+      mode == WindowMode::BorderlessFullscreen)
   {
     // Save current style and position for restoration.
     entry->SavedStyle =
@@ -543,8 +544,7 @@ void Win32WindowsBackend::SetWindowMode(WindowHandle window,
     mi.cbSize = sizeof(mi);
     ::GetMonitorInfoW(hMon, &mi);
 
-    ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE,
-                        WS_POPUP | WS_VISIBLE);
+    ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
     ::SetWindowPos(entry->Hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
                    mi.rcMonitor.right - mi.rcMonitor.left,
                    mi.rcMonitor.bottom - mi.rcMonitor.top,
@@ -557,11 +557,11 @@ void Win32WindowsBackend::SetWindowMode(WindowHandle window,
     {
       ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE, entry->SavedStyle);
       ::SetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE, entry->SavedExStyle);
-      ::SetWindowPos(
-          entry->Hwnd, nullptr, entry->SavedRect.left, entry->SavedRect.top,
-          entry->SavedRect.right - entry->SavedRect.left,
-          entry->SavedRect.bottom - entry->SavedRect.top,
-          SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
+      ::SetWindowPos(entry->Hwnd, nullptr, entry->SavedRect.left,
+                     entry->SavedRect.top,
+                     entry->SavedRect.right - entry->SavedRect.left,
+                     entry->SavedRect.bottom - entry->SavedRect.top,
+                     SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
     }
     else
     {
@@ -659,8 +659,8 @@ void Win32WindowsBackend::SetAlwaysOnTop(WindowHandle window,
     return;
 
   entry->AlwaysOnTop = topmost;
-  ::SetWindowPos(entry->Hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0,
-                 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+  ::SetWindowPos(entry->Hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0,
+                 0, SWP_NOMOVE | SWP_NOSIZE);
 }
 
 bool Win32WindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept

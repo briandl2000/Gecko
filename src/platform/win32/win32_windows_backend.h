@@ -58,8 +58,7 @@ public:
   WindowMode GetWindowMode(WindowHandle window) const noexcept override;
   void SetWindowButtons(WindowHandle window,
                         WindowButtons buttons) noexcept override;
-  WindowButtons GetWindowButtons(
-      WindowHandle window) const noexcept override;
+  WindowButtons GetWindowButtons(WindowHandle window) const noexcept override;
   void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
   void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
   void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override;

@@ -59,8 +59,7 @@ void PrintHelp() noexcept
              "  Gecko Platform Example — Window API Showcase");
   GECKO_INFO(app::platform_example::labels::Main,
              "═════════════════════════════════════════════════════");
-  GECKO_INFO(app::platform_example::labels::Main,
-             "  Window Creation:");
+  GECKO_INFO(app::platform_example::labels::Main, "  Window Creation:");
   GECKO_INFO(app::platform_example::labels::Main,
              "    [1] Small fixed window       (400x300)");
   GECKO_INFO(app::platform_example::labels::Main,
@@ -96,21 +95,16 @@ void PrintHelp() noexcept
   GECKO_INFO(app::platform_example::labels::Main,
              "    [8] Restore all buttons");
   GECKO_INFO(app::platform_example::labels::Main, "");
-  GECKO_INFO(app::platform_example::labels::Main,
-             "  Size Constraints:");
+  GECKO_INFO(app::platform_example::labels::Main, "  Size Constraints:");
   GECKO_INFO(app::platform_example::labels::Main,
              "    [9] Set min size 400x300, max size 1920x1080");
   GECKO_INFO(app::platform_example::labels::Main,
              "    [0] Clear size constraints");
   GECKO_INFO(app::platform_example::labels::Main, "");
-  GECKO_INFO(app::platform_example::labels::Main,
-             "  Other:");
-  GECKO_INFO(app::platform_example::labels::Main,
-             "    [H] Print this help");
-  GECKO_INFO(app::platform_example::labels::Main,
-             "    [I] Print window info");
-  GECKO_INFO(app::platform_example::labels::Main,
-             "    [Escape] Quit");
+  GECKO_INFO(app::platform_example::labels::Main, "  Other:");
+  GECKO_INFO(app::platform_example::labels::Main, "    [H] Print this help");
+  GECKO_INFO(app::platform_example::labels::Main, "    [I] Print window info");
+  GECKO_INFO(app::platform_example::labels::Main, "    [Escape] Quit");
   GECKO_INFO(app::platform_example::labels::Main,
              "═════════════════════════════════════════════════════");
 }
@@ -487,8 +481,7 @@ int main()
                                      ? (btns & ~WindowButtons::Close)
                                      : (btns | WindowButtons::Close);
             windows.SetWindowButtons(main, next);
-            GECKO_INFO(app::platform_example::labels::Main,
-                       "Close button: %s",
+            GECKO_INFO(app::platform_example::labels::Main, "Close button: %s",
                        BoolStr(Any(next & WindowButtons::Close)));
             break;
           }
@@ -659,7 +652,8 @@ int main()
     auto doFrame = [&]() {
       GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "Frame");
       {
-        GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "DispatchEvents");
+        GECKO_SCOPE_NAMED(app::platform_example::labels::Main,
+                          "DispatchEvents");
         (void)gecko::DispatchEvents();
       }
       GECKO_PRECISE_SLEEP_NS(16'000'000);

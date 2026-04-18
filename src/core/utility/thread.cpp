@@ -57,7 +57,7 @@ void PreciseSleepNs(u64 nanoseconds) noexcept
 #if defined(_WIN32)
   const u64 spinThresholdNs = 2000000;  // 2ms — stay within one timer tick
 #else
-  const u64 spinThresholdNs = 100000;   // 100us — Linux/macOS are fine
+  const u64 spinThresholdNs = 100000;  // 100us — Linux/macOS are fine
 #endif
 
   if (nanoseconds > spinThresholdNs)

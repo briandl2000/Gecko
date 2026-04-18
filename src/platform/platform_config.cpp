@@ -28,8 +28,8 @@ namespace {
     dpy = ::XOpenDisplay(":0");
     if (dpy)
     {
-      // Propagate to the process environment so all subsequent XOpenDisplay(NULL)
-      // calls in the backend code pick it up automatically.
+      // Propagate to the process environment so all subsequent
+      // XOpenDisplay(NULL) calls in the backend code pick it up automatically.
       ::setenv("DISPLAY", ":0", 0);
     }
   }

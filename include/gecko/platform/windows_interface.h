@@ -106,8 +106,7 @@ public:
   GECKO_API virtual void SetAlwaysOnTop(WindowHandle window,
                                         bool topmost) noexcept = 0;
 
-  GECKO_API virtual bool IsAlwaysOnTop(
-      WindowHandle window) const noexcept = 0;
+  GECKO_API virtual bool IsAlwaysOnTop(WindowHandle window) const noexcept = 0;
 
   // ── Cursor ───────────────────────────────────────────────────
 

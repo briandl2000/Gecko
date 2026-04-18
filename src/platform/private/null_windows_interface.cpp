@@ -239,8 +239,7 @@ void NullWindowsBackend::SetWindowMode(WindowHandle window,
   it->second.Mode = mode;
 }
 
-WindowMode NullWindowsBackend::GetWindowMode(
-    WindowHandle window) const noexcept
+WindowMode NullWindowsBackend::GetWindowMode(WindowHandle window) const noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -266,8 +265,7 @@ WindowButtons NullWindowsBackend::GetWindowButtons(
   return it->second.Buttons;
 }
 
-void NullWindowsBackend::SetMinSize(WindowHandle window,
-                                    Extent2D size) noexcept
+void NullWindowsBackend::SetMinSize(WindowHandle window, Extent2D size) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -275,8 +273,7 @@ void NullWindowsBackend::SetMinSize(WindowHandle window,
   it->second.MinSize = size;
 }
 
-void NullWindowsBackend::SetMaxSize(WindowHandle window,
-                                    Extent2D size) noexcept
+void NullWindowsBackend::SetMaxSize(WindowHandle window, Extent2D size) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
