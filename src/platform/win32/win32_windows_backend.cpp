@@ -225,7 +225,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   // Convert title to wide string
   const int titleLen =
       ::MultiByteToWideChar(CP_UTF8, 0, desc.Title, -1, nullptr, 0);
-  std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));
+  ::std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));
   ::MultiByteToWideChar(CP_UTF8, 0, desc.Title, -1, wTitle.data(), titleLen);
 
   HWND hwnd =
@@ -261,7 +261,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
     entry.Position = {static_cast<i32>(winRect.left),
                       static_cast<i32>(winRect.top)};
 
-  m_Windows.emplace(id, std::move(entry));
+  m_Windows.emplace(id, ::std::move(entry));
 
   // Store the handle id in the window user data for WndProc lookup
   ::SetWindowLongPtrW(hwnd, GWLP_USERDATA, static_cast<LONG_PTR>(id));
@@ -361,7 +361,7 @@ void Win32WindowsBackend::SetTitle(WindowHandle window,
   entry->TitleStorage = title ? title : "";
 
   const int len = ::MultiByteToWideChar(CP_UTF8, 0, title, -1, nullptr, 0);
-  std::vector<wchar_t> wTitle(static_cast<size_t>(len));
+  ::std::vector<wchar_t> wTitle(static_cast<size_t>(len));
   ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), len);
   ::SetWindowTextW(entry->Hwnd, wTitle.data());
 }
@@ -687,18 +687,18 @@ void Win32WindowsBackend::SetCursorMode(WindowHandle window,
   if (oldMode == CursorMode::Locked)
     ::ClipCursor(nullptr);
 
-  switch (mode)
-  {
-  case CursorMode::Normal:
+  // ShowCursor uses a global counter — only call when the cursor visibility
+  // actually needs to change, otherwise the counter drifts.
+  const bool wasVisible = (oldMode == CursorMode::Normal);
+  const bool nowVisible = (mode == CursorMode::Normal);
+
+  if (wasVisible && !nowVisible)
+    ::ShowCursor(FALSE);
+  else if (!wasVisible && nowVisible)
     ::ShowCursor(TRUE);
-    break;
 
-  case CursorMode::Hidden:
-    ::ShowCursor(FALSE);
-    break;
-
-  case CursorMode::Locked: {
-    ::ShowCursor(FALSE);
+  if (mode == CursorMode::Locked)
+  {
     RECT clipRect;
     if (::GetClientRect(entry->Hwnd, &clipRect))
     {
@@ -709,8 +709,6 @@ void Win32WindowsBackend::SetCursorMode(WindowHandle window,
       RECT screenRect {topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
       ::ClipCursor(&screenRect);
     }
-    break;
-  }
   }
 }
 

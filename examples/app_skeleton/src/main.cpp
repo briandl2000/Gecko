@@ -65,7 +65,7 @@ struct AppConfig
 
 static void PrintUsage(const char* exe)
 {
-  std::fprintf(
+  ::std::fprintf(
       stderr,
       "Usage: %s [options]\n\n"
       "Options:\n"
@@ -78,12 +78,12 @@ static void PrintUsage(const char* exe)
       exe ? exe : "app_skeleton");
 }
 
-static bool StartsWith(std::string_view s, std::string_view prefix)
+static bool StartsWith(::std::string_view s, ::std::string_view prefix)
 {
   return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
 }
 
-static bool ParseU32(std::string_view s, u32& out)
+static bool ParseU32(::std::string_view s, u32& out)
 {
   if (s.empty())
     return false;
@@ -104,7 +104,7 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
 {
   for (int i = 1; i < argc; ++i)
   {
-    std::string_view arg = argv[i] ? argv[i] : "";
+    ::std::string_view arg = argv[i] ? argv[i] : "";
 
     if (arg == "--help" || arg == "-h")
     {
@@ -120,11 +120,11 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
 
     if (StartsWith(arg, "--frames="))
     {
-      std::string_view value = arg.substr(std::strlen("--frames="));
+      ::std::string_view value = arg.substr(::std::strlen("--frames="));
       if (!ParseU32(value, cfg.maxFrames))
       {
-        std::fprintf(stderr, "Invalid --frames value: %.*s\n",
-                     static_cast<int>(value.size()), value.data());
+        ::std::fprintf(stderr, "Invalid --frames value: %.*s\n",
+                       static_cast<int>(value.size()), value.data());
         return false;
       }
       continue;
@@ -133,13 +133,13 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
     if (StartsWith(arg, "--title="))
     {
       // argv storage stays valid for the life of the process.
-      cfg.title = argv[i] + std::strlen("--title=");
+      cfg.title = argv[i] + ::std::strlen("--title=");
       continue;
     }
 
     if (StartsWith(arg, "--backend="))
     {
-      std::string_view value = arg.substr(std::strlen("--backend="));
+      ::std::string_view value = arg.substr(::std::strlen("--backend="));
       if (value == "auto")
       {
         cfg.backend = DisplayBackendKind::Auto;
@@ -154,15 +154,15 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
       }
       else
       {
-        std::fprintf(stderr, "Invalid --backend value: %.*s\n",
-                     static_cast<int>(value.size()), value.data());
+        ::std::fprintf(stderr, "Invalid --backend value: %.*s\n",
+                       static_cast<int>(value.size()), value.data());
         return false;
       }
       continue;
     }
 
-    std::fprintf(stderr, "Unknown arg: %.*s\n", static_cast<int>(arg.size()),
-                 arg.data());
+    ::std::fprintf(stderr, "Unknown arg: %.*s\n", static_cast<int>(arg.size()),
+                   arg.data());
     PrintUsage(argv[0]);
     return false;
   }

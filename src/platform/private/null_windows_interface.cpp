@@ -17,6 +17,8 @@ WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 
   NullWindowEntry entry;
   entry.Desc = desc;
+  entry.TitleStorage = desc.Title ? desc.Title : "";
+  entry.Desc.Title = entry.TitleStorage.c_str();
   entry.ClientSize = {static_cast<u32>(desc.Size.X),
                       static_cast<u32>(desc.Size.Y)};
   entry.Decorated = desc.Decorated;
@@ -99,7 +101,8 @@ void NullWindowsBackend::SetTitle(WindowHandle window,
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
     return;
-  it->second.Desc.Title = title;
+  it->second.TitleStorage = title ? title : "";
+  it->second.Desc.Title = it->second.TitleStorage.c_str();
 }
 
 DpiInfo NullWindowsBackend::GetDpi(WindowHandle window) const noexcept
@@ -129,7 +132,7 @@ const char* NullWindowsBackend::GetTitle(WindowHandle window) const noexcept
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
     return "";
-  return it->second.Desc.Title;
+  return it->second.TitleStorage.c_str();
 }
 
 void NullWindowsBackend::SetPosition(WindowHandle window,

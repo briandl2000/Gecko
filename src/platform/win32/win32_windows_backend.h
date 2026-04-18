@@ -2,10 +2,6 @@
 
 #if defined(_WIN32)
 
-#include "gecko/core/services/events.h"
-#include "gecko/platform/platform_events.h"
-#include "gecko/platform/windows_interface.h"
-
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -20,6 +16,10 @@
 // Windows.h defines CreateWindow as a macro (CreateWindowA/W), which collides
 // with our IWindowsBackend::CreateWindow virtual method.
 #undef CreateWindow
+
+#include "gecko/core/services/events.h"
+#include "gecko/platform/platform_events.h"
+#include "gecko/platform/windows_interface.h"
 
 namespace gecko::platform {
 
@@ -88,7 +88,7 @@ private:
     bool Resizable {true};
     bool AlwaysOnTop {false};
     bool Alive {true};
-    std::string TitleStorage;
+    ::std::string TitleStorage;
     // Saved style/position for fullscreen restoration.
     DWORD SavedStyle {0};
     DWORD SavedExStyle {0};
@@ -138,8 +138,8 @@ private:
 
   u64 m_NextId {0};
   ATOM m_WndClass {0};
-  std::unordered_map<u64, Win32WindowEntry> m_Windows;
-  std::vector<StagedEvent> m_Staged;
+  ::std::unordered_map<u64, Win32WindowEntry> m_Windows;
+  ::std::vector<StagedEvent> m_Staged;
 
   // Emitter pointer held during PumpEvents so WM_TIMER can flush events
   // while Windows runs its internal modal drag/resize loop.

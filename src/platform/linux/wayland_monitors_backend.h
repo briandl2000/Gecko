@@ -5,6 +5,7 @@
 #include "gecko/platform/monitors_interface.h"
 
 #include <deque>
+#include <list>
 #include <vector>
 #include <wayland-client.h>
 
@@ -66,8 +67,8 @@ private:
 
   wl_display* m_Display {nullptr};
   wl_registry* m_Registry {nullptr};
-  std::deque<WaylandMonitorEntry> m_Monitors;
-  std::vector<MonitorHandle> m_RemovedHandles;
+  ::std::list<WaylandMonitorEntry> m_Monitors;
+  ::std::vector<MonitorHandle> m_RemovedHandles;
   bool m_Dirty {false};
 };
 

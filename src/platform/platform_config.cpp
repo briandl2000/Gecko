@@ -38,6 +38,9 @@ namespace {
     ::XCloseDisplay(dpy);
     return true;
   }
+  GECKO_WARN(labels::Platform,
+             "X11: XOpenDisplay failed – DISPLAY not set or X server "
+             "unreachable");
   return false;
 #else
   return false;
@@ -53,6 +56,9 @@ namespace {
     ::wl_display_disconnect(dpy);
     return true;
   }
+  GECKO_WARN(labels::Platform,
+             "Wayland: wl_display_connect failed – WAYLAND_DISPLAY not set or "
+             "compositor unreachable");
   return false;
 #else
   return false;

@@ -14,6 +14,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 
 namespace gecko::platform {
 
@@ -150,7 +151,7 @@ void WaylandMonitorsBackend::EnumerateMonitors() noexcept
 
   // Mark first monitor as primary (Wayland has no primary concept)
   if (!m_Monitors.empty())
-    m_Monitors[0].Info.IsPrimary = true;
+    m_Monitors.front().Info.IsPrimary = true;
 
   GECKO_INFO(labels::General,
              "WaylandMonitorsBackend: enumerated %u monitor(s)",
@@ -166,7 +167,9 @@ MonitorHandle WaylandMonitorsBackend::GetMonitorHandle(u32 index) const noexcept
 {
   if (index >= static_cast<u32>(m_Monitors.size()))
     return {};
-  return m_Monitors[index].Handle;
+  auto it = m_Monitors.begin();
+  ::std::advance(it, index);
+  return it->Handle;
 }
 
 MonitorInfo WaylandMonitorsBackend::GetMonitorProperties(
@@ -190,7 +193,7 @@ MonitorHandle WaylandMonitorsBackend::GetPrimaryMonitor() const noexcept
       return entry.Handle;
   }
   if (!m_Monitors.empty())
-    return m_Monitors[0].Handle;
+    return m_Monitors.front().Handle;
   return {};
 }
 
@@ -237,8 +240,7 @@ void WaylandMonitorsBackend::HandleGlobal(wl_registry* registry, u32 name,
 
   m_Monitors.push_back(entry);
 
-  // Listener data points into the vector — stable because we don't
-  // erase during enumeration and the vector only grows here.
+  // Listener data points into the list — stable through insert and erase.
   ::wl_output_add_listener(output, &OutputListener, &m_Monitors.back());
 
   m_Dirty = true;

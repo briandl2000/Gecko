@@ -4,6 +4,7 @@
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/windows_interface.h"
 
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -12,6 +13,7 @@ namespace gecko::platform {
 struct NullWindowEntry
 {
   WindowDesc Desc {};
+  ::std::string TitleStorage;
   Extent2D ClientSize {};
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
@@ -88,8 +90,8 @@ private:
   static u64 NowNsSafe() noexcept;
 
   u64 m_NextId {0};
-  std::unordered_map<u64, NullWindowEntry> m_Windows;
-  std::vector<StagedEvent> m_Staged;
+  ::std::unordered_map<u64, NullWindowEntry> m_Windows;
+  ::std::vector<StagedEvent> m_Staged;
 };
 
 }  // namespace gecko::platform

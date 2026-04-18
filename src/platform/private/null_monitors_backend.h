@@ -30,7 +30,7 @@ private:
     MonitorInfo Info {};
   };
 
-  std::vector<MonitorEntry> m_Monitors;
+  ::std::vector<MonitorEntry> m_Monitors;
 };
 
 }  // namespace gecko::platform

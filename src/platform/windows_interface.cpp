@@ -61,9 +61,8 @@ Unique<IWindowsBackend> IWindowsBackend::Create(
 #endif
 
   case DisplayBackendKind::Cocoa:
-    // TODO: implement Cocoa window backend
     GECKO_WARN(labels::General,
-               "Cocoa window backend not yet implemented; using Null");
+               "Cocoa window backend not available; using Null");
     return CreateUnique<NullWindowsBackend>();
 
   default:

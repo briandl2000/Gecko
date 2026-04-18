@@ -262,7 +262,7 @@ int main()
     {
       PlatformContext* Ctx;
       WindowHandle MainWindow;
-      std::vector<WindowHandle> Spawned;
+      ::std::vector<WindowHandle> Spawned;
       bool Running {true};
     };
 
@@ -702,6 +702,6 @@ int main()
 
   GECKO_SHUTDOWN();
 
-  std::printf("Application exited successfully\n");
+  ::std::printf("Application exited successfully\n");
   return 0;
 }

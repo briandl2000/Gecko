@@ -18,6 +18,9 @@ namespace gecko::platform {
 
 namespace {
 
+constexpr i32 DefaultCursorSize = 24;
+constexpr u32 PlaceholderBufferColor = 0xFF333333;  // ARGB dark grey
+
 // ── Xkbcommon key mapping ──────────────────────────────────────────────
 
 #if defined(GECKO_HAS_XKBCOMMON)
@@ -309,7 +312,7 @@ const wl_pointer_listener kPointerListener = {PtrEnter,
 
 WaylandWindowsBackend::WaylandWindowsBackend() noexcept
 {
-  m_Display = wl_display_connect(nullptr);
+  m_Display = ::wl_display_connect(nullptr);
   if (!m_Display)
   {
     GECKO_ERROR(labels::General, "Failed to connect to Wayland display");
@@ -318,7 +321,7 @@ WaylandWindowsBackend::WaylandWindowsBackend() noexcept
 
   m_Registry = wl_display_get_registry(m_Display);
   wl_registry_add_listener(m_Registry, &kRegistryListener, this);
-  wl_display_roundtrip(m_Display);
+  ::wl_display_roundtrip(m_Display);
 
   if (!m_WmBase)
   {
@@ -335,13 +338,13 @@ WaylandWindowsBackend::WaylandWindowsBackend() noexcept
   // Load cursor theme for default cursor.
   if (m_Shm)
   {
-    m_CursorTheme = wl_cursor_theme_load(nullptr, 24, m_Shm);
+    m_CursorTheme = ::wl_cursor_theme_load(nullptr, DefaultCursorSize, m_Shm);
     if (m_CursorTheme)
       m_CursorSurface = wl_compositor_create_surface(m_Compositor);
   }
 
 #if defined(GECKO_HAS_XKBCOMMON)
-  m_XkbContext = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+  m_XkbContext = ::xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 #endif
 
   GECKO_INFO(labels::General,
@@ -367,11 +370,11 @@ WaylandWindowsBackend::~WaylandWindowsBackend() noexcept
 
 #if defined(GECKO_HAS_XKBCOMMON)
   if (m_XkbState)
-    xkb_state_unref(m_XkbState);
+    ::xkb_state_unref(m_XkbState);
   if (m_XkbKeymap)
-    xkb_keymap_unref(m_XkbKeymap);
+    ::xkb_keymap_unref(m_XkbKeymap);
   if (m_XkbContext)
-    xkb_context_unref(m_XkbContext);
+    ::xkb_context_unref(m_XkbContext);
 #endif
 
   if (m_Pointer)
@@ -381,7 +384,7 @@ WaylandWindowsBackend::~WaylandWindowsBackend() noexcept
   if (m_CursorSurface)
     wl_surface_destroy(m_CursorSurface);
   if (m_CursorTheme)
-    wl_cursor_theme_destroy(m_CursorTheme);
+    ::wl_cursor_theme_destroy(m_CursorTheme);
   if (m_DecorationManager)
     zxdg_decoration_manager_v1_destroy(m_DecorationManager);
   if (m_Seat)
@@ -396,7 +399,7 @@ WaylandWindowsBackend::~WaylandWindowsBackend() noexcept
     wl_registry_destroy(m_Registry);
   if (m_Display)
   {
-    wl_display_disconnect(m_Display);
+    ::wl_display_disconnect(m_Display);
     m_Display = nullptr;
   }
 }
@@ -522,6 +525,8 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
   auto& ws = m_Windows[id];
   ws.GeckoId = id;
   ws.Desc = desc;
+  ws.TitleStorage = desc.Title ? desc.Title : "Gecko";
+  ws.Desc.Title = ws.TitleStorage.c_str();
   ws.ClientSize = {static_cast<u32>(desc.Size.X > 0 ? desc.Size.X : 1280),
                    static_cast<u32>(desc.Size.Y > 0 ? desc.Size.Y : 720)};
   ws.Decorated = desc.Decorated;
@@ -544,14 +549,31 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
 
   // Create xdg_surface.
   ws.XdgSurface = xdg_wm_base_get_xdg_surface(m_WmBase, ws.Surface);
+  if (!ws.XdgSurface)
+  {
+    GECKO_ERROR(labels::General, "Failed to create xdg_surface");
+    m_WindowBySurface.erase(ws.Surface);
+    wl_surface_destroy(ws.Surface);
+    m_Windows.erase(id);
+    return {};
+  }
   xdg_surface_add_listener(ws.XdgSurface, &kXdgSurfaceListener, &ws);
 
   // Create xdg_toplevel.
   ws.Toplevel = xdg_surface_get_toplevel(ws.XdgSurface);
+  if (!ws.Toplevel)
+  {
+    GECKO_ERROR(labels::General, "Failed to create xdg_toplevel");
+    m_WindowBySurface.erase(ws.Surface);
+    xdg_surface_destroy(ws.XdgSurface);
+    wl_surface_destroy(ws.Surface);
+    m_Windows.erase(id);
+    return {};
+  }
 
   // Store listener data for toplevel callbacks.
   // We use a static map to keep listener data alive.
-  static std::unordered_map<u64, ToplevelListenerData> s_ToplevelData;
+  static ::std::unordered_map<u64, ToplevelListenerData> s_ToplevelData;
   s_ToplevelData[id] = {this, &ws};
   xdg_toplevel_add_listener(ws.Toplevel, &kToplevelListener,
                             &s_ToplevelData[id]);
@@ -596,7 +618,7 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
 
   // Commit the surface to trigger the initial configure.
   wl_surface_commit(ws.Surface);
-  wl_display_roundtrip(m_Display);
+  ::wl_display_roundtrip(m_Display);
 
   // Handle the initial configure.
   if (ws.ConfigurePending)
@@ -650,7 +672,7 @@ void WaylandWindowsBackend::DestroyWindow(WindowHandle window) noexcept
   }
 
   if (m_Display)
-    wl_display_flush(m_Display);
+    ::wl_display_flush(m_Display);
 
   m_Staged.push_back(MakeStagedEvent(
       events::WindowClosed, events::WindowClosedPayload {window, NowNsSafe()}));
@@ -710,7 +732,8 @@ void WaylandWindowsBackend::SetTitle(WindowHandle window,
   if (it == m_Windows.end())
     return;
 
-  it->second.Desc.Title = title;
+  it->second.TitleStorage = title ? title : "";
+  it->second.Desc.Title = it->second.TitleStorage.c_str();
   if (it->second.Toplevel && title)
     xdg_toplevel_set_title(it->second.Toplevel, title);
 }
@@ -720,7 +743,7 @@ const char* WaylandWindowsBackend::GetTitle(WindowHandle window) const noexcept
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
     return "";
-  return it->second.Desc.Title;
+  return it->second.TitleStorage.c_str();
 }
 
 void WaylandWindowsBackend::SetPosition(WindowHandle window,
@@ -746,7 +769,11 @@ math::Int2 WaylandWindowsBackend::GetPosition(
 
 DpiInfo WaylandWindowsBackend::GetDpi(WindowHandle /*window*/) const noexcept
 {
-  // TODO: query wl_output scale for the surface's output.
+  // TODO: query wl_output scale for the surface's current output.
+  // Requires tracking which wl_output each surface is on via
+  // wl_surface.enter/leave events.
+  GECKO_DEBUG(labels::Window, "GetDpi: not yet implemented on Wayland, "
+                              "returning default 96 DPI / 1.0x scale");
   return DpiInfo {};
 }
 
@@ -802,13 +829,17 @@ void WaylandWindowsBackend::SetWindowState(WindowHandle window,
     break;
 
   case platform::WindowState::Hidden:
-    // Hiding on Wayland can be done by unmapping (destroy + recreate surface),
-    // but that's heavy. For now, store state only.
+    // Hiding on Wayland requires unmapping the xdg-surface (destroy +
+    // recreate), which is a heavyweight operation with side-effects.
+    // For now, store state only and log a warning.
+    GECKO_WARN(labels::Window,
+               "WindowState::Hidden is not fully implemented on Wayland; "
+               "the window will remain visible");
     break;
   }
 
   if (m_Display)
-    wl_display_flush(m_Display);
+    ::wl_display_flush(m_Display);
 
   ws.State = state;
   m_Staged.push_back(MakeStagedEvent(
@@ -890,7 +921,7 @@ void WaylandWindowsBackend::SetResizable(WindowHandle window,
       xdg_toplevel_set_max_size(it->second.Toplevel, w, h);
     }
     if (m_Display)
-      wl_display_flush(m_Display);
+      ::wl_display_flush(m_Display);
   }
 }
 
@@ -929,7 +960,7 @@ void WaylandWindowsBackend::SetWindowMode(WindowHandle window,
 
   it->second.Mode = mode;
   if (m_Display)
-    wl_display_flush(m_Display);
+    ::wl_display_flush(m_Display);
 }
 
 WindowMode WaylandWindowsBackend::GetWindowMode(
@@ -976,7 +1007,7 @@ void WaylandWindowsBackend::SetMinSize(WindowHandle window,
         it->second.Toplevel, size.Width > 0 ? static_cast<i32>(size.Width) : 1,
         size.Height > 0 ? static_cast<i32>(size.Height) : 1);
     if (m_Display)
-      wl_display_flush(m_Display);
+      ::wl_display_flush(m_Display);
   }
 }
 
@@ -994,7 +1025,7 @@ void WaylandWindowsBackend::SetMaxSize(WindowHandle window,
         it->second.Toplevel, size.Width > 0 ? static_cast<i32>(size.Width) : 0,
         size.Height > 0 ? static_cast<i32>(size.Height) : 0);
     if (m_Display)
-      wl_display_flush(m_Display);
+      ::wl_display_flush(m_Display);
   }
 }
 
@@ -1049,11 +1080,12 @@ void WaylandWindowsBackend::ApplyCursorVisibility(
     // Restore default cursor.
     if (m_CursorTheme && m_CursorSurface)
     {
-      wl_cursor* cursor = wl_cursor_theme_get_cursor(m_CursorTheme, "left_ptr");
+      wl_cursor* cursor =
+          ::wl_cursor_theme_get_cursor(m_CursorTheme, "left_ptr");
       if (cursor && cursor->image_count > 0)
       {
         wl_cursor_image* image = cursor->images[0];
-        wl_buffer* buffer = wl_cursor_image_get_buffer(image);
+        wl_buffer* buffer = ::wl_cursor_image_get_buffer(image);
         wl_surface_attach(m_CursorSurface, buffer, 0, 0);
         wl_surface_damage(m_CursorSurface, 0, 0, static_cast<i32>(image->width),
                           static_cast<i32>(image->height));
@@ -1097,11 +1129,11 @@ void WaylandWindowsBackend::AttachBlankBuffer(WaylandWindowState& ws) noexcept
     return;
   }
 
-  // Fill with dark grey (ARGB 0xFF333333).
+  // Fill placeholder buffer.
   auto* pixels = static_cast<u32*>(data);
   const i32 count = w * h;
   for (i32 i = 0; i < count; ++i)
-    pixels[i] = 0xFF333333;
+    pixels[i] = PlaceholderBufferColor;
 
   wl_shm_pool* pool = wl_shm_create_pool(m_Shm, fd, size);
   wl_buffer* buffer =
@@ -1135,19 +1167,19 @@ void WaylandWindowsBackend::PumpEvents(
     return;
 
   // Non-blocking dispatch: prepare + read (if ready) + dispatch.
-  wl_display_flush(m_Display);
-  if (wl_display_prepare_read(m_Display) == 0)
+  ::wl_display_flush(m_Display);
+  if (::wl_display_prepare_read(m_Display) == 0)
   {
     // Poll with zero timeout (non-blocking).
     struct pollfd pfd {};
-    pfd.fd = wl_display_get_fd(m_Display);
+    pfd.fd = ::wl_display_get_fd(m_Display);
     pfd.events = POLLIN;
     if (::poll(&pfd, 1, 0) > 0)
-      wl_display_read_events(m_Display);
+      ::wl_display_read_events(m_Display);
     else
-      wl_display_cancel_read(m_Display);
+      ::wl_display_cancel_read(m_Display);
   }
-  wl_display_dispatch_pending(m_Display);
+  ::wl_display_dispatch_pending(m_Display);
 
   // Process configure events.
   for (auto& [id, ws] : m_Windows)
@@ -1199,23 +1231,23 @@ void WaylandWindowsBackend::OnKeyboardKeymap(wl_keyboard* /*kb*/, u32 format,
 
   if (m_XkbState)
   {
-    xkb_state_unref(m_XkbState);
+    ::xkb_state_unref(m_XkbState);
     m_XkbState = nullptr;
   }
   if (m_XkbKeymap)
   {
-    xkb_keymap_unref(m_XkbKeymap);
+    ::xkb_keymap_unref(m_XkbKeymap);
     m_XkbKeymap = nullptr;
   }
 
   m_XkbKeymap =
-      xkb_keymap_new_from_string(m_XkbContext, map, XKB_KEYMAP_FORMAT_TEXT_V1,
-                                 XKB_KEYMAP_COMPILE_NO_FLAGS);
+      ::xkb_keymap_new_from_string(m_XkbContext, map, XKB_KEYMAP_FORMAT_TEXT_V1,
+                                   XKB_KEYMAP_COMPILE_NO_FLAGS);
   ::munmap(map, size);
   ::close(fd);
 
   if (m_XkbKeymap)
-    m_XkbState = xkb_state_new(m_XkbKeymap);
+    m_XkbState = ::xkb_state_new(m_XkbKeymap);
 #else
   (void)format;
   ::close(fd);
@@ -1265,9 +1297,9 @@ void WaylandWindowsBackend::OnKeyboardKey(wl_keyboard* /*kb*/, u32 /*serial*/,
 #if defined(GECKO_HAS_XKBCOMMON)
   // evdev scancode → xkb keycode (offset by 8)
   const xkb_keycode_t xkbCode = key + 8;
-  const xkb_keysym_t sym = m_XkbState
-                               ? xkb_state_key_get_one_sym(m_XkbState, xkbCode)
-                               : XKB_KEY_NoSymbol;
+  const xkb_keysym_t sym =
+      m_XkbState ? ::xkb_state_key_get_one_sym(m_XkbState, xkbCode)
+                 : XKB_KEY_NoSymbol;
   const KeyCode kc = XkbKeysymToKeyCode(sym);
 
   m_Staged.push_back(MakeStagedEvent(
@@ -1279,7 +1311,7 @@ void WaylandWindowsBackend::OnKeyboardKey(wl_keyboard* /*kb*/, u32 /*serial*/,
   {
     char buf[8] {};
     const int len =
-        xkb_state_key_get_utf8(m_XkbState, xkbCode, buf, sizeof(buf));
+        ::xkb_state_key_get_utf8(m_XkbState, xkbCode, buf, sizeof(buf));
     if (len == 1)
     {
       const unsigned char c = static_cast<unsigned char>(buf[0]);
@@ -1308,8 +1340,8 @@ void WaylandWindowsBackend::OnKeyboardModifiers(wl_keyboard* /*kb*/,
 #if defined(GECKO_HAS_XKBCOMMON)
   if (m_XkbState)
   {
-    xkb_state_update_mask(m_XkbState, modsDepressed, modsLatched, modsLocked, 0,
-                          0, group);
+    ::xkb_state_update_mask(m_XkbState, modsDepressed, modsLatched, modsLocked,
+                            0, 0, group);
   }
 #else
   (void)modsDepressed;

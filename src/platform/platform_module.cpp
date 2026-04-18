@@ -7,8 +7,9 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <timeapi.h>
 #include <Windows.h>
+// neds to be after Windows.h to avoid macro conflicts (e.g. with CreateWindow).
+#include <timeapi.h>
 #pragma comment(lib, "Winmm.lib")
 #endif
 

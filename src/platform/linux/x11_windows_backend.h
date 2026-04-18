@@ -7,6 +7,7 @@
 #include "gecko/platform/windows_interface.h"
 
 #include <cstring>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -25,6 +26,7 @@ namespace gecko::platform {
 struct X11WindowState
 {
   WindowDesc Desc {};
+  ::std::string TitleStorage;
   Extent2D ClientSize {};
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
@@ -151,9 +153,9 @@ private:
   Atom m_MotifWmHints {0};
   u64 m_NextId {0};
 
-  std::unordered_map<u64, X11WindowState> m_Windows;
-  std::unordered_map<::Window, u64> m_WindowByXid;
-  std::vector<StagedEvent> m_Staged;
+  ::std::unordered_map<u64, X11WindowState> m_Windows;
+  ::std::unordered_map<::Window, u64> m_WindowByXid;
+  ::std::vector<StagedEvent> m_Staged;
 };
 
 Unique<IWindowsBackend> CreateXlibWindowsBackend() noexcept;

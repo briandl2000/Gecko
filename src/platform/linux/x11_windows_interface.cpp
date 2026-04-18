@@ -16,6 +16,15 @@
 
 namespace gecko::platform {
 
+namespace {
+int X11ErrorHandler(::Display* /*display*/, ::XErrorEvent* event)
+{
+  GECKO_WARN(labels::General, "X11 error: request=%u, error=%u, serial=%lu",
+             event->request_code, event->error_code, event->serial);
+  return 0;
+}
+}  // namespace
+
 // ── Constructor / Destructor ───────────────────────────────────────────
 
 X11WindowsBackend::X11WindowsBackend() noexcept
@@ -26,6 +35,8 @@ X11WindowsBackend::X11WindowsBackend() noexcept
     GECKO_ERROR(labels::General, "Failed to open X display");
     return;
   }
+
+  ::XSetErrorHandler(X11ErrorHandler);
 
   m_WmDeleteWindow = ::XInternAtom(m_Display, "WM_DELETE_WINDOW", False);
   m_WmProtocols = ::XInternAtom(m_Display, "WM_PROTOCOLS", False);
@@ -122,6 +133,8 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 
   X11WindowState st;
   st.Desc = appliedDesc;
+  st.TitleStorage = appliedDesc.Title ? appliedDesc.Title : "";
+  st.Desc.Title = st.TitleStorage.c_str();
   st.ClientSize = Extent2D {static_cast<u32>(width), static_cast<u32>(height)};
   st.Decorated = desc.Decorated;
   st.Resizable = desc.Resizable;
@@ -386,14 +399,18 @@ void X11WindowsBackend::SetTitle(WindowHandle window,
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
     return;
-  it->second.Desc.Title = title;
+  it->second.TitleStorage = title ? title : "";
+  it->second.Desc.Title = it->second.TitleStorage.c_str();
   if (m_Display && it->second.WindowId != 0 && title)
     ::XStoreName(m_Display, it->second.WindowId, title);
 }
 
-DpiInfo X11WindowsBackend::GetDpi(WindowHandle window) const noexcept
+DpiInfo X11WindowsBackend::GetDpi(WindowHandle /*window*/) const noexcept
 {
-  (void)window;
+  // TODO: query Xft.dpi resource or compute from XRRGetOutputInfo physical
+  // dimensions and resolution.
+  GECKO_DEBUG(labels::Window, "GetDpi: not yet implemented on X11, "
+                              "returning default 96 DPI / 1.0x scale");
   return DpiInfo {};
 }
 
@@ -429,7 +446,7 @@ const char* X11WindowsBackend::GetTitle(WindowHandle window) const noexcept
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
     return "";
-  return it->second.Desc.Title;
+  return it->second.TitleStorage.c_str();
 }
 
 void X11WindowsBackend::SetPosition(WindowHandle window,

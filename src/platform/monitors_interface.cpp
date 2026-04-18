@@ -59,9 +59,8 @@ Unique<IMonitorsBackend> IMonitorsBackend::Create(
 #endif
 
   case DisplayBackendKind::Cocoa:
-    // TODO: implement Cocoa monitor backend (NSScreen)
     GECKO_WARN(labels::General,
-               "Cocoa monitor backend not yet implemented; using Null");
+               "Cocoa monitor backend not available; using Null");
     return CreateNullMonitorsBackend();
 
   default:

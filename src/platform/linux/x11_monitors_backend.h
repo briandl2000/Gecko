@@ -41,7 +41,7 @@ private:
 
   Display* m_Display {nullptr};
   int m_RREventBase {-1};
-  std::vector<MonitorEntry> m_Monitors;
+  ::std::vector<MonitorEntry> m_Monitors;
 };
 
 Unique<IMonitorsBackend> CreateXlibMonitorsBackend() noexcept;

@@ -2,6 +2,17 @@
 
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
 
+#include <cstring>
+#include <string>
+#include <unordered_map>
+#include <vector>
+#include <wayland-client.h>
+#include <wayland-cursor.h>
+
+#if defined(GECKO_HAS_XKBCOMMON)
+#include <xkbcommon/xkbcommon.h>
+#endif
+
 #include "gecko/core/services/events.h"
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/windows_interface.h"
@@ -14,16 +25,6 @@ struct zxdg_toplevel_decoration_v1;
 #endif
 #include "xdg-shell-client-protocol.h"
 
-#include <cstring>
-#include <unordered_map>
-#include <vector>
-#include <wayland-client.h>
-#include <wayland-cursor.h>
-
-#if defined(GECKO_HAS_XKBCOMMON)
-#include <xkbcommon/xkbcommon.h>
-#endif
-
 namespace gecko::platform {
 
 // ── Per-window state ───────────────────────────────────────────────────
@@ -31,6 +32,7 @@ namespace gecko::platform {
 struct WaylandWindowState
 {
   WindowDesc Desc {};
+  ::std::string TitleStorage;
   Extent2D ClientSize {};
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
@@ -200,9 +202,9 @@ private:
   u64 m_FocusedKeyboard {0};
   u64 m_FocusedPointer {0};
 
-  std::unordered_map<u64, WaylandWindowState> m_Windows;
-  std::unordered_map<wl_surface*, u64> m_WindowBySurface;
-  std::vector<StagedEvent> m_Staged;
+  ::std::unordered_map<u64, WaylandWindowState> m_Windows;
+  ::std::unordered_map<wl_surface*, u64> m_WindowBySurface;
+  ::std::vector<StagedEvent> m_Staged;
 };
 
 Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;

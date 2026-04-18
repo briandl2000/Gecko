@@ -2,14 +2,14 @@
 
 #if defined(_WIN32)
 
-#include "gecko/platform/monitors_interface.h"
-
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include "gecko/platform/monitors_interface.h"
+
 #include <vector>
 #include <Windows.h>
 
@@ -41,7 +41,7 @@ private:
   static BOOL CALLBACK EnumProc(HMONITOR hMonitor, HDC hdc, LPRECT lpRect,
                                 LPARAM lParam) noexcept;
 
-  std::vector<MonitorEntry> m_Monitors;
+  ::std::vector<MonitorEntry> m_Monitors;
 };
 
 Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept;
