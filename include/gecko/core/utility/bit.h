@@ -59,4 +59,17 @@ GECKO_API constexpr bool Any(E a) noexcept
 {
   return ToUnderlying(a) != 0;
 }
+
+template <EnumFlag E>
+GECKO_API constexpr E operator~(E a) noexcept
+{
+  using U = ::std::underlying_type_t<E>;
+  return static_cast<E>(~static_cast<U>(a));
+}
+
+template <EnumFlag E>
+GECKO_API constexpr E& operator&=(E& a, E b) noexcept
+{
+  return a = a & b;
+}
 }  // namespace gecko

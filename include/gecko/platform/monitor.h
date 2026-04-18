@@ -68,4 +68,10 @@ struct MonitorInfo
   }
 };
 
+struct MonitorBounds
+{
+  math::Rect2D Bounds {};
+  math::Rect2D WorkArea {};
+};
+
 }  // namespace gecko::platform

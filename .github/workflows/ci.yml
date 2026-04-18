@@ -7,9 +7,9 @@ on:
     branches: [main, dev]
 
 jobs:
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # Build & Test - Clang only (clang on Linux, clang-cl on Windows)
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   build-and-test:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -25,7 +25,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -105,9 +105,9 @@ jobs:
           done
           exit $failed
 
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # PR checks - enforce version bump and changelog for PRs to main
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   pr-checks:
     name: PR Checks (main)
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
@@ -159,9 +159,9 @@ jobs:
           fi
           echo "Changelog updated"
 
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # Resolve version - compute version string once for all downstream jobs
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   resolve-version:
     name: Resolve Version
     needs: build-and-test
@@ -205,9 +205,9 @@ jobs:
           
           echo "Resolved version: $(cat $GITHUB_OUTPUT | grep ^version= | cut -d= -f2)"
 
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # Package - only on push (merge) to dev or main
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   package:
     name: Package (${{ matrix.os }})
     needs: resolve-version
@@ -229,7 +229,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev zip
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -294,9 +294,9 @@ jobs:
           path: out/package/*.zip
           retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
 
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # Release - create GitHub release after packaging (dev and main)
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   release:
     name: Create Release
     needs: [resolve-version, package]

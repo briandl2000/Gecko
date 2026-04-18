@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, is_network_path
+from scripts.commands.build import _auto_configure
 
 # Unit test targets (headless, always run)
 UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests"]
@@ -67,6 +68,12 @@ def _run(args) -> int:
     # Ensure tests are enabled in the build configuration
     build_dir_rel = os.path.relpath(BUILD_DIR, _REPO_ROOT)
     cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
+
+    if not os.path.isfile(cache_file):
+        rc = _auto_configure()
+        if rc != 0:
+            return rc
+
     tests_enabled = False
     if os.path.isfile(cache_file):
         with open(cache_file) as f:

@@ -1,4 +1,4 @@
-#include "gecko/platform/platform_config.h"
+#include "wayland_monitors_backend.h"
 
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
 
@@ -8,46 +8,18 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
-#include "gecko/platform/monitors_interface.h"
 #include "gecko/platform/platform_events.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
-#include <deque>
-#include <vector>
-#include <wayland-client.h>
+#include <iterator>
 
 namespace gecko::platform {
 
 namespace {
-
-struct WaylandMonitorEntry
-{
-  MonitorHandle Handle {};
-  MonitorInfo Info {};
-  wl_output* Output {nullptr};
-  u32 GlobalName {0};
-  bool Done {false};
-  bool Announced {false};
-
-  // Snapshot of last-emitted state for reconfigured detection.
-  MonitorInfo LastInfo {};
-
-  // Pending state accumulated from wl_output events before "done".
-  i32 PendingX {0};
-  i32 PendingY {0};
-  i32 PendingPhysicalW {0};
-  i32 PendingPhysicalH {0};
-  i32 PendingModeW {0};
-  i32 PendingModeH {0};
-  u32 PendingRefreshMHz {0};
-  i32 PendingScale {1};
-  char PendingName[MaxMonitorNameLength] {};
-};
-
-static void OutputGeometry(void* data, wl_output* /*output*/, i32 x, i32 y,
+static void OutputGeometry(void* data, ::wl_output* /*output*/, i32 x, i32 y,
                            i32 physW, i32 physH, i32 /*subpixel*/,
                            const char* make, const char* model,
                            i32 /*transform*/)
@@ -69,8 +41,8 @@ static void OutputGeometry(void* data, wl_output* /*output*/, i32 x, i32 y,
   ::std::strncpy(entry->PendingName, name, sizeof(entry->PendingName) - 1);
 }
 
-static void OutputMode(void* data, wl_output* /*output*/, u32 flags, i32 width,
-                       i32 height, i32 refresh)
+static void OutputMode(void* data, ::wl_output* /*output*/, u32 flags,
+                       i32 width, i32 height, i32 refresh)
 {
   if (!(flags & WL_OUTPUT_MODE_CURRENT))
     return;
@@ -80,7 +52,7 @@ static void OutputMode(void* data, wl_output* /*output*/, u32 flags, i32 width,
   entry->PendingRefreshMHz = static_cast<u32>(refresh);
 }
 
-static void OutputDone(void* data, wl_output* /*output*/)
+static void OutputDone(void* data, ::wl_output* /*output*/)
 {
   auto* entry = static_cast<WaylandMonitorEntry*>(data);
   entry->Done = true;
@@ -106,269 +78,243 @@ static void OutputDone(void* data, wl_output* /*output*/)
   }
 }
 
-static void OutputScale(void* data, wl_output* /*output*/, i32 factor)
+static void OutputScale(void* data, ::wl_output* /*output*/, i32 factor)
 {
   auto* entry = static_cast<WaylandMonitorEntry*>(data);
   entry->PendingScale = factor;
 }
 
-static void OutputName(void* data, wl_output* /*output*/, const char* name)
+static void OutputName(void* data, ::wl_output* /*output*/, const char* name)
 {
   auto* entry = static_cast<WaylandMonitorEntry*>(data);
   if (name)
     ::std::strncpy(entry->PendingName, name, MaxMonitorNameLength - 1);
 }
 
-static void OutputDescription(void* /*data*/, wl_output* /*output*/,
+static void OutputDescription(void* /*data*/, ::wl_output* /*output*/,
                               const char* /*description*/)
 {
   // Not used — we prefer the short name.
 }
 
-static constexpr wl_output_listener OutputListener = {
+static constexpr ::wl_output_listener OutputListener = {
     OutputGeometry, OutputMode, OutputDone,
     OutputScale,    OutputName, OutputDescription,
 };
 
 }  // namespace
 
-class WaylandMonitorsBackend final : public IMonitorsBackend
+WaylandMonitorsBackend::WaylandMonitorsBackend() noexcept
 {
-public:
-  WaylandMonitorsBackend() noexcept
+  m_Display = ::wl_display_connect(nullptr);
+  if (!m_Display)
   {
-    m_Display = ::wl_display_connect(nullptr);
-    if (!m_Display)
-    {
-      GECKO_ERROR(labels::General,
-                  "WaylandMonitorsBackend: failed to connect to display");
-      return;
-    }
-
-    m_Registry = ::wl_display_get_registry(m_Display);
-    ::wl_registry_add_listener(m_Registry, &s_RegistryListener, this);
-
-    // Initial roundtrip to discover globals.
-    ::wl_display_roundtrip(m_Display);
-
-    GECKO_INFO(labels::General,
-               "WaylandMonitorsBackend: initialized (display=%p)", m_Display);
+    GECKO_ERROR(labels::General,
+                "WaylandMonitorsBackend: failed to connect to display");
+    return;
   }
 
-  ~WaylandMonitorsBackend() noexcept override
-  {
-    for (auto& entry : m_Monitors)
-    {
-      if (entry.Output)
-        ::wl_output_destroy(entry.Output);
-    }
-    m_Monitors.clear();
+  m_Registry = ::wl_display_get_registry(m_Display);
+  ::wl_registry_add_listener(m_Registry, &s_RegistryListener, this);
 
-    if (m_Registry)
-      ::wl_registry_destroy(m_Registry);
-    if (m_Display)
-      ::wl_display_disconnect(m_Display);
+  // Initial roundtrip to discover globals.
+  ::wl_display_roundtrip(m_Display);
+
+  GECKO_INFO(labels::General,
+             "WaylandMonitorsBackend: initialized (display=%p)", m_Display);
+}
+
+WaylandMonitorsBackend::~WaylandMonitorsBackend() noexcept
+{
+  for (auto& entry : m_Monitors)
+  {
+    if (entry.Output)
+      ::wl_output_destroy(entry.Output);
   }
+  m_Monitors.clear();
 
-  void EnumerateMonitors() noexcept override
+  if (m_Registry)
+    ::wl_registry_destroy(m_Registry);
+  if (m_Display)
+    ::wl_display_disconnect(m_Display);
+}
+
+void WaylandMonitorsBackend::EnumerateMonitors() noexcept
+{
+  GECKO_FUNC(labels::General);
+
+  if (!m_Display)
+    return;
+
+  // Second roundtrip to ensure all ::wl_output events (including done) arrive
+  ::wl_display_roundtrip(m_Display);
+
+  // Mark first monitor as primary (Wayland has no primary concept)
+  if (!m_Monitors.empty())
+    m_Monitors.front().Info.IsPrimary = true;
+
+  GECKO_INFO(labels::General,
+             "WaylandMonitorsBackend: enumerated %u monitor(s)",
+             static_cast<u32>(m_Monitors.size()));
+}
+
+u32 WaylandMonitorsBackend::GetMonitorCount() const noexcept
+{
+  return static_cast<u32>(m_Monitors.size());
+}
+
+MonitorHandle WaylandMonitorsBackend::GetMonitorHandle(u32 index) const noexcept
+{
+  if (index >= static_cast<u32>(m_Monitors.size()))
+    return {};
+  auto it = m_Monitors.begin();
+  ::std::advance(it, index);
+  return it->Handle;
+}
+
+MonitorInfo WaylandMonitorsBackend::GetMonitorProperties(
+    MonitorHandle handle) const noexcept
+{
+  if (!handle.IsValid())
+    return {};
+  for (const auto& entry : m_Monitors)
   {
-    GECKO_FUNC(labels::General);
-
-    if (!m_Display)
-      return;
-
-    // Second roundtrip to ensure all wl_output events (including done) arrive
-    ::wl_display_roundtrip(m_Display);
-
-    // Mark first monitor as primary (Wayland has no primary concept)
-    if (!m_Monitors.empty())
-      m_Monitors[0].Info.IsPrimary = true;
-
-    GECKO_INFO(labels::General,
-               "WaylandMonitorsBackend: enumerated %u monitor(s)",
-               static_cast<u32>(m_Monitors.size()));
+    if (entry.Handle == handle)
+      return entry.Info;
   }
+  return {};
+}
 
-  u32 GetMonitorCount() const noexcept override
+MonitorHandle WaylandMonitorsBackend::GetPrimaryMonitor() const noexcept
+{
+  for (const auto& entry : m_Monitors)
   {
-    return static_cast<u32>(m_Monitors.size());
+    if (entry.Info.IsPrimary)
+      return entry.Handle;
   }
+  if (!m_Monitors.empty())
+    return m_Monitors.front().Handle;
+  return {};
+}
 
-  bool GetMonitorHandle(u32 index,
-                        MonitorHandle& outHandle) const noexcept override
+MonitorBounds WaylandMonitorsBackend::GetMonitorBounds(
+    MonitorHandle handle) const noexcept
+{
+  MonitorInfo info = GetMonitorProperties(handle);
+  return {info.Bounds, info.WorkArea};
+}
+
+void WaylandMonitorsBackend::PumpEvents(
+    const gecko::EventEmitter& emitter) noexcept
+{
+  if (!m_Display)
+    return;
+
+  // Non-blocking dispatch of pending events.
+  ::wl_display_dispatch_pending(m_Display);
+  ::wl_display_flush(m_Display);
+
+  // Check for newly added/removed monitors since last pump.
+  if (m_Dirty)
   {
-    if (index >= static_cast<u32>(m_Monitors.size()))
-      return false;
-    outHandle = m_Monitors[index].Handle;
-    return true;
+    m_Dirty = false;
+    EmitChanges(emitter);
   }
+}
 
-  bool GetMonitorProperties(MonitorHandle handle,
-                            MonitorInfo& outInfo) const noexcept override
+void WaylandMonitorsBackend::HandleGlobal(::wl_registry* registry, u32 name,
+                                          const char* interface) noexcept
+{
+  if (::std::strcmp(interface, wl_output_interface.name) != 0)
+    return;
+
+  auto* output = static_cast<::wl_output*>(
+      ::wl_registry_bind(registry, name, &wl_output_interface, 4));
+  if (!output)
+    return;
+
+  WaylandMonitorEntry entry;
+  entry.Output = output;
+  entry.GlobalName = name;
+  entry.Handle = MonitorHandle {static_cast<u64>(name) + 1};
+
+  m_Monitors.push_back(entry);
+
+  // Listener data points into the list — stable through insert and erase.
+  ::wl_output_add_listener(output, &OutputListener, &m_Monitors.back());
+
+  m_Dirty = true;
+}
+
+void WaylandMonitorsBackend::HandleGlobalRemove(u32 name) noexcept
+{
+  auto it = ::std::find_if(
+      m_Monitors.begin(), m_Monitors.end(),
+      [name](const WaylandMonitorEntry& e) { return e.GlobalName == name; });
+  if (it != m_Monitors.end())
   {
-    if (!handle.IsValid())
-      return false;
-    for (const auto& entry : m_Monitors)
-    {
-      if (entry.Handle == handle)
-      {
-        outInfo = entry.Info;
-        return true;
-      }
-    }
-    return false;
-  }
-
-  bool GetPrimaryMonitor(MonitorHandle& outHandle) const noexcept override
-  {
-    for (const auto& entry : m_Monitors)
-    {
-      if (entry.Info.IsPrimary)
-      {
-        outHandle = entry.Handle;
-        return true;
-      }
-    }
-    if (!m_Monitors.empty())
-    {
-      outHandle = m_Monitors[0].Handle;
-      return true;
-    }
-    return false;
-  }
-
-  bool GetMonitorBounds(MonitorHandle handle, math::Rect2D& outBounds,
-                        math::Rect2D& outWorkArea) const noexcept override
-  {
-    MonitorInfo info;
-    if (!GetMonitorProperties(handle, info))
-      return false;
-    outBounds = info.Bounds;
-    outWorkArea = info.WorkArea;
-    return true;
-  }
-
-  void PumpEvents(const gecko::EventEmitter& emitter) noexcept override
-  {
-    if (!m_Display)
-      return;
-
-    // Non-blocking dispatch of pending events.
-    ::wl_display_dispatch_pending(m_Display);
-    ::wl_display_flush(m_Display);
-
-    // Check for newly added/removed monitors since last pump.
-    if (m_Dirty)
-    {
-      m_Dirty = false;
-      EmitChanges(emitter);
-    }
-  }
-
-private:
-  void HandleGlobal(wl_registry* registry, u32 name,
-                    const char* interface) noexcept
-  {
-    if (::std::strcmp(interface, wl_output_interface.name) != 0)
-      return;
-
-    auto* output = static_cast<wl_output*>(
-        ::wl_registry_bind(registry, name, &wl_output_interface, 4));
-    if (!output)
-      return;
-
-    WaylandMonitorEntry entry;
-    entry.Output = output;
-    entry.GlobalName = name;
-    entry.Handle = MonitorHandle {static_cast<u64>(name) + 1};
-
-    m_Monitors.push_back(entry);
-
-    // Listener data points into the vector — stable because we don't
-    // erase during enumeration and the vector only grows here.
-    ::wl_output_add_listener(output, &OutputListener, &m_Monitors.back());
-
+    m_RemovedHandles.push_back(it->Handle);
+    if (it->Output)
+      ::wl_output_destroy(it->Output);
+    m_Monitors.erase(it);
     m_Dirty = true;
   }
+}
 
-  void HandleGlobalRemove(u32 name) noexcept
+void WaylandMonitorsBackend::EmitChanges(
+    const gecko::EventEmitter& emitter) noexcept
+{
+  const u64 now = NowNsSafe();
+
+  for (const auto& handle : m_RemovedHandles)
   {
-    auto it = ::std::find_if(
-        m_Monitors.begin(), m_Monitors.end(),
-        [name](const WaylandMonitorEntry& e) { return e.GlobalName == name; });
-    if (it != m_Monitors.end())
+    gecko::SendEvent(emitter, events::MonitorDisconnected,
+                     events::MonitorDisconnectedPayload {handle, now});
+  }
+  m_RemovedHandles.clear();
+
+  for (auto& entry : m_Monitors)
+  {
+    if (!entry.Done)
+      continue;
+
+    if (!entry.Announced)
     {
-      m_RemovedHandles.push_back(it->Handle);
-      if (it->Output)
-        ::wl_output_destroy(it->Output);
-      m_Monitors.erase(it);
-      m_Dirty = true;
+      gecko::SendEvent(
+          emitter, events::MonitorConnected,
+          events::MonitorConnectedPayload {entry.Handle, now, entry.Info});
+      entry.Announced = true;
+      entry.LastInfo = entry.Info;
+    }
+    else if (entry.Info.Bounds != entry.LastInfo.Bounds ||
+             entry.Info.RefreshRateMilliHz !=
+                 entry.LastInfo.RefreshRateMilliHz ||
+             entry.Info.Dpi != entry.LastInfo.Dpi ||
+             entry.Info.IsPrimary != entry.LastInfo.IsPrimary)
+    {
+      gecko::SendEvent(
+          emitter, events::MonitorReconfigured,
+          events::MonitorReconfiguredPayload {entry.Handle, now, entry.Info});
+      entry.LastInfo = entry.Info;
     }
   }
+}
 
-  void EmitChanges(const gecko::EventEmitter& emitter) noexcept
-  {
-    const u64 now = NowNsSafe();
+void WaylandMonitorsBackend::RegistryGlobal(void* data, ::wl_registry* registry,
+                                            u32 name, const char* interface,
+                                            u32 /*version*/)
+{
+  auto* self = static_cast<WaylandMonitorsBackend*>(data);
+  self->HandleGlobal(registry, name, interface);
+}
 
-    for (const auto& handle : m_RemovedHandles)
-    {
-      gecko::SendEvent(emitter, events::MonitorDisconnected,
-                       events::MonitorDisconnectedPayload {handle, now});
-    }
-    m_RemovedHandles.clear();
-
-    for (auto& entry : m_Monitors)
-    {
-      if (!entry.Done)
-        continue;
-
-      if (!entry.Announced)
-      {
-        gecko::SendEvent(
-            emitter, events::MonitorConnected,
-            events::MonitorConnectedPayload {entry.Handle, now, entry.Info});
-        entry.Announced = true;
-        entry.LastInfo = entry.Info;
-      }
-      else if (entry.Info.Bounds != entry.LastInfo.Bounds ||
-               entry.Info.RefreshRateMilliHz !=
-                   entry.LastInfo.RefreshRateMilliHz ||
-               entry.Info.Dpi != entry.LastInfo.Dpi ||
-               entry.Info.IsPrimary != entry.LastInfo.IsPrimary)
-      {
-        gecko::SendEvent(
-            emitter, events::MonitorReconfigured,
-            events::MonitorReconfiguredPayload {entry.Handle, now, entry.Info});
-        entry.LastInfo = entry.Info;
-      }
-    }
-  }
-
-  static void RegistryGlobal(void* data, wl_registry* registry, u32 name,
-                             const char* interface, u32 /*version*/)
-  {
-    auto* self = static_cast<WaylandMonitorsBackend*>(data);
-    self->HandleGlobal(registry, name, interface);
-  }
-
-  static void RegistryGlobalRemove(void* data, wl_registry* /*registry*/,
-                                   u32 name)
-  {
-    auto* self = static_cast<WaylandMonitorsBackend*>(data);
-    self->HandleGlobalRemove(name);
-  }
-
-  static constexpr wl_registry_listener s_RegistryListener = {
-      RegistryGlobal,
-      RegistryGlobalRemove,
-  };
-
-  wl_display* m_Display {nullptr};
-  wl_registry* m_Registry {nullptr};
-  std::deque<WaylandMonitorEntry> m_Monitors;
-  std::vector<MonitorHandle> m_RemovedHandles;
-  bool m_Dirty {false};
-};
+void WaylandMonitorsBackend::RegistryGlobalRemove(void* data,
+                                                  ::wl_registry* /*registry*/,
+                                                  u32 name)
+{
+  auto* self = static_cast<WaylandMonitorsBackend*>(data);
+  self->HandleGlobalRemove(name);
+}
 
 Unique<IMonitorsBackend> CreateWaylandMonitorsBackend() noexcept
 {

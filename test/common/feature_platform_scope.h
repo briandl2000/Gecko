@@ -13,7 +13,7 @@ namespace gecko::test {
 /// when this returns false.
 inline bool HasLiveDisplay() noexcept
 {
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   // Win32 always has a display available when running interactively.
   return true;
 #elif defined(GECKO_PLATFORM_LINUX)

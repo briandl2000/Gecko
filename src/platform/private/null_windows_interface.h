@@ -4,34 +4,71 @@
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/windows_interface.h"
 
+#include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace gecko::platform {
 
-struct WindowState
+struct NullWindowEntry
 {
   WindowDesc Desc {};
+  ::std::string TitleStorage;
   Extent2D ClientSize {};
+  math::Int2 Position {0, 0};
+  platform::WindowState State {platform::WindowState::Normal};
+  CursorMode Cursor {CursorMode::Normal};
+  WindowMode Mode {WindowMode::Windowed};
+  WindowButtons Buttons {WindowButtons::All};
+  Extent2D MinSize {0, 0};
+  Extent2D MaxSize {0, 0};
+  bool Decorated {true};
+  bool Resizable {true};
+  bool AlwaysOnTop {false};
   bool Alive {true};
 };
 
 class NullWindowsBackend final : public IWindowsBackend
 {
 public:
-  bool CreateWindow(const WindowDesc& desc,
-                    WindowHandle& outWindow) noexcept override;
+  WindowHandle CreateWindow(const WindowDesc& desc) noexcept override;
   void DestroyWindow(WindowHandle window) noexcept override;
   bool IsWindowAlive(WindowHandle window) const noexcept override;
   bool RequestClose(WindowHandle window) noexcept override;
+
   Extent2D GetClientSize(WindowHandle window) const noexcept override;
+  void SetClientSize(WindowHandle window, Extent2D size) noexcept override;
   void SetTitle(WindowHandle window, const char* title) noexcept override;
+  const char* GetTitle(WindowHandle window) const noexcept override;
+  void SetPosition(WindowHandle window, math::Int2 pos) noexcept override;
+  math::Int2 GetPosition(WindowHandle window) const noexcept override;
   DpiInfo GetDpi(WindowHandle window) const noexcept override;
   NativeWindowHandle GetNativeWindowHandle(
       WindowHandle window) const noexcept override;
 
-  /// Drain staged events (from RequestClose / DestroyWindow) and enqueue
-  /// them on the global event bus.  No OS interaction for the null backend.
+  void SetWindowState(WindowHandle window,
+                      platform::WindowState state) noexcept override;
+  platform::WindowState GetWindowState(
+      WindowHandle window) const noexcept override;
+  void SetDecorated(WindowHandle window, bool decorated) noexcept override;
+  bool IsDecorated(WindowHandle window) const noexcept override;
+  void RequestFocus(WindowHandle window) noexcept override;
+
+  void SetResizable(WindowHandle window, bool resizable) noexcept override;
+  bool IsResizable(WindowHandle window) const noexcept override;
+  void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override;
+  WindowMode GetWindowMode(WindowHandle window) const noexcept override;
+  void SetWindowButtons(WindowHandle window,
+                        WindowButtons buttons) noexcept override;
+  WindowButtons GetWindowButtons(WindowHandle window) const noexcept override;
+  void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
+  void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override;
+  bool IsAlwaysOnTop(WindowHandle window) const noexcept override;
+
+  void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override;
+  CursorMode GetCursorMode(WindowHandle window) const noexcept override;
+
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
 
 private:
@@ -44,6 +81,8 @@ private:
     {
       events::WindowClosedPayload Closed;
       events::WindowCloseRequestedPayload CloseRequested;
+      events::WindowMovedPayload Moved;
+      events::WindowStateChangedPayload StateChanged;
     } Data {};
     u32 PayloadSize {0};
   };
@@ -51,8 +90,8 @@ private:
   static u64 NowNsSafe() noexcept;
 
   u64 m_NextId {0};
-  std::unordered_map<u64, WindowState> m_Windows;
-  std::vector<StagedEvent> m_Staged;
+  ::std::unordered_map<u64, NullWindowEntry> m_Windows;
+  ::std::vector<StagedEvent> m_Staged;
 };
 
 }  // namespace gecko::platform

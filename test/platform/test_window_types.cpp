@@ -3,6 +3,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+using namespace gecko;
 using namespace gecko::platform;
 
 TEST_CASE("WindowHandle default is invalid", "[platform][window]")
@@ -77,4 +78,63 @@ TEST_CASE("NativeWindowHandle defaults", "[platform][window]")
   REQUIRE(nh.Backend == DisplayBackendKind::Unknown);
   REQUIRE(nh.Handle == nullptr);
   REQUIRE(nh.Display == nullptr);
+}
+
+TEST_CASE("WindowDesc Decorated defaults to true", "[platform][window]")
+{
+  WindowDesc desc;
+  REQUIRE(desc.Decorated == true);
+}
+
+TEST_CASE("WindowState enum values", "[platform][window]")
+{
+  REQUIRE(WindowState::Normal != WindowState::Minimized);
+  REQUIRE(WindowState::Normal != WindowState::Maximized);
+  REQUIRE(WindowState::Normal != WindowState::Hidden);
+  REQUIRE(WindowState::Minimized != WindowState::Maximized);
+}
+
+TEST_CASE("WindowButtons defaults to All", "[platform][window]")
+{
+  WindowDesc desc;
+  REQUIRE(desc.Buttons == WindowButtons::All);
+}
+
+TEST_CASE("WindowButtons bitwise operators", "[platform][window]")
+{
+  WindowButtons btns = WindowButtons::Close | WindowButtons::Minimize;
+  REQUIRE(Any(btns & WindowButtons::Close));
+  REQUIRE(Any(btns & WindowButtons::Minimize));
+  REQUIRE_FALSE(Any(btns & WindowButtons::Maximize));
+}
+
+TEST_CASE("WindowButtons toggle with XOR", "[platform][window]")
+{
+  WindowButtons btns = WindowButtons::All;
+  btns ^= WindowButtons::Close;
+  REQUIRE_FALSE(Any(btns & WindowButtons::Close));
+  REQUIRE(Any(btns & WindowButtons::Minimize));
+  REQUIRE(Any(btns & WindowButtons::Maximize));
+}
+
+TEST_CASE("WindowButtons complement removes flags", "[platform][window]")
+{
+  WindowButtons btns = WindowButtons::All;
+  btns = btns & ~WindowButtons::Maximize;
+  REQUIRE(Any(btns & WindowButtons::Close));
+  REQUIRE(Any(btns & WindowButtons::Minimize));
+  REQUIRE_FALSE(Any(btns & WindowButtons::Maximize));
+}
+
+TEST_CASE("WindowButtons None has no flags set", "[platform][window]")
+{
+  REQUIRE_FALSE(Any(WindowButtons::None));
+  REQUIRE_FALSE(Any(WindowButtons::None & WindowButtons::Close));
+}
+
+TEST_CASE("WindowMode enum values", "[platform][window]")
+{
+  REQUIRE(WindowMode::Windowed != WindowMode::Fullscreen);
+  REQUIRE(WindowMode::Windowed != WindowMode::BorderlessFullscreen);
+  REQUIRE(WindowMode::Fullscreen != WindowMode::BorderlessFullscreen);
 }

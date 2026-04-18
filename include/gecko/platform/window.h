@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/types.h"
+#include "gecko/core/utility/bit.h"
 #include "gecko/math/vector.h"
 #include "gecko/platform/platform_config.h"
 
@@ -53,6 +54,23 @@ enum class CursorMode : u8
   Locked,
 };
 
+enum class WindowState : u8
+{
+  Normal,
+  Minimized,
+  Maximized,
+  Hidden,
+};
+
+enum class WindowButtons : u8
+{
+  None = 0,
+  Close = Bit(0),
+  Minimize = Bit(1),
+  Maximize = Bit(2),
+  All = Close | Minimize | Maximize,
+};
+
 struct DpiInfo
 {
   u32 Dpi {96};
@@ -64,8 +82,10 @@ struct WindowDesc
   const char* Title {"Gecko"};
   math::Int2 Size {1280, 720};
   WindowMode Mode {WindowMode::Windowed};
+  WindowButtons Buttons {WindowButtons::All};
   bool Resizable {true};
   bool Visible {true};
+  bool Decorated {true};
   bool HighDpi {true};
 };
 

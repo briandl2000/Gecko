@@ -42,6 +42,15 @@ public:
     m_Monitors->PumpEvents(m_Emitter);
   }
 
+  /// Register a callback invoked during modal OS loops (e.g. Win32
+  /// drag/resize) so the application can keep updating and rendering.
+  /// The callback should perform one frame of work but NOT call PumpEvents.
+  GECKO_API void SetModalFrameCallback(IWindowsBackend::ModalFrameFn callback,
+                                       void* userData) noexcept
+  {
+    m_Windows->SetModalFrameCallback(callback, userData);
+  }
+
 private:
   PlatformConfig m_Config;
   gecko::EventEmitter m_Emitter {};
