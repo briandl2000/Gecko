@@ -1,4 +1,4 @@
-#include "gecko/platform/window.h"
+#include "x11_monitors_backend.h"
 
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
 
@@ -8,33 +8,17 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
-#include "gecko/platform/monitors_interface.h"
 #include "gecko/platform/platform_events.h"
 
 #include <cmath>
 #include <cstring>
-#include <vector>
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xlib.h>
 
 namespace gecko::platform {
 
-namespace {
-
-struct MonitorEntry
+X11MonitorsBackend::X11MonitorsBackend() noexcept
 {
-  MonitorHandle Handle {};
-  MonitorInfo Info {};
-  RROutput OutputId {0};
-};
-
-}  // namespace
-
-class X11MonitorsBackend final : public IMonitorsBackend
-{
-public:
-  X11MonitorsBackend() noexcept
-  {
     m_Display = ::XOpenDisplay(nullptr);
     if (!m_Display)
     {
@@ -63,7 +47,7 @@ public:
                m_Display, m_RREventBase);
   }
 
-  ~X11MonitorsBackend() noexcept override
+X11MonitorsBackend::~X11MonitorsBackend() noexcept
   {
     if (m_Display)
     {
@@ -72,7 +56,7 @@ public:
     }
   }
 
-  void EnumerateMonitors() noexcept override
+void X11MonitorsBackend::EnumerateMonitors() noexcept
   {
     GECKO_FUNC(labels::General);
 
@@ -173,19 +157,19 @@ public:
                static_cast<u32>(m_Monitors.size()));
   }
 
-  u32 GetMonitorCount() const noexcept override
+u32 X11MonitorsBackend::GetMonitorCount() const noexcept
   {
     return static_cast<u32>(m_Monitors.size());
   }
 
-  MonitorHandle GetMonitorHandle(u32 index) const noexcept override
+MonitorHandle X11MonitorsBackend::GetMonitorHandle(u32 index) const noexcept
   {
     if (index >= static_cast<u32>(m_Monitors.size()))
       return {};
     return m_Monitors[index].Handle;
   }
 
-  MonitorInfo GetMonitorProperties(MonitorHandle handle) const noexcept override
+MonitorInfo X11MonitorsBackend::GetMonitorProperties(MonitorHandle handle) const noexcept
   {
     if (!handle.IsValid())
       return {};
@@ -197,7 +181,7 @@ public:
     return {};
   }
 
-  MonitorHandle GetPrimaryMonitor() const noexcept override
+MonitorHandle X11MonitorsBackend::GetPrimaryMonitor() const noexcept
   {
     for (const auto& entry : m_Monitors)
     {
@@ -209,13 +193,13 @@ public:
     return {};
   }
 
-  MonitorBounds GetMonitorBounds(MonitorHandle handle) const noexcept override
+MonitorBounds X11MonitorsBackend::GetMonitorBounds(MonitorHandle handle) const noexcept
   {
     MonitorInfo info = GetMonitorProperties(handle);
     return {info.Bounds, info.WorkArea};
   }
 
-  void PumpEvents(const gecko::EventEmitter& emitter) noexcept override
+void X11MonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   {
     if (!m_Display || m_RREventBase < 0)
       return;
@@ -237,8 +221,7 @@ public:
     }
   }
 
-private:
-  void HandleScreenChange(const gecko::EventEmitter& emitter) noexcept
+void X11MonitorsBackend::HandleScreenChange(const gecko::EventEmitter& emitter) noexcept
   {
     auto oldMonitors = m_Monitors;
     EnumerateMonitors();
@@ -293,11 +276,6 @@ private:
       }
     }
   }
-
-  Display* m_Display {nullptr};
-  int m_RREventBase {-1};
-  std::vector<MonitorEntry> m_Monitors;
-};
 
 Unique<IMonitorsBackend> CreateXlibMonitorsBackend() noexcept
 {

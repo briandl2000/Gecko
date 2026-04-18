@@ -1,86 +1,24 @@
-#include "gecko/platform/window.h"
+#include "x11_windows_backend.h"
 
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
 
 #include "../private/labels.h"
 #include "../private/platform_utils.h"
+#include "gecko/core/ptr.h"
 #include "gecko/core/scope.h"
-#include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
-#include "gecko/platform/platform_events.h"
-#include "gecko/platform/windows_interface.h"
+#include "gecko/platform/input_codes.h"
 #include "x11_key_map.h"
 
 #include <cstdint>
-#include <cstring>
-#include <unordered_map>
-#include <vector>
 #include <X11/Xatom.h>
-#include <X11/Xlib.h>
 #include <X11/Xutil.h>
 
 namespace gecko::platform {
 
-namespace {
+// ── Constructor / Destructor ───────────────────────────────────────────
 
-struct X11WindowState
-{
-  WindowDesc Desc {};
-  Extent2D ClientSize {};
-  math::Int2 Position {0, 0};
-  platform::WindowState State {platform::WindowState::Normal};
-  CursorMode Cursor {CursorMode::Normal};
-  WindowMode Mode {WindowMode::Windowed};
-  WindowButtons Buttons {WindowButtons::All};
-  Extent2D MinSize {0, 0};
-  Extent2D MaxSize {0, 0};
-  bool Decorated {true};
-  bool Resizable {true};
-  bool AlwaysOnTop {false};
-  ::Window WindowId {0};
-};
-
-struct MwmHints
-{
-  unsigned long flags;
-  unsigned long functions;
-  unsigned long decorations;
-  long inputMode;
-  unsigned long status;
-};
-
-constexpr unsigned long MwmHintsDecorations = 1UL << 1;
-constexpr unsigned long MwmHintsFunctions = 1UL << 0;
-constexpr unsigned long MwmDecorAll = 1UL;
-constexpr unsigned long MwmFuncResize = 1UL << 1;
-constexpr unsigned long MwmFuncMove = 1UL << 2;
-constexpr unsigned long MwmFuncMinimize = 1UL << 3;
-constexpr unsigned long MwmFuncMaximize = 1UL << 4;
-constexpr unsigned long MwmFuncClose = 1UL << 5;
-
-struct StagedEvent
-{
-  gecko::EventCode Code {0};
-  u8 PayloadStorage[128] {};
-  u32 PayloadSize {0};
-};
-
-template <typename T>
-StagedEvent MakeStagedEvent(gecko::EventCode code, const T& payload) noexcept
-{
-  static_assert(sizeof(T) <= 128, "Payload too large for StagedEvent storage");
-  StagedEvent ev;
-  ev.Code = code;
-  ev.PayloadSize = static_cast<u32>(sizeof(T));
-  ::std::memcpy(ev.PayloadStorage, &payload, sizeof(T));
-  return ev;
-}
-}  // namespace
-
-class X11WindowsBackend final : public IWindowsBackend
-{
-public:
-  X11WindowsBackend() noexcept
+X11WindowsBackend::X11WindowsBackend() noexcept
   {
     m_Display = ::XOpenDisplay(nullptr);
     if (!m_Display)
@@ -108,7 +46,7 @@ public:
                m_Display);
   }
 
-  ~X11WindowsBackend() noexcept override
+X11WindowsBackend::~X11WindowsBackend() noexcept
   {
     // Destroy any remaining windows before closing the display.
     for (auto& [id, state] : m_Windows)
@@ -126,7 +64,7 @@ public:
     }
   }
 
-  WindowHandle CreateWindow(const WindowDesc& desc) noexcept override
+WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   {
     GECKO_FUNC(labels::General);
 
@@ -209,7 +147,7 @@ public:
     return WindowHandle {id};
   }
 
-  void DestroyWindow(WindowHandle window) noexcept override
+void X11WindowsBackend::DestroyWindow(WindowHandle window) noexcept
   {
     GECKO_FUNC(labels::General);
 
@@ -237,14 +175,14 @@ public:
     m_Windows.erase(it);
   }
 
-  bool IsWindowAlive(WindowHandle window) const noexcept override
+bool X11WindowsBackend::IsWindowAlive(WindowHandle window) const noexcept
   {
     if (!window.IsValid())
       return false;
     return m_Windows.find(window.Id) != m_Windows.end();
   }
 
-  bool RequestClose(WindowHandle window) noexcept override
+bool X11WindowsBackend::RequestClose(WindowHandle window) noexcept
   {
     GECKO_FUNC(labels::General);
 
@@ -257,7 +195,7 @@ public:
     return true;
   }
 
-  void PumpEvents(const gecko::EventEmitter& emitter) noexcept override
+void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   {
     GECKO_FUNC(labels::General);
 
@@ -440,7 +378,7 @@ public:
       GECKO_TRACE(labels::Input, "Pumped %d X11 events", eventCount);
   }
 
-  Extent2D GetClientSize(WindowHandle window) const noexcept override
+Extent2D X11WindowsBackend::GetClientSize(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -448,7 +386,7 @@ public:
     return it->second.ClientSize;
   }
 
-  void SetTitle(WindowHandle window, const char* title) noexcept override
+void X11WindowsBackend::SetTitle(WindowHandle window, const char* title) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -458,14 +396,14 @@ public:
       ::XStoreName(m_Display, it->second.WindowId, title);
   }
 
-  DpiInfo GetDpi(WindowHandle window) const noexcept override
+DpiInfo X11WindowsBackend::GetDpi(WindowHandle window) const noexcept
   {
     (void)window;
     return DpiInfo {};
   }
 
-  NativeWindowHandle GetNativeWindowHandle(
-      WindowHandle window) const noexcept override
+NativeWindowHandle X11WindowsBackend::GetNativeWindowHandle(
+    WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -479,7 +417,7 @@ public:
     return nh;
   }
 
-  void SetClientSize(WindowHandle window, Extent2D size) noexcept override
+void X11WindowsBackend::SetClientSize(WindowHandle window, Extent2D size) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -490,7 +428,7 @@ public:
     // Actual size update happens via ConfigureNotify in PumpEvents.
   }
 
-  const char* GetTitle(WindowHandle window) const noexcept override
+const char* X11WindowsBackend::GetTitle(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -498,7 +436,7 @@ public:
     return it->second.Desc.Title;
   }
 
-  void SetPosition(WindowHandle window, math::Int2 pos) noexcept override
+void X11WindowsBackend::SetPosition(WindowHandle window, math::Int2 pos) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -509,7 +447,7 @@ public:
     // Actual position update happens via ConfigureNotify in PumpEvents.
   }
 
-  math::Int2 GetPosition(WindowHandle window) const noexcept override
+math::Int2 X11WindowsBackend::GetPosition(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -517,8 +455,8 @@ public:
     return it->second.Position;
   }
 
-  void SetWindowState(WindowHandle window,
-                      platform::WindowState state) noexcept override
+void X11WindowsBackend::SetWindowState(WindowHandle window,
+                    platform::WindowState state) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -569,8 +507,8 @@ public:
                                         window, NowNsSafe(), oldState, state}));
   }
 
-  platform::WindowState GetWindowState(
-      WindowHandle window) const noexcept override
+platform::WindowState X11WindowsBackend::GetWindowState(
+    WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -578,7 +516,7 @@ public:
     return it->second.State;
   }
 
-  void SetDecorated(WindowHandle window, bool decorated) noexcept override
+void X11WindowsBackend::SetDecorated(WindowHandle window, bool decorated) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -589,7 +527,7 @@ public:
     ::XFlush(m_Display);
   }
 
-  bool IsDecorated(WindowHandle window) const noexcept override
+bool X11WindowsBackend::IsDecorated(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -597,7 +535,7 @@ public:
     return it->second.Decorated;
   }
 
-  void RequestFocus(WindowHandle window) noexcept override
+void X11WindowsBackend::RequestFocus(WindowHandle window) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -609,7 +547,7 @@ public:
     ::XFlush(m_Display);
   }
 
-  void SetResizable(WindowHandle window, bool resizable) noexcept override
+void X11WindowsBackend::SetResizable(WindowHandle window, bool resizable) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -651,7 +589,7 @@ public:
     ::XFlush(m_Display);
   }
 
-  bool IsResizable(WindowHandle window) const noexcept override
+bool X11WindowsBackend::IsResizable(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -659,7 +597,7 @@ public:
     return it->second.Resizable;
   }
 
-  void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override
+void X11WindowsBackend::SetWindowMode(WindowHandle window, WindowMode mode) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -697,7 +635,7 @@ public:
     it->second.Mode = mode;
   }
 
-  WindowMode GetWindowMode(WindowHandle window) const noexcept override
+WindowMode X11WindowsBackend::GetWindowMode(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -705,8 +643,8 @@ public:
     return it->second.Mode;
   }
 
-  void SetWindowButtons(WindowHandle window,
-                        WindowButtons buttons) noexcept override
+void X11WindowsBackend::SetWindowButtons(WindowHandle window,
+                      WindowButtons buttons) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -717,7 +655,7 @@ public:
     ::XFlush(m_Display);
   }
 
-  WindowButtons GetWindowButtons(WindowHandle window) const noexcept override
+WindowButtons X11WindowsBackend::GetWindowButtons(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -725,7 +663,7 @@ public:
     return it->second.Buttons;
   }
 
-  void SetMinSize(WindowHandle window, Extent2D size) noexcept override
+void X11WindowsBackend::SetMinSize(WindowHandle window, Extent2D size) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -736,7 +674,7 @@ public:
       ApplySizeConstraints(it->second);
   }
 
-  void SetMaxSize(WindowHandle window, Extent2D size) noexcept override
+void X11WindowsBackend::SetMaxSize(WindowHandle window, Extent2D size) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -747,7 +685,7 @@ public:
       ApplySizeConstraints(it->second);
   }
 
-  void SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept override
+void X11WindowsBackend::SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -762,7 +700,7 @@ public:
     ::XFlush(m_Display);
   }
 
-  bool IsAlwaysOnTop(WindowHandle window) const noexcept override
+bool X11WindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -770,7 +708,7 @@ public:
     return it->second.AlwaysOnTop;
   }
 
-  void SetCursorMode(WindowHandle window, CursorMode mode) noexcept override
+void X11WindowsBackend::SetCursorMode(WindowHandle window, CursorMode mode) noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end() || !m_Display)
@@ -806,7 +744,7 @@ public:
     ::XFlush(m_Display);
   }
 
-  CursorMode GetCursorMode(WindowHandle window) const noexcept override
+CursorMode X11WindowsBackend::GetCursorMode(WindowHandle window) const noexcept
   {
     auto it = m_Windows.find(window.Id);
     if (it == m_Windows.end())
@@ -814,8 +752,8 @@ public:
     return it->second.Cursor;
   }
 
-private:
-  void ApplyResizableHint(::Window w, const WindowDesc& desc) noexcept
+
+void X11WindowsBackend::ApplyResizableHint(::Window w, const WindowDesc& desc) noexcept
   {
     if (!m_Display || w == 0)
       return;
@@ -832,7 +770,7 @@ private:
     ::XSetWMNormalHints(m_Display, w, &hints);
   }
 
-  void ApplyMotifDecorations(::Window w, bool enabled) noexcept
+void X11WindowsBackend::ApplyMotifDecorations(::Window w, bool enabled) noexcept
   {
     if (!m_Display || w == 0 || m_MotifWmHints == 0)
       return;
@@ -847,8 +785,8 @@ private:
                       static_cast<int>(sizeof(hints) / sizeof(long)));
   }
 
-  void ApplyMotifFunctions(::Window w, WindowButtons buttons,
-                           bool resizable) noexcept
+void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons,
+                         bool resizable) noexcept
   {
     if (!m_Display || w == 0 || m_MotifWmHints == 0)
       return;
@@ -890,7 +828,7 @@ private:
                       static_cast<int>(sizeof(hints) / sizeof(long)));
   }
 
-  void ApplySizeConstraints(const X11WindowState& state) noexcept
+void X11WindowsBackend::ApplySizeConstraints(const X11WindowState& state) noexcept
   {
     if (!m_Display || state.WindowId == 0)
       return;
@@ -910,8 +848,8 @@ private:
     ::XFlush(m_Display);
   }
 
-  void ApplyInitialWindowMode(::Window w, ::Window root,
-                              const WindowDesc& desc) noexcept
+void X11WindowsBackend::ApplyInitialWindowMode(::Window w, ::Window root,
+                            const WindowDesc& desc) noexcept
   {
     if (!m_Display || w == 0)
       return;
@@ -943,8 +881,8 @@ private:
     }
   }
 
-  void SendNetWmStateMessage(::Window root, ::Window w, long action,
-                             Atom state1) noexcept
+void X11WindowsBackend::SendNetWmStateMessage(::Window root, ::Window w, long action,
+                           Atom state1) noexcept
   {
     if (!m_Display || root == 0 || w == 0 || m_NetWmState == 0 || state1 == 0)
       return;
@@ -967,30 +905,13 @@ private:
                  SubstructureRedirectMask | SubstructureNotifyMask, &ev);
   }
 
-  u64 FindWindowId(::Window xid) const noexcept
+u64 X11WindowsBackend::FindWindowId(::Window xid) const noexcept
   {
     auto it = m_WindowByXid.find(xid);
     if (it == m_WindowByXid.end())
       return 0;
     return it->second;
   }
-
-  Display* m_Display {nullptr};
-  Atom m_WmDeleteWindow {0};
-  Atom m_WmProtocols {0};
-  Atom m_NetWmState {0};
-  Atom m_NetWmStateFullscreen {0};
-  Atom m_NetWmStateMaximizedHorz {0};
-  Atom m_NetWmStateMaximizedVert {0};
-  Atom m_NetWmStateHidden {0};
-  Atom m_NetWmStateAbove {0};
-  Atom m_MotifWmHints {0};
-  u64 m_NextId {0};
-
-  std::unordered_map<u64, X11WindowState> m_Windows;
-  std::unordered_map<::Window, u64> m_WindowByXid;
-  std::vector<StagedEvent> m_Staged;
-};
 
 Unique<IWindowsBackend> CreateXlibWindowsBackend() noexcept
 {

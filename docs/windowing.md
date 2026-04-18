@@ -75,6 +75,35 @@ cfg.Backend = DisplayBackendKind::Null; // headless, no real windows
 
 ---
 
+### Backend file layout
+
+Each backend implementation follows a **private header + implementation** pattern. The class declaration and any backend-specific types live in a private header alongside the `.cpp` file, while the public API is exposed only through the abstract interface (`IWindowsBackend`, `IMonitorsBackend`) and a factory function.
+
+```
+src/platform/
+  linux/
+    wayland_windows_backend.h      # class + supporting types (private)
+    wayland_windows_backend.cpp     # out-of-class method definitions
+    wayland_monitors_backend.h
+    wayland_monitors_backend.cpp
+    x11_windows_backend.h
+    x11_windows_interface.cpp
+    x11_monitors_backend.h
+    x11_monitors_backend.cpp
+  win32/
+    win32_windows_backend.h
+    win32_windows_backend.cpp
+    win32_monitors_backend.h
+    win32_monitors_backend.cpp
+  private/
+    null_windows_interface.h        # null backends follow the same pattern
+    null_monitors_backend.h
+```
+
+The private headers are **not installed** and are never included outside the `src/platform/` directory. They exist so that the full private API of each backend is visible at a glance without scrolling through the implementation file. The `.cpp` file includes its private header first, then provides out-of-class method definitions.
+
+---
+
 ## Window creation
 
 ### WindowDesc

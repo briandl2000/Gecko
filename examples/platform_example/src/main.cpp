@@ -655,6 +655,20 @@ int main()
         },
         nullptr);
 
+    // ── Frame callback (shared between normal loop and modal timer) ──
+    auto doFrame = [&]() {
+      GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "Frame");
+      {
+        GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "DispatchEvents");
+        (void)gecko::DispatchEvents();
+      }
+      GECKO_PRECISE_SLEEP_NS(16'000'000);
+    };
+
+    // Register for Win32 modal drag/resize so the app keeps ticking.
+    ctx.SetModalFrameCallback(
+        [](void* ud) { (*static_cast<decltype(&doFrame)>(ud))(); }, &doFrame);
+
     // ── Main loop (runs until user quits) ──────────────────────────
     GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
     while (appState.Running && ctx.Windows().IsWindowAlive(window))
@@ -664,10 +678,9 @@ int main()
       {
         GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "PumpEvents");
         ctx.PumpEvents();
-        (void)gecko::DispatchEvents();
       }
 
-      GECKO_SLEEP_MS(16);
+      doFrame();
     }
 
     // ── Cleanup — destroy all spawned windows, then main ───────────

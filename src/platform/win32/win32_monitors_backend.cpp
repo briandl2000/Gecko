@@ -1,4 +1,4 @@
-#include "gecko/platform/platform_config.h"
+#include "win32_monitors_backend.h"
 
 #if defined(_WIN32)
 
@@ -8,47 +8,22 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
-#include "gecko/platform/monitors_interface.h"
 #include "gecko/platform/platform_events.h"
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
 #include <cmath>
 #include <cstring>
 #include <shellscalingapi.h>
-#include <vector>
-#include <Windows.h>
 
 #pragma comment(lib, "Shcore.lib")
 
 namespace gecko::platform {
 
-namespace {
-
-struct MonitorEntry
+Win32MonitorsBackend::Win32MonitorsBackend() noexcept
 {
-  MonitorHandle Handle {};
-  MonitorInfo Info {};
-  HMONITOR HMonitor {nullptr};
-};
-
-}  // namespace
-
-class Win32MonitorsBackend final : public IMonitorsBackend
-{
-public:
-  Win32MonitorsBackend() noexcept
-  {
     GECKO_INFO(labels::General, "Win32MonitorsBackend: initialized");
   }
 
-  ~Win32MonitorsBackend() noexcept override = default;
-
-  void EnumerateMonitors() noexcept override
+void Win32MonitorsBackend::EnumerateMonitors() noexcept
   {
     GECKO_FUNC(labels::General);
     m_Monitors.clear();
@@ -60,19 +35,19 @@ public:
                static_cast<u32>(m_Monitors.size()));
   }
 
-  u32 GetMonitorCount() const noexcept override
+u32 Win32MonitorsBackend::GetMonitorCount() const noexcept
   {
     return static_cast<u32>(m_Monitors.size());
   }
 
-  MonitorHandle GetMonitorHandle(u32 index) const noexcept override
+MonitorHandle Win32MonitorsBackend::GetMonitorHandle(u32 index) const noexcept
   {
     if (index >= static_cast<u32>(m_Monitors.size()))
       return {};
     return m_Monitors[index].Handle;
   }
 
-  MonitorInfo GetMonitorProperties(MonitorHandle handle) const noexcept override
+MonitorInfo Win32MonitorsBackend::GetMonitorProperties(MonitorHandle handle) const noexcept
   {
     if (!handle.IsValid())
       return {};
@@ -84,7 +59,7 @@ public:
     return {};
   }
 
-  MonitorHandle GetPrimaryMonitor() const noexcept override
+MonitorHandle Win32MonitorsBackend::GetPrimaryMonitor() const noexcept
   {
     for (const auto& entry : m_Monitors)
     {
@@ -96,13 +71,13 @@ public:
     return {};
   }
 
-  MonitorBounds GetMonitorBounds(MonitorHandle handle) const noexcept override
+MonitorBounds Win32MonitorsBackend::GetMonitorBounds(MonitorHandle handle) const noexcept
   {
     MonitorInfo info = GetMonitorProperties(handle);
     return {info.Bounds, info.WorkArea};
   }
 
-  void PumpEvents(const gecko::EventEmitter& emitter) noexcept override
+void Win32MonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   {
     // Win32 monitor change detection: re-enumerate and diff.
     // In a real scenario, WM_DISPLAYCHANGE is delivered to a window message
@@ -111,9 +86,8 @@ public:
     (void)emitter;
   }
 
-private:
-  static BOOL CALLBACK EnumProc(HMONITOR hMonitor, HDC /*hdc*/,
-                                LPRECT /*lpRect*/, LPARAM lParam) noexcept
+BOOL CALLBACK Win32MonitorsBackend::EnumProc(HMONITOR hMonitor, HDC /*hdc*/,
+                              LPRECT /*lpRect*/, LPARAM lParam) noexcept
   {
     auto* self = reinterpret_cast<Win32MonitorsBackend*>(lParam);
 
@@ -163,9 +137,6 @@ private:
     self->m_Monitors.push_back(entry);
     return TRUE;
   }
-
-  std::vector<MonitorEntry> m_Monitors;
-};
 
 Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept
 {

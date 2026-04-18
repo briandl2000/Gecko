@@ -125,6 +125,24 @@ public:
   GECKO_API virtual void PumpEvents(
       const gecko::EventEmitter& emitter) noexcept = 0;
 
+  // ── Modal frame callback ─────────────────────────────────────
+  //
+  // On platforms with modal event loops (Win32 drag/resize), the backend
+  // calls this callback at regular intervals so the application can
+  // continue updating and rendering while the OS blocks PumpEvents.
+  //
+  // The callback should perform one frame of work (dispatch events,
+  // update, render) but must NOT call PumpEvents.
+
+  using ModalFrameFn = void (*)(void* userData);
+
+  GECKO_API virtual void SetModalFrameCallback(ModalFrameFn callback,
+                                               void* userData) noexcept
+  {
+    (void)callback;
+    (void)userData;
+  }
+
 private:
 };
 
