@@ -11,7 +11,17 @@
 #include "gecko/platform/input_codes.h"
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/windows_interface.h"
+#ifdef GECKO_HAVE_XDG_DECORATION
 #include "xdg-decoration-client-protocol.h"
+#else
+// Stubs so the rest of the file compiles without xdg-decoration protocol.
+struct zxdg_decoration_manager_v1;
+struct zxdg_toplevel_decoration_v1;
+static inline void zxdg_decoration_manager_v1_destroy(
+    zxdg_decoration_manager_v1*) {}
+static inline void zxdg_toplevel_decoration_v1_destroy(
+    zxdg_toplevel_decoration_v1*) {}
+#endif
 #include "xdg-shell-client-protocol.h"
 
 #include <cstdint>
@@ -624,6 +634,7 @@ void WaylandWindowsBackend::OnRegistryGlobal(wl_registry* registry, u32 name,
         wl_registry_bind(registry, name, &wl_seat_interface, 5));
     wl_seat_add_listener(m_Seat, &kSeatListener, this);
   }
+#ifdef GECKO_HAVE_XDG_DECORATION
   else if (::std::strcmp(interface,
                          zxdg_decoration_manager_v1_interface.name) == 0)
   {
@@ -631,6 +642,7 @@ void WaylandWindowsBackend::OnRegistryGlobal(wl_registry* registry, u32 name,
         static_cast<zxdg_decoration_manager_v1*>(wl_registry_bind(
             registry, name, &zxdg_decoration_manager_v1_interface, 1));
   }
+#endif
 }
 
 void WaylandWindowsBackend::OnRegistryGlobalRemove(wl_registry* /*registry*/,
@@ -775,6 +787,7 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
   const bool wantDecorations =
       desc.Decorated && desc.Mode != WindowMode::BorderlessFullscreen;
   ws.Decorated = wantDecorations;
+#ifdef GECKO_HAVE_XDG_DECORATION
   if (m_DecorationManager)
   {
     ws.Decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
@@ -784,6 +797,7 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
                            ? ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
                            : ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
   }
+#endif
 
   // Commit the surface to trigger the initial configure.
   wl_surface_commit(ws.Surface);
@@ -1025,6 +1039,7 @@ void WaylandWindowsBackend::SetDecorated(WindowHandle window,
 
   it->second.Decorated = decorated;
 
+#ifdef GECKO_HAVE_XDG_DECORATION
   if (it->second.Decoration)
   {
     zxdg_toplevel_decoration_v1_set_mode(
@@ -1032,6 +1047,7 @@ void WaylandWindowsBackend::SetDecorated(WindowHandle window,
         decorated ? ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE
                   : ZXDG_TOPLEVEL_DECORATION_V1_MODE_CLIENT_SIDE);
   }
+#endif
 }
 
 bool WaylandWindowsBackend::IsDecorated(WindowHandle window) const noexcept

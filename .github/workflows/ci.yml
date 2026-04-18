@@ -25,7 +25,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -229,7 +229,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev zip
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'

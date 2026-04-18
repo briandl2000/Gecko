@@ -387,6 +387,9 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   entry.ClientSize = {static_cast<u32>(desc.Size.X),
                       static_cast<u32>(desc.Size.Y)};
   entry.Decorated = desc.Decorated;
+  entry.Resizable = desc.Resizable;
+  entry.Mode = desc.Mode;
+  entry.Buttons = desc.Buttons;
   entry.State = desc.Visible ? platform::WindowState::Normal
                              : platform::WindowState::Hidden;
   entry.Alive = true;
