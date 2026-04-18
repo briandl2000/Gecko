@@ -17,7 +17,7 @@ Unique<IWindowsBackend> CreateXlibWindowsBackend() noexcept;
 Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;
 #endif
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 Unique<IWindowsBackend> CreateWin32WindowsBackend() noexcept;
 #endif
 
@@ -52,7 +52,7 @@ Unique<IWindowsBackend> IWindowsBackend::Create(
 #endif
 
   case DisplayBackendKind::Win32:
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
     return CreateWin32WindowsBackend();
 #else
     GECKO_WARN(labels::General,

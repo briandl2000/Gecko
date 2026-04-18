@@ -17,7 +17,7 @@ Unique<IMonitorsBackend> CreateXlibMonitorsBackend() noexcept;
 Unique<IMonitorsBackend> CreateWaylandMonitorsBackend() noexcept;
 #endif
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept;
 #endif
 
@@ -50,7 +50,7 @@ Unique<IMonitorsBackend> IMonitorsBackend::Create(
 #endif
 
   case DisplayBackendKind::Win32:
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
     return CreateWin32MonitorsBackend();
 #else
     GECKO_WARN(labels::General,

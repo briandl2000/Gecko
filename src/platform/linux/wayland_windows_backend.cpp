@@ -1110,7 +1110,7 @@ void WaylandWindowsBackend::AttachBlankBuffer(WaylandWindowState& ws) noexcept
 
   // Create a temporary anonymous file for the shared-memory buffer.
   int fd = -1;
-#if defined(__linux__)
+#if defined(GECKO_PLATFORM_LINUX)
   fd = memfd_create("gecko-wl-buffer", MFD_CLOEXEC);
 #endif
   if (fd < 0)

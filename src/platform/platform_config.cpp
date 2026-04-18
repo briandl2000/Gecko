@@ -99,7 +99,7 @@ namespace {
   case DisplayBackendKind::Wayland:
     return IsWaylandAvailable();
   case DisplayBackendKind::Win32:
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
     return true;
 #else
     return false;
@@ -115,7 +115,7 @@ namespace {
 /// backend.
 [[nodiscard]] DisplayBackendKind ProbeBackend() noexcept
 {
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   return DisplayBackendKind::Win32;
 #elif defined(GECKO_PLATFORM_LINUX)
   if (IsWaylandAvailable())

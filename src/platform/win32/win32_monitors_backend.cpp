@@ -1,6 +1,6 @@
 #include "win32_monitors_backend.h"
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 
 #include "../private/labels.h"
 #include "../private/platform_utils.h"
@@ -147,4 +147,4 @@ Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept
 
 }  // namespace gecko::platform
 
-#endif  // _WIN32
+#endif  // GECKO_PLATFORM_WINDOWS

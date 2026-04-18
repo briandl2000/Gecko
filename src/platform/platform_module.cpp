@@ -3,7 +3,7 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -21,7 +21,7 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Platform);
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   // Request 1ms timer resolution so sleep/timer functions are accurate.
   // Without this, Sleep(16) rounds up to ~31ms on default 15.6ms ticks.
   ::timeBeginPeriod(1);
@@ -34,7 +34,7 @@ void PlatformModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Platform);
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   ::timeEndPeriod(1);
 #endif
 }

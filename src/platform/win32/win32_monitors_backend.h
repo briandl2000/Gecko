@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -48,4 +48,4 @@ Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept;
 
 }  // namespace gecko::platform
 
-#endif  // _WIN32
+#endif  // GECKO_PLATFORM_WINDOWS

@@ -65,14 +65,11 @@ enum class WindowState : u8
 enum class WindowButtons : u8
 {
   None = 0,
-  Close = 1 << 0,
-  Minimize = 1 << 1,
-  Maximize = 1 << 2,
+  Close = Bit(0),
+  Minimize = Bit(1),
+  Maximize = Bit(2),
   All = Close | Minimize | Maximize,
 };
-
-// Bitwise operators (|, &, ^, |=, ^=) and Any() are provided by
-// gecko/core/utility/bit.h for all enum classes.
 
 struct DpiInfo
 {

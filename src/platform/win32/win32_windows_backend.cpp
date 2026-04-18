@@ -1,6 +1,6 @@
 #include "win32_windows_backend.h"
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 
 #include "../private/labels.h"
 #include "../private/platform_utils.h"
@@ -1087,4 +1087,4 @@ Unique<IWindowsBackend> CreateWin32WindowsBackend() noexcept
 
 }  // namespace gecko::platform
 
-#endif  // _WIN32
+#endif  // GECKO_PLATFORM_WINDOWS
