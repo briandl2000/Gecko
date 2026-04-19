@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, is_network_path
+from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, is_network_path, _is_windows
 from scripts.commands.build import _auto_configure
 
 # Unit test targets (headless, always run)
@@ -109,7 +109,7 @@ def _run(args) -> int:
 
     # Run tests directly (Catch2 handles test discovery and reporting)
     print(f"\nRunning tests...")
-    exe_suffix = ".exe" if os.name == "nt" else ""
+    exe_suffix = ".exe" if _is_windows() else ""
     overall_result = 0
 
     # On Windows network shares, SmartScreen blocks unsigned executables in

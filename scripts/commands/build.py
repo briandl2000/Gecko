@@ -4,7 +4,7 @@ import os
 import shutil
 import subprocess
 
-from scripts.commands import BUILD_DIR, _REPO_ROOT
+from scripts.commands import BUILD_DIR, _REPO_ROOT, _is_windows
 
 
 _CONFIGS = {
@@ -25,6 +25,8 @@ def _auto_configure() -> int:
         gpp = shutil.which("g++")
         if not gcc or not gpp:
             print("ERROR: GCC compiler not found. Gecko requires GCC.")
+            if _is_windows():
+                print("  Make sure you're using the MSYS2 UCRT64 shell.")
             return 1
         env.setdefault("CC", gcc)
         env.setdefault("CXX", gpp)

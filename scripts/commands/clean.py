@@ -5,7 +5,7 @@ import stat
 import shutil
 import sys
 
-from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT
+from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, _is_windows
 
 
 def _force_remove_readonly(func, path, exc_info):
@@ -48,7 +48,7 @@ def _run(args) -> int:
                 _rmtree(path)
 
     # Also clean local debug copy on Windows
-    if os.name == "nt":
+    if _is_windows():
         debug_dir = os.path.join("C:\\", "Gecko", "debug")
         if os.path.isdir(debug_dir):
             print(f"Removing {debug_dir}")
