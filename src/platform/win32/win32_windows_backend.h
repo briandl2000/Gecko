@@ -113,10 +113,7 @@ private:
       events::WindowFocusChangedPayload FocusChanged;
       events::WindowMovedPayload Moved;
       events::WindowStateChangedPayload StateChanged;
-      PayloadUnion() noexcept
-      {
-        ::std::memset(this, 0, sizeof(PayloadUnion));
-      }
+      PayloadUnion() noexcept : Closed {} {}
     } Data;
     u32 PayloadSize {0};
   };

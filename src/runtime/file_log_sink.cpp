@@ -2,7 +2,7 @@
 
 #include <cstdio>
 #if defined(GECKO_PLATFORM_WINDOWS)
-#include <corecrt_share.h>
+#include <share.h>
 #include <stdio.h>
 #endif
 

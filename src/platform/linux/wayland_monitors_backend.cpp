@@ -38,7 +38,8 @@ static void OutputGeometry(void* data, ::wl_output* /*output*/, i32 x, i32 y,
     ::std::strncpy(name, make, sizeof(name) - 1);
   else if (model)
     ::std::strncpy(name, model, sizeof(name) - 1);
-  ::std::strncpy(entry->PendingName, name, sizeof(entry->PendingName) - 1);
+  entry->PendingName[sizeof(entry->PendingName) - 1] = '\0';
+  ::std::snprintf(entry->PendingName, sizeof(entry->PendingName), "%s", name);
 }
 
 static void OutputMode(void* data, ::wl_output* /*output*/, u32 flags,
