@@ -25,7 +25,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc g++ libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
+          sudo apt-get install -y ninja-build gcc-14 g++-14 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -54,7 +54,7 @@ jobs:
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
-          export CC=gcc CXX=g++
+          export CC=gcc-14 CXX=g++-14
           cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
 
       - name: Configure (Windows)
@@ -262,7 +262,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc g++ libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
+          sudo apt-get install -y ninja-build gcc-14 g++-14 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
@@ -286,7 +286,7 @@ jobs:
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
-          export CC=gcc CXX=g++
+          export CC=gcc-14 CXX=g++-14
           cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
 
       - name: Configure (Windows)
