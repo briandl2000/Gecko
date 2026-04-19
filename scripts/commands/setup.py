@@ -93,7 +93,7 @@ def _run(args) -> int:
 
     if result.returncode == 0:
         print("\nSetup complete! To use gecko commands:")
-        print("  Linux/macOS: source scripts/dev_env.sh")
+        print("  Linux/macOS: source scripts/setup.sh")
         print("  PowerShell:  . .\\scripts\\setup.ps1")
 
     return result.returncode
