@@ -5,25 +5,45 @@
 - CMake 3.22+
 - Python 3.7+
 - Ninja
-- **Clang 17+** (required - project does not support GCC or MSVC)
-- Linux: `libx11-dev libxext-dev`
-- Windows: Visual Studio Build Tools (for Windows SDK headers/libs)
+- **GCC 14+** (C++26 support required)
+- Linux: `libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols`
 
-### Installing Clang
+> **Why GCC?** Gecko targets C++26 (`-std=c++2c`) for early access to features
+> like reflection. As of mid-2026, GCC is the only compiler with broad C++26
+> support in a stable release. When MSVC and Clang ship C++26 support, we plan
+> to re-evaluate and may add them as supported compilers.
 
-**Windows:**
-- Visual Studio Installer → Modify → Individual Components → "C++ Clang Compiler"
-- Or standalone: `winget install LLVM.LLVM`
+### Installing GCC
 
-**Linux:**
+**Linux (Ubuntu/Debian):**
 ```bash
-sudo apt-get install clang  # Ubuntu/Debian
-sudo dnf install clang      # Fedora
+sudo apt-get install gcc g++ ninja-build cmake
+# Platform dependencies
+sudo apt-get install libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
 ```
+
+**Linux (Fedora):**
+```bash
+sudo dnf install gcc g++ ninja-build cmake
+sudo dnf install libX11-devel libXext-devel libXrandr-devel wayland-devel wayland-protocols-devel
+```
+
+**Windows (MSYS2 + MinGW-w64):**
+
+1. Install [MSYS2](https://www.msys2.org/) (follow the installer)
+2. Open the **UCRT64** terminal (not MSYS or MINGW64)
+3. Install the toolchain:
+```bash
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake
+```
+4. Add `C:\msys64\ucrt64\bin` to your system PATH
+5. Verify: `gcc --version` should show GCC 14+
+
+> **Note:** MSVC does not support C++26. Windows builds use MinGW-w64 GCC via MSYS2.
 
 **macOS:**
 ```bash
-brew install llvm
+brew install gcc ninja cmake
 ```
 
 ## Setup
@@ -35,9 +55,8 @@ source scripts/setup.sh    # Linux/macOS
 ```
 
 The setup script will:
-1. Detect and configure Clang compiler
-2. On Windows: Load Visual Studio environment and find clang-cl
-3. Configure CMake with Ninja Multi-Config generator
+1. Detect and configure GCC compiler
+2. Configure CMake with Ninja Multi-Config generator
 
 ## CLI Commands
 
