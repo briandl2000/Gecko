@@ -82,12 +82,13 @@ cmake --install out/build --prefix /your/prefix --config Release
 
 ```
 out/
-├── build/           # CMake internals (hidden)
-├── bin/Debug/       # Debug binaries
-├── bin/Release/     # Release binaries
-├── lib/Debug/       # Debug libraries
-├── lib/Release/     # Release libraries
-└── package/         # Created packages
+├── build/<PlatformID>/  # CMake internals (hidden)
+└── <PlatformID>/
+    ├── bin/Debug/       # Debug binaries
+    ├── bin/Release/     # Release binaries
+    ├── lib/Debug/       # Debug libraries
+    ├── lib/Release/     # Release libraries
+    └── package/         # Created packages
 ```
 
 ## Build Options

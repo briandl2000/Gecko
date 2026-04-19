@@ -27,6 +27,7 @@ feature/xyz ──PR──> dev ──release PR──> main
 
 1. Ensure all work is merged to `dev` and CI is green
 2. Bump version in `CMakeLists.txt` (`GECKO_VERSION_PRERELEASE` or `VERSION`)
+   - `version.h` is auto-generated from `version.h.in` at configure time — no manual edits needed
 3. Update `CHANGELOG.md` — move `[Unreleased]` entries to a new version section
 4. Commit & push to `dev`
 5. Create PR: **dev → main** using the [release template](https://github.com/briandl2000/Gecko/compare/main...dev?template=release.md)
