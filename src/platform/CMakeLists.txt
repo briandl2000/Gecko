@@ -155,6 +155,7 @@ elseif(WIN32)
     win32/win32_monitors_backend.cpp
     win32/win32_windows_backend.cpp
   )
+  target_link_libraries(Platform PRIVATE winmm shcore user32)
 endif()
 
 target_include_directories(Platform

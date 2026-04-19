@@ -14,8 +14,6 @@
 #include <cstring>
 #include <shellscalingapi.h>
 
-#pragma comment(lib, "Shcore.lib")
-
 namespace gecko::platform {
 
 Win32MonitorsBackend::Win32MonitorsBackend() noexcept

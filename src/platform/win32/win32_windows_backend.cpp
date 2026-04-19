@@ -13,9 +13,6 @@
 #include <shellscalingapi.h>
 #include <windowsx.h>
 
-#pragma comment(lib, "Shcore.lib")
-#pragma comment(lib, "User32.lib")
-
 namespace gecko::platform {
 
 namespace {
