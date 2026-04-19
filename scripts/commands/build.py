@@ -17,17 +17,17 @@ def _auto_configure() -> int:
     """Auto-configure CMake when the build directory doesn't exist yet."""
     env = os.environ.copy()
 
-    # Gecko requires Clang. When no toolchain file is in play (native builds),
-    # make sure CMake picks up clang instead of whatever cc/c++ defaults to.
+    # Gecko uses GCC. When no toolchain file is in play (native builds),
+    # make sure CMake picks up gcc instead of whatever cc/c++ defaults to.
     toolchain = env.get("CMAKE_TOOLCHAIN_FILE")
     if not toolchain:
-        clang = shutil.which("clang")
-        clangpp = shutil.which("clang++")
-        if not clang or not clangpp:
-            print("ERROR: Clang compiler not found. Gecko requires Clang.")
+        gcc = shutil.which("gcc")
+        gpp = shutil.which("g++")
+        if not gcc or not gpp:
+            print("ERROR: GCC compiler not found. Gecko requires GCC.")
             return 1
-        env.setdefault("CC", clang)
-        env.setdefault("CXX", clangpp)
+        env.setdefault("CC", gcc)
+        env.setdefault("CXX", gpp)
 
     cmake_args = [
         "cmake", "-S", _REPO_ROOT, "-B", BUILD_DIR,

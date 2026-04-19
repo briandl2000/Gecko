@@ -21,17 +21,17 @@ export GECKO_PLATFORM_ID="$(uname -s)-$(uname -m)"
 if [ ! -d "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" ]; then
     echo "Configuring CMake for $GECKO_PLATFORM_ID..."
     
-    # Require Clang compiler
-    if command -v clang &> /dev/null && command -v clang++ &> /dev/null; then
-        echo "Using Clang compiler: $(clang --version | head -n1)"
-        export CC=clang
-        export CXX=clang++
+    # Prefer GCC; fall back to any cc/c++ if available
+    if command -v gcc &> /dev/null && command -v g++ &> /dev/null; then
+        echo "Using GCC compiler: $(gcc --version | head -n1)"
+        export CC=gcc
+        export CXX=g++
     else
-        echo "ERROR: Clang compiler not found!"
+        echo "ERROR: GCC compiler not found!"
         echo "Install with:"
-        echo "  Ubuntu/Debian: sudo apt-get install clang"
-        echo "  Fedora:        sudo dnf install clang"
-        echo "  macOS:         brew install llvm"
+        echo "  Ubuntu/Debian: sudo apt-get install gcc g++"
+        echo "  Fedora:        sudo dnf install gcc gcc-c++"
+        echo "  Arch:          sudo pacman -S gcc"
         return 1
     fi
     

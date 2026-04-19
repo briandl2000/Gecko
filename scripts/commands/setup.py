@@ -37,12 +37,12 @@ def _check_tools() -> bool:
         ok = False
 
     if os.name == "nt":
-        # On Windows, clang-cl is used via MSVC toolchain — setup.ps1 handles this
+        # On Windows, GCC via MinGW/MSYS2 is expected
         pass
     else:
-        if not shutil.which("clang") or not shutil.which("clang++"):
-            print("ERROR: clang/clang++ not found.", file=sys.stderr)
-            print("  Install with: sudo apt-get install clang")
+        if not shutil.which("gcc") or not shutil.which("g++"):
+            print("ERROR: gcc/g++ not found.", file=sys.stderr)
+            print("  Install with: sudo apt-get install gcc g++")
             ok = False
 
     return ok
@@ -53,9 +53,9 @@ def _setup_env() -> dict[str, str]:
     env = os.environ.copy()
 
     if os.name != "nt":
-        # On Linux/macOS, ensure clang is used
-        env.setdefault("CC", "clang")
-        env.setdefault("CXX", "clang++")
+        # On Linux/macOS, ensure GCC is used
+        env.setdefault("CC", "gcc")
+        env.setdefault("CXX", "g++")
 
     return env
 
