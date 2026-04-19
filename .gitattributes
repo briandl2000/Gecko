@@ -9,7 +9,6 @@
 *.c   text eol=lf
 
 # Extensionless scripts (bash, git hooks)
-bin/gk text eol=lf
 .githooks/* text eol=lf
 *.cmake text eol=lf
 *.py  text eol=lf

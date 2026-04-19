@@ -26,6 +26,12 @@ endif()
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Generate version.h from template with real values stamped in
+configure_file(
+  "${CMAKE_SOURCE_DIR}/include/gecko/version.h.in"
+  "${CMAKE_BINARY_DIR}/generated/include/gecko/version.h"
+  @ONLY)
+
 # Enable LTO only for Release builds (Debug builds are much faster without it)
 if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)

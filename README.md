@@ -12,7 +12,7 @@ cd gecko
 # Setup dev environment (creates gk function for this shell)
 source scripts/setup.sh    # Linux/macOS
 # or
-. .\scripts\setup.ps1      # PowerShell
+. .\scripts\setup.ps1      # Windows PowerShell
 
 # Build
 gk build
@@ -56,9 +56,11 @@ gecko/
 
 ## Versioning
 
-Format: `v{major}.{minor}.{patch}[-{prerelease}]`
+Format: `v0.0.0-{stage}.{N}` during development, `v{major}.{minor}.{patch}` for stable releases.
 
-- **Prerelease**: `alpha.N`, `beta.N`, or empty for stable
+- **Alpha** (`alpha.N`): Building engine foundations — modules, platform, graphics
+- **Beta** (`beta.N`): Proving the engine with a test game
+- **Stable** (`0.1.0`+): Ready for use
 - **Dev builds**: Append `-dev.{timestamp}` (automatic in CI)
 
 ## CI/CD
