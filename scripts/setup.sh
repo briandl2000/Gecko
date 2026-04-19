@@ -15,7 +15,12 @@ export -f gk
 git -C "$REPO_ROOT" config core.hooksPath .githooks 2>/dev/null
 
 # Platform identifier for build/output directory separation
-export GECKO_PLATFORM_ID="$(uname -s)-$(uname -m)"
+_gecko_os="$(uname -s)"
+case "$_gecko_os" in
+    MINGW*|MSYS*) _gecko_os="Windows" ;;
+esac
+export GECKO_PLATFORM_ID="${_gecko_os}-$(uname -m)"
+unset _gecko_os
 
 # Configure CMake if not already done
 if [ ! -d "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" ]; then
