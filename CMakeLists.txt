@@ -42,13 +42,6 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
 
-# On MinGW, statically link the GCC/C++ runtime so executables don't
-# depend on MSYS2 DLLs. Only applied to executables — shared libraries
-# must use dynamic linking to avoid duplicate symbol conflicts.
-if(MINGW)
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
-endif()
-
 # All outputs go to out/<PlatformID>/ at project root, separated by platform
 # CMake internals stay in out/build/<PlatformID>/
 # Normalize architecture names across platforms (AMD64 → x86_64, ARM64 → aarch64)
@@ -74,6 +67,41 @@ endforeach()
 option(GECKO_BUILD_EXAMPLES "Build examples" ON)
 option(GECKO_BUILD_TESTS "Build tests" OFF)
 option(GECKO_OVERRIDE_NEW "Override global operator new/delete to route through Gecko allocator" OFF)
+
+# On MinGW, copy GCC/C++ runtime DLLs to the output directory so
+# executables work without MSYS2 on PATH. We deliberately avoid static
+# linking because mixing static and dynamic runtimes across our shared
+# library (CoreServices.dll) causes duplicate-symbol crashes.
+if(MINGW)
+    get_filename_component(_MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    set(_MINGW_RUNTIME_DLLS
+        "${_MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
+        "${_MINGW_BIN_DIR}/libstdc++-6.dll"
+        "${_MINGW_BIN_DIR}/libwinpthread-1.dll"
+    )
+    add_custom_target(gecko_copy_mingw_runtime ALL
+        COMMENT "Copying MinGW runtime DLLs to output directories"
+    )
+    foreach(_cfg Debug Release RelWithDebInfo MinSizeRel)
+        string(TOUPPER ${_cfg} _CFGU)
+        foreach(_dll ${_MINGW_RUNTIME_DLLS})
+            if(EXISTS "${_dll}")
+                add_custom_command(TARGET gecko_copy_mingw_runtime POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory
+                        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_CFGU}}"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_dll}"
+                        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_CFGU}}/"
+                )
+            endif()
+        endforeach()
+    endforeach()
+    foreach(_dll ${_MINGW_RUNTIME_DLLS})
+        if(NOT EXISTS "${_dll}")
+            message(WARNING "MinGW runtime DLL not found: ${_dll}")
+        endif()
+    endforeach()
+endif()
 
 # Copy the compilation database to the repo root on build for editor tooling.
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
