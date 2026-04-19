@@ -42,6 +42,13 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
 
+# On MinGW, statically link the GCC/C++ runtime so executables don't
+# depend on MSYS2 DLLs. Only applied to executables — shared libraries
+# must use dynamic linking to avoid duplicate symbol conflicts.
+if(MINGW)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+endif()
+
 # All outputs go to out/<PlatformID>/ at project root, separated by platform
 # CMake internals stay in out/build/<PlatformID>/
 # Normalize architecture names across platforms (AMD64 → x86_64, ARM64 → aarch64)
