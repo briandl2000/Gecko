@@ -1,12 +1,12 @@
 # Gecko Development Environment (PowerShell)
-# Can be dot-sourced or executed: . .\scripts\setup.ps1 or .\scripts\setup.ps1
-
-# Get the repository root regardless of how script is invoked
-if ($PSScriptRoot) {
-    $script:RepoRoot = Split-Path -Parent $PSScriptRoot
-} else {
-    $script:RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
-}
+# DEPRECATED: Windows builds now use MSYS2 UCRT64 with MinGW-w64 GCC.
+# Use the MSYS2 UCRT64 terminal and run: source scripts/setup.sh
+# This script is kept for reference only and will be removed in a future release.
+Write-Host "ERROR: This script is deprecated." -ForegroundColor Red
+Write-Host "Windows builds now use MSYS2 UCRT64 with MinGW-w64 GCC." -ForegroundColor Yellow
+Write-Host "Open the MSYS2 UCRT64 terminal and run: source scripts/setup.sh" -ForegroundColor Yellow
+Write-Host "See docs/build.md for setup instructions." -ForegroundColor Yellow
+return
 
 # Store VS path globally for later use
 $script:VSInstallPath = $null
