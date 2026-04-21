@@ -332,7 +332,7 @@ u32 underlying = gecko::ToUnderlying(combined);
 ```cpp
 #if defined(_WIN32)
   // Windows-specific code
-  #include <corecrt_share.h>
+  #include <share.h>
   m_File = _fsopen(path, "wb", _SH_DENYNO);
 #else
   // POSIX code

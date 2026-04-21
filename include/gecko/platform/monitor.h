@@ -52,7 +52,7 @@ struct MonitorInfo
   u32 RefreshRateMilliHz {60000};
   u32 Dpi {96};
   float DpiScale {1.0F};
-  ColorSpace ColorSpace {ColorSpace::Srgb};
+  ColorSpace MonitorColorSpace {ColorSpace::Srgb};
   bool IsPrimary {false};
 
   void SetName(const char* name) noexcept

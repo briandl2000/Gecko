@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.commands import BUILD_DIR, _REPO_ROOT
+from scripts.commands import BUILD_DIR, _REPO_ROOT, _is_windows
 
 
 def register(subparsers) -> None:
@@ -32,18 +32,17 @@ def _check_tools() -> bool:
 
     if not shutil.which("ninja"):
         print("ERROR: ninja not found.", file=sys.stderr)
-        if os.name != "nt":
+        if not _is_windows():
             print("  Install with: sudo apt-get install ninja-build")
         ok = False
 
-    if os.name == "nt":
-        # On Windows, clang-cl is used via MSVC toolchain — setup.ps1 handles this
-        pass
-    else:
-        if not shutil.which("clang") or not shutil.which("clang++"):
-            print("ERROR: clang/clang++ not found.", file=sys.stderr)
-            print("  Install with: sudo apt-get install clang")
-            ok = False
+    if not shutil.which("gcc") or not shutil.which("g++"):
+        print("ERROR: gcc/g++ not found.", file=sys.stderr)
+        if _is_windows():
+            print("  Use the MSYS2 UCRT64 shell (gcc is installed there)")
+        else:
+            print("  Install with: sudo apt-get install gcc g++")
+        ok = False
 
     return ok
 
@@ -52,10 +51,10 @@ def _setup_env() -> dict[str, str]:
     """Return environment with correct compiler settings."""
     env = os.environ.copy()
 
-    if os.name != "nt":
-        # On Linux/macOS, ensure clang is used
-        env.setdefault("CC", "clang")
-        env.setdefault("CXX", "clang++")
+    if not _is_windows():
+        # On Linux/macOS, ensure GCC is used
+        env.setdefault("CC", "gcc")
+        env.setdefault("CXX", "g++")
 
     return env
 
@@ -93,7 +92,6 @@ def _run(args) -> int:
 
     if result.returncode == 0:
         print("\nSetup complete! To use gecko commands:")
-        print("  Linux/macOS: source scripts/setup.sh")
-        print("  PowerShell:  . .\\scripts\\setup.ps1")
+        print("  source scripts/setup.sh    # Linux/macOS/MSYS2")
 
     return result.returncode

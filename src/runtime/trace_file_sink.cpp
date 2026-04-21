@@ -2,6 +2,10 @@
 
 #include "gecko/core/assert.h"
 
+#if defined(GECKO_PLATFORM_WINDOWS)
+#include <share.h>
+#endif
+
 namespace gecko::runtime {
 
 TraceFileSink::TraceFileSink(const char* path)

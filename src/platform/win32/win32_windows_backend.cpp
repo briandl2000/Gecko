@@ -13,9 +13,6 @@
 #include <shellscalingapi.h>
 #include <windowsx.h>
 
-#pragma comment(lib, "Shcore.lib")
-#pragma comment(lib, "User32.lib")
-
 namespace gecko::platform {
 
 namespace {
@@ -127,7 +124,7 @@ Win32WindowsBackend::Win32WindowsBackend() noexcept
   s_Instance = this;
 
   // Enable per-monitor DPI awareness so Windows sends WM_DPICHANGED.
-  ::SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  ::SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 
   ::WNDCLASSEXW wc {};
   wc.cbSize = sizeof(wc);

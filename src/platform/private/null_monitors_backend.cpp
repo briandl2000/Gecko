@@ -22,7 +22,7 @@ void NullMonitorsBackend::EnumerateMonitors() noexcept
   info.RefreshRateMilliHz = 60000;
   info.Dpi = 96;
   info.DpiScale = 1.0F;
-  info.ColorSpace = ColorSpace::Srgb;
+  info.MonitorColorSpace = ColorSpace::Srgb;
   info.IsPrimary = true;
 
   m_Monitors.push_back(entry);

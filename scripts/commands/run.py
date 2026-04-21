@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.commands import OUTPUT_DIR, is_network_path
+from scripts.commands import OUTPUT_DIR, is_network_path, _is_windows
 
 
 def register(subparsers) -> None:
@@ -34,7 +34,7 @@ def register(subparsers) -> None:
 
 def _run(args) -> int:
     config = "Debug" if args.config == "debug" else "Release"
-    exe_suffix = ".exe" if os.name == "nt" else ""
+    exe_suffix = ".exe" if _is_windows() else ""
     executable = Path(f"{OUTPUT_DIR}/bin/{config}/{args.target}{exe_suffix}")
 
     if not executable.exists():

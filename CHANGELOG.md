@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build scripts handle Windows network/mapped drives (UNC path safety)
 - PR templates cleaned up with concise checklists
 - Dev releases hidden from "latest" on GitHub, main releases use auto-generated notes
+- Force use GCC now for c++26 features. Updated the build system.
 
 ### Fixed
 - CI version extraction on Windows (portable sed-based extraction)

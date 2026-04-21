@@ -2,17 +2,6 @@ cmake_minimum_required(VERSION 3.22)
 
 project(Gecko VERSION 0.0.0 LANGUAGES C CXX)
 
-# Enforce Clang compiler (either Clang or clang-cl on Windows)
-if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  message(FATAL_ERROR 
-    "Gecko requires Clang compiler but detected: ${CMAKE_CXX_COMPILER_ID}\n"
-    "Please install LLVM/Clang:\n"
-    "  Windows: Visual Studio Installer > Individual Components > 'C++ Clang Compiler'\n"
-    "  Ubuntu:  sudo apt-get install clang\n"
-    "  macOS:   brew install llvm\n"
-    "Then delete the out/build directory and reconfigure.")
-endif()
-
 # Optional SemVer prerelease identifier (repo-controlled).
 # Examples: "alpha.1", "beta.2", "rc.1". Set to "" for a normal release.
 set(GECKO_VERSION_PRERELEASE "alpha.2")
@@ -23,7 +12,7 @@ else()
   set(GECKO_VERSION_FULL "${PROJECT_VERSION}-${GECKO_VERSION_PRERELEASE}")
 endif()
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Generate version.h from template with real values stamped in
@@ -45,13 +34,11 @@ if(CCACHE_PROGRAM)
   message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
 endif()
 
-# Compiler flags - Clang-only, consistent across platforms
-# clang-cl uses MSVC-style flags, regular clang uses GCC-style
+# Compiler warnings — GCC and Clang share these flags.
+# The MSVC path covers clang-cl or native MSVC if ever used.
 if(MSVC)
-    # clang-cl on Windows (still sets MSVC=true but uses Clang frontend)
     add_compile_options(/W4 /WX)
 else()
-    # clang on Linux/macOS
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
 
@@ -80,6 +67,41 @@ endforeach()
 option(GECKO_BUILD_EXAMPLES "Build examples" ON)
 option(GECKO_BUILD_TESTS "Build tests" OFF)
 option(GECKO_OVERRIDE_NEW "Override global operator new/delete to route through Gecko allocator" OFF)
+
+# On MinGW, copy GCC/C++ runtime DLLs to the output directory so
+# executables work without MSYS2 on PATH. We deliberately avoid static
+# linking because mixing static and dynamic runtimes across our shared
+# library (CoreServices.dll) causes duplicate-symbol crashes.
+if(MINGW)
+    get_filename_component(_MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    set(_MINGW_RUNTIME_DLLS
+        "${_MINGW_BIN_DIR}/libgcc_s_seh-1.dll"
+        "${_MINGW_BIN_DIR}/libstdc++-6.dll"
+        "${_MINGW_BIN_DIR}/libwinpthread-1.dll"
+    )
+    add_custom_target(gecko_copy_mingw_runtime ALL
+        COMMENT "Copying MinGW runtime DLLs to output directories"
+    )
+    foreach(_cfg Debug Release RelWithDebInfo MinSizeRel)
+        string(TOUPPER ${_cfg} _CFGU)
+        foreach(_dll ${_MINGW_RUNTIME_DLLS})
+            if(EXISTS "${_dll}")
+                add_custom_command(TARGET gecko_copy_mingw_runtime POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory
+                        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_CFGU}}"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_dll}"
+                        "${CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_CFGU}}/"
+                )
+            endif()
+        endforeach()
+    endforeach()
+    foreach(_dll ${_MINGW_RUNTIME_DLLS})
+        if(NOT EXISTS "${_dll}")
+            message(WARNING "MinGW runtime DLL not found: ${_dll}")
+        endif()
+    endforeach()
+endif()
 
 # Copy the compilation database to the repo root on build for editor tooling.
 if(CMAKE_EXPORT_COMPILE_COMMANDS)

@@ -1,6 +1,6 @@
 # Gecko Engine
 
-A modular C++23 game/application engine focused on clean architecture and fast iteration.
+A modular C++26 game/application engine focused on clean architecture and fast iteration.
 
 ## Quick Start
 
@@ -10,9 +10,7 @@ git clone https://github.com/yourusername/gecko.git
 cd gecko
 
 # Setup dev environment (creates gk function for this shell)
-source scripts/setup.sh    # Linux/macOS
-# or
-. .\scripts\setup.ps1      # Windows PowerShell
+source scripts/setup.sh    # Linux/macOS/MSYS2
 
 # Build
 gk build
@@ -26,7 +24,7 @@ gk test
 - **CMake** 3.22+
 - **Python** 3.7+
 - **Ninja** (recommended)
-- **Clang 17+** with C++23 support (GCC/MSVC not currently supported)
+- **GCC 15+** with C++26 support (Windows: via MSYS2 MinGW-w64)
 
 ## CLI Commands
 

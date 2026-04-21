@@ -455,7 +455,7 @@ for (u32 i = 0; i < count; ++i)
   // info.RefreshRateMilliHz — e.g. 60000 = 60 Hz, 144000 = 144 Hz
   // info.Dpi             — e.g. 96, 192
   // info.DpiScale        — e.g. 1.0, 2.0
-  // info.ColorSpace      — Srgb, Hdr10, DolbyVision
+  // info.MonitorColorSpace — Srgb, Hdr10, DolbyVision
   // info.IsPrimary       — true for the primary display
 }
 ```

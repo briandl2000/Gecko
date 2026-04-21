@@ -8,7 +8,7 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Build & Test - Clang only (clang on Linux, clang-cl on Windows)
+  # Build & Test - GCC on Linux, MinGW-w64 GCC on Windows
   # ---------------------------------------------------------------------------
   build-and-test:
     name: Build & Test (${{ matrix.os }})
@@ -24,18 +24,16 @@ jobs:
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          choco install ninja llvm
-      
-      - name: Setup MSVC environment (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -52,28 +50,37 @@ jobs:
             echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
           fi
 
-      - name: Configure
-        shell: bash
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            export CC=clang-cl
-            export CXX=clang-cl
-          else
-            export CC=clang
-            export CXX=clang++
-          fi
+          export CC=gcc-15 CXX=g++-15
           cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
-      
-      - name: Build
-        shell: bash
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
-      
-      - name: Build tests
-        shell: bash
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
+
+      - name: Build tests (Linux)
+        if: runner.os == 'Linux'
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
@@ -81,20 +88,47 @@ jobs:
             cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
           done
 
-      - name: Run tests
-        shell: bash
+      - name: Build tests (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          for target in core_tests platform_tests runtime_tests math_tests; do
+            cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
+          done
+
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
+          failed=0
+          for test in core_tests platform_tests runtime_tests math_tests; do
+            exe="$test_dir/${test}"
+            if [ -f "$exe" ]; then
+              echo "--- $test ---"
+              "$exe" || failed=1
+            else
+              echo "Test executable not found: $exe"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
           test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
           bin_dir="./out/$GECKO_PLATFORM_ID/bin/Release"
-          exe_suffix=""
-          [ "${{ runner.os }}" = "Windows" ] && exe_suffix=".exe"
-          # Add shared library dir to PATH so tests find CoreServices.dll (Windows)
           export PATH="$(cd "$bin_dir" && pwd):$PATH"
           failed=0
           for test in core_tests platform_tests runtime_tests math_tests; do
-            exe="$test_dir/${test}${exe_suffix}"
+            exe="$test_dir/${test}.exe"
             if [ -f "$exe" ]; then
               echo "--- $test ---"
               "$exe" || failed=1
@@ -228,16 +262,16 @@ jobs:
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install ninja llvm
-      
-      - name: Setup MSVC environment (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake zip
       
       - name: Set platform ID
         id: platform
@@ -249,28 +283,44 @@ jobs:
             echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
           fi
 
-      - name: Configure
-        shell: bash
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            export CC=clang-cl
-            export CXX=clang-cl
-          else
-            export CC=clang
-            export CXX=clang++
-          fi
+          export CC=gcc-15 CXX=g++-15
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
           cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
       
-      - name: Build Release
-        shell: bash
+      - name: Build Release (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
+
+      - name: Build Release (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
       
-      - name: Install to package directory
-        shell: bash
+      - name: Install to package directory (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --install out/build/$GECKO_PLATFORM_ID --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
+
+      - name: Install to package directory (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: cmake --install out/build/$GECKO_PLATFORM_ID --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
@@ -283,9 +333,10 @@ jobs:
       
       - name: Create zip (Windows)
         if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           cd out/package
-          Compress-Archive -Path gecko-${{ needs.resolve-version.outputs.version }} -DestinationPath gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip
+          zip -r gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip gecko-${{ needs.resolve-version.outputs.version }}
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4

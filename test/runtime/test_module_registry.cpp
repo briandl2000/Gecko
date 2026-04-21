@@ -40,7 +40,6 @@ struct TestServiceScope
 
   ~TestServiceScope()
   {
-    modules.ShutdownAllModules();
     UninstallServices();
   }
 };
@@ -91,6 +90,8 @@ TEST_CASE("ModuleRegistry register and find module", "[runtime][modules]")
 
   IModule* found = scope.modules.GetModule(mod.m_Label);
   REQUIRE(found == &mod);
+
+  scope.modules.ShutdownAllModules();
 }
 
 TEST_CASE("ModuleRegistry duplicate registration fails", "[runtime][modules]")
@@ -103,6 +104,8 @@ TEST_CASE("ModuleRegistry duplicate registration fails", "[runtime][modules]")
 
   auto reg2 = scope.modules.RegisterStatic(mod);
   REQUIRE(reg2.Result == ModuleResult::DuplicateModule);
+
+  scope.modules.ShutdownAllModules();
 }
 
 TEST_CASE("ModuleRegistry unregister module", "[runtime][modules]")
@@ -137,6 +140,8 @@ TEST_CASE("ModuleRegistry StartupAllModules calls Startup",
   REQUIRE(scope.modules.StartupAllModules());
   REQUIRE(mod1.m_StartupCalled);
   REQUIRE(mod2.m_StartupCalled);
+
+  scope.modules.ShutdownAllModules();
 }
 
 TEST_CASE("ModuleRegistry ShutdownAllModules calls Shutdown",
@@ -180,4 +185,6 @@ TEST_CASE("ModuleRegistry ForEachModule visits all modules",
       &visitCount);
 
   REQUIRE(visitCount == 2);
+
+  scope.modules.ShutdownAllModules();
 }

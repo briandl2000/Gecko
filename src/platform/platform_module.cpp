@@ -10,7 +10,6 @@
 #include <Windows.h>
 // needs to be after Windows.h to avoid macro conflicts (e.g. with CreateWindow).
 #include <timeapi.h>
-#pragma comment(lib, "Winmm.lib")
 #endif
 
 namespace gecko::platform {
