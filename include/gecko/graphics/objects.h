@@ -484,6 +484,11 @@ struct GraphicsPipelineDesc
   const char* VertexShaderPath {nullptr};
   const char* PixelShaderPath {nullptr};
 
+  // Optional inline SPIR-V (takes precedence over paths when non-empty).
+  // Use C++26 `#embed` to fill these at compile time.
+  ::std::span<const unsigned char> VertexShaderCode {};
+  ::std::span<const unsigned char> PixelShaderCode  {};
+
   VertexLayout Layout {};
 
   u32        NumRenderTargets {0};
@@ -506,7 +511,7 @@ struct GraphicsPipelineDesc
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    if (VertexShaderPath == nullptr)
+    if (VertexShaderPath == nullptr && VertexShaderCode.empty())
       return false;
     if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
       return false;

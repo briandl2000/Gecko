@@ -1,11 +1,12 @@
 #include "vulkan_command_list.h"
-#include "vulkan_device.h"
 #include "vulkan_util.h"
 
 #include "gecko/core/services/log.h"
 #include "private/labels.h"
 
 namespace gecko::graphics {
+
+// ── Construction / destruction ────────────────────────────────────────────
 
 VulkanCommandList::VulkanCommandList(VulkanDevice& device) noexcept
     : m_Device(device)
@@ -19,7 +20,14 @@ VulkanCommandList::VulkanCommandList(VulkanDevice& device) noexcept
   if (vkAllocateCommandBuffers(m_Device.Device(), &cbAI, &m_CmdBuffer) != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Graphics, "VulkanCommandList: vkAllocateCommandBuffers failed");
+    return;
   }
+
+  // Begin recording immediately.
+  VkCommandBufferBeginInfo bi{};
+  bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  VULKAN_CHECK(vkBeginCommandBuffer(m_CmdBuffer, &bi));
 }
 
 VulkanCommandList::~VulkanCommandList()
@@ -37,32 +45,48 @@ bool VulkanCommandList::IsValid() const noexcept
   return m_CmdBuffer != VK_NULL_HANDLE;
 }
 
-void VulkanCommandList::Begin() noexcept
+// ── Render target ─────────────────────────────────────────────────────────
+
+void VulkanCommandList::ClearRenderTarget(const RenderTarget& rt) noexcept
 {
-  VkCommandBufferBeginInfo bi{};
-  bi.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  bi.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  VULKAN_CHECK(vkBeginCommandBuffer(m_CmdBuffer, &bi));
+  m_PendingClear = true;
+
+  if (rt.Desc.NumRenderTargets > 0)
+  {
+    const auto& cv          = rt.Desc.RenderTargetClearValues[0];
+    m_ClearColor.float32[0] = cv.Color[0];
+    m_ClearColor.float32[1] = cv.Color[1];
+    m_ClearColor.float32[2] = cv.Color[2];
+    m_ClearColor.float32[3] = cv.Color[3];
+  }
+  else
+  {
+    m_ClearColor = {};  // black
+  }
 }
 
-void VulkanCommandList::End() noexcept
-{
-  VULKAN_CHECK(vkEndCommandBuffer(m_CmdBuffer));
-}
-
-void VulkanCommandList::BeginRendering(const RenderTarget& rt,
-                                        bool clearColor,
-                                        bool /*clearDepth*/) noexcept
+void VulkanCommandList::BindRenderTarget(const RenderTarget& rt) noexcept
 {
   if (!rt.Data)
     return;
 
-  auto* bbData = static_cast<BackBufferData*>(rt.Data.get());
-  m_CurrentImage     = bbData->Image;
-  m_CurrentImageView = bbData->ImageView;
-  m_Rendering        = true;
+  if (m_Rendering)
+    EndActiveRendering();
 
-  // Transition: UNDEFINED → COLOR_ATTACHMENT_OPTIMAL
+  auto* rtData    = static_cast<VulkanRTData*>(rt.Data.get());
+  m_CurrentImage  = rtData->Image;
+  m_CurrentView   = rtData->ImageView;
+  m_RTWidth       = rt.Desc.Width;
+  m_RTHeight      = rt.Desc.Height;
+  m_IsSwapchain   = (rtData->RTKind == VulkanRTData::Kind::Swapchain);
+
+  if (m_IsSwapchain)
+  {
+    m_SwapchainData  = rtData->SwapchainData;
+    m_SwapchainFrame = rtData->FrameIndex;
+  }
+
+  // Transition: UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL
   VkImageMemoryBarrier barrier{};
   barrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
   barrier.oldLayout                       = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -85,85 +109,46 @@ void VulkanCommandList::BeginRendering(const RenderTarget& rt,
 
   VkRenderingAttachmentInfo colorAtt{};
   colorAtt.sType       = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  colorAtt.imageView   = m_CurrentImageView;
+  colorAtt.imageView   = m_CurrentView;
   colorAtt.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  colorAtt.loadOp      = clearColor ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+  colorAtt.loadOp      = m_PendingClear
+                             ? VK_ATTACHMENT_LOAD_OP_CLEAR
+                             : VK_ATTACHMENT_LOAD_OP_LOAD;
   colorAtt.storeOp     = VK_ATTACHMENT_STORE_OP_STORE;
-  if (clearColor)
-  {
-    colorAtt.clearValue.color = {
-        {rt.Desc.RenderTargetClearValues[0].Color[0],
-         rt.Desc.RenderTargetClearValues[0].Color[1],
-         rt.Desc.RenderTargetClearValues[0].Color[2],
-         rt.Desc.RenderTargetClearValues[0].Color[3]}};
-  }
+  if (m_PendingClear)
+    colorAtt.clearValue.color = m_ClearColor;
+  m_PendingClear = false;
 
   VkRenderingInfo renderingInfo{};
   renderingInfo.sType                = VK_STRUCTURE_TYPE_RENDERING_INFO;
   renderingInfo.renderArea.offset    = {0, 0};
-  renderingInfo.renderArea.extent    = {rt.Desc.Width, rt.Desc.Height};
+  renderingInfo.renderArea.extent    = {m_RTWidth, m_RTHeight};
   renderingInfo.layerCount           = 1;
   renderingInfo.colorAttachmentCount = 1;
   renderingInfo.pColorAttachments    = &colorAtt;
 
   vkCmdBeginRendering(m_CmdBuffer, &renderingInfo);
-}
+  m_Rendering = true;
 
-void VulkanCommandList::EndRendering() noexcept
-{
-  vkCmdEndRendering(m_CmdBuffer);
-  m_Rendering = false;
-
-  if (m_CurrentImage == VK_NULL_HANDLE)
-    return;
-
-  // Transition: COLOR_ATTACHMENT_OPTIMAL → PRESENT_SRC_KHR
-  VkImageMemoryBarrier barrier{};
-  barrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout                       = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  barrier.newLayout                       = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-  barrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-  barrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image                           = m_CurrentImage;
-  barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-  barrier.subresourceRange.baseMipLevel   = 0;
-  barrier.subresourceRange.levelCount     = 1;
-  barrier.subresourceRange.baseArrayLayer = 0;
-  barrier.subresourceRange.layerCount     = 1;
-  barrier.srcAccessMask                   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  barrier.dstAccessMask                   = 0;
-
-  vkCmdPipelineBarrier(m_CmdBuffer,
-                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                        0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-  m_CurrentImage     = VK_NULL_HANDLE;
-  m_CurrentImageView = VK_NULL_HANDLE;
-}
-
-void VulkanCommandList::SetViewport(f32 x, f32 y, f32 width, f32 height,
-                                     f32 minDepth, f32 maxDepth) noexcept
-{
+  // Dynamic viewport / scissor (pipeline uses VK_DYNAMIC_STATE_*)
   VkViewport vp{};
-  vp.x        = x;
-  vp.y        = y;
-  vp.width    = width;
-  vp.height   = height;
-  vp.minDepth = minDepth;
-  vp.maxDepth = maxDepth;
+  vp.x        = 0.0F;
+  vp.y        = 0.0F;
+  vp.width    = static_cast<float>(m_RTWidth);
+  vp.height   = static_cast<float>(m_RTHeight);
+  vp.minDepth = 0.0F;
+  vp.maxDepth = 1.0F;
   vkCmdSetViewport(m_CmdBuffer, 0, 1, &vp);
-}
 
-void VulkanCommandList::SetScissor(u32 x, u32 y, u32 width, u32 height) noexcept
-{
   VkRect2D scissor{};
-  scissor.offset = {static_cast<i32>(x), static_cast<i32>(y)};
-  scissor.extent = {width, height};
+  scissor.offset = {0, 0};
+  scissor.extent = {m_RTWidth, m_RTHeight};
   vkCmdSetScissor(m_CmdBuffer, 0, 1, &scissor);
 }
 
-void VulkanCommandList::BindPipeline(const GraphicsPipeline& pipeline) noexcept
+// ── Pipeline ──────────────────────────────────────────────────────────────
+
+void VulkanCommandList::BindGraphicsPipeline(const GraphicsPipeline& pipeline) noexcept
 {
   if (!pipeline.Data)
     return;
@@ -171,85 +156,94 @@ void VulkanCommandList::BindPipeline(const GraphicsPipeline& pipeline) noexcept
   vkCmdBindPipeline(m_CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeData->Pipeline);
 }
 
-void VulkanCommandList::DrawVertices(u32 vertexCount, u32 instanceCount,
-                                      u32 firstVertex, u32 firstInstance) noexcept
-{
-  vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
-}
-
-void VulkanCommandList::DrawIndexedVertices(u32 indexCount, u32 instanceCount,
-                                             u32 firstIndex, i32 vertexOffset,
-                                             u32 firstInstance) noexcept
-{
-  vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex, vertexOffset,
-                    firstInstance);
-}
-
-// ── Swapchain semaphore accessors ─────────────────────────────────────────
-
-VkSemaphore* VulkanCommandList::ImageAvailableSemaphore() noexcept
-{
-  if (!m_SwapchainData)
-    return nullptr;
-  return &m_SwapchainData->ImageAvailable[m_SwapchainData->FrameIndex];
-}
-
-VkSemaphore* VulkanCommandList::RenderFinishedSemaphore() noexcept
-{
-  if (!m_SwapchainData)
-    return nullptr;
-  return &m_SwapchainData->RenderFinished[m_SwapchainData->FrameIndex];
-}
-
-VkFence VulkanCommandList::InFlightFence() noexcept
-{
-  if (!m_SwapchainData)
-    return VK_NULL_HANDLE;
-  return m_SwapchainData->InFlight[m_SwapchainData->FrameIndex];
-}
-
-// ── Legacy no-op stubs ────────────────────────────────────────────────────
-
-void VulkanCommandList::ClearRenderTarget(const RenderTarget&) noexcept {}
-void VulkanCommandList::BindRenderTarget(const RenderTarget&) noexcept {}
-void VulkanCommandList::CopyTextureToTexture(const Texture&, const Texture&) noexcept {}
-void VulkanCommandList::BindTexture(u32, const Texture&) noexcept {}
-void VulkanCommandList::BindTexture(u32, const Texture&, u32) noexcept {}
-void VulkanCommandList::BindAsRWTexture(u32, const Texture&) noexcept {}
-void VulkanCommandList::BindAsRWTexture(u32, const Texture&, u32) noexcept {}
+// ── Buffer ────────────────────────────────────────────────────────────────
 
 void VulkanCommandList::BindVertexBuffer(const Buffer& buf) noexcept
 {
   if (!buf.Data)
     return;
-  auto* bufData = static_cast<VulkanBufferData*>(buf.Data.get());
-  VkDeviceSize offset = 0;
+  auto*        bufData = static_cast<VulkanBufferData*>(buf.Data.get());
+  VkDeviceSize offset  = 0;
   vkCmdBindVertexBuffers(m_CmdBuffer, 0, 1, &bufData->Buffer, &offset);
 }
 
-void VulkanCommandList::BindIndexBuffer(const Buffer& /*buf*/) noexcept {}
-void VulkanCommandList::BindConstantBuffer(u32, const Buffer&) noexcept {}
-void VulkanCommandList::BindStructuredBuffer(u32, const Buffer&) noexcept {}
-void VulkanCommandList::BindAsRWBuffer(u32, const Buffer&) noexcept {}
-void VulkanCommandList::SetLocalData(u32, const void*) noexcept {}
-
-void VulkanCommandList::BindGraphicsPipeline(const GraphicsPipeline& pipeline) noexcept
-{
-  BindPipeline(pipeline);
-}
-
-void VulkanCommandList::BindComputePipeline(const ComputePipeline&) noexcept {}
-
-void VulkanCommandList::Draw(u32 numIndices) noexcept
-{
-  vkCmdDraw(m_CmdBuffer, numIndices, 1, 0, 0);
-}
+// ── Draw ──────────────────────────────────────────────────────────────────
 
 void VulkanCommandList::DrawAuto(u32 numVertices) noexcept
 {
   vkCmdDraw(m_CmdBuffer, numVertices, 1, 0, 0);
 }
 
-void VulkanCommandList::Dispatch(u32, u32, u32) noexcept {}
+void VulkanCommandList::Draw(u32 numIndices) noexcept
+{
+  vkCmdDraw(m_CmdBuffer, numIndices, 1, 0, 0);
+}
+
+// ── Finalise ──────────────────────────────────────────────────────────────
+
+void VulkanCommandList::EndActiveRendering() noexcept
+{
+  if (!m_Rendering)
+    return;
+
+  vkCmdEndRendering(m_CmdBuffer);
+  m_Rendering = false;
+
+  if (m_IsSwapchain && m_CurrentImage != VK_NULL_HANDLE)
+  {
+    // Transition: COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR
+    VkImageMemoryBarrier barrier{};
+    barrier.sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout                       = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    barrier.newLayout                       = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barrier.srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image                           = m_CurrentImage;
+    barrier.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel   = 0;
+    barrier.subresourceRange.levelCount     = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount     = 1;
+    barrier.srcAccessMask                   = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    barrier.dstAccessMask                   = 0;
+
+    vkCmdPipelineBarrier(m_CmdBuffer,
+                          VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                          0, 0, nullptr, 0, nullptr, 1, &barrier);
+  }
+
+  m_CurrentImage = VK_NULL_HANDLE;
+  m_CurrentView  = VK_NULL_HANDLE;
+}
+
+void VulkanCommandList::FinalizeForSubmit() noexcept
+{
+  EndActiveRendering();
+  VULKAN_CHECK(vkEndCommandBuffer(m_CmdBuffer));
+}
+
+// ── Sync accessors ────────────────────────────────────────────────────────
+
+VkSemaphore* VulkanCommandList::ImageAvailableSemaphore() noexcept
+{
+  if (!m_SwapchainData)
+    return nullptr;
+  return &m_SwapchainData->ImageAvailable[m_SwapchainFrame];
+}
+
+VkSemaphore* VulkanCommandList::RenderFinishedSemaphore() noexcept
+{
+  if (!m_SwapchainData)
+    return nullptr;
+  return &m_SwapchainData->RenderFinished[m_SwapchainFrame];
+}
+
+VkFence VulkanCommandList::InFlightFence() noexcept
+{
+  if (!m_SwapchainData)
+    return VK_NULL_HANDLE;
+  return m_SwapchainData->InFlight[m_SwapchainFrame];
+}
 
 }  // namespace gecko::graphics

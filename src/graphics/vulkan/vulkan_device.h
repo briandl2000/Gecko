@@ -47,9 +47,24 @@ struct VulkanSwapchainData
   VkSemaphore     ImageAvailable[8]{};
   VkSemaphore     RenderFinished[8]{};
   VkFence         InFlight[8]      {};
-  VkCommandBuffer CmdBuffers[8]    {};
   u32             FrameIndex       {0};
   u32             AcquiredIndex    {0};
+};
+
+// ── Render target GPU data ────────────────────────────────────────────────
+// Stored in RenderTarget::Data so VulkanCommandList can read it.
+
+struct VulkanRTData
+{
+  enum class Kind : u8 { Swapchain, Offscreen };
+
+  Kind        RTKind    { Kind::Offscreen };
+  VkImage     Image     { VK_NULL_HANDLE };
+  VkImageView ImageView { VK_NULL_HANDLE };
+
+  // Only valid when RTKind == Swapchain
+  VulkanSwapchainData* SwapchainData { nullptr };
+  u32                  FrameIndex    { 0 };
 };
 
 // ── VulkanDevice ─────────────────────────────────────────────────────────
@@ -122,6 +137,7 @@ private:
                                 const SwapchainDesc& desc) noexcept;
   void DestroySwapchainInternal(VulkanSwapchainData& data) noexcept;
 
+  [[nodiscard]] VkShaderModule CreateShaderModule(const void* code, usize size) noexcept;
   [[nodiscard]] VkShaderModule LoadShaderModule(const char* path) noexcept;
 
   void OneTimeSubmit(void (*record)(VkCommandBuffer, void*), void* ctx) noexcept;

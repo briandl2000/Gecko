@@ -24,15 +24,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 {
   if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
   {
-    GECKO_ERROR(labels::Graphics, "[Vulkan validation] {}", data->pMessage);
+    GECKO_ERROR(labels::Graphics, "[Vulkan validation] %s", data->pMessage);
   }
   else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
   {
-    GECKO_WARN(labels::Graphics, "[Vulkan validation] {}", data->pMessage);
+    GECKO_WARN(labels::Graphics, "[Vulkan validation] %s", data->pMessage);
   }
   else
   {
-    GECKO_INFO(labels::Graphics, "[Vulkan validation] {}", data->pMessage);
+    GECKO_INFO(labels::Graphics, "[Vulkan validation] %s", data->pMessage);
   }
   return VK_FALSE;
 }
@@ -80,7 +80,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   VkResult res = vkCreateInstance(&instanceCI, nullptr, &m_Instance);
   if (res != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Graphics, "VulkanDevice: vkCreateInstance failed ({})",
+    GECKO_ERROR(labels::Graphics, "VulkanDevice: vkCreateInstance failed (%d)",
                 static_cast<i32>(res));
     return;
   }
@@ -137,7 +137,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     vkGetPhysicalDeviceProperties(m_PhysicalDevice, &props);
     u32 major = VK_VERSION_MAJOR(props.apiVersion);
     u32 minor = VK_VERSION_MINOR(props.apiVersion);
-    GECKO_INFO(labels::Graphics, "VulkanDevice: selected GPU '{}' (Vulkan {}.{})",
+    GECKO_INFO(labels::Graphics, "VulkanDevice: selected GPU '%s' (Vulkan %u.%u)",
                props.deviceName, major, minor);
   }
 
@@ -200,7 +200,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   res = vkCreateDevice(m_PhysicalDevice, &deviceCI, nullptr, &m_Device);
   if (res != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Graphics, "VulkanDevice: vkCreateDevice failed ({})",
+    GECKO_ERROR(labels::Graphics, "VulkanDevice: vkCreateDevice failed (%d)",
                 static_cast<i32>(res));
     return;
   }
@@ -233,7 +233,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   res = vmaCreateAllocator(&vmaCI, &m_Allocator);
   if (res != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Graphics, "VulkanDevice: vmaCreateAllocator failed ({})",
+    GECKO_ERROR(labels::Graphics, "VulkanDevice: vmaCreateAllocator failed (%d)",
                 static_cast<i32>(res));
     return;
   }
@@ -462,14 +462,7 @@ void VulkanDevice::CreateSwapchainInternal(
     VULKAN_CHECK(vkCreateImageView(m_Device, &ivCI, nullptr, &data.ImageViews[i]));
   }
 
-  // Per-frame sync + command buffers
-  VkCommandBufferAllocateInfo cbAI{};
-  cbAI.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cbAI.commandPool        = m_GraphicsCommandPool;
-  cbAI.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cbAI.commandBufferCount = data.ImageCount;
-  VULKAN_CHECK(vkAllocateCommandBuffers(m_Device, &cbAI, data.CmdBuffers));
-
+  // Per-frame sync objects
   VkSemaphoreCreateInfo semCI{};
   semCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -500,9 +493,6 @@ void VulkanDevice::DestroySwapchainInternal(VulkanSwapchainData& data) noexcept
     if (data.InFlight[i] != VK_NULL_HANDLE)
       vkDestroyFence(m_Device, data.InFlight[i], nullptr);
   }
-
-  if (data.ImageCount > 0)
-    vkFreeCommandBuffers(m_Device, m_GraphicsCommandPool, data.ImageCount, data.CmdBuffers);
 
   if (data.Swapchain != VK_NULL_HANDLE)
     vkDestroySwapchainKHR(m_Device, data.Swapchain, nullptr);
@@ -548,7 +538,7 @@ Swapchain VulkanDevice::CreateSwapchain(
     delete d;
   });
 
-  GECKO_INFO(labels::Graphics, "VulkanDevice: swapchain created ({}x{}, {} images)",
+  GECKO_INFO(labels::Graphics, "VulkanDevice: swapchain created (%ux%u, %u images)",
              data->Extent.width, data->Extent.height, data->ImageCount);
   return sc;
 }
@@ -587,9 +577,6 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
     if (data->InFlight[i] != VK_NULL_HANDLE)
       vkDestroyFence(m_Device, data->InFlight[i], nullptr);
   }
-
-  if (data->ImageCount > 0)
-    vkFreeCommandBuffers(m_Device, m_GraphicsCommandPool, data->ImageCount, data->CmdBuffers);
 
   VkSwapchainKHR oldSwapchain = data->Swapchain;
 
@@ -660,14 +647,7 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
     VULKAN_CHECK(vkCreateImageView(m_Device, &ivCI, nullptr, &data->ImageViews[i]));
   }
 
-  // Re-alloc command buffers + sync
-  VkCommandBufferAllocateInfo cbAI{};
-  cbAI.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cbAI.commandPool        = m_GraphicsCommandPool;
-  cbAI.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  cbAI.commandBufferCount = data->ImageCount;
-  VULKAN_CHECK(vkAllocateCommandBuffers(m_Device, &cbAI, data->CmdBuffers));
-
+  // Re-create sync objects
   VkSemaphoreCreateInfo semCI{};
   semCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
   VkFenceCreateInfo fenceCI{};
@@ -684,7 +664,7 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
   swapchain.Desc.Width  = extent.width;
   swapchain.Desc.Height = extent.height;
 
-  GECKO_INFO(labels::Graphics, "VulkanDevice: swapchain resized to {}x{}",
+  GECKO_INFO(labels::Graphics, "VulkanDevice: swapchain resized to %ux%u",
              extent.width, extent.height);
 }
 
@@ -704,32 +684,32 @@ RenderTarget VulkanDevice::GetCurrentBackBuffer(
 
   if (res == VK_ERROR_OUT_OF_DATE_KHR)
   {
-    GECKO_WARN(labels::Graphics, "VulkanDevice: swapchain out of date on acquire");
+    GECKO_WARN(labels::Graphics, "VulkanDevice: swapchain out-of-date on acquire");
     return RenderTarget{};
   }
 
   data->AcquiredIndex = imageIndex;
 
-  // Wait for this frame's fence
+  // Wait for this frame's fence before reusing its resources.
   vkWaitForFences(m_Device, 1, &data->InFlight[data->FrameIndex], VK_TRUE, UINT64_MAX);
   vkResetFences(m_Device, 1, &data->InFlight[data->FrameIndex]);
 
-  // Build a RenderTarget that wraps this image
-  // We store a small struct as the RT's Data so VulkanCommandList can read it
-  struct BackBufferData
-  {
-    VkImage     Image;
-    VkImageView ImageView;
-  };
-
-  auto* bbData = new BackBufferData{data->Images[imageIndex], data->ImageViews[imageIndex]};
+  // Build a RenderTarget whose Data is a VulkanRTData carrying the swapchain
+  // pointer so VulkanCommandList can set up sync objects on BindRenderTarget.
+  auto* rtData        = new VulkanRTData{};
+  rtData->RTKind      = VulkanRTData::Kind::Swapchain;
+  rtData->Image       = data->Images[imageIndex];
+  rtData->ImageView   = data->ImageViews[imageIndex];
+  rtData->SwapchainData = data;
+  rtData->FrameIndex  = data->FrameIndex;
 
   RenderTarget rt{};
   rt.Desc.Width                  = data->Extent.width;
   rt.Desc.Height                 = data->Extent.height;
   rt.Desc.NumRenderTargets       = 1;
   rt.Desc.RenderTargetFormats[0] = FromVkFormat(data->Format);
-  rt.Data = ::gecko::Shared<void>(bbData, [](void* p) { delete static_cast<BackBufferData*>(p); });
+  rt.Data = ::gecko::Shared<void>(rtData,
+      [](void* p) { delete static_cast<VulkanRTData*>(p); });
 
   return rt;
 }
@@ -762,7 +742,7 @@ void VulkanDevice::Present(const Swapchain& swapchain) noexcept
   VkResult res = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
   if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR)
   {
-    GECKO_WARN(labels::Graphics, "VulkanDevice: swapchain needs resize");
+    GECKO_WARN(labels::Graphics, "VulkanDevice: swapchain suboptimal or out-of-date");
   }
 
   data->FrameIndex = (frame + 1) % data->ImageCount;
@@ -784,14 +764,16 @@ void VulkanDevice::ExecuteGraphicsCommandList(
     return;
 
   auto* cmd = static_cast<VulkanCommandList*>(commandList.get());
-  VkCommandBuffer cb = cmd->CommandBuffer();
 
-  VkSubmitInfo si{};
-  si.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  si.commandBufferCount   = 1;
-  si.pCommandBuffers      = &cb;
+  // End rendering pass, insert PRESENT transition if needed, end command buffer.
+  cmd->FinalizeForSubmit();
 
-  // Hook up swapchain semaphores if we have an active swapchain frame
+  VkCommandBuffer     cb = cmd->CommandBuffer();
+  VkSubmitInfo        si{};
+  si.sType              = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  si.commandBufferCount = 1;
+  si.pCommandBuffers    = &cb;
+
   if (cmd->HasSwapchainData())
   {
     VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -891,14 +873,31 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& /*desc*/) noexcept
   return Texture{};
 }
 
-// ── Shader loading ────────────────────────────────────────────────────────
+// ── Shader module helpers ─────────────────────────────────────────────────
+
+VkShaderModule VulkanDevice::CreateShaderModule(const void* code,
+                                                  usize size) noexcept
+{
+  VkShaderModuleCreateInfo ci{};
+  ci.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  ci.codeSize = size;
+  ci.pCode    = static_cast<const u32*>(code);
+
+  VkShaderModule module = VK_NULL_HANDLE;
+  if (vkCreateShaderModule(m_Device, &ci, nullptr, &module) != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Graphics, "VulkanDevice: vkCreateShaderModule failed");
+    return VK_NULL_HANDLE;
+  }
+  return module;
+}
 
 VkShaderModule VulkanDevice::LoadShaderModule(const char* path) noexcept
 {
   ::std::ifstream file(path, ::std::ios::binary | ::std::ios::ate);
   if (!file.is_open())
   {
-    GECKO_ERROR(labels::Graphics, "VulkanDevice: cannot open shader '{}'", path);
+    GECKO_ERROR(labels::Graphics, "VulkanDevice: cannot open shader '%s'", path);
     return VK_NULL_HANDLE;
   }
 
@@ -916,7 +915,7 @@ VkShaderModule VulkanDevice::LoadShaderModule(const char* path) noexcept
   VkShaderModule module = VK_NULL_HANDLE;
   if (vkCreateShaderModule(m_Device, &ci, nullptr, &module) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Graphics, "VulkanDevice: vkCreateShaderModule failed for '{}'", path);
+    GECKO_ERROR(labels::Graphics, "VulkanDevice: vkCreateShaderModule failed for '%s'", path);
     return VK_NULL_HANDLE;
   }
   return module;
@@ -928,8 +927,29 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   if (!m_Valid)
     return GraphicsPipeline{};
 
-  VkShaderModule vertModule = LoadShaderModule(desc.VertexShaderPath);
-  VkShaderModule fragModule = desc.PixelShaderPath ? LoadShaderModule(desc.PixelShaderPath) : VK_NULL_HANDLE;
+  // Prefer inline SPIR-V (from #embed) over path-based loading.
+  VkShaderModule vertModule = VK_NULL_HANDLE;
+  VkShaderModule fragModule = VK_NULL_HANDLE;
+
+  if (!desc.VertexShaderCode.empty())
+  {
+    vertModule = CreateShaderModule(desc.VertexShaderCode.data(),
+                                     desc.VertexShaderCode.size_bytes());
+  }
+  else if (desc.VertexShaderPath)
+  {
+    vertModule = LoadShaderModule(desc.VertexShaderPath);
+  }
+
+  if (!desc.PixelShaderCode.empty())
+  {
+    fragModule = CreateShaderModule(desc.PixelShaderCode.data(),
+                                     desc.PixelShaderCode.size_bytes());
+  }
+  else if (desc.PixelShaderPath)
+  {
+    fragModule = LoadShaderModule(desc.PixelShaderPath);
+  }
 
   if (vertModule == VK_NULL_HANDLE)
   {

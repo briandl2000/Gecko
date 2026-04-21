@@ -53,8 +53,8 @@ namespace gecko::graphics {
     if (_vkr != VK_SUCCESS)                                                   \
     {                                                                         \
       GECKO_ERROR(::gecko::graphics::labels::Graphics,                       \
-                  "Vulkan error {} in {}: {}", static_cast<::gecko::i32>(_vkr), \
-                  __func__, #expr);                                           \
+                  "Vulkan error %d in %s: %s",                               \
+                  static_cast<::gecko::i32>(_vkr), __func__, #expr);         \
     }                                                                         \
   } while (false)
 

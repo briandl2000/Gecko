@@ -162,13 +162,21 @@ int main()
     }
 
     // ── Graphics pipeline ─────────────────────────────────────────
+    // Embed compiled SPIR-V directly — no runtime file I/O needed.
+    alignas(4) static const unsigned char k_VertSpv[] = {
+#embed "../shaders/triangle.vert.spv"
+    };
+    alignas(4) static const unsigned char k_FragSpv[] = {
+#embed "../shaders/triangle.frag.spv"
+    };
+
     VertexLayout layout;
     layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Position");
     layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Color");
 
     GraphicsPipelineDesc pipelineDesc;
-    pipelineDesc.VertexShaderPath       = "shaders/triangle.vert.spv";
-    pipelineDesc.PixelShaderPath        = "shaders/triangle.frag.spv";
+    pipelineDesc.VertexShaderCode       = {k_VertSpv, sizeof(k_VertSpv)};
+    pipelineDesc.PixelShaderCode        = {k_FragSpv, sizeof(k_FragSpv)};
     pipelineDesc.Layout                 = layout;
     pipelineDesc.NumRenderTargets       = 1;
     pipelineDesc.RenderTargetFormats[0] = swapchain.IsValid()
@@ -248,23 +256,11 @@ int main()
         if (backBuffer.IsValid())
         {
           auto cmd = device->CreateGraphicsCommandList();
-          cmd->Begin();
-
-          cmd->BeginRendering(backBuffer, /*clearColor=*/true, /*clearDepth=*/false);
-
-          cmd->SetViewport(0.0F, 0.0F,
-                            static_cast<f32>(swapchain.Desc.Width),
-                            static_cast<f32>(swapchain.Desc.Height),
-                            0.0F, 1.0F);
-          cmd->SetScissor(0, 0, swapchain.Desc.Width, swapchain.Desc.Height);
-
-          cmd->BindPipeline(pipeline);
+          cmd->ClearRenderTarget(backBuffer);
+          cmd->BindRenderTarget(backBuffer);
+          cmd->BindGraphicsPipeline(pipeline);
           cmd->BindVertexBuffer(vertexBuffer);
-          cmd->DrawVertices(3, 1, 0, 0);
-
-          cmd->EndRendering();
-          cmd->End();
-
+          cmd->DrawAuto(3);
           device->ExecuteGraphicsCommandList(::std::move(cmd));
         }
       }

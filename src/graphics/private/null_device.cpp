@@ -6,16 +6,6 @@ namespace gecko::graphics {
 
 bool NullCommandList::IsValid() const noexcept { return true; }
 
-void NullCommandList::Begin() noexcept {}
-void NullCommandList::End() noexcept {}
-void NullCommandList::BeginRendering(const RenderTarget&, bool, bool) noexcept {}
-void NullCommandList::EndRendering() noexcept {}
-void NullCommandList::SetViewport(f32, f32, f32, f32, f32, f32) noexcept {}
-void NullCommandList::SetScissor(u32, u32, u32, u32) noexcept {}
-void NullCommandList::BindPipeline(const GraphicsPipeline&) noexcept {}
-void NullCommandList::DrawVertices(u32, u32, u32, u32) noexcept {}
-void NullCommandList::DrawIndexedVertices(u32, u32, u32, i32, u32) noexcept {}
-
 void NullCommandList::ClearRenderTarget(const RenderTarget&) noexcept {}
 void NullCommandList::BindRenderTarget(const RenderTarget&) noexcept {}
 void NullCommandList::CopyTextureToTexture(const Texture&,
