@@ -35,8 +35,7 @@ public:
 
   GECKO_API virtual void DestroySwapchain(Swapchain& swapchain) noexcept = 0;
 
-  GECKO_API virtual void ResizeSwapchain(Swapchain& swapchain, u32 width,
-                                         u32 height) noexcept = 0;
+  GECKO_API virtual void ResizeSwapchain(Swapchain& swapchain) noexcept = 0;
 
   [[nodiscard]]
   GECKO_API virtual RenderTarget GetCurrentBackBuffer(

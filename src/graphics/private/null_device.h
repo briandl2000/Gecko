@@ -59,7 +59,7 @@ public:
   {
     swapchain = Swapchain{};
   }
-  void ResizeSwapchain(Swapchain&, u32, u32) noexcept override {}
+  void ResizeSwapchain(Swapchain&) noexcept override {}
   RenderTarget GetCurrentBackBuffer(const Swapchain&) const noexcept override
   {
     return RenderTarget{};

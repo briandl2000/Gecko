@@ -147,9 +147,11 @@ int main()
           const auto* payload =
               reinterpret_cast<const events::WindowResizedPayload*>(
                   view.Data());
+          (void)payload;
           auto* state = static_cast<ResizeState*>(user);
-          state->Device->ResizeSwapchain(*state->SC, payload->Width,
-                                         payload->Height);
+          // Backend queries current size from the native window handle
+          // stored inside Swapchain.Data.
+          state->Device->ResizeSwapchain(*state->SC);
         },
         &resizeState);
 
