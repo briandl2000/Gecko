@@ -13,14 +13,14 @@ constexpr ::gecko::Label GraphicsModule::RootLabel() const noexcept
   return labels::Graphics;
 }
 
-bool GraphicsModule::Startup(::gecko::IModuleRegistry& modules) noexcept
+bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Graphics);
   return true;
 }
 
 void GraphicsModule::Shutdown(
-    ::gecko::IModuleRegistry& modules) noexcept
+    ::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Graphics);
 }

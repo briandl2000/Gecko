@@ -72,6 +72,21 @@ TEST_CASE("CalculateNumberOfMips", "[graphics][objects]")
     // step 2: 1x1 (mips=3)
     REQUIRE(CalculateNumberOfMips(3, 5) == 3);
   }
+
+  SECTION("zero width returns 0")
+  {
+    REQUIRE(CalculateNumberOfMips(0, 4) == 0);
+  }
+
+  SECTION("zero height returns 0")
+  {
+    REQUIRE(CalculateNumberOfMips(4, 0) == 0);
+  }
+
+  SECTION("zero width and height returns 0")
+  {
+    REQUIRE(CalculateNumberOfMips(0, 0) == 0);
+  }
 }
 
 // ── VertexAttribute ───────────────────────────────────────────────────────
@@ -110,6 +125,29 @@ TEST_CASE("VertexLayout with attributes is valid", "[graphics][objects]")
   REQUIRE(layout.StrideInBytes == 20);
   REQUIRE(layout.Attributes[0].Offset == 0);
   REQUIRE(layout.Attributes[1].Offset == 12);
+}
+
+TEST_CASE("VertexLayout AddAttribute ignores DataFormat::None",
+          "[graphics][objects]")
+{
+  VertexLayout layout;
+  layout.AddAttribute(DataFormat::None, "Bad");
+  REQUIRE(layout.NumAttributes == 0);
+  REQUIRE(layout.StrideInBytes == 0);
+  REQUIRE_FALSE(layout.IsValid());
+}
+
+TEST_CASE("VertexLayout AddAttribute mixed valid and invalid formats",
+          "[graphics][objects]")
+{
+  VertexLayout layout;
+  layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "Position");
+  layout.AddAttribute(DataFormat::None, "Bad");
+  layout.AddAttribute(DataFormat::R32G32_FLOAT, "UV");
+
+  REQUIRE(layout.NumAttributes == 2);
+  REQUIRE(layout.StrideInBytes == 20);
+  REQUIRE(layout.IsValid());
 }
 
 // ── VertexBufferDesc ──────────────────────────────────────────────────────

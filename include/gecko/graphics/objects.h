@@ -134,6 +134,8 @@ enum class MemoryType : u8
 [[nodiscard]] constexpr u32 CalculateNumberOfMips(u32 width,
                                                    u32 height) noexcept
 {
+  if (width == 0 || height == 0)
+    return 0;
   u32 mips = 1;
   while (width > 1 || height > 1)
   {
@@ -192,18 +194,28 @@ struct VertexLayout
   {
     if (NumAttributes >= MaxAttributes)
       return;
+    const u32 size = FormatSizeInBytes(format);
+    if (size == 0)
+      return;
     VertexAttribute& attr = Attributes[NumAttributes];
     attr.Name             = name;
     attr.AttributeFormat  = format;
-    attr.Size             = FormatSizeInBytes(format);
+    attr.Size             = size;
     attr.Offset           = StrideInBytes;
-    StrideInBytes += attr.Size;
+    StrideInBytes += size;
     ++NumAttributes;
   }
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return NumAttributes > 0 && StrideInBytes > 0;
+    if (NumAttributes == 0 || StrideInBytes == 0)
+      return false;
+    for (u32 i = 0; i < NumAttributes; ++i)
+    {
+      if (!Attributes[i].IsValid())
+        return false;
+    }
+    return true;
   }
   explicit operator bool() const noexcept
   {
@@ -592,6 +604,15 @@ struct Swapchain
 {
   SwapchainDesc Desc {};
   Shared<void>  Data {nullptr};
+
+  Swapchain()  = default;
+  ~Swapchain() = default;
+
+  Swapchain(const Swapchain&)            = delete;
+  Swapchain& operator=(const Swapchain&) = delete;
+
+  Swapchain(Swapchain&&) noexcept            = default;
+  Swapchain& operator=(Swapchain&&) noexcept = default;
 
   [[nodiscard]] bool IsValid() const noexcept
   {

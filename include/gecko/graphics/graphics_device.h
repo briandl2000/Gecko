@@ -28,7 +28,7 @@ public:
 
   // ── Swapchain management ──────────────────────────────────────
 
-  [[nodiscard("Discarding a Swapchain leaks GPU resources")]]
+  [[nodiscard("Swapchain must be stored to present frames")]]
   GECKO_API virtual Swapchain CreateSwapchain(
       const ::gecko::platform::NativeWindowHandle& native,
       const SwapchainDesc&                         desc) noexcept = 0;
@@ -65,35 +65,35 @@ public:
 
   // ── Resource creation ─────────────────────────────────────────
 
-  [[nodiscard("Discarding a created RenderTarget leaks GPU resources")]]
+  [[nodiscard("Discarding a RenderTarget immediately releases the GPU resource")]]
   GECKO_API virtual RenderTarget CreateRenderTarget(
       const RenderTargetDesc& desc) noexcept = 0;
 
-  [[nodiscard("Discarding a created Buffer leaks GPU resources")]]
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
   GECKO_API virtual Buffer CreateVertexBuffer(
       const VertexBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard("Discarding a created Buffer leaks GPU resources")]]
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
   GECKO_API virtual Buffer CreateIndexBuffer(
       const IndexBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard("Discarding a created Buffer leaks GPU resources")]]
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
   GECKO_API virtual Buffer CreateConstantBuffer(
       const ConstantBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard("Discarding a created Buffer leaks GPU resources")]]
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
   GECKO_API virtual Buffer CreateStructuredBuffer(
       const StructuredBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard("Discarding a created Texture leaks GPU resources")]]
+  [[nodiscard("Discarding a created Texture immediately releases the GPU resource")]]
   GECKO_API virtual Texture CreateTexture(
       const TextureDesc& desc) noexcept = 0;
 
-  [[nodiscard("Discarding a created GraphicsPipeline leaks GPU resources")]]
+  [[nodiscard("Discarding a created GraphicsPipeline immediately releases the GPU resource")]]
   GECKO_API virtual GraphicsPipeline CreateGraphicsPipeline(
       const GraphicsPipelineDesc& desc) noexcept = 0;
 
-  [[nodiscard("Discarding a created ComputePipeline leaks GPU resources")]]
+  [[nodiscard("Discarding a created ComputePipeline immediately releases the GPU resource")]]
   GECKO_API virtual ComputePipeline CreateComputePipeline(
       const ComputePipelineDesc& desc) noexcept = 0;
 

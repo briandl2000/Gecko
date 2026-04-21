@@ -1,5 +1,3 @@
-cmake_minimum_required(VERSION 3.22)
-
 add_executable(graphics_tests
   test_objects.cpp
   test_null_device.cpp

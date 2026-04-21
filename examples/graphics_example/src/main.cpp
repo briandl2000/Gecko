@@ -116,9 +116,18 @@ int main()
     scDesc.NumBackBuffers = 2;
 
     Swapchain swapchain = device->CreateSwapchain(native, scDesc);
-    GECKO_INFO(app::graphics_example::labels::Main,
-               "Swapchain created (%ux%u, %u back buffers)", scDesc.Width,
-               scDesc.Height, scDesc.NumBackBuffers);
+    if (!swapchain.IsValid())
+    {
+      GECKO_WARN(app::graphics_example::labels::Main,
+                 "No concrete graphics backend; running without a real swapchain"
+                 " (NullDevice presents are no-ops)");
+    }
+    else
+    {
+      GECKO_INFO(app::graphics_example::labels::Main,
+                 "Swapchain created (%ux%u, %u back buffers)", scDesc.Width,
+                 scDesc.Height, scDesc.NumBackBuffers);
+    }
 
     // ── Event subscriptions ───────────────────────────────────────
     bool running = true;
