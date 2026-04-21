@@ -9,7 +9,7 @@ from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, is_network_path,
 from scripts.commands.build import _auto_configure
 
 # Unit test targets (headless, always run)
-UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests"]
+UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests", "graphics_tests"]
 
 # Feature test targets (need live display / real backends)
 FEATURE_TARGETS = ["platform_feature_tests"]
