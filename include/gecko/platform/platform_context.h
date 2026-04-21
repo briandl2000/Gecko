@@ -2,42 +2,60 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/ptr.h"
-#include "gecko/platform/window.h"
+#include "gecko/core/services/events.h"
+#include "gecko/platform/monitors_interface.h"
+#include "gecko/platform/platform_config.h"
+#include "gecko/platform/windows_interface.h"
 
 namespace gecko::platform {
-
-struct PlatformConfig
-{
-  WindowBackendKind WindowBackend {WindowBackendKind::Auto};
-};
 
 class PlatformContext
 {
 public:
-  GECKO_API virtual ~PlatformContext() = default;
+  GECKO_API PlatformContext(const PlatformConfig& cfg);
 
-  [[nodiscard]]
-  GECKO_API static Unique<PlatformContext> Create(const PlatformConfig& cfg);
+  GECKO_API ~PlatformContext() = default;
 
-  GECKO_API virtual bool CreateWindow(const WindowDesc& desc,
-                                      WindowHandle& outWindow) noexcept = 0;
-  GECKO_API virtual void DestroyWindow(WindowHandle window) noexcept = 0;
+  /// The fully resolved config used to construct this context.
+  /// Backend is always a concrete value (never Auto or Unknown).
+  GECKO_API const PlatformConfig& Config() const noexcept
+  {
+    return m_Config;
+  }
 
-  GECKO_API virtual bool IsWindowAlive(WindowHandle window) const noexcept = 0;
-  GECKO_API virtual bool RequestClose(WindowHandle window) noexcept = 0;
+  GECKO_API IWindowsBackend& Windows()
+  {
+    return *m_Windows;
+  }
 
-  GECKO_API virtual void PumpEvents() noexcept = 0;
-  GECKO_API virtual bool PollEvent(WindowEvent& outEvent) noexcept = 0;
+  GECKO_API IMonitorsBackend& Monitors()
+  {
+    return *m_Monitors;
+  }
 
-  GECKO_API virtual Extent2D GetClientSize(
-      WindowHandle window) const noexcept = 0;
-  GECKO_API virtual void SetTitle(WindowHandle window,
-                                  const char* title) noexcept = 0;
-  GECKO_API virtual DpiInfo GetDpi(WindowHandle window) const noexcept = 0;
-  GECKO_API virtual NativeWindowHandle GetNativeWindowHandle(
-      WindowHandle window) const noexcept = 0;
+  /// Pump all pending OS events for windows and monitors.
+  /// Events are sent to the global event bus — call
+  /// DispatchEvents() afterwards to deliver them to Queued subscribers.
+  GECKO_API void PumpEvents() noexcept
+  {
+    m_Windows->PumpEvents(m_Emitter);
+    m_Monitors->PumpEvents(m_Emitter);
+  }
+
+  /// Register a callback invoked during modal OS loops (e.g. Win32
+  /// drag/resize) so the application can keep updating and rendering.
+  /// The callback should perform one frame of work but NOT call PumpEvents.
+  GECKO_API void SetModalFrameCallback(IWindowsBackend::ModalFrameFn callback,
+                                       void* userData) noexcept
+  {
+    m_Windows->SetModalFrameCallback(callback, userData);
+  }
 
 private:
+  PlatformConfig m_Config;
+  gecko::EventEmitter m_Emitter {};
+  Unique<IWindowsBackend> m_Windows;
+  Unique<IMonitorsBackend> m_Monitors;
 };
 
 }  // namespace gecko::platform

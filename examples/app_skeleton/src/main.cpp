@@ -60,12 +60,12 @@ struct AppConfig
   const char* title = "Gecko App";
   bool windowed = true;
   u32 maxFrames = 0;  // 0 = run until close
-  WindowBackendKind backend = WindowBackendKind::Auto;
+  DisplayBackendKind backend = DisplayBackendKind::Auto;
 };
 
 static void PrintUsage(const char* exe)
 {
-  std::fprintf(
+  ::std::fprintf(
       stderr,
       "Usage: %s [options]\n\n"
       "Options:\n"
@@ -78,12 +78,12 @@ static void PrintUsage(const char* exe)
       exe ? exe : "app_skeleton");
 }
 
-static bool StartsWith(std::string_view s, std::string_view prefix)
+static bool StartsWith(::std::string_view s, ::std::string_view prefix)
 {
   return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
 }
 
-static bool ParseU32(std::string_view s, u32& out)
+static bool ParseU32(::std::string_view s, u32& out)
 {
   if (s.empty())
     return false;
@@ -104,7 +104,7 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
 {
   for (int i = 1; i < argc; ++i)
   {
-    std::string_view arg = argv[i] ? argv[i] : "";
+    ::std::string_view arg = argv[i] ? argv[i] : "";
 
     if (arg == "--help" || arg == "-h")
     {
@@ -120,11 +120,11 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
 
     if (StartsWith(arg, "--frames="))
     {
-      std::string_view value = arg.substr(std::strlen("--frames="));
+      ::std::string_view value = arg.substr(::std::strlen("--frames="));
       if (!ParseU32(value, cfg.maxFrames))
       {
-        std::fprintf(stderr, "Invalid --frames value: %.*s\n",
-                     static_cast<int>(value.size()), value.data());
+        ::std::fprintf(stderr, "Invalid --frames value: %.*s\n",
+                       static_cast<int>(value.size()), value.data());
         return false;
       }
       continue;
@@ -133,36 +133,36 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
     if (StartsWith(arg, "--title="))
     {
       // argv storage stays valid for the life of the process.
-      cfg.title = argv[i] + std::strlen("--title=");
+      cfg.title = argv[i] + ::std::strlen("--title=");
       continue;
     }
 
     if (StartsWith(arg, "--backend="))
     {
-      std::string_view value = arg.substr(std::strlen("--backend="));
+      ::std::string_view value = arg.substr(::std::strlen("--backend="));
       if (value == "auto")
       {
-        cfg.backend = WindowBackendKind::Auto;
+        cfg.backend = DisplayBackendKind::Auto;
       }
       else if (value == "null")
       {
-        cfg.backend = WindowBackendKind::Null;
+        cfg.backend = DisplayBackendKind::Null;
       }
       else if (value == "xlib")
       {
-        cfg.backend = WindowBackendKind::Xlib;
+        cfg.backend = DisplayBackendKind::Xlib;
       }
       else
       {
-        std::fprintf(stderr, "Invalid --backend value: %.*s\n",
-                     static_cast<int>(value.size()), value.data());
+        ::std::fprintf(stderr, "Invalid --backend value: %.*s\n",
+                       static_cast<int>(value.size()), value.data());
         return false;
       }
       continue;
     }
 
-    std::fprintf(stderr, "Unknown arg: %.*s\n", static_cast<int>(arg.size()),
-                 arg.data());
+    ::std::fprintf(stderr, "Unknown arg: %.*s\n", static_cast<int>(arg.size()),
+                   arg.data());
     PrintUsage(argv[0]);
     return false;
   }
@@ -258,24 +258,18 @@ static int AppMain(int argc, char** argv)
   else
   {
     PlatformConfig platformCfg {};
-    platformCfg.WindowBackend = cfg.backend;
+    platformCfg.Backend = cfg.backend;
 
-    Unique<PlatformContext> ctx = PlatformContext::Create(platformCfg);
-    if (!ctx)
-    {
-      GECKO_ERROR(app::app_skeleton::labels::Main,
-                  "Failed to create PlatformContext");
-      return 1;
-    }
+    PlatformContext ctx = PlatformContext(platformCfg);
 
     WindowDesc windowDesc {};
     windowDesc.Title = cfg.title;
-    windowDesc.Size = Extent2D {1280, 720};
+    windowDesc.Size = {1280, 720};
     windowDesc.Visible = true;
     windowDesc.Resizable = true;
 
-    WindowHandle window {};
-    if (!ctx->CreateWindow(windowDesc, window))
+    WindowHandle window = ctx.Windows().CreateWindow(windowDesc);
+    if (!window.IsValid())
     {
       GECKO_ERROR(app::app_skeleton::labels::Main, "Failed to create window");
       return 1;
@@ -284,20 +278,19 @@ static int AppMain(int argc, char** argv)
     bool running = true;
     u32 frames = 0;
 
-    while (running && ctx->IsWindowAlive(window))
+    auto closeSub = gecko::SubscribeEvent(
+        events::WindowCloseRequested,
+        [](void* user, const gecko::EventMeta&, gecko::EventView) {
+          *static_cast<bool*>(user) = false;
+        },
+        &running);
+
+    while (running && ctx.Windows().IsWindowAlive(window))
     {
       GECKO_SCOPE_NAMED(app::app_skeleton::labels::Main, "Frame");
 
-      ctx->PumpEvents();
-      WindowEvent ev {};
-      while (ctx->PollEvent(ev))
-      {
-        if (ev.Kind == WindowEventKind::CloseRequested)
-        {
-          running = false;
-          break;
-        }
-      }
+      ctx.PumpEvents();
+      (void)gecko::DispatchEvents();
 
       // Your update/render work goes here.
       GECKO_SLEEP_MS(16);
@@ -309,7 +302,7 @@ static int AppMain(int argc, char** argv)
       }
     }
 
-    ctx->DestroyWindow(window);
+    ctx.Windows().DestroyWindow(window);
   }
 
   // Unregister sinks before shutting down services
@@ -322,7 +315,7 @@ static int AppMain(int argc, char** argv)
   return result;
 }
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
 // On Windows, you typically choose ONE of:
 // - main(int,char**) for a console subsystem app
 // - wmain(int,wchar_t**) to preserve Unicode arguments

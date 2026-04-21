@@ -109,6 +109,13 @@ Always use the `::` prefix when referring to global namespace items to prevent a
 ::posix_memalign()
 ::pthread_create()
 
+// ✅ External library types and functions - always use ::
+::wl_display* display;           // Wayland types
+::xdg_toplevel_set_title(tl, t); // Wayland protocol wrappers
+::XOpenDisplay(nullptr);         // Xlib functions
+::HWND hwnd;                     // Win32 types
+::SetWindowPos(hwnd, ...);       // Win32 functions
+
 // ✅ Within gecko namespace - no prefix needed (you're already inside)
 IAllocator* allocator;
 GetLogger();
@@ -123,7 +130,7 @@ platform::Window
 - **Clarity**: Immediately visible what's from global scope vs your namespace
 - **Prevents collisions**: If you add a `malloc` to `gecko`, `::malloc` still refers to the global one
 - **Explicit intent**: `::std::` means "std from global namespace, not some nested std"
-- **Consistency**: Works for C functions, C++ stdlib, and OS-specific APIs
+- **Consistency**: Works for C functions, C++ stdlib, OS-specific APIs, and external library types
 
 ### Formatting Standards
 
@@ -325,7 +332,7 @@ u32 underlying = gecko::ToUnderlying(combined);
 ```cpp
 #if defined(_WIN32)
   // Windows-specific code
-  #include <corecrt_share.h>
+  #include <share.h>
   m_File = _fsopen(path, "wb", _SH_DENYNO);
 #else
   // POSIX code

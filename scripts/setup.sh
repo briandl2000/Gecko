@@ -14,25 +14,36 @@ export -f gk
 # Point git to our hooks directory
 git -C "$REPO_ROOT" config core.hooksPath .githooks 2>/dev/null
 
+# Platform identifier for build/output directory separation
+_gecko_os="$(uname -s)"
+case "$_gecko_os" in
+    MINGW*|MSYS*) _gecko_os="Windows" ;;
+esac
+export GECKO_PLATFORM_ID="${_gecko_os}-$(uname -m)"
+unset _gecko_os
+
 # Configure CMake if not already done
-if [ ! -d "$REPO_ROOT/out/build" ]; then
-    echo "Configuring CMake..."
+if [ ! -d "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" ]; then
+    echo "Configuring CMake for $GECKO_PLATFORM_ID..."
     
-    # Require Clang compiler
-    if command -v clang &> /dev/null && command -v clang++ &> /dev/null; then
-        echo "Using Clang compiler: $(clang --version | head -n1)"
-        export CC=clang
-        export CXX=clang++
+    # Prefer GCC; fall back to any cc/c++ if available
+    if command -v gcc &> /dev/null && command -v g++ &> /dev/null; then
+        echo "Using GCC compiler: $(gcc --version | head -n1)"
+        export CC=gcc
+        export CXX=g++
     else
-        echo "ERROR: Clang compiler not found!"
+        echo "ERROR: GCC compiler not found!"
         echo "Install with:"
-        echo "  Ubuntu/Debian: sudo apt-get install clang"
-        echo "  Fedora:        sudo dnf install clang"
-        echo "  macOS:         brew install llvm"
+        echo "  Ubuntu/Debian: sudo apt-get install gcc g++"
+        echo "  Fedora:        sudo dnf install gcc gcc-c++"
+        echo "  Arch:          sudo pacman -S gcc"
         return 1
     fi
     
-    cmake -S "$REPO_ROOT" -B "$REPO_ROOT/out/build" -G "Ninja Multi-Config"
+    cmake -S "$REPO_ROOT" -B "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" \
+        -G "Ninja Multi-Config" \
+        -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+        -DGECKO_BUILD_TESTS=ON
 fi
 
 echo "Gecko dev environment ready. Commands: gk build, gk test, gk package"

@@ -5,39 +5,57 @@
 - CMake 3.22+
 - Python 3.7+
 - Ninja
-- **Clang 17+** (required - project does not support GCC or MSVC)
-- Linux: `libx11-dev libxext-dev`
-- Windows: Visual Studio Build Tools (for Windows SDK headers/libs)
+- **GCC 15+** (C++26 support required)
+- Linux: `libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols`
 
-### Installing Clang
+> **Why GCC?** Gecko targets C++26 (`-std=c++2c`) for early access to features
+> like reflection. As of mid-2026, GCC is the only compiler with broad C++26
+> support in a stable release. When MSVC and Clang ship C++26 support, we plan
+> to re-evaluate and may add them as supported compilers.
 
-**Windows:**
-- Visual Studio Installer → Modify → Individual Components → "C++ Clang Compiler"
-- Or standalone: `winget install LLVM.LLVM`
+### Installing GCC
 
-**Linux:**
+**Linux (Ubuntu/Debian):**
 ```bash
-sudo apt-get install clang  # Ubuntu/Debian
-sudo dnf install clang      # Fedora
+sudo apt-get install gcc g++ ninja-build cmake
+# Platform dependencies
+sudo apt-get install libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
 ```
+
+**Linux (Fedora):**
+```bash
+sudo dnf install gcc g++ ninja-build cmake
+sudo dnf install libX11-devel libXext-devel libXrandr-devel wayland-devel wayland-protocols-devel
+```
+
+**Windows (MSYS2 + MinGW-w64):**
+1. Install [MSYS2](https://www.msys2.org/) (follow the installer)
+2. Open the **UCRT64** terminal (not MSYS or MINGW64)
+3. Install the toolchain:
+```bash
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-gdb mingw-w64-ucrt-x86_64-python
+```
+4. All commands (`gk build`, `gk test`, etc.) must be run from the MSYS2 UCRT64 terminal
+5. Verify: `gcc --version` should show GCC 15+
+
+> **Note:** MSVC does not yet support C++26 (still completing C++23 as of mid-2026).
+> Windows builds use MinGW-w64 GCC via MSYS2. See [MSVC Migration Plan](#msvc-migration-plan) below.
 
 **macOS:**
 ```bash
-brew install llvm
+brew install gcc ninja cmake
 ```
 
 ## Setup
 
 ```bash
 # Source the dev environment (creates gk function)
-source scripts/setup.sh    # Linux/macOS
-. .\scripts\setup.ps1      # PowerShell
+source scripts/setup.sh    # Linux/macOS/MSYS2
 ```
 
 The setup script will:
-1. Detect and configure Clang compiler
-2. On Windows: Load Visual Studio environment and find clang-cl
-3. Configure CMake with Ninja Multi-Config generator
+1. Detect and configure GCC compiler
+2. Configure CMake with Ninja Multi-Config generator
 
 ## CLI Commands
 
@@ -82,12 +100,13 @@ cmake --install out/build --prefix /your/prefix --config Release
 
 ```
 out/
-├── build/           # CMake internals (hidden)
-├── bin/Debug/       # Debug binaries
-├── bin/Release/     # Release binaries
-├── lib/Debug/       # Debug libraries
-├── lib/Release/     # Release libraries
-└── package/         # Created packages
+├── build/<PlatformID>/  # CMake internals (hidden)
+└── <PlatformID>/
+    ├── bin/Debug/       # Debug binaries
+    ├── bin/Release/     # Release binaries
+    ├── lib/Debug/       # Debug libraries
+    ├── lib/Release/     # Release libraries
+    └── package/         # Created packages
 ```
 
 ## Build Options
@@ -101,17 +120,45 @@ out/
 
 Pre-configured debug launch targets are available in `.vscode/launch.json`:
 
-- **Debug: app_skeleton** - Minimal application skeleton
-- **Debug: core_example** - Core services demo
-- **Debug: math_example** - Math library demo  
-- **Debug: platform_example** - Platform/window demo
+- **Debug: Target (Linux)** — GDB on Linux
+- **Debug: Target (Windows)** — GDB via MSYS2 on Windows
+- **Remote Pi: Target** — Remote GDB debugging on Raspberry Pi
 
 To debug:
 1. Set breakpoints in your code
 2. Press `F5` or Run → Start Debugging
-3. Select the example you want to debug
+3. Select the target you want to debug
+
+**Windows:** The debugger uses GDB from MSYS2 (`C:\msys64\ucrt64\bin\gdb.exe`).
+The pre-launch task copies build artifacts to `C:\Gecko\debug\` to avoid
+network share and SmartScreen issues.
+
+**Linux:** Uses the system GDB (`/usr/bin/gdb`). Executables run directly from
+the build output directory.
 
 All configurations automatically build before launching.
+
+## MinGW Runtime DLLs
+
+On Windows, the build automatically copies MinGW runtime DLLs (`libgcc_s_seh-1.dll`,
+`libstdc++-6.dll`, `libwinpthread-1.dll`) alongside the built executables.
+This ensures programs work without requiring MSYS2's bin directory on PATH.
+
+## MSVC Migration Plan
+
+Gecko currently uses GCC exclusively because MSVC has no C++26 core language
+support (still completing C++23 as of mid-2026). The plan for MSVC adoption:
+
+1. **Now:** GCC 15 on both Linux and Windows (via MinGW-w64). Write
+   MSVC-compatible code where possible — avoid GCC-only extensions.
+2. **When MSVC ships C++26:** Add MSVC as a Windows compiler option alongside
+   MinGW. Target: Windows builds with MSVC, Linux builds with GCC.
+3. **Code guidelines for MSVC readiness:**
+   - Use `_WIN32` not `_MSC_VER` for Windows platform checks
+   - Use `<share.h>` not `<corecrt_share.h>` (both compilers support it)
+   - Keep Windows API calls in `win32/` backend files
+   - Use CMake `target_link_libraries` instead of `#pragma comment(lib, ...)`
+   - Avoid GCC builtins — use standard C++ or `#ifdef` with MSVC equivalents
 
 ## VS Code Tasks
 

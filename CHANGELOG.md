@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.0-alpha.2]
+
+### Added
+- **Platform windowing** — full window lifecycle management (create, resize, move, minimize, maximize, fullscreen, close)
+- **Win32 window backend** — native Windows windowing with per-monitor DPI awareness
+- **Wayland window backend** — xdg-shell based windowing with resize constraints, decorations, and fullscreen support
+- **X11 window backend** — Xlib-based windowing for Linux
+- **Monitor system** — platform-specific monitor backends for Linux (X11 + Wayland) and Windows
+- **Platform event bus** — event dispatch for platform-level events (monitors, windows)
+- **Rect2D** structure and corresponding tests
+- **Unit tests** — core, platform, runtime, and math test modules (Catch2)
+- **Feature tests** — visible window tests gated behind `[.visible]` tag
+- **Cross-platform build infrastructure** — platform-separated build/output directories
+
+### Changed
+- Platform API returns values instead of output references
+- Event bus API renamed: Send/Dispatch convention
+- Platform context refactored for cleaner backend selection
+- Platform feature macros streamlined in CMakeLists (removed platform.h)
+- `GECKO_PLATFORM_WINDOWS` macro replaces raw `_WIN32` checks
+- Build scripts handle Windows network/mapped drives (UNC path safety)
+- PR templates cleaned up with concise checklists
+- Dev releases hidden from "latest" on GitHub, main releases use auto-generated notes
+- Force use GCC now for c++26 features. Updated the build system.
+
+### Fixed
+- CI version extraction on Windows (portable sed-based extraction)
+- Windows DLL loading during test discovery at build time
+- IntelliSense not working due to compile_commands.json location
+- Label scope macros use `__LINE__` for unique identifiers
+- Xlib and Wayland availability checks for headless environments
+
 ## [0.0.0-alpha.1]
 
 ### Added

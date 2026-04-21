@@ -2,13 +2,17 @@
 
 #include "gecko/core/assert.h"
 
+#if defined(GECKO_PLATFORM_WINDOWS)
+#include <share.h>
+#endif
+
 namespace gecko::runtime {
 
 TraceFileSink::TraceFileSink(const char* path)
 {
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
-#if defined(_WIN32)
+#if defined(GECKO_PLATFORM_WINDOWS)
   m_File = _fsopen(path, "w", _SH_DENYNO);
 #else
   m_File = std::fopen(path, "w");

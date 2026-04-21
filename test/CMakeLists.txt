@@ -25,5 +25,11 @@ foreach(cfg Debug Release RelWithDebInfo MinSizeRel)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${CFGU} "${GECKO_OUT_DIR}/bin/${cfg}/tests")
 endforeach()
 
+# Shared test utilities (available to all test targets)
+set(GECKO_TEST_COMMON_DIR "${CMAKE_CURRENT_SOURCE_DIR}/common")
+
 # Add test subdirectories
+add_subdirectory(core)
+add_subdirectory(platform)
+add_subdirectory(runtime)
 add_subdirectory(math)

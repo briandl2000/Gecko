@@ -1,26 +1,12 @@
-<!-- ⚠️  IMPORTANT: Most PRs should target the 'dev' branch, NOT main.
-     If your base branch says 'main', change it to 'dev' unless this is a release PR.
-     Only dev → main merges (releases) should target main. -->
+<!-- ⚠️  Most PRs should target 'dev', NOT main.
+     Change the base branch if needed. Only dev → main merges (releases) should target main.
+     For release PRs, use: https://github.com/briandl2000/Gecko/compare/main...dev?template=release.md -->
 
 ## Description
 <!-- What does this PR do? -->
-
-
-### Type of Change
-- [ ] New feature
-- [ ] Bug fix
-- [ ] Refactor / cleanup
-- [ ] CI / build system
-- [ ] Documentation
 
 ### Pre-merge Checklist
 - [ ] **Base branch is `dev`** (not `main`)
 - [ ] CI passes (build + tests on both platforms)
 - [ ] Code follows [coding standards](docs/CODING_STANDARDS.md)
 - [ ] Added/updated tests (if applicable)
-
-### Notes
-<!-- Anything reviewers should know? -->
-
-<!-- For release PRs (dev → main), use the release template instead:
-     https://github.com/briandl2000/Gecko/compare/main...dev?template=release.md -->

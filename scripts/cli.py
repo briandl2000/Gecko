@@ -9,7 +9,9 @@ from types import ModuleType
 
 
 def _ensure_repo_on_path() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
+    # Use absolute() not resolve() — resolve() converts mapped drives (Z:\)
+    # to UNC paths which poisons sys.path and all __file__ attributes.
+    repo_root = Path(__file__).absolute().parents[1]
     repo_str = str(repo_root)
     if repo_str not in sys.path:
         sys.path.insert(0, repo_str)

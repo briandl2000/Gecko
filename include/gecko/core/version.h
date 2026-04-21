@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/api.h"
+#include "gecko/version.h"
 
 namespace gecko {
 

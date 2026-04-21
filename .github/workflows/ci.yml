@@ -7,9 +7,9 @@ on:
     branches: [main, dev]
 
 jobs:
-  # =============================================================================
-  # Build & Test - Clang only (clang on Linux, clang-cl on Windows)
-  # =============================================================================
+  # ---------------------------------------------------------------------------
+  # Build & Test - GCC on Linux, MinGW-w64 GCC on Windows
+  # ---------------------------------------------------------------------------
   build-and-test:
     name: Build & Test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -24,54 +24,124 @@ jobs:
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        shell: powershell
-        run: |
-          choco install ninja llvm
-      
-      - name: Setup MSVC environment (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake
       
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
       
-      - name: Configure
+      - name: Set platform ID
+        id: platform
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "Windows" ]; then
-            export CC=clang-cl
-            export CXX=clang-cl
+            echo "id=Windows-x86_64" >> $GITHUB_OUTPUT
           else
-            export CC=clang
-            export CXX=clang++
-          fi
-          cmake -S . -B out/build -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
-      
-      - name: Build
-        run: cmake --build out/build --config Release
-      
-      - name: Run tests
-        shell: bash
-        run: |
-          if [ -f "./out/bin/Release/tests/math_tests.exe" ]; then
-            ./out/bin/Release/tests/math_tests.exe
-          elif [ -f "./out/bin/Release/tests/math_tests" ]; then
-            ./out/bin/Release/tests/math_tests
-          else
-            echo "Test executable not found!"
-            exit 1
+            echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
           fi
 
-  # =============================================================================
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          export CC=gcc-15 CXX=g++-15
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
+
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
+
+      - name: Build tests (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          for target in core_tests platform_tests runtime_tests math_tests; do
+            cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
+          done
+
+      - name: Build tests (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          for target in core_tests platform_tests runtime_tests math_tests; do
+            cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
+          done
+
+      - name: Run tests (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
+          failed=0
+          for test in core_tests platform_tests runtime_tests math_tests; do
+            exe="$test_dir/${test}"
+            if [ -f "$exe" ]; then
+              echo "--- $test ---"
+              "$exe" || failed=1
+            else
+              echo "Test executable not found: $exe"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
+          bin_dir="./out/$GECKO_PLATFORM_ID/bin/Release"
+          export PATH="$(cd "$bin_dir" && pwd):$PATH"
+          failed=0
+          for test in core_tests platform_tests runtime_tests math_tests; do
+            exe="$test_dir/${test}.exe"
+            if [ -f "$exe" ]; then
+              echo "--- $test ---"
+              "$exe" || failed=1
+            else
+              echo "Test executable not found: $exe"
+              failed=1
+            fi
+          done
+          exit $failed
+
+  # ---------------------------------------------------------------------------
   # PR checks - enforce version bump and changelog for PRs to main
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   pr-checks:
     name: PR Checks (main)
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
@@ -123,9 +193,9 @@ jobs:
           fi
           echo "Changelog updated"
 
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # Resolve version - compute version string once for all downstream jobs
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   resolve-version:
     name: Resolve Version
     needs: build-and-test
@@ -169,9 +239,9 @@ jobs:
           
           echo "Resolved version: $(cat $GITHUB_OUTPUT | grep ^version= | cut -d= -f2)"
 
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # Package - only on push (merge) to dev or main
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   package:
     name: Package (${{ matrix.os }})
     needs: resolve-version
@@ -192,34 +262,68 @@ jobs:
       - name: Install dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev zip
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
-        run: choco install ninja llvm
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake zip
       
-      - name: Setup MSVC environment (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-      
-      - name: Configure
+      - name: Set platform ID
+        id: platform
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "Windows" ]; then
-            export CC=clang-cl
-            export CXX=clang-cl
+            echo "id=Windows-x86_64" >> $GITHUB_OUTPUT
           else
-            export CC=clang
-            export CXX=clang++
+            echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
           fi
-          cmake -S . -B out/build -G "Ninja Multi-Config"
+
+      - name: Configure (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          export CC=gcc-15 CXX=g++-15
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: |
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
       
-      - name: Build Release
-        run: cmake --build out/build --config Release
+      - name: Build Release (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
+
+      - name: Build Release (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
       
-      - name: Install to package directory
-        run: cmake --install out/build --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
+      - name: Install to package directory (Linux)
+        if: runner.os == 'Linux'
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --install out/build/$GECKO_PLATFORM_ID --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
+
+      - name: Install to package directory (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        env:
+          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+        run: cmake --install out/build/$GECKO_PLATFORM_ID --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
       
       - name: Create zip (Linux)
         if: runner.os == 'Linux'
@@ -229,9 +333,10 @@ jobs:
       
       - name: Create zip (Windows)
         if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           cd out/package
-          Compress-Archive -Path gecko-${{ needs.resolve-version.outputs.version }} -DestinationPath gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip
+          zip -r gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip gecko-${{ needs.resolve-version.outputs.version }}
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -240,9 +345,9 @@ jobs:
           path: out/package/*.zip
           retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
 
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   # Release - create GitHub release after packaging (dev and main)
-  # =============================================================================
+  # ---------------------------------------------------------------------------
   release:
     name: Create Release
     needs: [resolve-version, package]
@@ -265,44 +370,27 @@ jobs:
           find artifacts -name "*.zip" -exec cp {} release/ \;
           ls -la release/
       
-      - name: Extract changelog (main only)
-        if: github.ref == 'refs/heads/main'
-        id: changelog
-        run: |
-          VERSION="${{ needs.resolve-version.outputs.version }}"
-          
-          if [ -f CHANGELOG.md ]; then
-            NOTES=$(sed -n "/^## \[${VERSION}\]/,/^## \[/{ /^## \[${VERSION}\]/d; /^## \[/d; p; }" CHANGELOG.md)
-            if [ -z "$NOTES" ]; then
-              NOTES="No changelog entry for ${VERSION}."
-            fi
-          else
-            NOTES="No CHANGELOG.md found."
-          fi
-          
-          echo "$NOTES" > release_notes.md
-          echo "Release notes:"
-          cat release_notes.md
-      
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          FLAGS=""
-          if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
-            FLAGS="--prerelease"
-          fi
-          
           if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            TITLE="Gecko Dev Build ${{ needs.resolve-version.outputs.version }}"
-            NOTES_FLAG="--generate-notes"
+            # Dev: prerelease, not shown as latest, no description
+            gh release create "${{ needs.resolve-version.outputs.tag }}" \
+              --title "Gecko Dev Build ${{ needs.resolve-version.outputs.version }}" \
+              --prerelease \
+              --latest=false \
+              --notes "" \
+              release/*.zip
           else
-            TITLE="Gecko ${{ needs.resolve-version.outputs.version }}"
-            NOTES_FLAG="--notes-file release_notes.md"
+            # Main: auto-generated notes from commits since last release tag
+            FLAGS=""
+            if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
+              FLAGS="--prerelease"
+            fi
+            gh release create "${{ needs.resolve-version.outputs.tag }}" \
+              --title "Gecko ${{ needs.resolve-version.outputs.version }}" \
+              ${FLAGS} \
+              --generate-notes \
+              release/*.zip
           fi
-          
-          gh release create "${{ needs.resolve-version.outputs.tag }}" \
-            --title "${TITLE}" \
-            ${NOTES_FLAG} \
-            ${FLAGS} \
-            release/*.zip

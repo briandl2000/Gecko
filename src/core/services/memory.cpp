@@ -3,6 +3,9 @@
 #include "gecko/core/types.h"
 
 #include <cstdlib>
+#if defined(GECKO_PLATFORM_WINDOWS)
+#include <malloc.h>
+#endif
 
 namespace gecko {
 
@@ -17,7 +20,7 @@ void* PlatformAlloc(u64 size, u32 alignment) noexcept
     return ::std::malloc(static_cast<usize>(size));
   }
 
-#if defined(_MSC_VER)
+#if defined(GECKO_PLATFORM_WINDOWS)
   return ::_aligned_malloc(static_cast<usize>(size), alignment);
 #else
   void* ptr = nullptr;
@@ -32,7 +35,7 @@ void PlatformFree(void* ptr, u32 alignment) noexcept
   if (!ptr)
     return;
 
-#if defined(_MSC_VER)
+#if defined(GECKO_PLATFORM_WINDOWS)
   if (alignment > alignof(::std::max_align_t))
     ::_aligned_free(ptr);
   else

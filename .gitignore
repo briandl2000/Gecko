@@ -1,12 +1,19 @@
 # Build outputs
 /out/
 
+# Compilation database
+compile_commands.json
+.cache/
+
 # IDE (user-specific)
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# Local dev scripts
+scripts/copy_debug.py
 
 # OS
 .DS_Store

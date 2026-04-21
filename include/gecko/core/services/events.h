@@ -76,7 +76,7 @@ struct EventEmitter
 enum class SubscriptionDelivery : u8
 {
   Queued = 0,
-  OnPublish = 1
+  Immediate = 1
 };
 
 struct SubscriptionOptions
@@ -90,8 +90,8 @@ class EventSubscription
 {
 public:
   EventSubscription() = default;
-  EventSubscription(const EventSubscription&) = delete;
-  EventSubscription& operator=(const EventSubscription&) = delete;
+  EventSubscription(const EventSubscription&) = delete("EventSubscription is move-only; copying would create duplicate unsubscribe");
+  EventSubscription& operator=(const EventSubscription&) = delete("EventSubscription is move-only; copying would create duplicate unsubscribe");
 
   EventSubscription(EventSubscription&& other) noexcept
       : m_Bus(other.m_Bus), m_Id(other.m_Id)
@@ -147,28 +147,16 @@ public:
       EventCode code, CallbackFn fn, void* user,
       SubscriptionOptions options = {}) = 0;
 
-  GECKO_API virtual void PublishImmediate(const EventEmitter& emitter,
-                                          EventCode code,
-                                          EventView payload) = 0;
+  GECKO_API virtual void Send(const EventEmitter& emitter, EventCode code,
+                              EventView payload) = 0;
 
   template <class T>
-  void PublishImmediate(const EventEmitter& emitter, EventCode code,
-                        const T& payload)
+  void Send(const EventEmitter& emitter, EventCode code, const T& payload)
   {
-    PublishImmediate(emitter, code,
-                     EventView {&payload, static_cast<u32>(sizeof(T))});
+    Send(emitter, code, EventView {&payload, static_cast<u32>(sizeof(T))});
   }
 
-  GECKO_API virtual void Enqueue(const EventEmitter& emitter, EventCode code,
-                                 EventView payload) = 0;
-
-  template <class T>
-  void Enqueue(const EventEmitter& emitter, EventCode code, const T& payload)
-  {
-    Enqueue(emitter, code, EventView {&payload, static_cast<u32>(sizeof(T))});
-  }
-
-  GECKO_API virtual std::size_t DispatchQueued(
+  GECKO_API virtual std::size_t Dispatch(
       std::size_t maxCount = static_cast<std::size_t>(-1)) = 0;
 
   GECKO_API virtual bool RegisterModule(u64 moduleId) = 0;
@@ -211,46 +199,28 @@ GECKO_API inline EventSubscription SubscribeEvent(
   return {};
 }
 
-GECKO_API inline void PublishEvent(const EventEmitter& emitter, EventCode code,
-                                   EventView payload)
+GECKO_API inline void SendEvent(const EventEmitter& emitter, EventCode code,
+                                EventView payload)
 {
   if (auto* eventBus = GetEventBus())
-    eventBus->Enqueue(emitter, code, payload);
+    eventBus->Send(emitter, code, payload);
   else
     GECKO_ASSERT(false && "No event bus detected!");
 }
 
 template <class T>
-inline void PublishEvent(const EventEmitter& emitter, EventCode code,
-                         const T& payload)
+inline void SendEvent(const EventEmitter& emitter, EventCode code,
+                      const T& payload)
 {
-  PublishEvent(emitter, code,
-               EventView {&payload, static_cast<u32>(sizeof(T))});
-}
-
-inline void PublishImmediateEvent(const EventEmitter& emitter, EventCode code,
-                                  EventView payload)
-{
-  if (auto* eventBus = GetEventBus())
-    eventBus->PublishImmediate(emitter, code, payload);
-  else
-    GECKO_ASSERT(false && "No event bus detected!");
-}
-
-template <class T>
-inline void PublishImmediateEvent(const EventEmitter& emitter, EventCode code,
-                                  const T& payload)
-{
-  PublishImmediateEvent(emitter, code,
-                        EventView {&payload, static_cast<u32>(sizeof(T))});
+  SendEvent(emitter, code, EventView {&payload, static_cast<u32>(sizeof(T))});
 }
 
 [[nodiscard]]
-GECKO_API inline std::size_t DispatchQueuedEvents(
+GECKO_API inline std::size_t DispatchEvents(
     std::size_t maxCount = static_cast<std::size_t>(-1))
 {
   if (auto* eventBus = GetEventBus())
-    return eventBus->DispatchQueued(maxCount);
+    return eventBus->Dispatch(maxCount);
   GECKO_ASSERT(false && "No event bus detected!");
   return 0;
 }
@@ -260,12 +230,9 @@ struct NullEventBus final : IEventBus
   GECKO_API virtual EventSubscription Subscribe(
       EventCode code, CallbackFn fn, void* user,
       SubscriptionOptions options = {}) noexcept override;
-  GECKO_API virtual void PublishImmediate(const EventEmitter& emitter,
-                                          EventCode code,
-                                          EventView payload) noexcept override;
-  GECKO_API virtual void Enqueue(const EventEmitter& emitter, EventCode code,
-                                 EventView payload) noexcept override;
-  GECKO_API virtual std::size_t DispatchQueued(
+  GECKO_API virtual void Send(const EventEmitter& emitter, EventCode code,
+                              EventView payload) noexcept override;
+  GECKO_API virtual std::size_t Dispatch(
       std::size_t maxCount) noexcept override;
 
   GECKO_API virtual bool RegisterModule(u64 moduleId) noexcept override;

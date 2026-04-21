@@ -43,19 +43,22 @@ target_link_libraries(CoreServices PUBLIC Gecko::Core)
 
 target_include_directories(Core
   PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/generated/include>
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR})
 
-target_compile_definitions(Core
-  PUBLIC
-    GECKO_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-    GECKO_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-    GECKO_VERSION_PATCH=${PROJECT_VERSION_PATCH}
-    GECKO_VERSION_STRING="${PROJECT_VERSION}"
-    GECKO_VERSION_PRERELEASE="${GECKO_VERSION_PRERELEASE}"
-    GECKO_VERSION_FULL_STRING="${GECKO_VERSION_FULL}")
+# ── OS / platform feature macros ────────────────────────────────────────────
+# Exposed as PUBLIC so every target that links Gecko::Core receives them
+# automatically – no header inclusion required.
+if(WIN32)
+  target_compile_definitions(Core PUBLIC GECKO_PLATFORM_WINDOWS=1)
+elseif(UNIX AND NOT APPLE)
+  target_compile_definitions(Core PUBLIC GECKO_PLATFORM_LINUX=1)
+elseif(APPLE)
+  target_compile_definitions(Core PUBLIC GECKO_PLATFORM_APPLE=1)
+endif()
 
 install(TARGETS Core CoreServices
   EXPORT ${GECKO_EXPORT_SET_NAME}
@@ -63,3 +66,4 @@ install(TARGETS Core CoreServices
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/include/gecko/core DESTINATION include/gecko)
+install(FILES ${CMAKE_BINARY_DIR}/generated/include/gecko/version.h DESTINATION include/gecko)

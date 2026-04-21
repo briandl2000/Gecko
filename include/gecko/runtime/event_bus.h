@@ -21,11 +21,9 @@ public:
   EventSubscription Subscribe(
       EventCode code, CallbackFn fn, void* user,
       SubscriptionOptions options = {}) noexcept override;
-  void PublishImmediate(const EventEmitter& emitter, EventCode code,
-                        EventView payload) noexcept override;
-  void Enqueue(const EventEmitter& emitter, EventCode code,
-               EventView payload) noexcept override;
-  std::size_t DispatchQueued(std::size_t maxCount) noexcept override;
+  void Send(const EventEmitter& emitter, EventCode code,
+            EventView payload) noexcept override;
+  std::size_t Dispatch(std::size_t maxCount) noexcept override;
 
   bool RegisterModule(u64 moduleId) noexcept override;
   void UnregisterModule(u64 moduleId) noexcept override;
@@ -55,11 +53,9 @@ private:
     u32 payloadSize {0};
   };
 
-  void PublishToSubscribers(EventCode code, const EventMeta& meta,
-                            EventView payload);
-  void PublishToSubscribers(EventCode code, const EventMeta& meta,
-                            EventView payload,
-                            SubscriptionDelivery deliveryFilter);
+  void NotifySubscribers(EventCode code, const EventMeta& meta,
+                         EventView payload,
+                         SubscriptionDelivery deliveryFilter);
 
   std::unique_ptr<std::unordered_map<EventCode, std::vector<Subscriber>>>
       m_Subscribers;
