@@ -20,6 +20,40 @@ public:
   [[nodiscard]]
   GECKO_API virtual bool IsValid() const noexcept = 0;
 
+  // ── Recording lifecycle ───────────────────────────────────────
+
+  GECKO_API virtual void Begin() noexcept = 0;
+  GECKO_API virtual void End() noexcept   = 0;
+
+  // ── Dynamic rendering (Vulkan 1.3 / no render passes) ─────────
+
+  GECKO_API virtual void BeginRendering(const RenderTarget& rt,
+                                         bool clearColor,
+                                         bool clearDepth) noexcept = 0;
+  GECKO_API virtual void EndRendering() noexcept = 0;
+
+  // ── Viewport / scissor ────────────────────────────────────────
+
+  GECKO_API virtual void SetViewport(f32 x, f32 y, f32 width, f32 height,
+                                      f32 minDepth, f32 maxDepth) noexcept = 0;
+  GECKO_API virtual void SetScissor(u32 x, u32 y, u32 width,
+                                     u32 height) noexcept = 0;
+
+  // ── Pipeline binding (new-style) ──────────────────────────────
+
+  GECKO_API virtual void BindPipeline(
+      const GraphicsPipeline& pipeline) noexcept = 0;
+
+  // ── Draw (new-style) ──────────────────────────────────────────
+
+  GECKO_API virtual void DrawVertices(u32 vertexCount, u32 instanceCount,
+                                       u32 firstVertex,
+                                       u32 firstInstance) noexcept = 0;
+
+  GECKO_API virtual void DrawIndexedVertices(u32 indexCount, u32 instanceCount,
+                                              u32 firstIndex, i32 vertexOffset,
+                                              u32 firstInstance) noexcept = 0;
+
   // ── Render target ─────────────────────────────────────────────
 
   GECKO_API virtual void ClearRenderTarget(

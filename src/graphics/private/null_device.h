@@ -15,6 +15,16 @@ public:
 
   bool IsValid() const noexcept override;
 
+  void Begin() noexcept override;
+  void End() noexcept override;
+  void BeginRendering(const RenderTarget&, bool, bool) noexcept override;
+  void EndRendering() noexcept override;
+  void SetViewport(f32, f32, f32, f32, f32, f32) noexcept override;
+  void SetScissor(u32, u32, u32, u32) noexcept override;
+  void BindPipeline(const GraphicsPipeline&) noexcept override;
+  void DrawVertices(u32, u32, u32, u32) noexcept override;
+  void DrawIndexedVertices(u32, u32, u32, i32, u32) noexcept override;
+
   void ClearRenderTarget(const RenderTarget&) noexcept override;
   void BindRenderTarget(const RenderTarget&) noexcept override;
   void CopyTextureToTexture(const Texture&, const Texture&) noexcept override;

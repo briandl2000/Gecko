@@ -49,6 +49,18 @@ public:
 
 AppModule g_AppModule;
 
+struct Vertex
+{
+  float Position[3];
+  float Color[3];
+};
+
+constexpr Vertex k_TriangleVertices[] = {
+    {{ 0.0F,  0.5F, 0.0F}, {1.0F, 0.0F, 0.0F}},  // top    — red
+    {{ 0.5F, -0.5F, 0.0F}, {0.0F, 1.0F, 0.0F}},  // right  — green
+    {{-0.5F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}},  // left   — blue
+};
+
 }  // namespace
 
 int main()
@@ -103,7 +115,10 @@ int main()
     GECKO_INFO(app::graphics_example::labels::Main, "Window created");
 
     // ── Graphics device ──────────────────────────────────────────
-    auto device = CreateGraphicsDevice();
+    auto device = CreateGraphicsDevice(
+        GraphicsDeviceDesc{.Backend = GraphicsBackend::Vulkan,
+                           .Debug   = true,
+                           .AppName = "graphics_example"});
     GECKO_INFO(app::graphics_example::labels::Main, "Graphics device created");
 
     // ── Swapchain ────────────────────────────────────────────────
@@ -111,9 +126,11 @@ int main()
     Extent2D           clientSz = ctx.Windows().GetClientSize(window);
 
     SwapchainDesc scDesc;
-    scDesc.Width       = clientSz.Width;
-    scDesc.Height      = clientSz.Height;
+    scDesc.Width          = clientSz.Width;
+    scDesc.Height         = clientSz.Height;
     scDesc.NumBackBuffers = 2;
+    scDesc.Format         = DataFormat::R8G8B8A8_UNORM;
+    scDesc.VSync          = true;
 
     Swapchain swapchain = device->CreateSwapchain(native, scDesc);
     if (!swapchain.IsValid())
@@ -125,8 +142,49 @@ int main()
     else
     {
       GECKO_INFO(app::graphics_example::labels::Main,
-                 "Swapchain created (%ux%u, %u back buffers)", scDesc.Width,
-                 scDesc.Height, scDesc.NumBackBuffers);
+                 "Swapchain created (%ux%u, %u back buffers)",
+                 scDesc.Width, scDesc.Height, scDesc.NumBackBuffers);
+    }
+
+    // ── Vertex buffer ─────────────────────────────────────────────
+    VertexBufferDesc vbDesc;
+    vbDesc.NumVertices = 3;
+    vbDesc.VertexSize  = sizeof(Vertex);
+    vbDesc.Memory      = MemoryType::Dedicated;
+
+    Buffer vertexBuffer = device->CreateVertexBuffer(vbDesc);
+    if (vertexBuffer.IsValid())
+    {
+      const auto* raw  = reinterpret_cast<const gecko::byte*>(k_TriangleVertices);
+      const usize size = sizeof(k_TriangleVertices);
+      device->UploadBufferData(vertexBuffer, {raw, size});
+      GECKO_INFO(app::graphics_example::labels::Main, "Vertex buffer uploaded");
+    }
+
+    // ── Graphics pipeline ─────────────────────────────────────────
+    VertexLayout layout;
+    layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Position");
+    layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Color");
+
+    GraphicsPipelineDesc pipelineDesc;
+    pipelineDesc.VertexShaderPath       = "shaders/triangle.vert.spv";
+    pipelineDesc.PixelShaderPath        = "shaders/triangle.frag.spv";
+    pipelineDesc.Layout                 = layout;
+    pipelineDesc.NumRenderTargets       = 1;
+    pipelineDesc.RenderTargetFormats[0] = swapchain.IsValid()
+                                              ? swapchain.Desc.Format
+                                              : DataFormat::R8G8B8A8_UNORM;
+    pipelineDesc.Culling                = CullMode::None;
+
+    GraphicsPipeline pipeline = device->CreateGraphicsPipeline(pipelineDesc);
+    if (!pipeline.IsValid())
+    {
+      GECKO_WARN(app::graphics_example::labels::Main,
+                 "Pipeline creation failed — will skip draw calls");
+    }
+    else
+    {
+      GECKO_INFO(app::graphics_example::labels::Main, "Graphics pipeline created");
     }
 
     // ── Event subscriptions ───────────────────────────────────────
@@ -158,8 +216,6 @@ int main()
                   view.Data());
           (void)payload;
           auto* state = static_cast<ResizeState*>(user);
-          // Backend queries current size from the native window handle
-          // stored inside Swapchain.Data.
           state->Device->ResizeSwapchain(*state->SC);
         },
         &resizeState);
@@ -186,8 +242,33 @@ int main()
       ctx.PumpEvents();
       (void)DispatchEvents();
 
-      // With NullDevice this is a no-op. With a real backend this would
-      // submit command lists and flip the swapchain.
+      if (swapchain.IsValid() && pipeline.IsValid() && vertexBuffer.IsValid())
+      {
+        RenderTarget backBuffer = device->GetCurrentBackBuffer(swapchain);
+        if (backBuffer.IsValid())
+        {
+          auto cmd = device->CreateGraphicsCommandList();
+          cmd->Begin();
+
+          cmd->BeginRendering(backBuffer, /*clearColor=*/true, /*clearDepth=*/false);
+
+          cmd->SetViewport(0.0F, 0.0F,
+                            static_cast<f32>(swapchain.Desc.Width),
+                            static_cast<f32>(swapchain.Desc.Height),
+                            0.0F, 1.0F);
+          cmd->SetScissor(0, 0, swapchain.Desc.Width, swapchain.Desc.Height);
+
+          cmd->BindPipeline(pipeline);
+          cmd->BindVertexBuffer(vertexBuffer);
+          cmd->DrawVertices(3, 1, 0, 0);
+
+          cmd->EndRendering();
+          cmd->End();
+
+          device->ExecuteGraphicsCommandList(::std::move(cmd));
+        }
+      }
+
       device->Present(swapchain);
     }
 

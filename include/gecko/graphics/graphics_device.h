@@ -2,6 +2,7 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/ptr.h"
+#include "gecko/core/types.h"
 #include "gecko/graphics/command_list.h"
 #include "gecko/graphics/objects.h"
 #include "gecko/platform/window.h"
@@ -9,6 +10,21 @@
 #include <span>
 
 namespace gecko::graphics {
+
+// ── Backend selection ─────────────────────────────────────────────────────
+
+enum class GraphicsBackend : u8
+{
+  Null,    ///< Zero-dep no-op backend (default)
+  Vulkan,  ///< Vulkan 1.3 backend
+};
+
+struct GraphicsDeviceDesc
+{
+  GraphicsBackend Backend {GraphicsBackend::Null};
+  bool            Debug   {false};      ///< Enable validation layers
+  const char*     AppName {"Gecko"};
+};
 
 /// Abstract graphics device. Concrete backends (NullDevice, VulkanDevice, ...)
 /// inherit from this class. Users receive a Unique<GraphicsDevice> from
@@ -113,9 +129,13 @@ protected:
 
 // ── Factory ───────────────────────────────────────────────────────────────
 
-/// Create a graphics device. Returns a NullDevice until a concrete backend
-/// is wired in (e.g. Vulkan). Future overload will accept a config struct.
+/// Create a NullDevice (zero-dep, no-op).
 [[nodiscard]]
 GECKO_API Unique<GraphicsDevice> CreateGraphicsDevice() noexcept;
+
+/// Create a graphics device with the specified backend and options.
+[[nodiscard]]
+GECKO_API Unique<GraphicsDevice> CreateGraphicsDevice(
+    const GraphicsDeviceDesc& desc) noexcept;
 
 }  // namespace gecko::graphics
