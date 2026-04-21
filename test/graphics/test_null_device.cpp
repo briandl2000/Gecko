@@ -1,70 +1,63 @@
-#include "gecko/graphics/device.h"
+#include "gecko/graphics/graphics_device.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 using namespace gecko;
 using namespace gecko::graphics;
+using namespace gecko::platform;
 
-TEST_CASE("GetDevice returns a valid device by default", "[graphics][device]")
+TEST_CASE("GraphicsDevice constructs without crashing", "[graphics][device]")
 {
-  // NullDevice is installed by default — just verify we can get it without crashing
-  [[maybe_unused]] IDevice& device = GetDevice();
+  GraphicsDevice device;
   REQUIRE(true);
 }
 
-TEST_CASE("NullDevice Init/Shutdown are no-ops", "[graphics][device]")
-{
-  IDevice& device = GetDevice();
-  device.Init();
-  device.Shutdown();
-}
-
-TEST_CASE("NullDevice CreateSwapchain returns invalid swapchain",
+TEST_CASE("GraphicsDevice CreateSwapchain returns invalid swapchain",
           "[graphics][device]")
 {
-  IDevice& device = GetDevice();
+  GraphicsDevice device;
 
-  platform::NativeWindowHandle native{};
-  platform::WindowDesc         wDesc{};
-  SwapchainDesc                sDesc{.Width = 800, .Height = 600};
+  NativeWindowHandle native{};
+  WindowDesc         wDesc{};
+  SwapchainDesc      sDesc{.Width = 800, .Height = 600};
 
   Swapchain sc = device.CreateSwapchain(native, wDesc, sDesc);
   REQUIRE_FALSE(sc.IsValid());
 }
 
-TEST_CASE("NullDevice CreateGraphicsCommandList returns valid command list",
+TEST_CASE("GraphicsDevice CreateGraphicsCommandList returns valid command list",
           "[graphics][device]")
 {
-  IDevice& device = GetDevice();
+  GraphicsDevice device;
 
   auto cmdList = device.CreateGraphicsCommandList();
   REQUIRE(cmdList != nullptr);
   REQUIRE(cmdList->IsValid());
 }
 
-TEST_CASE("NullDevice CreateComputeCommandList returns valid command list",
+TEST_CASE("GraphicsDevice CreateComputeCommandList returns valid command list",
           "[graphics][device]")
 {
-  IDevice& device = GetDevice();
+  GraphicsDevice device;
 
   auto cmdList = device.CreateComputeCommandList();
   REQUIRE(cmdList != nullptr);
   REQUIRE(cmdList->IsValid());
 }
 
-TEST_CASE("NullDevice resource creation returns invalid objects",
+TEST_CASE("GraphicsDevice resource creation returns invalid objects",
           "[graphics][device]")
 {
-  IDevice& device = GetDevice();
+  GraphicsDevice device;
 
   SECTION("CreateRenderTarget")
   {
     RenderTargetDesc desc;
-    desc.Width                 = 800;
-    desc.Height                = 600;
-    desc.NumRenderTargets      = 1;
+    desc.Width                  = 800;
+    desc.Height                 = 600;
+    desc.NumRenderTargets       = 1;
     desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
-    RenderTarget rt = device.CreateRenderTarget(desc);
+    RenderTarget rt             = device.CreateRenderTarget(desc);
     REQUIRE_FALSE(rt.IsValid());
   }
 
@@ -93,20 +86,22 @@ TEST_CASE("NullDevice resource creation returns invalid objects",
   }
 }
 
-TEST_CASE("NullDevice GetCurrentBackBufferIndex returns 0",
+TEST_CASE("GraphicsDevice GetCurrentBackBufferIndex returns 0",
           "[graphics][device]")
 {
-  IDevice& device = GetDevice();
-  Swapchain sc{};
+  GraphicsDevice device;
+  Swapchain      sc{};
   REQUIRE(device.GetCurrentBackBufferIndex(sc) == 0);
 }
 
-TEST_CASE("InstallDevice with nullptr restores NullDevice",
+TEST_CASE("Multiple GraphicsDevice instances are independent",
           "[graphics][device]")
 {
-  IDevice* original = &GetDevice();
-  InstallDevice(nullptr);
-  REQUIRE(&GetDevice() != nullptr);
-  // Restore
-  InstallDevice(original);
+  GraphicsDevice deviceA;
+  GraphicsDevice deviceB;
+
+  auto cmdA = deviceA.CreateGraphicsCommandList();
+  auto cmdB = deviceB.CreateGraphicsCommandList();
+  REQUIRE(cmdA != nullptr);
+  REQUIRE(cmdB != nullptr);
 }

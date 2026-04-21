@@ -113,11 +113,4 @@ protected:
   IDevice() = default;
 };
 
-// Access the active device (returns NullDevice if none installed).
-[[nodiscard]]
-GECKO_API IDevice& GetDevice() noexcept;
-
-// Install a concrete device (replaces the current one).
-GECKO_API void InstallDevice(IDevice* device) noexcept;
-
 }  // namespace gecko::graphics

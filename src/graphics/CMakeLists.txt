@@ -4,7 +4,7 @@ add_library(Gecko::Graphics ALIAS Graphics)
 target_sources(Graphics
   PRIVATE
     graphics_module.cpp
-    null_device.cpp
+    graphics_device.cpp
 )
 
 target_include_directories(Graphics
