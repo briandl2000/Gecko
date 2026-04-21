@@ -6,49 +6,47 @@ using namespace gecko;
 using namespace gecko::graphics;
 using namespace gecko::platform;
 
-TEST_CASE("GraphicsDevice constructs without crashing", "[graphics][device]")
+TEST_CASE("CreateGraphicsDevice returns a device", "[graphics][device]")
 {
-  GraphicsDevice device;
-  REQUIRE(true);
+  auto device = CreateGraphicsDevice();
+  REQUIRE(device != nullptr);
 }
 
-TEST_CASE("GraphicsDevice CreateSwapchain returns invalid swapchain",
+TEST_CASE("CreateSwapchain returns invalid swapchain for NullDevice",
           "[graphics][device]")
 {
-  GraphicsDevice device;
+  auto device = CreateGraphicsDevice();
 
   NativeWindowHandle native{};
   WindowDesc         wDesc{};
   SwapchainDesc      sDesc{.Width = 800, .Height = 600};
 
-  Swapchain sc = device.CreateSwapchain(native, wDesc, sDesc);
+  Swapchain sc = device->CreateSwapchain(native, wDesc, sDesc);
   REQUIRE_FALSE(sc.IsValid());
 }
 
-TEST_CASE("GraphicsDevice CreateGraphicsCommandList returns valid command list",
+TEST_CASE("CreateGraphicsCommandList returns valid command list",
           "[graphics][device]")
 {
-  GraphicsDevice device;
-
-  auto cmdList = device.CreateGraphicsCommandList();
+  auto device  = CreateGraphicsDevice();
+  auto cmdList = device->CreateGraphicsCommandList();
   REQUIRE(cmdList != nullptr);
   REQUIRE(cmdList->IsValid());
 }
 
-TEST_CASE("GraphicsDevice CreateComputeCommandList returns valid command list",
+TEST_CASE("CreateComputeCommandList returns valid command list",
           "[graphics][device]")
 {
-  GraphicsDevice device;
-
-  auto cmdList = device.CreateComputeCommandList();
+  auto device  = CreateGraphicsDevice();
+  auto cmdList = device->CreateComputeCommandList();
   REQUIRE(cmdList != nullptr);
   REQUIRE(cmdList->IsValid());
 }
 
-TEST_CASE("GraphicsDevice resource creation returns invalid objects",
+TEST_CASE("NullDevice resource creation returns invalid objects",
           "[graphics][device]")
 {
-  GraphicsDevice device;
+  auto device = CreateGraphicsDevice();
 
   SECTION("CreateRenderTarget")
   {
@@ -57,7 +55,7 @@ TEST_CASE("GraphicsDevice resource creation returns invalid objects",
     desc.Height                 = 600;
     desc.NumRenderTargets       = 1;
     desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
-    RenderTarget rt             = device.CreateRenderTarget(desc);
+    RenderTarget rt             = device->CreateRenderTarget(desc);
     REQUIRE_FALSE(rt.IsValid());
   }
 
@@ -68,7 +66,7 @@ TEST_CASE("GraphicsDevice resource creation returns invalid objects",
         .VertexSize  = 12,
         .Memory      = MemoryType::Dedicated,
     };
-    Buffer buf = device.CreateVertexBuffer(desc);
+    Buffer buf = device->CreateVertexBuffer(desc);
     REQUIRE_FALSE(buf.IsValid());
   }
 
@@ -81,27 +79,26 @@ TEST_CASE("GraphicsDevice resource creation returns invalid objects",
         .Type   = TextureType::Tex2D,
         .Memory = MemoryType::Dedicated,
     };
-    Texture tex = device.CreateTexture(desc);
+    Texture tex = device->CreateTexture(desc);
     REQUIRE_FALSE(tex.IsValid());
   }
 }
 
-TEST_CASE("GraphicsDevice GetCurrentBackBufferIndex returns 0",
+TEST_CASE("GetCurrentBackBufferIndex returns 0 for NullDevice",
           "[graphics][device]")
 {
-  GraphicsDevice device;
-  Swapchain      sc{};
-  REQUIRE(device.GetCurrentBackBufferIndex(sc) == 0);
+  auto      device = CreateGraphicsDevice();
+  Swapchain sc{};
+  REQUIRE(device->GetCurrentBackBufferIndex(sc) == 0);
 }
 
-TEST_CASE("Multiple GraphicsDevice instances are independent",
-          "[graphics][device]")
+TEST_CASE("Multiple independent devices can be created", "[graphics][device]")
 {
-  GraphicsDevice deviceA;
-  GraphicsDevice deviceB;
+  auto deviceA = CreateGraphicsDevice();
+  auto deviceB = CreateGraphicsDevice();
 
-  auto cmdA = deviceA.CreateGraphicsCommandList();
-  auto cmdB = deviceB.CreateGraphicsCommandList();
+  auto cmdA = deviceA->CreateGraphicsCommandList();
+  auto cmdB = deviceB->CreateGraphicsCommandList();
   REQUIRE(cmdA != nullptr);
   REQUIRE(cmdB != nullptr);
 }

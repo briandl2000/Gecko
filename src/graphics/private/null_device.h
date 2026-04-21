@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/graphics/device.h"
+#include "gecko/graphics/graphics_device.h"
 
 namespace gecko::graphics {
 
@@ -39,7 +39,7 @@ public:
   void Dispatch(u32, u32, u32) noexcept override {}
 };
 
-class NullDevice final : public IDevice
+class NullDevice final : public GraphicsDevice
 {
 public:
   NullDevice()  = default;
@@ -48,9 +48,6 @@ public:
   NullDevice(const NullDevice&) = delete("NullDevice is not copyable");
   NullDevice& operator=(
       const NullDevice&) = delete("NullDevice is not copyable");
-
-  void Init() noexcept override {}
-  void Shutdown() noexcept override {}
 
   Swapchain CreateSwapchain(
       const ::gecko::platform::NativeWindowHandle&,
