@@ -5,7 +5,7 @@ target_sources(Graphics
   PRIVATE
     graphics_module.cpp
     graphics_device.cpp
-    null_device.cpp
+    private/null_device.cpp
 )
 
 target_include_directories(Graphics

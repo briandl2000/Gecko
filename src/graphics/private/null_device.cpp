@@ -1,4 +1,4 @@
-#include "private/null_device.h"
+#include "null_device.h"
 
 namespace gecko::graphics {
 
