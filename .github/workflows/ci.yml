@@ -383,7 +383,9 @@ jobs:
               --notes "" \
               release/*.zip
           else
-            # Main: auto-generated notes from commits since last release tag
+            # Main: extract changelog section for this version as the release description
+            VERSION_STR="${{ needs.resolve-version.outputs.version }}"
+            python3 -c "import re,sys;t=open('CHANGELOG.md').read();m=re.search(r'## \['+re.escape(sys.argv[1])+r'\](.*?)(?=\n## \[|\Z)',t,re.DOTALL);print(m.group(1).strip()if m else '')" "$VERSION_STR" > release_notes.md
             FLAGS=""
             if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
               FLAGS="--prerelease"
@@ -391,6 +393,6 @@ jobs:
             gh release create "${{ needs.resolve-version.outputs.tag }}" \
               --title "Gecko ${{ needs.resolve-version.outputs.version }}" \
               ${FLAGS} \
-              --generate-notes \
+              --notes-file release_notes.md \
               release/*.zip
           fi
