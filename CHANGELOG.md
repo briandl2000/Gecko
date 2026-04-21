@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.0-alpha.3]
+
+### Changed
+- CI: main branch releases now use the CHANGELOG section for the release description instead of auto-generated commit notes
+- CI: dev build releases no longer include a description
+
 ## [0.0.0-alpha.2]
 
 ### Added
