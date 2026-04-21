@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.0-alpha.3]
 
+### Added
+- **Graphics module** — API-agnostic backend with `GraphicsDevice` abstract class
+  - `CreateGraphicsDevice()` factory returns `Unique<GraphicsDevice>` (NullDevice by default)
+  - Full GPU resource API: `Buffer`, `Texture`, `RenderTarget`, `GraphicsPipeline`, `ComputePipeline`, `Swapchain`
+  - Multi-window swapchain support: `CreateSwapchain(NativeWindowHandle, SwapchainDesc)`, `ResizeSwapchain(Swapchain&)`, `Present(Swapchain&)`
+  - `ICommandList` interface: render target binding, texture/buffer binding, draw/dispatch commands
+  - `NullDevice` + `NullCommandList` no-op implementations for headless operation
+  - C++26 features: `[[nodiscard("reason")]]` on all Create* methods, `= delete("reason")` on non-copyable types, `std::span` for data upload APIs
+  - `constexpr FormatSizeInBytes(DataFormat)` and `CalculateNumberOfMips(u32, u32)`
+  - 31 unit tests covering all descriptor `IsValid()` methods and null device smoke tests
+- **graphics_example** — demonstrates window + swapchain creation, frame loop with resize handling and ESC/close events
+
 ### Changed
 - CI: main branch releases now use the CHANGELOG section for the release description instead of auto-generated commit notes
 - CI: dev build releases no longer include a description
