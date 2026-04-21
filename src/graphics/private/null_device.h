@@ -51,7 +51,6 @@ public:
 
   Swapchain CreateSwapchain(
       const ::gecko::platform::NativeWindowHandle&,
-      const ::gecko::platform::WindowDesc&,
       const SwapchainDesc&) noexcept override
   {
     return Swapchain{};

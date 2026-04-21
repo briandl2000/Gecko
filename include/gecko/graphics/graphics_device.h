@@ -31,7 +31,6 @@ public:
   [[nodiscard("Discarding a Swapchain leaks GPU resources")]]
   GECKO_API virtual Swapchain CreateSwapchain(
       const ::gecko::platform::NativeWindowHandle& native,
-      const ::gecko::platform::WindowDesc&         windowDesc,
       const SwapchainDesc&                         desc) noexcept = 0;
 
   GECKO_API virtual void DestroySwapchain(Swapchain& swapchain) noexcept = 0;

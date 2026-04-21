@@ -115,7 +115,7 @@ int main()
     scDesc.Height      = clientSz.Height;
     scDesc.NumBackBuffers = 2;
 
-    Swapchain swapchain = device->CreateSwapchain(native, windowDesc, scDesc);
+    Swapchain swapchain = device->CreateSwapchain(native, scDesc);
     GECKO_INFO(app::graphics_example::labels::Main,
                "Swapchain created (%ux%u, %u back buffers)", scDesc.Width,
                scDesc.Height, scDesc.NumBackBuffers);

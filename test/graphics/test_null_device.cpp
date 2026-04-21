@@ -18,10 +18,9 @@ TEST_CASE("CreateSwapchain returns invalid swapchain for NullDevice",
   auto device = CreateGraphicsDevice();
 
   NativeWindowHandle native{};
-  WindowDesc         wDesc{};
   SwapchainDesc      sDesc{.Width = 800, .Height = 600};
 
-  Swapchain sc = device->CreateSwapchain(native, wDesc, sDesc);
+  Swapchain sc = device->CreateSwapchain(native, sDesc);
   REQUIRE_FALSE(sc.IsValid());
 }
 
