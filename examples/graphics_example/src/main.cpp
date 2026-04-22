@@ -10,8 +10,9 @@
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
+#include <gecko/runtime/file_log_sink.h>
 #include <gecko/runtime/module_registry.h>
-#include <gecko/runtime/ring_logger.h>
+#include <gecko/runtime/immediate_logger.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
@@ -55,10 +56,20 @@ struct Vertex
   float Color[3];
 };
 
-constexpr Vertex k_TriangleVertices[] = {
+constexpr Vertex TriangleVertices[] = {
     {{ 0.0F,  0.5F, 0.0F}, {1.0F, 0.0F, 0.0F}},  // top    — red
     {{ 0.5F, -0.5F, 0.0F}, {0.0F, 1.0F, 0.0F}},  // right  — green
     {{-0.5F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}},  // left   — blue
+};
+
+// Per-window state.
+struct WindowSlot
+{
+  WindowHandle  Handle {};
+  Swapchain     SC {};
+  bool          ResizeDirty {false};
+  u32           ResizeW {0};
+  u32           ResizeH {0};
 };
 
 }  // namespace
@@ -67,7 +78,8 @@ int main()
 {
   runtime::TrackingAllocator trackingAlloc;
   runtime::RingProfiler      ringProfiler(1 << 16);
-  runtime::RingLogger        ringLogger(1 << 16);
+  runtime::ImmediateLogger   ringLogger;
+  ringLogger.SetThreadSafe(true);
   runtime::ModuleRegistry    moduleRegistry;
   runtime::EventBus          eventBus;
   runtime::ThreadPoolJobSystem jobSystem;
@@ -81,8 +93,10 @@ int main()
                        .EventBus   = &eventBus}));
 
   runtime::ConsoleLogSink consoleSink;
+  runtime::FileLogSink    fileSink("log.txt");
   if (auto* logger = GetLogger())
   {
+    fileSink.RegisterWith(logger);
     consoleSink.RegisterWith(logger);
     logger->SetLevel(LogLevel::Info);
   }
@@ -95,24 +109,32 @@ int main()
     (void)InstallModule(platform::GetModule());
     (void)InstallModule(g_AppModule);
 
-    // ── Window ────────────────────────────────────────────────────
     PlatformContext ctx(PlatformConfig{});
 
-    WindowDesc windowDesc;
-    windowDesc.Title     = "Gecko Graphics Example";
-    windowDesc.Size      = {1280, 720};
-    windowDesc.Visible   = true;
-    windowDesc.Resizable = true;
-    windowDesc.Mode      = WindowMode::Windowed;
-
-    WindowHandle window = ctx.Windows().CreateWindow(windowDesc);
-    if (!window.IsValid())
+    // ── Two windows ───────────────────────────────────────────────
+    WindowSlot slots[2];
+    const char* titles[2] = {
+        "Gecko Graphics — Window A",
+        "Gecko Graphics — Window B",
+    };
+    for (u32 i = 0; i < 2; ++i)
     {
-      GECKO_ERROR(app::graphics_example::labels::Main,
-                  "Failed to create window");
-      return 1;
+      WindowDesc wd;
+      wd.Title     = titles[i];
+      wd.Size      = {1280, 720};
+      wd.Visible   = true;
+      wd.Resizable = true;
+      wd.Mode      = WindowMode::Windowed;
+
+      slots[i].Handle = ctx.Windows().CreateWindow(wd);
+      if (!slots[i].Handle.IsValid())
+      {
+        GECKO_ERROR(app::graphics_example::labels::Main,
+                    "Failed to create window %u", i);
+        return 1;
+      }
     }
-    GECKO_INFO(app::graphics_example::labels::Main, "Window created");
+    GECKO_INFO(app::graphics_example::labels::Main, "Two windows created");
 
     // ── Graphics device ──────────────────────────────────────────
     auto device = CreateGraphicsDevice(
@@ -121,32 +143,51 @@ int main()
                            .AppName = "graphics_example"});
     GECKO_INFO(app::graphics_example::labels::Main, "Graphics device created");
 
-    // ── Swapchain ────────────────────────────────────────────────
-    NativeWindowHandle native   = ctx.Windows().GetNativeWindowHandle(window);
-    Extent2D           clientSz = ctx.Windows().GetClientSize(window);
-
-    SwapchainDesc scDesc;
-    scDesc.Width          = clientSz.Width;
-    scDesc.Height         = clientSz.Height;
-    scDesc.NumBackBuffers = 2;
-    scDesc.Format         = DataFormat::R8G8B8A8_UNORM;
-    scDesc.VSync          = true;
-
-    Swapchain swapchain = device->CreateSwapchain(native, scDesc);
-    if (!swapchain.IsValid())
+    // ── Swapchains ───────────────────────────────────────────────
+    for (u32 i = 0; i < 2; ++i)
     {
-      GECKO_WARN(app::graphics_example::labels::Main,
-                 "No concrete graphics backend; running without a real swapchain"
-                 " (NullDevice presents are no-ops)");
+      NativeWindowHandle native =
+          ctx.Windows().GetNativeWindowHandle(slots[i].Handle);
+      Extent2D sz = ctx.Windows().GetClientSize(slots[i].Handle);
+
+      SwapchainDesc scDesc;
+      scDesc.Width          = sz.Width;
+      scDesc.Height         = sz.Height;
+      scDesc.NumBackBuffers = 2;
+      scDesc.Format         = DataFormat::R8G8B8A8_UNORM;
+      scDesc.VSync          = true;
+
+      slots[i].SC = device->CreateSwapchain(native, scDesc);
+      if (!slots[i].SC.IsValid())
+      {
+        GECKO_WARN(app::graphics_example::labels::Main,
+                   "Swapchain %u not created (NullDevice?)", i);
+      }
     }
-    else
-    {
+
+    // ── Offscreen render target ───────────────────────────────────
+    constexpr u32   kOffscreenW   = 1280;
+    constexpr u32   kOffscreenH   = 720;
+    constexpr auto  kOffscreenFmt = DataFormat::R8G8B8A8_UNORM;
+
+    RenderTargetDesc rtDesc;
+    rtDesc.Width                  = kOffscreenW;
+    rtDesc.Height                 = kOffscreenH;
+    rtDesc.NumRenderTargets       = 1;
+    rtDesc.RenderTargetFormats[0] = kOffscreenFmt;
+    rtDesc.RenderTargetClearValues[0] =
+        ClearValue::RenderTarget(0.1F, 0.1F, 0.15F, 1.0F);
+
+    RenderTarget offscreenRT = device->CreateRenderTarget(rtDesc);
+    if (offscreenRT.IsValid())
       GECKO_INFO(app::graphics_example::labels::Main,
-                 "Swapchain created (%ux%u, %u back buffers)",
-                 scDesc.Width, scDesc.Height, scDesc.NumBackBuffers);
-    }
+                 "Offscreen render target created (%ux%u)", kOffscreenW,
+                 kOffscreenH);
+    else
+      GECKO_WARN(app::graphics_example::labels::Main,
+                 "Offscreen render target creation failed");
 
-    // ── Vertex buffer ─────────────────────────────────────────────
+    // ── Vertex buffer for triangle ───────────────────────────────
     VertexBufferDesc vbDesc;
     vbDesc.NumVertices = 3;
     vbDesc.VertexSize  = sizeof(Vertex);
@@ -155,44 +196,96 @@ int main()
     Buffer vertexBuffer = device->CreateVertexBuffer(vbDesc);
     if (vertexBuffer.IsValid())
     {
-      const auto* raw  = reinterpret_cast<const gecko::byte*>(k_TriangleVertices);
-      const usize size = sizeof(k_TriangleVertices);
+      const auto* raw  = reinterpret_cast<const gecko::byte*>(TriangleVertices);
+      const usize size = sizeof(TriangleVertices);
       device->UploadBufferData(vertexBuffer, {raw, size});
-      GECKO_INFO(app::graphics_example::labels::Main, "Vertex buffer uploaded");
     }
 
-    // ── Graphics pipeline ─────────────────────────────────────────
-    // Embed compiled SPIR-V directly — no runtime file I/O needed.
-    alignas(4) static const unsigned char k_VertSpv[] = {
+    // ── Shader binaries (embedded) ───────────────────────────────
+#if defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Wc23-extensions"
+#endif
+    alignas(4) static const unsigned char TriVertSpv[] = {
 #embed "../shaders/triangle.vert.spv"
     };
-    alignas(4) static const unsigned char k_FragSpv[] = {
+    alignas(4) static const unsigned char TriFragSpv[] = {
 #embed "../shaders/triangle.frag.spv"
     };
+    alignas(4) static const unsigned char FsVertSpv[] = {
+#embed "../shaders/fullscreen.vert.spv"
+    };
+    alignas(4) static const unsigned char FsFragSpv[] = {
+#embed "../shaders/fullscreen.frag.spv"
+    };
+#if defined(__clang__)
+#  pragma clang diagnostic pop
+#endif
 
-    VertexLayout layout;
-    layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Position");
-    layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Color");
+    // ── Pipeline 1: triangle -> offscreen RT ─────────────────────
+    VertexLayout triLayout;
+    triLayout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Position");
+    triLayout.AddAttribute(DataFormat::R32G32B32_FLOAT, "a_Color");
 
-    GraphicsPipelineDesc pipelineDesc;
-    pipelineDesc.VertexShaderCode       = {k_VertSpv, sizeof(k_VertSpv)};
-    pipelineDesc.PixelShaderCode        = {k_FragSpv, sizeof(k_FragSpv)};
-    pipelineDesc.Layout                 = layout;
-    pipelineDesc.NumRenderTargets       = 1;
-    pipelineDesc.RenderTargetFormats[0] = swapchain.IsValid()
-                                              ? swapchain.Desc.Format
-                                              : DataFormat::R8G8B8A8_UNORM;
-    pipelineDesc.Culling                = CullMode::None;
+    GraphicsPipelineDesc triPDesc;
+    triPDesc.VertexShader = ShaderCode{
+        .Format = ShaderFormat::SPIRV,
+        .Bytes  = {reinterpret_cast<const gecko::byte*>(TriVertSpv),
+                   sizeof(TriVertSpv)},
+    };
+    triPDesc.PixelShader = ShaderCode{
+        .Format = ShaderFormat::SPIRV,
+        .Bytes  = {reinterpret_cast<const gecko::byte*>(TriFragSpv),
+                   sizeof(TriFragSpv)},
+    };
+    triPDesc.Layout                 = triLayout;
+    triPDesc.NumRenderTargets       = 1;
+    triPDesc.RenderTargetFormats[0] = kOffscreenFmt;
+    triPDesc.Culling                = CullMode::None;
 
-    GraphicsPipeline pipeline = device->CreateGraphicsPipeline(pipelineDesc);
-    if (!pipeline.IsValid())
+    GraphicsPipeline trianglePipeline = device->CreateGraphicsPipeline(triPDesc);
+
+    // ── Pipeline 2: fullscreen blit -> swapchain ─────────────────
+    // Same pipeline used against both swapchains (their backbuffers use the
+    // same format).  Binding 0: combined-image-sampler with a linear clamp
+    // sampler.
+    GraphicsPipelineDesc blitPDesc;
+    blitPDesc.VertexShader = ShaderCode{
+        .Format = ShaderFormat::SPIRV,
+        .Bytes  = {reinterpret_cast<const gecko::byte*>(FsVertSpv),
+                   sizeof(FsVertSpv)},
+    };
+    blitPDesc.PixelShader = ShaderCode{
+        .Format = ShaderFormat::SPIRV,
+        .Bytes  = {reinterpret_cast<const gecko::byte*>(FsFragSpv),
+                   sizeof(FsFragSpv)},
+    };
+    blitPDesc.Layout                 = {};  // no vertex input
+    blitPDesc.NumRenderTargets       = 1;
+    blitPDesc.RenderTargetFormats[0] = slots[0].SC.IsValid()
+                                            ? slots[0].SC.Desc.Format
+                                            : DataFormat::R8G8B8A8_UNORM;
+    blitPDesc.Culling                = CullMode::None;
+
+    blitPDesc.PipelineResources[0] = PipelineResource::TextureBinding(
+        1, ShaderType::Pixel);
+    blitPDesc.NumPipelineResources = 1;
+
+    blitPDesc.SamplerDescs[0].Filter   = SamplerFilter::Linear;
+    blitPDesc.SamplerDescs[0].WrapMode = SamplerWrapMode::Clamp;
+    blitPDesc.NumSamplers              = 1;
+
+    GraphicsPipeline blitPipeline = device->CreateGraphicsPipeline(blitPDesc);
+
+    if (!trianglePipeline.IsValid() || !blitPipeline.IsValid())
     {
       GECKO_WARN(app::graphics_example::labels::Main,
-                 "Pipeline creation failed — will skip draw calls");
+                 "One or more pipelines failed to build — rendering disabled");
     }
     else
     {
-      GECKO_INFO(app::graphics_example::labels::Main, "Graphics pipeline created");
+      GECKO_INFO(app::graphics_example::labels::Main,
+                 "Pipelines ready (triangle + fullscreen blit)");
     }
 
     // ── Event subscriptions ───────────────────────────────────────
@@ -201,32 +294,35 @@ int main()
     auto closeSub = SubscribeEvent(
         events::WindowCloseRequested,
         [](void* user, const EventMeta&, EventView view) {
-          const auto* payload =
-              reinterpret_cast<const events::WindowCloseRequestedPayload*>(
-                  view.Data());
-          (void)payload;
+          (void)view;
           *static_cast<bool*>(user) = false;
         },
         &running);
 
-    struct ResizeState
+    struct ResizeContext
     {
-      GraphicsDevice* Device;
-      Swapchain*      SC;
+      PlatformContext* Ctx {nullptr};
+      WindowSlot*      Slots {nullptr};
     };
-    ResizeState resizeState{device.get(), &swapchain};
+    ResizeContext rctx{&ctx, slots};
 
     auto resizeSub = SubscribeEvent(
         events::WindowResized,
         [](void* user, const EventMeta&, EventView view) {
           const auto* payload =
-              reinterpret_cast<const events::WindowResizedPayload*>(
-                  view.Data());
-          (void)payload;
-          auto* state = static_cast<ResizeState*>(user);
-          state->Device->ResizeSwapchain(*state->SC);
+              reinterpret_cast<const events::WindowResizedPayload*>(view.Data());
+          auto* rc = static_cast<ResizeContext*>(user);
+          for (u32 i = 0; i < 2; ++i)
+          {
+            if (rc->Slots[i].Handle == payload->Window)
+            {
+              rc->Slots[i].ResizeW     = payload->Width;
+              rc->Slots[i].ResizeH     = payload->Height;
+              rc->Slots[i].ResizeDirty = true;
+            }
+          }
         },
-        &resizeState);
+        &rctx);
 
     auto keySub = SubscribeEvent(
         events::WindowKey,
@@ -242,35 +338,108 @@ int main()
         &running);
 
     GECKO_INFO(app::graphics_example::labels::Main,
-               "Entering frame loop — press Escape or close window to quit");
+               "Entering frame loop — Escape or close to quit");
 
-    // ── Frame loop ────────────────────────────────────────────────
+    auto renderFrame = [&]() {
+      // Coalesce pending resizes into a single swapchain rebuild per window.
+      for (u32 i = 0; i < 2; ++i)
+      {
+        if (slots[i].ResizeDirty)
+        {
+          if (slots[i].ResizeW > 0 && slots[i].ResizeH > 0)
+          {
+            slots[i].SC.Desc.Width  = slots[i].ResizeW;
+            slots[i].SC.Desc.Height = slots[i].ResizeH;
+          }
+          device->ResizeSwapchain(slots[i].SC);
+          slots[i].ResizeDirty = false;
+        }
+      }
+
+      if (!trianglePipeline.IsValid() || !blitPipeline.IsValid() ||
+          !vertexBuffer.IsValid() || !offscreenRT.IsValid())
+        return;
+
+      // Acquire both swapchains (skip any that fail).
+      FrameContext frames[2] {};
+      for (u32 i = 0; i < 2; ++i)
+      {
+        if (slots[i].SC.IsValid())
+          frames[i] = device->BeginFrame(slots[i].SC);
+      }
+      if (!frames[0].Valid && !frames[1].Valid)
+        return;
+
+      auto cmd = device->CreateGraphicsCommandList();
+      cmd->Begin();
+
+      // Pass 1: render the spinning-coloured triangle into the offscreen RT.
+      ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
+      cmd->BeginRendering(offscreenRT, &rtClear);
+      cmd->SetViewport(0.0F, 0.0F,
+                        static_cast<f32>(kOffscreenW),
+                        static_cast<f32>(kOffscreenH));
+      cmd->SetScissor(0, 0, kOffscreenW, kOffscreenH);
+      cmd->BindPipeline(trianglePipeline);
+      cmd->BindVertexBuffer(vertexBuffer);
+      cmd->Draw(3);
+      cmd->EndRendering();
+      // After EndRendering the offscreen target is in SHADER_READ_ONLY.
+
+      // Pass 2 & 3: fullscreen-quad blit the same offscreen RT into both
+      // swapchain back buffers.  One command list, one submit, one Present.
+      const Texture& sampled = offscreenRT.RenderTextures[0];
+
+      for (u32 i = 0; i < 2; ++i)
+      {
+        if (!frames[i].Valid)
+          continue;
+        ClearValue scClear = ClearValue::RenderTarget(0.0F, 0.0F, 0.0F, 1.0F);
+        cmd->BeginRendering(frames[i].BackBuffer, &scClear);
+        cmd->SetViewport(0.0F, 0.0F,
+                          static_cast<f32>(frames[i].BackBuffer.Desc.Width),
+                          static_cast<f32>(frames[i].BackBuffer.Desc.Height));
+        cmd->SetScissor(0, 0, frames[i].BackBuffer.Desc.Width,
+                         frames[i].BackBuffer.Desc.Height);
+        cmd->BindPipeline(blitPipeline);
+        cmd->BindTexture(0, sampled);
+        cmd->Draw(3);
+        cmd->EndRendering();
+      }
+
+      cmd->End();
+      device->ExecuteGraphicsCommandList(::std::move(cmd));
+
+      // Present both swapchains in one driver call.
+      FrameContext toPresent[2] {};
+      u32          presentCount = 0;
+      for (u32 i = 0; i < 2; ++i)
+      {
+        if (frames[i].Valid)
+          toPresent[presentCount++] = ::std::move(frames[i]);
+      }
+      device->Present(::std::span<const FrameContext>{toPresent, presentCount});
+    };
+
+    ctx.SetModalFrameCallback(
+        [](void* ud) { (*static_cast<decltype(&renderFrame)>(ud))(); },
+        &renderFrame);
+
     while (running)
     {
       ctx.PumpEvents();
       (void)DispatchEvents();
-
-      if (swapchain.IsValid() && pipeline.IsValid() && vertexBuffer.IsValid())
-      {
-        RenderTarget backBuffer = device->GetCurrentBackBuffer(swapchain);
-        if (backBuffer.IsValid())
-        {
-          auto cmd = device->CreateGraphicsCommandList();
-          cmd->ClearRenderTarget(backBuffer);
-          cmd->BindRenderTarget(backBuffer);
-          cmd->BindGraphicsPipeline(pipeline);
-          cmd->BindVertexBuffer(vertexBuffer);
-          cmd->DrawAuto(3);
-          device->ExecuteGraphicsCommandList(::std::move(cmd));
-        }
-      }
-
-      device->Present(swapchain);
+      renderFrame();
     }
 
-    // ── Cleanup ───────────────────────────────────────────────────
-    device->DestroySwapchain(swapchain);
-    ctx.Windows().DestroyWindow(window);
+    ctx.SetModalFrameCallback(nullptr, nullptr);
+
+    // Destroy in reverse order.
+    for (u32 i = 0; i < 2; ++i)
+    {
+      device->DestroySwapchain(slots[i].SC);
+      ctx.Windows().DestroyWindow(slots[i].Handle);
+    }
 
     GECKO_INFO(app::graphics_example::labels::Main, "Shutdown complete");
   }

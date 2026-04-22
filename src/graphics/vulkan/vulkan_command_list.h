@@ -1,89 +1,103 @@
 #pragma once
 
 #include "gecko/graphics/command_list.h"
-#include "vulkan_device.h"
+
+#include <vulkan/vulkan.h>
 
 namespace gecko::graphics {
 
-// ── VulkanCommandList ─────────────────────────────────────────────────────
-// Recording begins immediately on construction (vkBeginCommandBuffer).
-// VulkanDevice::ExecuteGraphicsCommandList calls FinalizeForSubmit() which
-// ends any active render pass, inserts the PRESENT transition if needed,
-// and calls vkEndCommandBuffer before submission.
+class VulkanDevice;
+struct VulkanSwapchainData;
 
 class VulkanCommandList final : public ICommandList
 {
 public:
-  explicit VulkanCommandList(VulkanDevice& device) noexcept;
+  struct TouchedSwapchain
+  {
+    VulkanSwapchainData* Data {nullptr};
+    u32                  FrameIndex {0};
+  };
+
+  struct TouchedView
+  {
+    const TouchedSwapchain* Data {nullptr};
+    u32                     Count {0};
+  };
+
+  VulkanCommandList(VulkanDevice& device, bool compute) noexcept;
   ~VulkanCommandList() override;
 
-  VulkanCommandList(const VulkanCommandList&)            = delete("VulkanCommandList is not copyable");
-  VulkanCommandList& operator=(const VulkanCommandList&) = delete("VulkanCommandList is not copyable");
+  VulkanCommandList(const VulkanCommandList&)            = delete("not copyable");
+  VulkanCommandList& operator=(const VulkanCommandList&) = delete("not copyable");
 
-  // ── ICommandList ──────────────────────────────────────────────
+  // ── ICommandList API ──────────────────────────────────────────
 
-  bool IsValid() const noexcept override;
+  void Begin() noexcept override;
+  void End() noexcept override;
+  [[nodiscard]] bool IsValid() const noexcept override { return m_CmdBuffer != VK_NULL_HANDLE; }
 
-  // Render target
-  void ClearRenderTarget(const RenderTarget& rt) noexcept override;
-  void BindRenderTarget(const RenderTarget& rt) noexcept override;
+  void BeginRendering(const RenderTarget& color,
+                      const ClearValue*   clear) noexcept override;
+  void BeginRendering(::std::span<const RenderTarget* const> colors,
+                       const RenderTarget*                    depth,
+                       ::std::span<const ClearValue> clears) noexcept override;
+  void EndRendering() noexcept override;
 
-  // Texture (no-op stubs)
-  void CopyTextureToTexture(const Texture&, const Texture&) noexcept override {}
-  void BindTexture(u32, const Texture&) noexcept override {}
-  void BindTexture(u32, const Texture&, u32) noexcept override {}
-  void BindAsRWTexture(u32, const Texture&) noexcept override {}
-  void BindAsRWTexture(u32, const Texture&, u32) noexcept override {}
+  void SetViewport(f32 x, f32 y, f32 w, f32 h, f32 minD,
+                    f32 maxD) noexcept override;
+  void SetScissor(i32 x, i32 y, u32 w, u32 h) noexcept override;
 
-  // Buffer
-  void BindVertexBuffer(const Buffer& vertexBuffer) noexcept override;
-  void BindIndexBuffer(const Buffer&) noexcept override {}
-  void BindConstantBuffer(u32, const Buffer&) noexcept override {}
-  void BindStructuredBuffer(u32, const Buffer&) noexcept override {}
-  void BindAsRWBuffer(u32, const Buffer&) noexcept override {}
-  void SetLocalData(u32, const void*) noexcept override {}
+  void BindPipeline(const GraphicsPipeline& pipeline) noexcept override;
+  void BindPipeline(const ComputePipeline& pipeline) noexcept override;
 
-  // Pipeline
-  void BindGraphicsPipeline(const GraphicsPipeline& pipeline) noexcept override;
-  void BindComputePipeline(const ComputePipeline&) noexcept override {}
+  void BindVertexBuffer(const Buffer& buffer, u32 slot) noexcept override;
+  void BindIndexBuffer(const Buffer& buffer) noexcept override;
+  void BindConstantBuffer(u32 slot, const Buffer& buffer) noexcept override;
+  void BindTexture(u32 slot, const Texture& texture) noexcept override;
 
-  // Draw / dispatch
-  void Draw(u32 numIndices) noexcept override;
-  void DrawAuto(u32 numVertices) noexcept override;
-  void Dispatch(u32, u32, u32) noexcept override {}
+  void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex,
+             u32 firstInstance) noexcept override;
+  void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
+                    i32 vertexOffset, u32 firstInstance) noexcept override;
+  void Dispatch(u32 x, u32 y, u32 z) noexcept override;
 
-  // ── Internal: called by VulkanDevice::Execute* ────────────────
-
-  // Ends active rendering, transitions swapchain image to PRESENT, ends cmd buffer.
-  void FinalizeForSubmit() noexcept;
+  // ── Accessors used by VulkanDevice::Execute ───────────────────
 
   [[nodiscard]] VkCommandBuffer CommandBuffer() const noexcept { return m_CmdBuffer; }
-  [[nodiscard]] bool HasSwapchainData() const noexcept { return m_SwapchainData != nullptr; }
-  [[nodiscard]] VkSemaphore* ImageAvailableSemaphore() noexcept;
-  [[nodiscard]] VkSemaphore* RenderFinishedSemaphore() noexcept;
-  [[nodiscard]] VkFence      InFlightFence() noexcept;
+  [[nodiscard]] TouchedView     TouchedSwapchains() const noexcept
+  {
+    return {m_Touched, m_TouchedCount};
+  }
 
 private:
-  void EndActiveRendering() noexcept;
+  void MaybeRecordSwapchain(const RenderTarget& rt) noexcept;
+  void TransitionToColorAttachment(VkImage image) noexcept;
+  void TransitionToPresent(VkImage image) noexcept;
+  void TransitionImage(VkImage image, VkImageAspectFlags aspect,
+                       VkImageLayout oldLayout,
+                       VkImageLayout newLayout) noexcept;
 
-  VulkanDevice&        m_Device;
-  VkCommandBuffer      m_CmdBuffer     { VK_NULL_HANDLE };
+  VulkanDevice*   m_Device {nullptr};
+  VkCommandBuffer m_CmdBuffer {VK_NULL_HANDLE};
+  bool            m_Compute {false};
 
-  // Current render target state
-  VkImage              m_CurrentImage  { VK_NULL_HANDLE };
-  VkImageView          m_CurrentView   { VK_NULL_HANDLE };
-  u32                  m_RTWidth       { 0 };
-  u32                  m_RTHeight      { 0 };
-  bool                 m_Rendering     { false };
-  bool                 m_IsSwapchain   { false };
+  TouchedSwapchain m_Touched[MaxSwapchainsPerSubmit] {};
+  u32              m_TouchedCount {0};
 
-  // Pending clear (set by ClearRenderTarget, consumed by BindRenderTarget)
-  bool                 m_PendingClear  { false };
-  VkClearColorValue    m_ClearColor    {};
+  // Track the single-RT rendering in-progress for proper layout transitions.
+  VkImage             m_ActiveSwapchainImage {VK_NULL_HANDLE};
+  struct VulkanRTData* m_ActiveOffscreenRT {nullptr};
 
-  // Swapchain sync pointers (non-owning)
-  VulkanSwapchainData* m_SwapchainData { nullptr };
-  u32                  m_SwapchainFrame{ 0 };
+  // Pipeline currently bound for graphics; used by BindTexture to source
+  // the descriptor-set layout for ad-hoc descriptor sets.
+  struct VulkanPipelineData* m_CurrentPipeline {nullptr};
+
+  // Per-command-list descriptor pool, reset on Begin().
+  VkDescriptorPool m_DescPool {VK_NULL_HANDLE};
+
+  // Descriptor set allocated for the currently bound pipeline; shared by
+  // all BindTexture / BindConstantBuffer / BindStructuredBuffer calls.
+  VkDescriptorSet m_CurrentDescSet {VK_NULL_HANDLE};
 };
 
 }  // namespace gecko::graphics

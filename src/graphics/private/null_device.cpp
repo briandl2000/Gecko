@@ -2,32 +2,6 @@
 
 namespace gecko::graphics {
 
-// ── NullCommandList ───────────────────────────────────────────────────────
-
-bool NullCommandList::IsValid() const noexcept { return true; }
-
-void NullCommandList::ClearRenderTarget(const RenderTarget&) noexcept {}
-void NullCommandList::BindRenderTarget(const RenderTarget&) noexcept {}
-void NullCommandList::CopyTextureToTexture(const Texture&,
-                                            const Texture&) noexcept {}
-void NullCommandList::BindTexture(u32, const Texture&) noexcept {}
-void NullCommandList::BindTexture(u32, const Texture&, u32) noexcept {}
-void NullCommandList::BindAsRWTexture(u32, const Texture&) noexcept {}
-void NullCommandList::BindAsRWTexture(u32, const Texture&, u32) noexcept {}
-void NullCommandList::BindVertexBuffer(const Buffer&) noexcept {}
-void NullCommandList::BindIndexBuffer(const Buffer&) noexcept {}
-void NullCommandList::BindConstantBuffer(u32, const Buffer&) noexcept {}
-void NullCommandList::BindStructuredBuffer(u32, const Buffer&) noexcept {}
-void NullCommandList::BindAsRWBuffer(u32, const Buffer&) noexcept {}
-void NullCommandList::SetLocalData(u32, const void*) noexcept {}
-void NullCommandList::BindGraphicsPipeline(const GraphicsPipeline&) noexcept {}
-void NullCommandList::BindComputePipeline(const ComputePipeline&) noexcept {}
-void NullCommandList::Draw(u32) noexcept {}
-void NullCommandList::DrawAuto(u32) noexcept {}
-void NullCommandList::Dispatch(u32, u32, u32) noexcept {}
-
-// ── NullDevice ────────────────────────────────────────────────────────────
-
 Swapchain NullDevice::CreateSwapchain(
     const ::gecko::platform::NativeWindowHandle&,
     const SwapchainDesc&) noexcept
@@ -42,30 +16,24 @@ void NullDevice::DestroySwapchain(Swapchain& swapchain) noexcept
 
 void NullDevice::ResizeSwapchain(Swapchain&) noexcept {}
 
-RenderTarget NullDevice::GetCurrentBackBuffer(const Swapchain&) const noexcept
+FrameContext NullDevice::BeginFrame(Swapchain&) noexcept
 {
-  return RenderTarget{};
+  return FrameContext{};
 }
 
-u32 NullDevice::GetCurrentBackBufferIndex(const Swapchain&) const noexcept
-{
-  return 0;
-}
-
-void NullDevice::Present(const Swapchain&) noexcept {}
+void NullDevice::Present(::std::span<const FrameContext>) noexcept {}
 
 Unique<ICommandList> NullDevice::CreateGraphicsCommandList() noexcept
 {
   return ::gecko::CreateUnique<NullCommandList>();
 }
 
-void NullDevice::ExecuteGraphicsCommandList(Unique<ICommandList>) noexcept {}
-
 Unique<ICommandList> NullDevice::CreateComputeCommandList() noexcept
 {
   return ::gecko::CreateUnique<NullCommandList>();
 }
 
+void NullDevice::ExecuteGraphicsCommandList(Unique<ICommandList>) noexcept {}
 void NullDevice::ExecuteComputeCommandList(Unique<ICommandList>) noexcept {}
 
 RenderTarget NullDevice::CreateRenderTarget(const RenderTargetDesc&) noexcept

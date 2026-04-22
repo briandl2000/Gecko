@@ -22,15 +22,34 @@ enum class GraphicsBackend : u8
 struct GraphicsDeviceDesc
 {
   GraphicsBackend Backend {GraphicsBackend::Null};
-  bool            Debug   {false};      ///< Enable validation layers
+  bool            Debug {false};        ///< Enable validation layers
   const char*     AppName {"Gecko"};
 };
 
-/// Abstract graphics device. Concrete backends (NullDevice, VulkanDevice, ...)
-/// inherit from this class. Users receive a Unique<GraphicsDevice> from
-/// CreateGraphicsDevice() and pass GraphicsDevice& to code that needs GPU access.
+// ── Frame context ─────────────────────────────────────────────────────────
+
+/// Returned by `BeginFrame`. Carries the acquired back buffer plus the sync
+/// slot used for that acquisition. Cheap to copy; must be passed to
+/// `Present` (directly or via a span) to complete the frame.
+struct FrameContext
+{
+  Swapchain*   SC {nullptr};
+  u32          FrameIndex {0};   ///< sync slot [0, MaxFramesInFlight)
+  u32          ImageIndex {0};   ///< acquired swapchain image
+  RenderTarget BackBuffer {};
+  bool         Valid {false};
+};
+
+// ── GraphicsDevice ────────────────────────────────────────────────────────
+
+/// Abstract graphics device. Concrete backends (`NullDevice`, `VulkanDevice`,
+/// ...) inherit from this class. Users receive a `Unique<GraphicsDevice>`
+/// from `CreateGraphicsDevice()` and pass `GraphicsDevice&` to code that
+/// needs GPU access.
 ///
-/// No singleton — no global state. Create one, pass it around.
+/// Ownership rule: GPU objects (Buffer, Texture, Swapchain, Pipeline,
+/// RenderTarget) hold deleters that reference the owning device. The device
+/// **must outlive** all GPU objects it created.
 class GraphicsDevice
 {
 public:
@@ -53,15 +72,21 @@ public:
 
   GECKO_API virtual void ResizeSwapchain(Swapchain& swapchain) noexcept = 0;
 
+  /// Acquire the next swapchain image and wait on its frame fence.
+  /// Returns a `FrameContext` whose `BackBuffer` can be rendered into and
+  /// which must later be passed to `Present`.
   [[nodiscard]]
-  GECKO_API virtual RenderTarget GetCurrentBackBuffer(
-      const Swapchain& swapchain) const noexcept = 0;
+  GECKO_API virtual FrameContext BeginFrame(Swapchain& swapchain) noexcept = 0;
 
-  [[nodiscard]]
-  GECKO_API virtual u32 GetCurrentBackBufferIndex(
-      const Swapchain& swapchain) const noexcept = 0;
+  /// Present one or more swapchains in a single driver call.
+  GECKO_API virtual void Present(
+      ::std::span<const FrameContext> frames) noexcept = 0;
 
-  GECKO_API virtual void Present(const Swapchain& swapchain) noexcept = 0;
+  /// Convenience overload for the common single-swapchain case.
+  void Present(const FrameContext& frame) noexcept
+  {
+    Present(::std::span<const FrameContext>{&frame, 1});
+  }
 
   // ── Command lists ─────────────────────────────────────────────
 
@@ -69,12 +94,12 @@ public:
   GECKO_API virtual Unique<ICommandList>
   CreateGraphicsCommandList() noexcept = 0;
 
-  GECKO_API virtual void ExecuteGraphicsCommandList(
-      Unique<ICommandList> commandList) noexcept = 0;
-
   [[nodiscard("Discarding a CommandList without executing it wastes work")]]
   GECKO_API virtual Unique<ICommandList>
   CreateComputeCommandList() noexcept = 0;
+
+  GECKO_API virtual void ExecuteGraphicsCommandList(
+      Unique<ICommandList> commandList) noexcept = 0;
 
   GECKO_API virtual void ExecuteComputeCommandList(
       Unique<ICommandList> commandList) noexcept = 0;

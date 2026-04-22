@@ -7,6 +7,12 @@
 
 namespace gecko::graphics {
 
+// ── Named constants ───────────────────────────────────────────────────────
+
+inline constexpr u32 MaxSwapchainImages     = 8;
+inline constexpr u32 MaxFramesInFlight      = 2;
+inline constexpr u32 MaxSwapchainsPerSubmit = 4;
+
 // ── Enums ─────────────────────────────────────────────────────────────────
 
 enum class ShaderType : u8
@@ -20,8 +26,11 @@ enum class ShaderType : u8
 enum class DataFormat : u16
 {
   None,
+  // Colour
   R8G8B8A8_SRGB,
   R8G8B8A8_UNORM,
+  B8G8R8A8_UNORM,
+  B8G8R8A8_SRGB,
   R32G32_FLOAT,
   R32G32B32_FLOAT,
   R32G32B32A32_FLOAT,
@@ -33,6 +42,19 @@ enum class DataFormat : u16
   R8_INT,
   R16_INT,
   R32_INT,
+  // Depth / depth-stencil
+  D32_FLOAT,
+  D24_UNORM_S8_UINT,
+  D16_UNORM,
+};
+
+enum class ShaderFormat : u8
+{
+  None,
+  SPIRV,        ///< Vulkan native; portable for runtime translation
+  DXIL,         ///< DX12 native
+  GLSL_Source,  ///< runtime-compiled (future)
+  HLSL_Source,  ///< runtime-compiled (future)
 };
 
 enum class ClearValueType : u8
@@ -115,7 +137,9 @@ enum class MemoryType : u8
   switch (format)
   {
     case DataFormat::R8G8B8A8_SRGB:
-    case DataFormat::R8G8B8A8_UNORM: return 4;
+    case DataFormat::R8G8B8A8_UNORM:
+    case DataFormat::B8G8R8A8_UNORM:
+    case DataFormat::B8G8R8A8_SRGB: return 4;
     case DataFormat::R32G32_FLOAT: return 8;
     case DataFormat::R32G32B32_FLOAT: return 12;
     case DataFormat::R32G32B32A32_FLOAT: return 16;
@@ -127,7 +151,21 @@ enum class MemoryType : u8
     case DataFormat::R16_INT: return 2;
     case DataFormat::R32_UINT:
     case DataFormat::R32_INT: return 4;
+    case DataFormat::D32_FLOAT: return 4;
+    case DataFormat::D24_UNORM_S8_UINT: return 4;
+    case DataFormat::D16_UNORM: return 2;
     default: return 0;
+  }
+}
+
+[[nodiscard]] constexpr bool IsDepthFormat(DataFormat format) noexcept
+{
+  switch (format)
+  {
+    case DataFormat::D32_FLOAT:
+    case DataFormat::D24_UNORM_S8_UINT:
+    case DataFormat::D16_UNORM: return true;
+    default: return false;
   }
 }
 
@@ -477,17 +515,27 @@ struct RenderTarget
   }
 };
 
+// ── Shader code ───────────────────────────────────────────────────────────
+
+struct ShaderCode
+{
+  ShaderFormat                     Format {ShaderFormat::None};
+  ::std::span<const ::gecko::byte> Bytes {};           ///< inline (e.g. #embed)
+  const char*                      Path {nullptr};    ///< on-disk fallback
+  const char*                      Entry {"main"};
+
+  [[nodiscard]] bool IsValid() const noexcept
+  {
+    return Format != ShaderFormat::None && (!Bytes.empty() || Path != nullptr);
+  }
+};
+
 // ── Pipeline descriptors & objects ────────────────────────────────────────
 
 struct GraphicsPipelineDesc
 {
-  const char* VertexShaderPath {nullptr};
-  const char* PixelShaderPath {nullptr};
-
-  // Optional inline SPIR-V (takes precedence over paths when non-empty).
-  // Use C++26 `#embed` to fill these at compile time.
-  ::std::span<const unsigned char> VertexShaderCode {};
-  ::std::span<const unsigned char> PixelShaderCode  {};
+  ShaderCode VertexShader {};
+  ShaderCode PixelShader {};
 
   VertexLayout Layout {};
 
@@ -511,7 +559,7 @@ struct GraphicsPipelineDesc
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    if (VertexShaderPath == nullptr && VertexShaderCode.empty())
+    if (!VertexShader.IsValid())
       return false;
     if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
       return false;
@@ -545,7 +593,7 @@ struct GraphicsPipeline
 
 struct ComputePipelineDesc
 {
-  const char* ComputeShaderPath {nullptr};
+  ShaderCode ComputeShader {};
 
   static constexpr u32 MaxReadOnlyResources = 32;
   PipelineResource     ReadOnlyResources[MaxReadOnlyResources] {};
@@ -561,7 +609,7 @@ struct ComputePipelineDesc
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return ComputeShaderPath != nullptr;
+    return ComputeShader.IsValid();
   }
   explicit operator bool() const noexcept
   {

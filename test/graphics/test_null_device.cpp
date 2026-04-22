@@ -83,12 +83,13 @@ TEST_CASE("NullDevice resource creation returns invalid objects",
   }
 }
 
-TEST_CASE("GetCurrentBackBufferIndex returns 0 for NullDevice",
+TEST_CASE("BeginFrame returns invalid FrameContext for NullDevice",
           "[graphics][device]")
 {
   auto      device = CreateGraphicsDevice();
   Swapchain sc{};
-  REQUIRE(device->GetCurrentBackBufferIndex(sc) == 0);
+  FrameContext f = device->BeginFrame(sc);
+  REQUIRE_FALSE(f.Valid);
 }
 
 TEST_CASE("Multiple independent devices can be created", "[graphics][device]")

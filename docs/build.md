@@ -7,6 +7,10 @@
 - Ninja
 - **GCC 15+** (C++26 support required)
 - Linux: `libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols`
+- **Vulkan SDK (optional, recommended):** needed to build the Vulkan graphics
+  backend. Without it, `CreateGraphicsDevice()` falls back to the `NullDevice`
+  and anything that renders will be a no-op. See
+  [Installing the Vulkan SDK](#installing-the-vulkan-sdk) below.
 
 > **Why GCC?** Gecko targets C++26 (`-std=c++2c`) for early access to features
 > like reflection. As of mid-2026, GCC is the only compiler with broad C++26
@@ -45,6 +49,45 @@ pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x
 ```bash
 brew install gcc ninja cmake
 ```
+
+## Installing the Vulkan SDK
+
+Gecko's graphics module uses Vulkan 1.3 with dynamic rendering. The SDK is
+*optional* — without it, `GraphicsBackend::Vulkan` is unavailable and
+`CreateGraphicsDevice()` returns a `NullDevice` (all calls are no-ops). Install
+it to run anything that actually draws.
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install libvulkan-dev vulkan-validationlayers vulkan-tools spirv-tools
+```
+
+**Linux (Fedora):**
+```bash
+sudo dnf install vulkan-loader-devel vulkan-validation-layers vulkan-tools spirv-tools
+```
+
+**Linux (Arch):**
+```bash
+sudo pacman -S vulkan-devel vulkan-validation-layers vulkan-tools spirv-tools
+```
+
+**Windows (MSYS2 UCRT64):**
+```bash
+pacman -S mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-vulkan-validation-layers mingw-w64-ucrt-x86_64-spirv-tools
+```
+Or install the [LunarG Vulkan SDK](https://vulkan.lunarg.com/) system-wide.
+
+**macOS:** Install the [LunarG SDK for macOS](https://vulkan.lunarg.com/),
+which includes MoltenVK.
+
+**Shader tooling:** Examples with shaders (e.g. `graphics_example`) require
+`glslangValidator` (shipped with the Vulkan SDK / `spirv-tools` on most distros)
+to compile GLSL → SPIR-V at build time.
+
+**Validation layers:** Debug builds enable `VK_LAYER_KHRONOS_validation` when
+it is present on the system. If the layer package is missing, the instance is
+created without it — shipping builds do not require it.
 
 ## Setup
 

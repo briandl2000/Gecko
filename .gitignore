@@ -14,6 +14,11 @@ compile_commands.json
 
 # Local dev scripts
 scripts/copy_debug.py
+scripts/aarch64-linux-toolchain.cmake
+
+# Cross-compile prebuilts + fetched headers (populated by scripts/fetch_pi_vulkan.sh)
+third_party/prebuilt/
+third_party/vulkan-headers/
 
 # OS
 .DS_Store

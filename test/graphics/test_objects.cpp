@@ -246,8 +246,12 @@ TEST_CASE("GraphicsPipelineDesc default is invalid", "[graphics][objects]")
 TEST_CASE("GraphicsPipelineDesc valid with shader path and render target",
           "[graphics][objects]")
 {
+  static constexpr ::gecko::byte DummySpv[] = {::gecko::byte{0}};
   GraphicsPipelineDesc desc;
-  desc.VertexShaderPath       = "shaders/vert.spv";
+  desc.VertexShader = ShaderCode{
+      .Format = ShaderFormat::SPIRV,
+      .Bytes  = {DummySpv, sizeof(DummySpv)},
+  };
   desc.NumRenderTargets       = 1;
   desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
   REQUIRE(desc.IsValid());
@@ -263,7 +267,12 @@ TEST_CASE("ComputePipelineDesc default is invalid", "[graphics][objects]")
 
 TEST_CASE("ComputePipelineDesc valid with shader path", "[graphics][objects]")
 {
-  ComputePipelineDesc desc{.ComputeShaderPath = "shaders/comp.spv"};
+  static constexpr ::gecko::byte DummySpv[] = {::gecko::byte{0}};
+  ComputePipelineDesc desc{
+      .ComputeShader = ShaderCode{
+          .Format = ShaderFormat::SPIRV,
+          .Bytes  = {DummySpv, sizeof(DummySpv)},
+      }};
   REQUIRE(desc.IsValid());
 }
 

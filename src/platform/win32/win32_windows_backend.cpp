@@ -751,7 +751,9 @@ void Win32WindowsBackend::PumpEvents(
   }
 
   FlushStagedEvents();
-  m_CurrentEmitter = nullptr;
+  // Keep the emitter cached so WM_TIMER can dispatch staged events while
+  // Windows is spinning its own modal loop (drag/resize/menu).  The pointer
+  // stays valid — PlatformContext owns the EventEmitter for its lifetime.
 }
 
 // ── WndProc ────────────────────────────────────────────────────────────

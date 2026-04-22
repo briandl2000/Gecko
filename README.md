@@ -25,6 +25,9 @@ gk test
 - **Python** 3.7+
 - **Ninja** (recommended)
 - **GCC 15+** with C++26 support (Windows: via MSYS2 MinGW-w64)
+- **Vulkan SDK** *(optional — needed for the Vulkan graphics backend;
+  without it `CreateGraphicsDevice` falls back to the `NullDevice`)*.
+  See [docs/build.md](docs/build.md#installing-the-vulkan-sdk).
 
 ## CLI Commands
 
@@ -42,6 +45,7 @@ gk test
 gecko/
 ├── include/gecko/    # Public headers
 │   ├── core/         # Core utilities, services, logging
+│   ├── graphics/     # Graphics module (Vulkan 1.3 backend + NullDevice)
 │   ├── math/         # Math library (vectors, matrices, rotors)
 │   ├── platform/     # Platform abstraction (window, input)
 │   └── runtime/      # Runtime services (event bus, profiling)
