@@ -9,6 +9,13 @@
 [[vk::binding(0, 0)]] Texture2D    g_Source  : register(t0);
 [[vk::binding(1, 0)]] SamplerState g_Sampler : register(s0);
 
+struct PushConstants
+{
+    float4 Tint;
+};
+
+[[vk::push_constant]] ConstantBuffer<PushConstants> g_Push;
+
 struct PSInput
 {
     float4 Position : SV_Position;
@@ -17,5 +24,5 @@ struct PSInput
 
 float4 main(PSInput input) : SV_Target
 {
-    return g_Source.Sample(g_Sampler, input.UV);
+    return g_Source.Sample(g_Sampler, input.UV) * g_Push.Tint;
 }
