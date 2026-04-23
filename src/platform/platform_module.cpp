@@ -3,6 +3,8 @@
 #include "gecko/core/scope.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
+#include "gecko/core/services/log.h"
+
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
