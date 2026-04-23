@@ -17,8 +17,8 @@ TEST_CASE("CreateSwapchain returns invalid swapchain for NullDevice",
 {
   auto device = CreateGraphicsDevice();
 
-  NativeWindowHandle native{};
-  SwapchainDesc      sDesc{.Width = 800, .Height = 600};
+  NativeWindowHandle native {};
+  SwapchainDesc sDesc {.Width = 800, .Height = 600};
 
   Swapchain sc = device->CreateSwapchain(native, sDesc);
   REQUIRE_FALSE(sc.IsValid());
@@ -27,7 +27,7 @@ TEST_CASE("CreateSwapchain returns invalid swapchain for NullDevice",
 TEST_CASE("CreateGraphicsCommandList returns valid command list",
           "[graphics][device]")
 {
-  auto device  = CreateGraphicsDevice();
+  auto device = CreateGraphicsDevice();
   auto cmdList = device->CreateGraphicsCommandList();
   REQUIRE(cmdList != nullptr);
   REQUIRE(cmdList->IsValid());
@@ -36,7 +36,7 @@ TEST_CASE("CreateGraphicsCommandList returns valid command list",
 TEST_CASE("CreateComputeCommandList returns valid command list",
           "[graphics][device]")
 {
-  auto device  = CreateGraphicsDevice();
+  auto device = CreateGraphicsDevice();
   auto cmdList = device->CreateComputeCommandList();
   REQUIRE(cmdList != nullptr);
   REQUIRE(cmdList->IsValid());
@@ -50,20 +50,20 @@ TEST_CASE("NullDevice resource creation returns invalid objects",
   SECTION("CreateRenderTarget")
   {
     RenderTargetDesc desc;
-    desc.Width                  = 800;
-    desc.Height                 = 600;
-    desc.NumRenderTargets       = 1;
+    desc.Width = 800;
+    desc.Height = 600;
+    desc.NumRenderTargets = 1;
     desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
-    RenderTarget rt             = device->CreateRenderTarget(desc);
+    RenderTarget rt = device->CreateRenderTarget(desc);
     REQUIRE_FALSE(rt.IsValid());
   }
 
   SECTION("CreateVertexBuffer")
   {
-    VertexBufferDesc desc{
+    VertexBufferDesc desc {
         .NumVertices = 3,
-        .VertexSize  = 12,
-        .Memory      = MemoryType::Dedicated,
+        .VertexSize = 12,
+        .Memory = MemoryType::Dedicated,
     };
     Buffer buf = device->CreateVertexBuffer(desc);
     REQUIRE_FALSE(buf.IsValid());
@@ -71,11 +71,11 @@ TEST_CASE("NullDevice resource creation returns invalid objects",
 
   SECTION("CreateTexture")
   {
-    TextureDesc desc{
-        .Width  = 64,
+    TextureDesc desc {
+        .Width = 64,
         .Height = 64,
         .Format = DataFormat::R8G8B8A8_UNORM,
-        .Type   = TextureType::Tex2D,
+        .Type = TextureType::Tex2D,
         .Memory = MemoryType::Dedicated,
     };
     Texture tex = device->CreateTexture(desc);
@@ -86,8 +86,8 @@ TEST_CASE("NullDevice resource creation returns invalid objects",
 TEST_CASE("BeginFrame returns invalid FrameContext for NullDevice",
           "[graphics][device]")
 {
-  auto      device = CreateGraphicsDevice();
-  Swapchain sc{};
+  auto device = CreateGraphicsDevice();
+  Swapchain sc {};
   FrameContext f = device->BeginFrame(sc);
   REQUIRE_FALSE(f.Valid);
 }

@@ -1,12 +1,12 @@
 #if defined(GECKO_PLATFORM_LINUX)
 #define VK_USE_PLATFORM_XLIB_KHR 1
 
-#include "../vulkan_surface.h"
 #include "gecko/core/services/log.h"
+#include "gecko/platform/window.h"
 #include "private/labels.h"
 
-#include <X11/Xlib.h>
 #include <vulkan/vulkan.h>
+#include <X11/Xlib.h>
 
 // X11 pollutes the global namespace with macros that collide with our code.
 #undef None
@@ -19,13 +19,13 @@
 
 namespace gecko::graphics {
 
-VkResult CreateXlibSurface(VkInstance                                   instance,
-                            const ::gecko::platform::NativeWindowHandle& native,
-                            VkSurfaceKHR*                                out) noexcept
+VkResult CreateXlibSurface(VkInstance instance,
+                           const ::gecko::platform::NativeWindowHandle& native,
+                           VkSurfaceKHR* out) noexcept
 {
-  VkXlibSurfaceCreateInfoKHR sci{};
-  sci.sType  = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
-  sci.dpy    = static_cast<Display*>(native.Display);
+  VkXlibSurfaceCreateInfoKHR sci {};
+  sci.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+  sci.dpy = static_cast<Display*>(native.Display);
   sci.window = reinterpret_cast<Window>(native.Handle);
 
   auto fn = reinterpret_cast<PFN_vkCreateXlibSurfaceKHR>(

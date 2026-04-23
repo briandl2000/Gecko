@@ -16,36 +16,40 @@ public:
   struct TouchedSwapchain
   {
     VulkanSwapchainData* Data {nullptr};
-    u32                  FrameIndex {0};
+    u32 FrameIndex {0};
   };
 
   struct TouchedView
   {
     const TouchedSwapchain* Data {nullptr};
-    u32                     Count {0};
+    u32 Count {0};
   };
 
   VulkanCommandList(VulkanDevice& device, bool compute) noexcept;
   ~VulkanCommandList() override;
 
-  VulkanCommandList(const VulkanCommandList&)            = delete("not copyable");
-  VulkanCommandList& operator=(const VulkanCommandList&) = delete("not copyable");
+  VulkanCommandList(const VulkanCommandList&) = delete ("not copyable");
+  VulkanCommandList& operator=(const VulkanCommandList&) =
+      delete ("not copyable");
 
   // ── ICommandList API ──────────────────────────────────────────
 
   void Begin() noexcept override;
   void End() noexcept override;
-  [[nodiscard]] bool IsValid() const noexcept override { return m_CmdBuffer != VK_NULL_HANDLE; }
+  [[nodiscard]] bool IsValid() const noexcept override
+  {
+    return m_CmdBuffer != VK_NULL_HANDLE;
+  }
 
   void BeginRendering(const RenderTarget& color,
-                      const ClearValue*   clear) noexcept override;
+                      const ClearValue* clear) noexcept override;
   void BeginRendering(::std::span<const RenderTarget* const> colors,
-                       const RenderTarget*                    depth,
-                       ::std::span<const ClearValue> clears) noexcept override;
+                      const RenderTarget* depth,
+                      ::std::span<const ClearValue> clears) noexcept override;
   void EndRendering() noexcept override;
 
   void SetViewport(f32 x, f32 y, f32 w, f32 h, f32 minD,
-                    f32 maxD) noexcept override;
+                   f32 maxD) noexcept override;
   void SetScissor(i32 x, i32 y, u32 w, u32 h) noexcept override;
 
   void BindPipeline(const GraphicsPipeline& pipeline) noexcept override;
@@ -60,36 +64,37 @@ public:
   void BindRWTexture(u32 slot, const Texture& texture) noexcept override;
   void BindSampler(u32 slot, const Sampler& sampler) noexcept override;
   void SetConstants(u32 offset,
-                     ::std::span<const ::gecko::byte> bytes) noexcept override;
+                    ::std::span<const ::gecko::byte> bytes) noexcept override;
 
   void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex,
-             u32 firstInstance) noexcept override;
+            u32 firstInstance) noexcept override;
   void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
-                    i32 vertexOffset, u32 firstInstance) noexcept override;
+                   i32 vertexOffset, u32 firstInstance) noexcept override;
   void DrawIndirect(const Buffer& buffer, u64 offset, u32 drawCount,
-                     u32 stride) noexcept override;
+                    u32 stride) noexcept override;
   void DrawIndexedIndirect(const Buffer& buffer, u64 offset, u32 drawCount,
-                            u32 stride) noexcept override;
+                           u32 stride) noexcept override;
   void Dispatch(u32 x, u32 y, u32 z) noexcept override;
   void DispatchIndirect(const Buffer& buffer, u64 offset) noexcept override;
 
   void CopyBuffer(const Buffer& dst, u64 dstOffset, const Buffer& src,
-                   u64 srcOffset, u64 size) noexcept override;
+                  u64 srcOffset, u64 size) noexcept override;
   void CopyBufferToTexture(const Texture& dst, u32 mip, u32 slice,
-                            const Buffer& src,
-                            u64 srcOffset) noexcept override;
-  void CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
-                            const Texture& src, u32 mip,
-                            u32 slice) noexcept override;
+                           const Buffer& src, u64 srcOffset) noexcept override;
+  void CopyTextureToBuffer(const Buffer& dst, u64 dstOffset, const Texture& src,
+                           u32 mip, u32 slice) noexcept override;
 
   void ResetTimestamps(const QueryPool& pool, u32 first,
-                        u32 count) noexcept override;
+                       u32 count) noexcept override;
   void WriteTimestamp(const QueryPool& pool, u32 index) noexcept override;
 
   // ── Accessors used by VulkanDevice::Execute ───────────────────
 
-  [[nodiscard]] VkCommandBuffer CommandBuffer() const noexcept { return m_CmdBuffer; }
-  [[nodiscard]] TouchedView     TouchedSwapchains() const noexcept
+  [[nodiscard]] VkCommandBuffer CommandBuffer() const noexcept
+  {
+    return m_CmdBuffer;
+  }
+  [[nodiscard]] TouchedView TouchedSwapchains() const noexcept
   {
     return {m_Touched, m_TouchedCount};
   }
@@ -102,15 +107,15 @@ private:
                        VkImageLayout oldLayout,
                        VkImageLayout newLayout) noexcept;
 
-  VulkanDevice*   m_Device {nullptr};
+  VulkanDevice* m_Device {nullptr};
   VkCommandBuffer m_CmdBuffer {VK_NULL_HANDLE};
-  bool            m_Compute {false};
+  bool m_Compute {false};
 
   TouchedSwapchain m_Touched[MaxSwapchainsPerSubmit] {};
-  u32              m_TouchedCount {0};
+  u32 m_TouchedCount {0};
 
   // Track the single-RT rendering in-progress for proper layout transitions.
-  VkImage             m_ActiveSwapchainImage {VK_NULL_HANDLE};
+  VkImage m_ActiveSwapchainImage {VK_NULL_HANDLE};
   struct VulkanRTData* m_ActiveOffscreenRT {nullptr};
 
   // Pipeline currently bound for graphics; used by BindTexture to source

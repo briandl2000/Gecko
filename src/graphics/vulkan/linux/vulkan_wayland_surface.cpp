@@ -1,8 +1,8 @@
 #if defined(GECKO_PLATFORM_LINUX)
 #define VK_USE_PLATFORM_WAYLAND_KHR 1
 
-#include "../vulkan_surface.h"
 #include "gecko/core/services/log.h"
+#include "gecko/platform/window.h"
 #include "private/labels.h"
 
 #include <vulkan/vulkan.h>
@@ -11,12 +11,11 @@
 namespace gecko::graphics {
 
 VkResult CreateWaylandSurface(
-    VkInstance                                   instance,
-    const ::gecko::platform::NativeWindowHandle& native,
-    VkSurfaceKHR*                                out) noexcept
+    VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+    VkSurfaceKHR* out) noexcept
 {
-  VkWaylandSurfaceCreateInfoKHR sci{};
-  sci.sType   = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+  VkWaylandSurfaceCreateInfoKHR sci {};
+  sci.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
   sci.display = static_cast<struct wl_display*>(native.Display);
   sci.surface = static_cast<struct wl_surface*>(native.Handle);
 

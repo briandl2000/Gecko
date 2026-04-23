@@ -224,11 +224,11 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 
   // Convert title to wide string
   const char* title = desc.Title ? desc.Title : "Gecko";
-  const int titleLen =
-      ::MultiByteToWideChar(CP_UTF8, 0, title, -1, nullptr, 0);
+  const int titleLen = ::MultiByteToWideChar(CP_UTF8, 0, title, -1, nullptr, 0);
   if (titleLen <= 0)
   {
-    GECKO_WARN(labels::Window, "CreateWindow: failed to convert title to UTF-16");
+    GECKO_WARN(labels::Window,
+               "CreateWindow: failed to convert title to UTF-16");
     return WindowHandle {};
   }
   ::std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));

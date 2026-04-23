@@ -518,8 +518,7 @@ void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
                           1, &set, 0, nullptr);
 }
 
-void VulkanCommandList::BindRWTexture(u32 slot,
-                                       const Texture& texture) noexcept
+void VulkanCommandList::BindRWTexture(u32 slot, const Texture& texture) noexcept
 {
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !texture.Data)
@@ -538,7 +537,7 @@ void VulkanCommandList::BindRWTexture(u32 slot,
   if (td->CurrentLayout != VK_IMAGE_LAYOUT_GENERAL)
   {
     TransitionImage(td->Image, td->Aspect, td->CurrentLayout,
-                     VK_IMAGE_LAYOUT_GENERAL);
+                    VK_IMAGE_LAYOUT_GENERAL);
     td->CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
 
@@ -598,9 +597,9 @@ void VulkanCommandList::BindSampler(u32 slot, const Sampler& sampler) noexcept
 
 namespace {
 void BindStorageBuffer(VulkanCommandList* self, VulkanDevice* device,
-                        VkCommandBuffer cmd, VkDescriptorPool pool,
-                        VulkanPipelineData* pd, VkDescriptorSet& cur,
-                        u32 slot, const Buffer& buffer) noexcept
+                       VkCommandBuffer cmd, VkDescriptorPool pool,
+                       VulkanPipelineData* pd, VkDescriptorSet& cur, u32 slot,
+                       const Buffer& buffer) noexcept
 {
   if (device == nullptr || pd == nullptr ||
       pd->DescSetLayout == VK_NULL_HANDLE || !buffer.Data)
@@ -616,15 +615,15 @@ void BindStorageBuffer(VulkanCommandList* self, VulkanDevice* device,
   VkDescriptorBufferInfo bufferInfo {};
   bufferInfo.buffer = bd->Buffer;
   bufferInfo.offset = 0;
-  bufferInfo.range  = VK_WHOLE_SIZE;
+  bufferInfo.range = VK_WHOLE_SIZE;
 
   VkWriteDescriptorSet write {};
-  write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write.dstSet          = set;
-  write.dstBinding      = slot;
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.dstSet = set;
+  write.dstBinding = slot;
   write.descriptorCount = 1;
-  write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  write.pBufferInfo     = &bufferInfo;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  write.pBufferInfo = &bufferInfo;
   vkUpdateDescriptorSets(device->Device(), 1, &write, 0, nullptr);
 
   const VkPipelineBindPoint bindPoint = pd->IsCompute
@@ -635,17 +634,17 @@ void BindStorageBuffer(VulkanCommandList* self, VulkanDevice* device,
 }  // namespace
 
 void VulkanCommandList::BindStructuredBuffer(u32 slot,
-                                               const Buffer& buffer) noexcept
+                                             const Buffer& buffer) noexcept
 {
   BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline,
-                     m_CurrentDescSet, slot, buffer);
+                    m_CurrentDescSet, slot, buffer);
 }
 
 void VulkanCommandList::BindRWStructuredBuffer(u32 slot,
-                                                 const Buffer& buffer) noexcept
+                                               const Buffer& buffer) noexcept
 {
   BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline,
-                     m_CurrentDescSet, slot, buffer);
+                    m_CurrentDescSet, slot, buffer);
 }
 
 void VulkanCommandList::SetConstants(
@@ -661,7 +660,7 @@ void VulkanCommandList::SetConstants(
                                         ? VK_SHADER_STAGE_COMPUTE_BIT
                                         : VK_SHADER_STAGE_ALL_GRAPHICS;
   vkCmdPushConstants(m_CmdBuffer, m_CurrentPipeline->Layout, stages, offset,
-                      size, bytes.data());
+                     size, bytes.data());
 }
 
 void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
@@ -680,7 +679,7 @@ void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
 }
 
 void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
-                                       u32 drawCount, u32 stride) noexcept
+                                     u32 drawCount, u32 stride) noexcept
 {
   if (!buffer.Data)
     return;
@@ -689,8 +688,7 @@ void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
 }
 
 void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
-                                              u32 drawCount,
-                                              u32 stride) noexcept
+                                            u32 drawCount, u32 stride) noexcept
 {
   if (!buffer.Data)
     return;
@@ -704,7 +702,7 @@ void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 }
 
 void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
-                                           u64 offset) noexcept
+                                         u64 offset) noexcept
 {
   if (!buffer.Data)
     return;
@@ -713,8 +711,8 @@ void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
 }
 
 void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,
-                                     const Buffer& src, u64 srcOffset,
-                                     u64 size) noexcept
+                                   const Buffer& src, u64 srcOffset,
+                                   u64 size) noexcept
 {
   if (!dst.Data || !src.Data || size == 0)
     return;
@@ -723,13 +721,13 @@ void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,
   VkBufferCopy region {};
   region.srcOffset = srcOffset;
   region.dstOffset = dstOffset;
-  region.size      = size;
+  region.size = size;
   vkCmdCopyBuffer(m_CmdBuffer, sd->Buffer, dd->Buffer, 1, &region);
 }
 
 void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
-                                              u32 slice, const Buffer& src,
-                                              u64 srcOffset) noexcept
+                                            u32 slice, const Buffer& src,
+                                            u64 srcOffset) noexcept
 {
   if (!dst.Data || !src.Data)
     return;
@@ -738,27 +736,26 @@ void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
 
   const VkImageLayout prev = td->CurrentLayout;
   TransitionImage(td->Image, td->Aspect, prev,
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
   VkBufferImageCopy region {};
   region.bufferOffset = srcOffset;
-  region.imageSubresource.aspectMask     = td->Aspect;
-  region.imageSubresource.mipLevel       = mip;
+  region.imageSubresource.aspectMask = td->Aspect;
+  region.imageSubresource.mipLevel = mip;
   region.imageSubresource.baseArrayLayer = slice;
-  region.imageSubresource.layerCount     = 1;
+  region.imageSubresource.layerCount = 1;
   region.imageExtent = {td->Width, td->Height, 1};
   vkCmdCopyBufferToImage(m_CmdBuffer, bd->Buffer, td->Image,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-  TransitionImage(td->Image, td->Aspect,
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  TransitionImage(td->Image, td->Aspect, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
 void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
-                                              const Texture& src, u32 mip,
-                                              u32 slice) noexcept
+                                            const Texture& src, u32 mip,
+                                            u32 slice) noexcept
 {
   if (!dst.Data || !src.Data)
     return;
@@ -767,26 +764,26 @@ void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
 
   const VkImageLayout prev = td->CurrentLayout;
   TransitionImage(td->Image, td->Aspect, prev,
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
   VkBufferImageCopy region {};
   region.bufferOffset = dstOffset;
-  region.imageSubresource.aspectMask     = td->Aspect;
-  region.imageSubresource.mipLevel       = mip;
+  region.imageSubresource.aspectMask = td->Aspect;
+  region.imageSubresource.mipLevel = mip;
   region.imageSubresource.baseArrayLayer = slice;
-  region.imageSubresource.layerCount     = 1;
+  region.imageSubresource.layerCount = 1;
   region.imageExtent = {td->Width, td->Height, 1};
   vkCmdCopyImageToBuffer(m_CmdBuffer, td->Image,
-                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bd->Buffer, 1,
-                          &region);
+                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bd->Buffer, 1,
+                         &region);
 
-  TransitionImage(td->Image, td->Aspect,
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, prev);
+  TransitionImage(td->Image, td->Aspect, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                  prev);
   td->CurrentLayout = prev;
 }
 
 void VulkanCommandList::ResetTimestamps(const QueryPool& pool, u32 first,
-                                          u32 count) noexcept
+                                        u32 count) noexcept
 {
   if (!pool.IsValid())
     return;
@@ -795,13 +792,13 @@ void VulkanCommandList::ResetTimestamps(const QueryPool& pool, u32 first,
 }
 
 void VulkanCommandList::WriteTimestamp(const QueryPool& pool,
-                                         u32 index) noexcept
+                                       u32 index) noexcept
 {
   if (!pool.IsValid())
     return;
   auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
   vkCmdWriteTimestamp(m_CmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                       qd->QueryPool, index);
+                      qd->QueryPool, index);
 }
 
 }  // namespace gecko::graphics

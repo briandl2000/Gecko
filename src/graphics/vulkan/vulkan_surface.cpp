@@ -11,20 +11,20 @@ namespace gecko::graphics {
 
 #if defined(GECKO_GRAPHICS_VULKAN_XLIB)
 VkResult CreateXlibSurface(VkInstance,
-                            const ::gecko::platform::NativeWindowHandle&,
-                            VkSurfaceKHR*) noexcept;
+                           const ::gecko::platform::NativeWindowHandle&,
+                           VkSurfaceKHR*) noexcept;
 #endif
 
 #if defined(GECKO_GRAPHICS_VULKAN_WAYLAND)
 VkResult CreateWaylandSurface(VkInstance,
-                               const ::gecko::platform::NativeWindowHandle&,
-                               VkSurfaceKHR*) noexcept;
+                              const ::gecko::platform::NativeWindowHandle&,
+                              VkSurfaceKHR*) noexcept;
 #endif
 
 #if defined(GECKO_GRAPHICS_VULKAN_WIN32)
 VkResult CreateWin32Surface(VkInstance,
-                             const ::gecko::platform::NativeWindowHandle&,
-                             VkSurfaceKHR*) noexcept;
+                            const ::gecko::platform::NativeWindowHandle&,
+                            VkSurfaceKHR*) noexcept;
 #endif
 
 // ── Public API ────────────────────────────────────────────────────────────
@@ -46,31 +46,31 @@ VkResult CreateWin32Surface(VkInstance,
   return {Extensions, sizeof(Extensions) / sizeof(Extensions[0])};
 }
 
-VkResult CreateSurface(VkInstance                                   instance,
-                        const ::gecko::platform::NativeWindowHandle& native,
-                        VkSurfaceKHR*                                out) noexcept
+VkResult CreateSurface(VkInstance instance,
+                       const ::gecko::platform::NativeWindowHandle& native,
+                       VkSurfaceKHR* out) noexcept
 {
   using ::gecko::platform::DisplayBackendKind;
 
   switch (native.Backend)
   {
 #if defined(GECKO_GRAPHICS_VULKAN_XLIB)
-    case DisplayBackendKind::Xlib:
-      return CreateXlibSurface(instance, native, out);
+  case DisplayBackendKind::Xlib:
+    return CreateXlibSurface(instance, native, out);
 #endif
 #if defined(GECKO_GRAPHICS_VULKAN_WAYLAND)
-    case DisplayBackendKind::Wayland:
-      return CreateWaylandSurface(instance, native, out);
+  case DisplayBackendKind::Wayland:
+    return CreateWaylandSurface(instance, native, out);
 #endif
 #if defined(GECKO_GRAPHICS_VULKAN_WIN32)
-    case DisplayBackendKind::Win32:
-      return CreateWin32Surface(instance, native, out);
+  case DisplayBackendKind::Win32:
+    return CreateWin32Surface(instance, native, out);
 #endif
-    default:
-      GECKO_ERROR(labels::Vulkan,
-                  "VulkanSurface: no surface backend for display kind %d",
-                  static_cast<i32>(native.Backend));
-      return VK_ERROR_EXTENSION_NOT_PRESENT;
+  default:
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanSurface: no surface backend for display kind %d",
+                static_cast<i32>(native.Backend));
+    return VK_ERROR_EXTENSION_NOT_PRESENT;
   }
 }
 

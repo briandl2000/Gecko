@@ -1,7 +1,6 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
-#include "gecko/platform/platform_config.h"
 #include "gecko/platform/window.h"
 
 #include <span>
@@ -22,9 +21,8 @@ GetRequiredSurfaceExtensions() noexcept;
 /// Create a `VkSurfaceKHR` for the given native window. Returns VK_SUCCESS
 /// on success and writes the surface to `*out`.
 [[nodiscard]] VkResult CreateSurface(
-    VkInstance                                   instance,
-    const ::gecko::platform::NativeWindowHandle& native,
-    VkSurfaceKHR*                                out) noexcept;
+    VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+    VkSurfaceKHR* out) noexcept;
 
 }  // namespace gecko::graphics
 #endif

@@ -3,7 +3,7 @@
 #include "private/null_device.h"
 
 #if defined(GECKO_GRAPHICS_VULKAN)
-#  include "vulkan/vulkan_device.h"
+#include "vulkan/vulkan_device.h"
 #endif
 
 namespace gecko::graphics {
@@ -19,11 +19,11 @@ Unique<GraphicsDevice> CreateGraphicsDevice(
   switch (desc.Backend)
   {
 #if defined(GECKO_GRAPHICS_VULKAN)
-    case GraphicsBackend::Vulkan:
-      return CreateUnique<VulkanDevice>(desc);
+  case GraphicsBackend::Vulkan:
+    return CreateUnique<VulkanDevice>(desc);
 #endif
-    default:
-      return CreateUnique<NullDevice>();
+  default:
+    return CreateUnique<NullDevice>();
   }
 }
 

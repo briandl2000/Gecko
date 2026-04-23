@@ -1,14 +1,14 @@
 #include "gecko/platform/platform_module.h"
 
 #include "gecko/core/scope.h"
-#include "gecko/core/services/log.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <Windows.h>
-// needs to be after Windows.h to avoid macro conflicts (e.g. with CreateWindow).
+// needs to be after Windows.h to avoid macro conflicts (e.g. with
+// CreateWindow).
 #include <timeapi.h>
 #endif
 

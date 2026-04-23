@@ -3,25 +3,26 @@
 namespace gecko::graphics {
 
 Swapchain NullDevice::CreateSwapchain(
-    const ::gecko::platform::NativeWindowHandle&,
-    const SwapchainDesc&) noexcept
+    const ::gecko::platform::NativeWindowHandle&, const SwapchainDesc&) noexcept
 {
-  return Swapchain{};
+  return Swapchain {};
 }
 
 void NullDevice::DestroySwapchain(Swapchain& swapchain) noexcept
 {
-  swapchain = Swapchain{};
+  swapchain = Swapchain {};
 }
 
-void NullDevice::ResizeSwapchain(Swapchain&) noexcept {}
+void NullDevice::ResizeSwapchain(Swapchain&) noexcept
+{}
 
 FrameContext NullDevice::BeginFrame(Swapchain&) noexcept
 {
-  return FrameContext{};
+  return FrameContext {};
 }
 
-void NullDevice::Present(::std::span<const FrameContext>) noexcept {}
+void NullDevice::Present(::std::span<const FrameContext>) noexcept
+{}
 
 Unique<ICommandList> NullDevice::CreateGraphicsCommandList() noexcept
 {
@@ -33,73 +34,74 @@ Unique<ICommandList> NullDevice::CreateComputeCommandList() noexcept
   return ::gecko::CreateUnique<NullCommandList>();
 }
 
-void NullDevice::ExecuteGraphicsCommandList(Unique<ICommandList>) noexcept {}
-void NullDevice::ExecuteComputeCommandList(Unique<ICommandList>) noexcept {}
+void NullDevice::ExecuteGraphicsCommandList(Unique<ICommandList>) noexcept
+{}
+void NullDevice::ExecuteComputeCommandList(Unique<ICommandList>) noexcept
+{}
 
 RenderTarget NullDevice::CreateRenderTarget(const RenderTargetDesc&) noexcept
 {
-  return RenderTarget{};
+  return RenderTarget {};
 }
 
 Buffer NullDevice::CreateVertexBuffer(const VertexBufferDesc&) noexcept
 {
-  return Buffer{};
+  return Buffer {};
 }
 
 Buffer NullDevice::CreateIndexBuffer(const IndexBufferDesc&) noexcept
 {
-  return Buffer{};
+  return Buffer {};
 }
 
 Buffer NullDevice::CreateConstantBuffer(const ConstantBufferDesc&) noexcept
 {
-  return Buffer{};
+  return Buffer {};
 }
 
 Buffer NullDevice::CreateStructuredBuffer(const StructuredBufferDesc&) noexcept
 {
-  return Buffer{};
+  return Buffer {};
 }
 
 Texture NullDevice::CreateTexture(const TextureDesc&) noexcept
 {
-  return Texture{};
+  return Texture {};
 }
 
 Sampler NullDevice::CreateSampler(const SamplerDesc&) noexcept
 {
-  return Sampler{};
+  return Sampler {};
 }
 
 GraphicsPipeline NullDevice::CreateGraphicsPipeline(
     const GraphicsPipelineDesc&) noexcept
 {
-  return GraphicsPipeline{};
+  return GraphicsPipeline {};
 }
 
 ComputePipeline NullDevice::CreateComputePipeline(
     const ComputePipelineDesc&) noexcept
 {
-  return ComputePipeline{};
+  return ComputePipeline {};
 }
 
 QueryPool NullDevice::CreateTimestampQueryPool(const QueryPoolDesc&) noexcept
 {
-  return QueryPool{};
+  return QueryPool {};
 }
 
-u32 NullDevice::ReadTimestamps(const QueryPool&, u32,
-                                 ::std::span<u64>) noexcept
+u32 NullDevice::ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept
 {
   return 0;
 }
 
 void NullDevice::UploadTextureData(Texture&, ::std::span<const ::gecko::byte>,
-                                    u32, u32) noexcept
+                                   u32, u32) noexcept
 {}
 
 void NullDevice::UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>,
-                                   u32) noexcept
+                                  u32) noexcept
 {}
 
 }  // namespace gecko::graphics
