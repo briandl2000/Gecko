@@ -1,3 +1,4 @@
+#if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_command_list.h"
 #include "vulkan_device.h"
 #include "vulkan_util.h"
@@ -531,3 +532,4 @@ void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 }
 
 }  // namespace gecko::graphics
+#endif

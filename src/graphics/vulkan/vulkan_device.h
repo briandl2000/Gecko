@@ -1,3 +1,4 @@
+#if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
 #include "gecko/graphics/graphics_device.h"
@@ -200,3 +201,4 @@ private:
 };
 
 }  // namespace gecko::graphics
+#endif

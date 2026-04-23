@@ -1,3 +1,4 @@
+#if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_surface.h"
 
 #include "gecko/core/services/log.h"
@@ -74,3 +75,5 @@ VkResult CreateSurface(VkInstance                                   instance,
 }
 
 }  // namespace gecko::graphics
+
+#endif

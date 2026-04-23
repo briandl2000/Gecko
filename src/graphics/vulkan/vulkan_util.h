@@ -1,3 +1,4 @@
+#if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
 #include "gecko/core/types.h"
@@ -66,3 +67,4 @@ namespace gecko::graphics {
   } while (false)
 
 }  // namespace gecko::graphics
+#endif

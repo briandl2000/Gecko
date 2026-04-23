@@ -1,3 +1,4 @@
+#if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
 #include "gecko/platform/platform_config.h"
@@ -26,3 +27,4 @@ GetRequiredSurfaceExtensions() noexcept;
     VkSurfaceKHR*                                out) noexcept;
 
 }  // namespace gecko::graphics
+#endif

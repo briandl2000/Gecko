@@ -1,3 +1,4 @@
+#if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
 #include "gecko/graphics/command_list.h"
@@ -101,3 +102,4 @@ private:
 };
 
 }  // namespace gecko::graphics
+#endif

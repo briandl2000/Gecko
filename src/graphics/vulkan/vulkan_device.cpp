@@ -1,3 +1,4 @@
+#if defined(GECKO_GRAPHICS_VULKAN)
 #define VMA_IMPLEMENTATION 1
 #define VMA_STATIC_VULKAN_FUNCTIONS  0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
@@ -202,6 +203,12 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
       break;
     }
   }
+
+  VkPhysicalDeviceProperties p{};
+  vkGetPhysicalDeviceProperties(m_PhysicalDevice, &p);
+
+  // print the name of the chosen GPU for informational purposes
+  GECKO_INFO(labels::Vulkan, "VulkanDevice: using GPU '%s'", p.deviceName);
 
   // Find graphics queue family
   u32 qcount = 0;
@@ -1778,3 +1785,4 @@ void VulkanDevice::UploadBufferData(Buffer& buffer,
 }
 
 }  // namespace gecko::graphics
+#endif
