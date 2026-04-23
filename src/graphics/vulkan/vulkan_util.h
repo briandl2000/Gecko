@@ -2,7 +2,7 @@
 #pragma once
 
 #include "gecko/core/types.h"
-#include "gecko/graphics/objects.h"
+#include "gecko/graphics/graphics_types.h"
 #include "private/labels.h"
 
 #include <vulkan/vulkan.h>

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gecko/core/api.h"
-#include "gecko/graphics/objects.h"
+#include "gecko/graphics/graphics_types.h"
 
 #include <span>
 

@@ -4,7 +4,7 @@
 #include "gecko/core/ptr.h"
 #include "gecko/core/types.h"
 #include "gecko/graphics/command_list.h"
-#include "gecko/graphics/objects.h"
+#include "gecko/graphics/graphics_types.h"
 #include "gecko/platform/window.h"
 
 #include <span>

@@ -5,7 +5,7 @@ dynamic rendering) behind a compact, backend-agnostic front end.
 
 | Header | Purpose |
 |---|---|
-| [`gecko/graphics/objects.h`](../include/gecko/graphics/objects.h) | POD descs + opaque GPU handles (`Swapchain`, `RenderTarget`, `Buffer`, `Pipeline`, …) |
+| [`gecko/graphics/graphics_types.h`](../include/gecko/graphics/graphics_types.h) | POD descs + opaque GPU handles (`Swapchain`, `RenderTarget`, `Buffer`, `Pipeline`, …) |
 | [`gecko/graphics/command_list.h`](../include/gecko/graphics/command_list.h) | `GraphicsCommandList` + `ComputeCommandList` |
 | [`gecko/graphics/graphics_device.h`](../include/gecko/graphics/graphics_device.h) | `GraphicsDevice`, `FrameContext`, `CreateGraphicsDevice()` |
 
