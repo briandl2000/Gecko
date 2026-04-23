@@ -104,14 +104,28 @@ struct VulkanPipelineData
   VkPipelineLayout      Layout {VK_NULL_HANDLE};
   VkPipeline            Pipeline {VK_NULL_HANDLE};
   VkDescriptorSetLayout DescSetLayout {VK_NULL_HANDLE};
-  VkSampler             Samplers[GraphicsPipelineDesc::MaxSamplers] {};
-  u32                   NumSamplers {0};
-  u32                   NumTextureBindings {0};
   // Per-binding descriptor types so BindXxx() can look up what to write.
   static constexpr u32  MaxBindings = 64;
   VkDescriptorType      BindingTypes[MaxBindings] {};
   u32                   NumBindings {0};
+  u32                   PushConstantBytes {0};
   bool                  IsCompute {false};
+};
+
+// ── Sampler GPU data ────────────────────────────────────────────────────
+
+struct VulkanSamplerData
+{
+  VkSampler Sampler {VK_NULL_HANDLE};
+};
+
+// ── Query pool GPU data ─────────────────────────────────────────────────
+
+struct VulkanQueryPoolData
+{
+  VkQueryPool QueryPool {VK_NULL_HANDLE};
+  u32         Count {0};
+  f32         TimestampPeriodNs {1.0F};
 };
 
 }  // namespace gecko::graphics

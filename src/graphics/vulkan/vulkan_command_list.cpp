@@ -24,6 +24,8 @@ VulkanCommandList::VulkanCommandList(VulkanDevice& device,
   // many BindPipeline calls per frame without running out.
   VkDescriptorPoolSize sizes[] = {
       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 128},
+      {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 128},
+      {VK_DESCRIPTOR_TYPE_SAMPLER, 64},
       {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 128},
       {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 64},
       {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 32},
@@ -491,17 +493,14 @@ void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
   if (set == VK_NULL_HANDLE)
     return;
 
-  // Determine descriptor type from the pipeline's binding table.
-  VkDescriptorType dtype = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  VkDescriptorType dtype = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
   if (slot < m_CurrentPipeline->NumBindings)
     dtype = m_CurrentPipeline->BindingTypes[slot];
 
   VkDescriptorImageInfo imageInfo {};
   imageInfo.imageView = td->ImageView;
-  imageInfo.imageLayout = (dtype == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE)
-                              ? VK_IMAGE_LAYOUT_GENERAL
-                              : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  imageInfo.sampler = VK_NULL_HANDLE;  // immutable via DSL when sampled
+  imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  imageInfo.sampler = VK_NULL_HANDLE;
 
   VkWriteDescriptorSet write {};
   write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -519,6 +518,152 @@ void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
                           1, &set, 0, nullptr);
 }
 
+void VulkanCommandList::BindRWTexture(u32 slot,
+                                       const Texture& texture) noexcept
+{
+  if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
+      m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !texture.Data)
+    return;
+  auto* td = static_cast<VulkanTextureData*>(texture.Data.get());
+  if (td->ImageView == VK_NULL_HANDLE)
+    return;
+
+  VkDescriptorSet set =
+      EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool,
+                           m_CurrentPipeline, m_CurrentDescSet);
+  if (set == VK_NULL_HANDLE)
+    return;
+
+  // Storage images must be in GENERAL layout.
+  if (td->CurrentLayout != VK_IMAGE_LAYOUT_GENERAL)
+  {
+    TransitionImage(td->Image, td->Aspect, td->CurrentLayout,
+                     VK_IMAGE_LAYOUT_GENERAL);
+    td->CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
+  }
+
+  VkDescriptorImageInfo imageInfo {};
+  imageInfo.imageView = td->ImageView;
+  imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+  VkWriteDescriptorSet write {};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.dstSet = set;
+  write.dstBinding = slot;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  write.pImageInfo = &imageInfo;
+  vkUpdateDescriptorSets(m_Device->Device(), 1, &write, 0, nullptr);
+
+  const VkPipelineBindPoint bindPoint = m_CurrentPipeline->IsCompute
+                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
+                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0,
+                          1, &set, 0, nullptr);
+}
+
+void VulkanCommandList::BindSampler(u32 slot, const Sampler& sampler) noexcept
+{
+  if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
+      m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !sampler.Data)
+    return;
+  auto* sd = static_cast<VulkanSamplerData*>(sampler.Data.get());
+  if (sd->Sampler == VK_NULL_HANDLE)
+    return;
+
+  VkDescriptorSet set =
+      EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool,
+                           m_CurrentPipeline, m_CurrentDescSet);
+  if (set == VK_NULL_HANDLE)
+    return;
+
+  VkDescriptorImageInfo imageInfo {};
+  imageInfo.sampler = sd->Sampler;
+
+  VkWriteDescriptorSet write {};
+  write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.dstSet = set;
+  write.dstBinding = slot;
+  write.descriptorCount = 1;
+  write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+  write.pImageInfo = &imageInfo;
+  vkUpdateDescriptorSets(m_Device->Device(), 1, &write, 0, nullptr);
+
+  const VkPipelineBindPoint bindPoint = m_CurrentPipeline->IsCompute
+                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
+                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0,
+                          1, &set, 0, nullptr);
+}
+
+namespace {
+void BindStorageBuffer(VulkanCommandList* self, VulkanDevice* device,
+                        VkCommandBuffer cmd, VkDescriptorPool pool,
+                        VulkanPipelineData* pd, VkDescriptorSet& cur,
+                        u32 slot, const Buffer& buffer) noexcept
+{
+  if (device == nullptr || pd == nullptr ||
+      pd->DescSetLayout == VK_NULL_HANDLE || !buffer.Data)
+    return;
+  auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  if (bd->Buffer == VK_NULL_HANDLE)
+    return;
+  VkDescriptorSet set =
+      EnsureCurrentDescSet(self, device->Device(), pool, pd, cur);
+  if (set == VK_NULL_HANDLE)
+    return;
+
+  VkDescriptorBufferInfo bufferInfo {};
+  bufferInfo.buffer = bd->Buffer;
+  bufferInfo.offset = 0;
+  bufferInfo.range  = VK_WHOLE_SIZE;
+
+  VkWriteDescriptorSet write {};
+  write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write.dstSet          = set;
+  write.dstBinding      = slot;
+  write.descriptorCount = 1;
+  write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  write.pBufferInfo     = &bufferInfo;
+  vkUpdateDescriptorSets(device->Device(), 1, &write, 0, nullptr);
+
+  const VkPipelineBindPoint bindPoint = pd->IsCompute
+                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
+                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  vkCmdBindDescriptorSets(cmd, bindPoint, pd->Layout, 0, 1, &set, 0, nullptr);
+}
+}  // namespace
+
+void VulkanCommandList::BindStructuredBuffer(u32 slot,
+                                               const Buffer& buffer) noexcept
+{
+  BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline,
+                     m_CurrentDescSet, slot, buffer);
+}
+
+void VulkanCommandList::BindRWStructuredBuffer(u32 slot,
+                                                 const Buffer& buffer) noexcept
+{
+  BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline,
+                     m_CurrentDescSet, slot, buffer);
+}
+
+void VulkanCommandList::SetConstants(
+    u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept
+{
+  if (m_CurrentPipeline == nullptr ||
+      m_CurrentPipeline->PushConstantBytes == 0 || bytes.empty())
+    return;
+  const u32 size = static_cast<u32>(bytes.size());
+  if (offset + size > m_CurrentPipeline->PushConstantBytes)
+    return;
+  const VkShaderStageFlags stages = m_CurrentPipeline->IsCompute
+                                        ? VK_SHADER_STAGE_COMPUTE_BIT
+                                        : VK_SHADER_STAGE_ALL_GRAPHICS;
+  vkCmdPushConstants(m_CmdBuffer, m_CurrentPipeline->Layout, stages, offset,
+                      size, bytes.data());
+}
+
 void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
                              u32 firstVertex, u32 firstInstance) noexcept
 {
@@ -534,9 +679,129 @@ void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
                    vertexOffset, firstInstance);
 }
 
+void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
+                                       u32 drawCount, u32 stride) noexcept
+{
+  if (!buffer.Data)
+    return;
+  auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  vkCmdDrawIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
+}
+
+void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
+                                              u32 drawCount,
+                                              u32 stride) noexcept
+{
+  if (!buffer.Data)
+    return;
+  auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  vkCmdDrawIndexedIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
+}
+
 void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 {
   vkCmdDispatch(m_CmdBuffer, x, y, z);
+}
+
+void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
+                                           u64 offset) noexcept
+{
+  if (!buffer.Data)
+    return;
+  auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  vkCmdDispatchIndirect(m_CmdBuffer, bd->Buffer, offset);
+}
+
+void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,
+                                     const Buffer& src, u64 srcOffset,
+                                     u64 size) noexcept
+{
+  if (!dst.Data || !src.Data || size == 0)
+    return;
+  auto* dd = static_cast<VulkanBufferData*>(dst.Data.get());
+  auto* sd = static_cast<VulkanBufferData*>(src.Data.get());
+  VkBufferCopy region {};
+  region.srcOffset = srcOffset;
+  region.dstOffset = dstOffset;
+  region.size      = size;
+  vkCmdCopyBuffer(m_CmdBuffer, sd->Buffer, dd->Buffer, 1, &region);
+}
+
+void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
+                                              u32 slice, const Buffer& src,
+                                              u64 srcOffset) noexcept
+{
+  if (!dst.Data || !src.Data)
+    return;
+  auto* td = static_cast<VulkanTextureData*>(dst.Data.get());
+  auto* bd = static_cast<VulkanBufferData*>(src.Data.get());
+
+  const VkImageLayout prev = td->CurrentLayout;
+  TransitionImage(td->Image, td->Aspect, prev,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+  VkBufferImageCopy region {};
+  region.bufferOffset = srcOffset;
+  region.imageSubresource.aspectMask     = td->Aspect;
+  region.imageSubresource.mipLevel       = mip;
+  region.imageSubresource.baseArrayLayer = slice;
+  region.imageSubresource.layerCount     = 1;
+  region.imageExtent = {td->Width, td->Height, 1};
+  vkCmdCopyBufferToImage(m_CmdBuffer, bd->Buffer, td->Image,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+  TransitionImage(td->Image, td->Aspect,
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+}
+
+void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
+                                              const Texture& src, u32 mip,
+                                              u32 slice) noexcept
+{
+  if (!dst.Data || !src.Data)
+    return;
+  auto* bd = static_cast<VulkanBufferData*>(dst.Data.get());
+  auto* td = static_cast<VulkanTextureData*>(src.Data.get());
+
+  const VkImageLayout prev = td->CurrentLayout;
+  TransitionImage(td->Image, td->Aspect, prev,
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+
+  VkBufferImageCopy region {};
+  region.bufferOffset = dstOffset;
+  region.imageSubresource.aspectMask     = td->Aspect;
+  region.imageSubresource.mipLevel       = mip;
+  region.imageSubresource.baseArrayLayer = slice;
+  region.imageSubresource.layerCount     = 1;
+  region.imageExtent = {td->Width, td->Height, 1};
+  vkCmdCopyImageToBuffer(m_CmdBuffer, td->Image,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bd->Buffer, 1,
+                          &region);
+
+  TransitionImage(td->Image, td->Aspect,
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, prev);
+  td->CurrentLayout = prev;
+}
+
+void VulkanCommandList::ResetTimestamps(const QueryPool& pool, u32 first,
+                                          u32 count) noexcept
+{
+  if (!pool.IsValid())
+    return;
+  auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
+  vkCmdResetQueryPool(m_CmdBuffer, qd->QueryPool, first, count);
+}
+
+void VulkanCommandList::WriteTimestamp(const QueryPool& pool,
+                                         u32 index) noexcept
+{
+  if (!pool.IsValid())
+    return;
+  auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
+  vkCmdWriteTimestamp(m_CmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                       qd->QueryPool, index);
 }
 
 }  // namespace gecko::graphics

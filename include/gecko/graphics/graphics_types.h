@@ -12,6 +12,7 @@ namespace gecko::graphics {
 inline constexpr u32 MaxSwapchainImages     = 8;
 inline constexpr u32 MaxFramesInFlight      = 2;
 inline constexpr u32 MaxSwapchainsPerSubmit = 4;
+inline constexpr u32 MaxPushConstantBytes   = 128;
 
 // ── Enums ─────────────────────────────────────────────────────────────────
 
@@ -109,8 +110,11 @@ enum class ResourceType : u8
 {
   None,
   Texture,
+  RWTexture,
   ConstantBuffer,
   StructuredBuffer,
+  RWStructuredBuffer,
+  Sampler,
   LocalData,
 };
 
@@ -128,6 +132,64 @@ enum class MemoryType : u8
   None,
   Shared,
   Dedicated,
+};
+
+enum class CompareFunc : u8
+{
+  Never,
+  Less,
+  Equal,
+  LessEqual,
+  Greater,
+  NotEqual,
+  GreaterEqual,
+  Always,
+};
+
+enum class StencilOp : u8
+{
+  Keep,
+  Zero,
+  Replace,
+  IncrementClamp,
+  DecrementClamp,
+  Invert,
+  IncrementWrap,
+  DecrementWrap,
+};
+
+enum class BlendFactor : u8
+{
+  Zero,
+  One,
+  SrcColor,
+  InvSrcColor,
+  SrcAlpha,
+  InvSrcAlpha,
+  DstColor,
+  InvDstColor,
+  DstAlpha,
+  InvDstAlpha,
+  SrcAlphaSaturate,
+};
+
+enum class BlendOp : u8
+{
+  Add,
+  Subtract,
+  ReverseSubtract,
+  Min,
+  Max,
+};
+
+enum class ColorWriteMask : u8
+{
+  None  = 0,
+  Red   = 1 << 0,
+  Green = 1 << 1,
+  Blue  = 1 << 2,
+  Alpha = 1 << 3,
+  All   = Red | Green | Blue | Alpha,
 };
 
 // ── Utility functions ─────────────────────────────────────────────────────
@@ -295,10 +357,26 @@ struct SamplerDesc
 {
   SamplerFilter   Filter {SamplerFilter::Linear};
   SamplerWrapMode WrapMode {SamplerWrapMode::Wrap};
+  const char*     DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
     return true;
+  }
+};
+
+struct Sampler
+{
+  SamplerDesc  Desc {};
+  Shared<void> Data {nullptr};
+
+  [[nodiscard]] bool IsValid() const noexcept
+  {
+    return Data != nullptr;
+  }
+  explicit operator bool() const noexcept
+  {
+    return IsValid();
   }
 };
 
@@ -318,11 +396,51 @@ struct PipelineResource
     };
   }
 
+  [[nodiscard]] static constexpr PipelineResource RWTextureBinding(
+      u32 count, ShaderType visibility) noexcept
+  {
+    return PipelineResource{
+        .Type             = ResourceType::RWTexture,
+        .ShaderVisibility = visibility,
+        .NumResources     = count,
+    };
+  }
+
   [[nodiscard]] static constexpr PipelineResource ConstantBufferBinding(
       u32 count, ShaderType visibility) noexcept
   {
     return PipelineResource{
         .Type             = ResourceType::ConstantBuffer,
+        .ShaderVisibility = visibility,
+        .NumResources     = count,
+    };
+  }
+
+  [[nodiscard]] static constexpr PipelineResource StructuredBufferBinding(
+      u32 count, ShaderType visibility) noexcept
+  {
+    return PipelineResource{
+        .Type             = ResourceType::StructuredBuffer,
+        .ShaderVisibility = visibility,
+        .NumResources     = count,
+    };
+  }
+
+  [[nodiscard]] static constexpr PipelineResource RWStructuredBufferBinding(
+      u32 count, ShaderType visibility) noexcept
+  {
+    return PipelineResource{
+        .Type             = ResourceType::RWStructuredBuffer,
+        .ShaderVisibility = visibility,
+        .NumResources     = count,
+    };
+  }
+
+  [[nodiscard]] static constexpr PipelineResource SamplerBinding(
+      u32 count, ShaderType visibility) noexcept
+  {
+    return PipelineResource{
+        .Type             = ResourceType::Sampler,
         .ShaderVisibility = visibility,
         .NumResources     = count,
     };
@@ -338,13 +456,46 @@ struct PipelineResource
   }
 };
 
+struct StencilOpDesc
+{
+  StencilOp   Fail {StencilOp::Keep};
+  StencilOp   DepthFail {StencilOp::Keep};
+  StencilOp   Pass {StencilOp::Keep};
+  CompareFunc Compare {CompareFunc::Always};
+};
+
+struct DepthStencilState
+{
+  bool          DepthTestEnable {false};
+  bool          DepthWriteEnable {false};
+  CompareFunc   DepthCompare {CompareFunc::Less};
+  bool          StencilEnable {false};
+  u8            StencilReadMask {0xFF};
+  u8            StencilWriteMask {0xFF};
+  StencilOpDesc StencilFront {};
+  StencilOpDesc StencilBack {};
+};
+
+struct RenderTargetBlendState
+{
+  bool        BlendEnable {false};
+  BlendFactor SrcColor {BlendFactor::One};
+  BlendFactor DstColor {BlendFactor::Zero};
+  BlendOp     ColorOp {BlendOp::Add};
+  BlendFactor SrcAlpha {BlendFactor::One};
+  BlendFactor DstAlpha {BlendFactor::Zero};
+  BlendOp     AlphaOp {BlendOp::Add};
+  u8          WriteMask {static_cast<u8>(ColorWriteMask::All)};
+};
+
 // ── Buffer descriptors & object ───────────────────────────────────────────
 
 struct VertexBufferDesc
 {
-  u32        NumVertices {0};
-  u32        VertexSize {0};
-  MemoryType Memory {MemoryType::None};
+  u32         NumVertices {0};
+  u32         VertexSize {0};
+  MemoryType  Memory {MemoryType::None};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -358,8 +509,9 @@ struct VertexBufferDesc
 
 struct IndexBufferDesc
 {
-  u32        NumIndices {0};
-  MemoryType Memory {MemoryType::None};
+  u32         NumIndices {0};
+  MemoryType  Memory {MemoryType::None};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -373,8 +525,9 @@ struct IndexBufferDesc
 
 struct ConstantBufferDesc
 {
-  u32        SizeInBytes {0};
-  MemoryType Memory {MemoryType::None};
+  u32         SizeInBytes {0};
+  MemoryType  Memory {MemoryType::None};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -388,9 +541,11 @@ struct ConstantBufferDesc
 
 struct StructuredBufferDesc
 {
-  u32        NumElements {0};
-  u32        ElementSize {0};
-  MemoryType Memory {MemoryType::None};
+  u32         NumElements {0};
+  u32         ElementSize {0};
+  MemoryType  Memory {MemoryType::None};
+  bool        AllowUnorderedAccess {false};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -435,7 +590,9 @@ struct TextureDesc
   MemoryType  Memory {MemoryType::None};
   bool        IsRenderTarget {false};
   bool        IsDepthStencil {false};
+  bool        AllowUnorderedAccess {false};
   ClearValue  OptimizedClear {};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -476,6 +633,7 @@ struct RenderTargetDesc
   DataFormat DepthStencilFormat {DataFormat::None};
   ClearValue RenderTargetClearValues[MaxRenderTargets] {};
   ClearValue DepthStencilClearValue {ClearValue::DepthStencil(1.0F, 0)};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -548,14 +706,18 @@ struct GraphicsPipelineDesc
   PipelineResource     PipelineResources[MaxPipelineResources] {};
   u32                  NumPipelineResources {0};
 
-  static constexpr u32 MaxSamplers = 8;
-  SamplerDesc          SamplerDescs[MaxSamplers] {};
-  u32                  NumSamplers {0};
+  /// Size in bytes of the push-constant block visible to all stages.
+  /// Must be a multiple of 4 and ≤ `MaxPushConstantBytes`.
+  u32 PushConstantBytes {0};
 
   CullMode      Culling {CullMode::None};
   WindingOrder  Winding {WindingOrder::ClockWise};
   PrimitiveType Primitive {PrimitiveType::Triangles};
-  bool          DepthBoundsTest {false};
+
+  DepthStencilState      DepthStencil {};
+  RenderTargetBlendState BlendStates[RenderTargetDesc::MaxRenderTargets] {};
+
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -568,6 +730,9 @@ struct GraphicsPipelineDesc
       if (RenderTargetFormats[i] == DataFormat::None)
         return false;
     }
+    if (PushConstantBytes > MaxPushConstantBytes
+        || (PushConstantBytes % 4) != 0)
+      return false;
     return true;
   }
   explicit operator bool() const noexcept
@@ -595,21 +760,24 @@ struct ComputePipelineDesc
 {
   ShaderCode ComputeShader {};
 
-  static constexpr u32 MaxReadOnlyResources = 32;
-  PipelineResource     ReadOnlyResources[MaxReadOnlyResources] {};
-  u32                  NumReadOnlyResources {0};
+  static constexpr u32 MaxPipelineResources = 48;
+  PipelineResource     PipelineResources[MaxPipelineResources] {};
+  u32                  NumPipelineResources {0};
 
-  static constexpr u32 MaxReadWriteResources = 16;
-  PipelineResource     ReadWriteResources[MaxReadWriteResources] {};
-  u32                  NumReadWriteResources {0};
+  /// Size in bytes of the push-constant block. Must be a multiple of 4
+  /// and ≤ `MaxPushConstantBytes`.
+  u32 PushConstantBytes {0};
 
-  static constexpr u32 MaxSamplers = 8;
-  SamplerDesc          SamplerDescs[MaxSamplers] {};
-  u32                  NumSamplers {0};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return ComputeShader.IsValid();
+    if (!ComputeShader.IsValid())
+      return false;
+    if (PushConstantBytes > MaxPushConstantBytes
+        || (PushConstantBytes % 4) != 0)
+      return false;
+    return true;
   }
   explicit operator bool() const noexcept
   {
@@ -636,11 +804,12 @@ struct ComputePipeline
 
 struct SwapchainDesc
 {
-  u32        Width {0};
-  u32        Height {0};
-  u32        NumBackBuffers {2};
-  DataFormat Format {DataFormat::R8G8B8A8_UNORM};
-  bool       VSync {true};
+  u32         Width {0};
+  u32         Height {0};
+  u32         NumBackBuffers {2};
+  DataFormat  Format {DataFormat::R8G8B8A8_UNORM};
+  bool        VSync {true};
+  const char* DebugName {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -666,6 +835,34 @@ struct Swapchain
 
   Swapchain(Swapchain&&) noexcept            = default;
   Swapchain& operator=(Swapchain&&) noexcept = default;
+
+  [[nodiscard]] bool IsValid() const noexcept
+  {
+    return Desc.IsValid() && Data != nullptr;
+  }
+  explicit operator bool() const noexcept
+  {
+    return IsValid();
+  }
+};
+
+// ── Query pool (timestamps) ───────────────────────────────────────────────
+
+struct QueryPoolDesc
+{
+  u32         Count {0};
+  const char* DebugName {nullptr};
+
+  [[nodiscard]] bool IsValid() const noexcept
+  {
+    return Count > 0;
+  }
+};
+
+struct QueryPool
+{
+  QueryPoolDesc Desc {};
+  Shared<void>  Data {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
   {

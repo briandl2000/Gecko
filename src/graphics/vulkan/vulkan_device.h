@@ -43,8 +43,12 @@ public:
   Buffer           CreateConstantBuffer(const ConstantBufferDesc& desc) noexcept override;
   Buffer           CreateStructuredBuffer(const StructuredBufferDesc& desc) noexcept override;
   Texture          CreateTexture(const TextureDesc& desc) noexcept override;
+  Sampler          CreateSampler(const SamplerDesc& desc) noexcept override;
   GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) noexcept override;
   ComputePipeline  CreateComputePipeline(const ComputePipelineDesc& desc) noexcept override;
+  QueryPool        CreateTimestampQueryPool(const QueryPoolDesc& desc) noexcept override;
+  u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery,
+                      ::std::span<u64> out) noexcept override;
 
   // ── Data upload ────────────────────────────────────────────────
 
@@ -63,6 +67,11 @@ public:
   [[nodiscard]] VkCommandPool GraphicsCommandPool() const noexcept { return m_GraphicsCommandPool; }
   [[nodiscard]] VmaAllocator  Allocator() const noexcept { return m_Allocator; }
   [[nodiscard]] VkDescriptorPool DescriptorPool() const noexcept { return m_DescriptorPool; }
+  [[nodiscard]] bool             HasDebugUtils() const noexcept { return m_HasDebugUtils; }
+
+  /// Apply a VK_EXT_debug_utils object name if validation is enabled.
+  void SetObjectName(VkObjectType type, u64 handle,
+                      const char* name) const noexcept;
 
 private:
   // ── Helpers ───────────────────────────────────────────────────
@@ -98,6 +107,8 @@ private:
 
   VkDebugUtilsMessengerEXT m_DebugMessenger {VK_NULL_HANDLE};
 
+  f32  m_TimestampPeriodNs {1.0F};
+  bool m_HasDebugUtils {false};
   bool m_Valid {false};
 };
 

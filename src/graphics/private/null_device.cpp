@@ -66,6 +66,11 @@ Texture NullDevice::CreateTexture(const TextureDesc&) noexcept
   return Texture{};
 }
 
+Sampler NullDevice::CreateSampler(const SamplerDesc&) noexcept
+{
+  return Sampler{};
+}
+
 GraphicsPipeline NullDevice::CreateGraphicsPipeline(
     const GraphicsPipelineDesc&) noexcept
 {
@@ -76,6 +81,17 @@ ComputePipeline NullDevice::CreateComputePipeline(
     const ComputePipelineDesc&) noexcept
 {
   return ComputePipeline{};
+}
+
+QueryPool NullDevice::CreateTimestampQueryPool(const QueryPoolDesc&) noexcept
+{
+  return QueryPool{};
+}
+
+u32 NullDevice::ReadTimestamps(const QueryPool&, u32,
+                                 ::std::span<u64>) noexcept
+{
+  return 0;
 }
 
 void NullDevice::UploadTextureData(Texture&, ::std::span<const ::gecko::byte>,

@@ -130,6 +130,10 @@ public:
   GECKO_API virtual Texture CreateTexture(
       const TextureDesc& desc) noexcept = 0;
 
+  [[nodiscard("Discarding a created Sampler immediately releases the GPU resource")]]
+  GECKO_API virtual Sampler CreateSampler(
+      const SamplerDesc& desc) noexcept = 0;
+
   [[nodiscard("Discarding a created GraphicsPipeline immediately releases the GPU resource")]]
   GECKO_API virtual GraphicsPipeline CreateGraphicsPipeline(
       const GraphicsPipelineDesc& desc) noexcept = 0;
@@ -137,6 +141,17 @@ public:
   [[nodiscard("Discarding a created ComputePipeline immediately releases the GPU resource")]]
   GECKO_API virtual ComputePipeline CreateComputePipeline(
       const ComputePipelineDesc& desc) noexcept = 0;
+
+  [[nodiscard("Discarding a created QueryPool immediately releases the GPU resource")]]
+  GECKO_API virtual QueryPool CreateTimestampQueryPool(
+      const QueryPoolDesc& desc) noexcept = 0;
+
+  /// Read `count` timestamps starting at `firstQuery` from the pool into
+  /// `out` as nanoseconds. Returns the number of timestamps written (0 on
+  /// failure or if results are not yet available on the implementation).
+  GECKO_API virtual u32 ReadTimestamps(
+      const QueryPool& pool, u32 firstQuery,
+      ::std::span<u64> out) noexcept = 0;
 
   // ── Data upload ───────────────────────────────────────────────
 

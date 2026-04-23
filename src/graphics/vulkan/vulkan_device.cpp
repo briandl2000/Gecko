@@ -183,6 +183,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
                &m_DebugMessenger);
   }
 
+  m_HasDebugUtils = haveDebugUtils;
+
   // ── Physical device ───────────────────────────────────────────
 
   u32 physicalDeviceCount = 0;
@@ -213,6 +215,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   vkGetPhysicalDeviceProperties(m_PhysicalDevice, &physicalDeviceProps);
   GECKO_INFO(labels::Vulkan, "VulkanDevice: using GPU '%s'",
              physicalDeviceProps.deviceName);
+
+  m_TimestampPeriodNs = physicalDeviceProps.limits.timestampPeriod;
 
   // Find graphics queue family
   u32 queueFamilyCount = 0;
@@ -1100,11 +1104,14 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
   imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
   imageCreateInfo.usage =
-      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+      VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   if (desc.IsRenderTarget)
     imageCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   if (desc.IsDepthStencil || isDepth)
     imageCreateInfo.usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+  if (desc.AllowUnorderedAccess)
+    imageCreateInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
   imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -1156,6 +1163,9 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
       vmaDestroyImage(dev->m_Allocator, d->Image, d->Allocation);
     FreeObject(d);
   });
+  if (desc.DebugName != nullptr)
+    SetObjectName(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<u64>(td->Image),
+                   desc.DebugName);
   return t;
 }
 
@@ -1280,9 +1290,15 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
       blendAttachments[RenderTargetDesc::MaxRenderTargets] {};
   for (u32 i = 0; i < desc.NumRenderTargets; ++i)
   {
-    blendAttachments[i].colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-        VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    const auto& bs = desc.BlendStates[i];
+    blendAttachments[i].blendEnable = bs.BlendEnable ? VK_TRUE : VK_FALSE;
+    blendAttachments[i].srcColorBlendFactor = ToVkBlendFactor(bs.SrcColor);
+    blendAttachments[i].dstColorBlendFactor = ToVkBlendFactor(bs.DstColor);
+    blendAttachments[i].colorBlendOp        = ToVkBlendOp(bs.ColorOp);
+    blendAttachments[i].srcAlphaBlendFactor = ToVkBlendFactor(bs.SrcAlpha);
+    blendAttachments[i].dstAlphaBlendFactor = ToVkBlendFactor(bs.DstAlpha);
+    blendAttachments[i].alphaBlendOp        = ToVkBlendOp(bs.AlphaOp);
+    blendAttachments[i].colorWriteMask      = ToVkColorWriteMask(bs.WriteMask);
   }
 
   VkPipelineColorBlendStateCreateInfo colorBlend {};
@@ -1302,76 +1318,35 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   pipelineLayoutCreateInfo.sType =
       VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-  // ── Descriptor set layout & samplers ──────────────────────────
+  // ── Descriptor set layout ─────────────────────────────────────
   // Resources are laid out as consecutive bindings in the order they
   // appear in `PipelineResources`, each `PipelineResource` contributing
   // `NumResources` individual descriptor slots of its type.
-  VkSampler samplers[GraphicsPipelineDesc::MaxSamplers] {};
-  u32 numSamplers = 0;
   VkDescriptorSetLayout dsl = VK_NULL_HANDLE;
   VkDescriptorType bindingTypes[VulkanPipelineData::MaxBindings] {};
   u32 numBindings = 0;
-  u32 textureBindings = 0;  // subset of numBindings
-
-  for (u32 i = 0; i < desc.NumSamplers; ++i)
-  {
-    const auto& samplerDesc = desc.SamplerDescs[i];
-    VkSamplerCreateInfo samplerCreateInfo {};
-    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerCreateInfo.magFilter = samplerDesc.Filter == SamplerFilter::Linear
-                                      ? VK_FILTER_LINEAR
-                                      : VK_FILTER_NEAREST;
-    samplerCreateInfo.minFilter = samplerCreateInfo.magFilter;
-    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    const VkSamplerAddressMode addressMode =
-        samplerDesc.WrapMode == SamplerWrapMode::Wrap
-            ? VK_SAMPLER_ADDRESS_MODE_REPEAT
-            : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerCreateInfo.addressModeU = addressMode;
-    samplerCreateInfo.addressModeV = addressMode;
-    samplerCreateInfo.addressModeW = addressMode;
-    samplerCreateInfo.maxLod = VK_LOD_CLAMP_NONE;
-    VULKAN_CHECK(vkCreateSampler(m_Device, &samplerCreateInfo, nullptr,
-                                 &samplers[numSamplers]));
-    ++numSamplers;
-  }
 
   VkDescriptorSetLayoutBinding bindings[VulkanPipelineData::MaxBindings] {};
-  VkSampler immSamplers[VulkanPipelineData::MaxBindings] {};
 
   for (u32 r = 0; r < desc.NumPipelineResources; ++r)
   {
     const auto& resource = desc.PipelineResources[r];
+    const VkDescriptorType dtype =
+        ToVkDescriptorType(resource.Type, /*isCompute*/ false);
+    if (dtype == VK_DESCRIPTOR_TYPE_MAX_ENUM)
+      continue;
     for (u32 n = 0; n < resource.NumResources &&
                     numBindings < VulkanPipelineData::MaxBindings;
          ++n)
     {
-      VkDescriptorType dtype = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      switch (resource.Type)
-      {
-      case ResourceType::Texture:
-        dtype = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        ++textureBindings;
-        break;
-      case ResourceType::ConstantBuffer:
-        dtype = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        break;
-      case ResourceType::StructuredBuffer:
-        dtype = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        break;
-      default:
-        continue;
-      }
       const u32 slot = numBindings;
       bindings[slot].binding = slot;
       bindings[slot].descriptorType = dtype;
       bindings[slot].descriptorCount = 1;
-      bindings[slot].stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
-      if (dtype == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER && numSamplers > 0)
-      {
-        immSamplers[slot] = samplers[0];
-        bindings[slot].pImmutableSamplers = &immSamplers[slot];
-      }
+      bindings[slot].stageFlags =
+          (resource.ShaderVisibility == ShaderType::All)
+              ? VkShaderStageFlags{VK_SHADER_STAGE_ALL_GRAPHICS}
+              : ToVkShaderStage(resource.ShaderVisibility);
       bindingTypes[slot] = dtype;
       ++numBindings;
     }
@@ -1390,6 +1365,16 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
     pipelineLayoutCreateInfo.pSetLayouts = &dsl;
   }
 
+  VkPushConstantRange pushConstantRange {};
+  if (desc.PushConstantBytes > 0)
+  {
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = desc.PushConstantBytes;
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+    pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+  }
+
   VkPipelineLayout layout = VK_NULL_HANDLE;
   VULKAN_CHECK(vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo,
                                       nullptr, &layout));
@@ -1406,6 +1391,29 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   renderingCreateInfo.depthAttachmentFormat =
       ToVkFormat(desc.DepthStencilFormat);
 
+  VkPipelineDepthStencilStateCreateInfo depthStencil {};
+  depthStencil.sType =
+      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depthStencil.depthTestEnable =
+      desc.DepthStencil.DepthTestEnable ? VK_TRUE : VK_FALSE;
+  depthStencil.depthWriteEnable =
+      desc.DepthStencil.DepthWriteEnable ? VK_TRUE : VK_FALSE;
+  depthStencil.depthCompareOp = ToVkCompareOp(desc.DepthStencil.DepthCompare);
+  depthStencil.stencilTestEnable =
+      desc.DepthStencil.StencilEnable ? VK_TRUE : VK_FALSE;
+  auto fillStencil = [&](const StencilOpDesc& s) {
+    VkStencilOpState o {};
+    o.failOp      = ToVkStencilOp(s.Fail);
+    o.depthFailOp = ToVkStencilOp(s.DepthFail);
+    o.passOp      = ToVkStencilOp(s.Pass);
+    o.compareOp   = ToVkCompareOp(s.Compare);
+    o.compareMask = desc.DepthStencil.StencilReadMask;
+    o.writeMask   = desc.DepthStencil.StencilWriteMask;
+    return o;
+  };
+  depthStencil.front = fillStencil(desc.DepthStencil.StencilFront);
+  depthStencil.back  = fillStencil(desc.DepthStencil.StencilBack);
+
   VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {};
   graphicsPipelineCreateInfo.sType =
       VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1417,6 +1425,8 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   graphicsPipelineCreateInfo.pViewportState = &viewportState;
   graphicsPipelineCreateInfo.pRasterizationState = &rasterizer;
   graphicsPipelineCreateInfo.pMultisampleState = &multisample;
+  graphicsPipelineCreateInfo.pDepthStencilState =
+      (desc.DepthStencilFormat != DataFormat::None) ? &depthStencil : nullptr;
   graphicsPipelineCreateInfo.pColorBlendState = &colorBlend;
   graphicsPipelineCreateInfo.pDynamicState = &dynamicState;
   graphicsPipelineCreateInfo.layout = layout;
@@ -1434,8 +1444,6 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
     vkDestroyPipelineLayout(m_Device, layout, nullptr);
     if (dsl != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
-    for (u32 i = 0; i < numSamplers; ++i)
-      vkDestroySampler(m_Device, samplers[i], nullptr);
     GECKO_ERROR(labels::Vulkan,
                 "VulkanDevice: vkCreateGraphicsPipelines failed (%d)",
                 static_cast<i32>(res));
@@ -1446,14 +1454,15 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   pd->Layout = layout;
   pd->Pipeline = pipeline;
   pd->DescSetLayout = dsl;
-  pd->NumSamplers = numSamplers;
-  pd->NumTextureBindings = textureBindings;
   pd->NumBindings = numBindings;
+  pd->PushConstantBytes = desc.PushConstantBytes;
   pd->IsCompute = false;
-  for (u32 i = 0; i < numSamplers; ++i)
-    pd->Samplers[i] = samplers[i];
   for (u32 i = 0; i < numBindings; ++i)
     pd->BindingTypes[i] = bindingTypes[i];
+
+  if (desc.DebugName != nullptr)
+    SetObjectName(VK_OBJECT_TYPE_PIPELINE,
+                   reinterpret_cast<u64>(pipeline), desc.DebugName);
 
   GraphicsPipeline gp;
   gp.Desc = desc;
@@ -1466,9 +1475,6 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
       vkDestroyPipelineLayout(dev->m_Device, d->Layout, nullptr);
     if (d->DescSetLayout != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(dev->m_Device, d->DescSetLayout, nullptr);
-    for (u32 i = 0; i < d->NumSamplers; ++i)
-      if (d->Samplers[i] != VK_NULL_HANDLE)
-        vkDestroySampler(dev->m_Device, d->Samplers[i], nullptr);
     FreeObject(d);
   });
   return gp;
@@ -1484,83 +1490,31 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   if (cs == VK_NULL_HANDLE)
     return ComputePipeline {};
 
-  // Samplers
-  VkSampler samplers[ComputePipelineDesc::MaxSamplers] {};
-  u32 numSamplers = 0;
-  for (u32 i = 0; i < desc.NumSamplers; ++i)
-  {
-    const auto& samplerDesc = desc.SamplerDescs[i];
-    VkSamplerCreateInfo samplerCreateInfo {};
-    samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerCreateInfo.magFilter = samplerDesc.Filter == SamplerFilter::Linear
-                                      ? VK_FILTER_LINEAR
-                                      : VK_FILTER_NEAREST;
-    samplerCreateInfo.minFilter = samplerCreateInfo.magFilter;
-    samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    const VkSamplerAddressMode addressMode =
-        samplerDesc.WrapMode == SamplerWrapMode::Wrap
-            ? VK_SAMPLER_ADDRESS_MODE_REPEAT
-            : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-    samplerCreateInfo.addressModeU = addressMode;
-    samplerCreateInfo.addressModeV = addressMode;
-    samplerCreateInfo.addressModeW = addressMode;
-    samplerCreateInfo.maxLod = VK_LOD_CLAMP_NONE;
-    VULKAN_CHECK(vkCreateSampler(m_Device, &samplerCreateInfo, nullptr,
-                                 &samplers[numSamplers]));
-    ++numSamplers;
-  }
-
-  // Bindings: read-only first, then read-write. Textures -> combined
-  // image sampler (sampled) / storage image (RW); buffers -> uniform /
-  // storage.
+  // ── Descriptor set layout ─────────────────────────────────────
   VkDescriptorSetLayoutBinding bindings[VulkanPipelineData::MaxBindings] {};
-  VkSampler immSamplers[VulkanPipelineData::MaxBindings] {};
   VkDescriptorType bindingTypes[VulkanPipelineData::MaxBindings] {};
   u32 numBindings = 0;
 
-  auto addGroup = [&](const PipelineResource* arr, u32 count, bool readOnly) {
-    for (u32 r = 0; r < count; ++r)
+  for (u32 r = 0; r < desc.NumPipelineResources; ++r)
+  {
+    const auto& resource = desc.PipelineResources[r];
+    const VkDescriptorType dtype =
+        ToVkDescriptorType(resource.Type, /*isCompute*/ true);
+    if (dtype == VK_DESCRIPTOR_TYPE_MAX_ENUM)
+      continue;
+    for (u32 n = 0; n < resource.NumResources &&
+                    numBindings < VulkanPipelineData::MaxBindings;
+         ++n)
     {
-      const auto& resource = arr[r];
-      for (u32 n = 0; n < resource.NumResources &&
-                      numBindings < VulkanPipelineData::MaxBindings;
-           ++n)
-      {
-        VkDescriptorType dtype = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        switch (resource.Type)
-        {
-        case ResourceType::Texture:
-          dtype = readOnly ? VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER
-                           : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-          break;
-        case ResourceType::ConstantBuffer:
-          dtype = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-          break;
-        case ResourceType::StructuredBuffer:
-          dtype = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-          break;
-        default:
-          continue;
-        }
-        const u32 slot = numBindings;
-        bindings[slot].binding = slot;
-        bindings[slot].descriptorType = dtype;
-        bindings[slot].descriptorCount = 1;
-        bindings[slot].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-        if (dtype == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER &&
-            numSamplers > 0)
-        {
-          immSamplers[slot] = samplers[0];
-          bindings[slot].pImmutableSamplers = &immSamplers[slot];
-        }
-        bindingTypes[slot] = dtype;
-        ++numBindings;
-      }
+      const u32 slot = numBindings;
+      bindings[slot].binding = slot;
+      bindings[slot].descriptorType = dtype;
+      bindings[slot].descriptorCount = 1;
+      bindings[slot].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+      bindingTypes[slot] = dtype;
+      ++numBindings;
     }
-  };
-
-  addGroup(desc.ReadOnlyResources, desc.NumReadOnlyResources, true);
-  addGroup(desc.ReadWriteResources, desc.NumReadWriteResources, false);
+  }
 
   VkDescriptorSetLayout dsl = VK_NULL_HANDLE;
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {};
@@ -1577,6 +1531,16 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
                                              nullptr, &dsl));
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &dsl;
+  }
+
+  VkPushConstantRange pushConstantRange {};
+  if (desc.PushConstantBytes > 0)
+  {
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = desc.PushConstantBytes;
+    pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+    pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
   }
 
   VkPipelineLayout layout = VK_NULL_HANDLE;
@@ -1606,8 +1570,6 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
     vkDestroyPipelineLayout(m_Device, layout, nullptr);
     if (dsl != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
-    for (u32 i = 0; i < numSamplers; ++i)
-      vkDestroySampler(m_Device, samplers[i], nullptr);
     GECKO_ERROR(labels::Vulkan,
                 "VulkanDevice: vkCreateComputePipelines failed (%d)",
                 static_cast<i32>(res));
@@ -1618,13 +1580,15 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   pd->Layout = layout;
   pd->Pipeline = pipeline;
   pd->DescSetLayout = dsl;
-  pd->NumSamplers = numSamplers;
   pd->NumBindings = numBindings;
+  pd->PushConstantBytes = desc.PushConstantBytes;
   pd->IsCompute = true;
-  for (u32 i = 0; i < numSamplers; ++i)
-    pd->Samplers[i] = samplers[i];
   for (u32 i = 0; i < numBindings; ++i)
     pd->BindingTypes[i] = bindingTypes[i];
+
+  if (desc.DebugName != nullptr)
+    SetObjectName(VK_OBJECT_TYPE_PIPELINE,
+                   reinterpret_cast<u64>(pipeline), desc.DebugName);
 
   ComputePipeline cp;
   cp.Desc = desc;
@@ -1637,12 +1601,167 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
       vkDestroyPipelineLayout(dev->m_Device, d->Layout, nullptr);
     if (d->DescSetLayout != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(dev->m_Device, d->DescSetLayout, nullptr);
-    for (u32 i = 0; i < d->NumSamplers; ++i)
-      if (d->Samplers[i] != VK_NULL_HANDLE)
-        vkDestroySampler(dev->m_Device, d->Samplers[i], nullptr);
     FreeObject(d);
   });
   return cp;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Sampler
+// ─────────────────────────────────────────────────────────────────────────
+
+Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
+{
+  if (!m_Valid)
+    return Sampler {};
+
+  VkSamplerCreateInfo samplerCreateInfo {};
+  samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+  samplerCreateInfo.magFilter = desc.Filter == SamplerFilter::Linear
+                                    ? VK_FILTER_LINEAR
+                                    : VK_FILTER_NEAREST;
+  samplerCreateInfo.minFilter  = samplerCreateInfo.magFilter;
+  samplerCreateInfo.mipmapMode = desc.Filter == SamplerFilter::Linear
+                                     ? VK_SAMPLER_MIPMAP_MODE_LINEAR
+                                     : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  const VkSamplerAddressMode addressMode =
+      desc.WrapMode == SamplerWrapMode::Wrap
+          ? VK_SAMPLER_ADDRESS_MODE_REPEAT
+          : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+  samplerCreateInfo.addressModeU = addressMode;
+  samplerCreateInfo.addressModeV = addressMode;
+  samplerCreateInfo.addressModeW = addressMode;
+  samplerCreateInfo.maxLod       = VK_LOD_CLAMP_NONE;
+
+  VkSampler vkSampler = VK_NULL_HANDLE;
+  if (vkCreateSampler(m_Device, &samplerCreateInfo, nullptr, &vkSampler)
+      != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateSampler failed");
+    return Sampler {};
+  }
+
+  auto* sd = AllocObject<VulkanSamplerData>();
+  sd->Sampler = vkSampler;
+
+  if (desc.DebugName != nullptr)
+    SetObjectName(VK_OBJECT_TYPE_SAMPLER,
+                   reinterpret_cast<u64>(vkSampler), desc.DebugName);
+
+  Sampler s;
+  s.Desc = desc;
+  VulkanDevice* dev = this;
+  s.Data = Shared<void>(sd, [dev](void* p) noexcept {
+    auto* d = static_cast<VulkanSamplerData*>(p);
+    if (d->Sampler != VK_NULL_HANDLE)
+      vkDestroySampler(dev->m_Device, d->Sampler, nullptr);
+    FreeObject(d);
+  });
+  return s;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Timestamp query pool
+// ─────────────────────────────────────────────────────────────────────────
+
+QueryPool VulkanDevice::CreateTimestampQueryPool(
+    const QueryPoolDesc& desc) noexcept
+{
+  if (!m_Valid || !desc.IsValid())
+    return QueryPool {};
+
+  VkQueryPoolCreateInfo queryPoolCreateInfo {};
+  queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+  queryPoolCreateInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+  queryPoolCreateInfo.queryCount = desc.Count;
+
+  VkQueryPool vkPool = VK_NULL_HANDLE;
+  if (vkCreateQueryPool(m_Device, &queryPoolCreateInfo, nullptr, &vkPool)
+      != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanDevice::CreateTimestampQueryPool failed");
+    return QueryPool {};
+  }
+
+  // Reset the whole pool up front so WriteTimestamp is legal before the
+  // first Reset call on a command list.
+  vkResetQueryPool(m_Device, vkPool, 0, desc.Count);
+
+  auto* qd = AllocObject<VulkanQueryPoolData>();
+  qd->QueryPool = vkPool;
+  qd->Count = desc.Count;
+  qd->TimestampPeriodNs = m_TimestampPeriodNs;
+
+  if (desc.DebugName != nullptr)
+    SetObjectName(VK_OBJECT_TYPE_QUERY_POOL,
+                   reinterpret_cast<u64>(vkPool), desc.DebugName);
+
+  QueryPool q;
+  q.Desc = desc;
+  VulkanDevice* dev = this;
+  q.Data = Shared<void>(qd, [dev](void* p) noexcept {
+    auto* d = static_cast<VulkanQueryPoolData*>(p);
+    if (d->QueryPool != VK_NULL_HANDLE)
+      vkDestroyQueryPool(dev->m_Device, d->QueryPool, nullptr);
+    FreeObject(d);
+  });
+  return q;
+}
+
+u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
+                                   ::std::span<u64> out) noexcept
+{
+  if (!pool.IsValid() || out.empty())
+    return 0;
+  auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
+  if (firstQuery >= qd->Count)
+    return 0;
+  const u32 count = static_cast<u32>(::std::min<::std::size_t>(
+      out.size(), qd->Count - firstQuery));
+
+  ::std::size_t stagingCount = count;
+  u64 staging[64];
+  ::std::vector<u64> heapStaging;
+  u64* ticks = staging;
+  if (stagingCount > 64)
+  {
+    heapStaging.resize(stagingCount);
+    ticks = heapStaging.data();
+  }
+
+  VkResult res = vkGetQueryPoolResults(
+      m_Device, qd->QueryPool, firstQuery, count, sizeof(u64) * count, ticks,
+      sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+  if (res != VK_SUCCESS)
+    return 0;
+
+  const f32 periodNs = qd->TimestampPeriodNs;
+  for (u32 i = 0; i < count; ++i)
+    out[i] = static_cast<u64>(static_cast<f64>(ticks[i])
+                                * static_cast<f64>(periodNs));
+  return count;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Debug naming
+// ─────────────────────────────────────────────────────────────────────────
+
+void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
+                                   const char* name) const noexcept
+{
+  if (!m_HasDebugUtils || name == nullptr || handle == 0)
+    return;
+  auto fn = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(
+      vkGetInstanceProcAddr(m_Instance, "vkSetDebugUtilsObjectNameEXT"));
+  if (fn == nullptr)
+    return;
+  VkDebugUtilsObjectNameInfoEXT info {};
+  info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+  info.objectType = type;
+  info.objectHandle = handle;
+  info.pObjectName = name;
+  fn(m_Device, &info);
 }
 
 // ─────────────────────────────────────────────────────────────────────────

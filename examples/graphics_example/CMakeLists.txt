@@ -42,7 +42,7 @@ set(_shader_list
   "triangle.vert.hlsl|vert|triangle.vert.spv|"
   "triangle.frag.hlsl|frag|triangle.frag.spv|"
   "fullscreen.vert.hlsl|vert|fullscreen.vert.spv|"
-  "fullscreen.frag.hlsl|frag|fullscreen.frag.spv|-fauto-combined-image-sampler"
+  "fullscreen.frag.hlsl|frag|fullscreen.frag.spv|"
 )
 
 set(_spv_outputs "")

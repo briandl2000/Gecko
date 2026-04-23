@@ -233,8 +233,7 @@ int main()
 
     // ── Pipeline 2: fullscreen blit -> swapchain ─────────────────
     // Same pipeline used against both swapchains (their backbuffers use the
-    // same format).  Binding 0: combined-image-sampler with a linear clamp
-    // sampler.
+    // same format).  Binding 0: SRV sampled image. Binding 1: sampler.
     GraphicsPipelineDesc blitPDesc;
     blitPDesc.VertexShader = ShaderCode{
         .Format = ShaderFormat::SPIRV,
@@ -255,13 +254,16 @@ int main()
 
     blitPDesc.PipelineResources[0] = PipelineResource::TextureBinding(
         1, ShaderType::Pixel);
-    blitPDesc.NumPipelineResources = 1;
-
-    blitPDesc.SamplerDescs[0].Filter   = SamplerFilter::Linear;
-    blitPDesc.SamplerDescs[0].WrapMode = SamplerWrapMode::Clamp;
-    blitPDesc.NumSamplers              = 1;
+    blitPDesc.PipelineResources[1] = PipelineResource::SamplerBinding(
+        1, ShaderType::Pixel);
+    blitPDesc.NumPipelineResources = 2;
 
     GraphicsPipeline blitPipeline = device->CreateGraphicsPipeline(blitPDesc);
+
+    SamplerDesc blitSamplerDesc {};
+    blitSamplerDesc.Filter   = SamplerFilter::Linear;
+    blitSamplerDesc.WrapMode = SamplerWrapMode::Clamp;
+    Sampler blitSampler      = device->CreateSampler(blitSamplerDesc);
 
     if (!trianglePipeline.IsValid() || !blitPipeline.IsValid())
     {
@@ -389,6 +391,7 @@ int main()
                          frames[i].BackBuffer.Desc.Height);
         cmd->BindPipeline(blitPipeline);
         cmd->BindTexture(0, sampled);
+        cmd->BindSampler(1, blitSampler);
         cmd->Draw(3);
         cmd->EndRendering();
       }

@@ -54,13 +54,37 @@ public:
   void BindVertexBuffer(const Buffer& buffer, u32 slot) noexcept override;
   void BindIndexBuffer(const Buffer& buffer) noexcept override;
   void BindConstantBuffer(u32 slot, const Buffer& buffer) noexcept override;
+  void BindStructuredBuffer(u32 slot, const Buffer& buffer) noexcept override;
+  void BindRWStructuredBuffer(u32 slot, const Buffer& buffer) noexcept override;
   void BindTexture(u32 slot, const Texture& texture) noexcept override;
+  void BindRWTexture(u32 slot, const Texture& texture) noexcept override;
+  void BindSampler(u32 slot, const Sampler& sampler) noexcept override;
+  void SetConstants(u32 offset,
+                     ::std::span<const ::gecko::byte> bytes) noexcept override;
 
   void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex,
              u32 firstInstance) noexcept override;
   void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
                     i32 vertexOffset, u32 firstInstance) noexcept override;
+  void DrawIndirect(const Buffer& buffer, u64 offset, u32 drawCount,
+                     u32 stride) noexcept override;
+  void DrawIndexedIndirect(const Buffer& buffer, u64 offset, u32 drawCount,
+                            u32 stride) noexcept override;
   void Dispatch(u32 x, u32 y, u32 z) noexcept override;
+  void DispatchIndirect(const Buffer& buffer, u64 offset) noexcept override;
+
+  void CopyBuffer(const Buffer& dst, u64 dstOffset, const Buffer& src,
+                   u64 srcOffset, u64 size) noexcept override;
+  void CopyBufferToTexture(const Texture& dst, u32 mip, u32 slice,
+                            const Buffer& src,
+                            u64 srcOffset) noexcept override;
+  void CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
+                            const Texture& src, u32 mip,
+                            u32 slice) noexcept override;
+
+  void ResetTimestamps(const QueryPool& pool, u32 first,
+                        u32 count) noexcept override;
+  void WriteTimestamp(const QueryPool& pool, u32 index) noexcept override;
 
   // ── Accessors used by VulkanDevice::Execute ───────────────────
 

@@ -32,11 +32,29 @@ public:
   void BindVertexBuffer(const Buffer&, u32) noexcept override {}
   void BindIndexBuffer(const Buffer&) noexcept override {}
   void BindConstantBuffer(u32, const Buffer&) noexcept override {}
+  void BindStructuredBuffer(u32, const Buffer&) noexcept override {}
+  void BindRWStructuredBuffer(u32, const Buffer&) noexcept override {}
   void BindTexture(u32, const Texture&) noexcept override {}
+  void BindRWTexture(u32, const Texture&) noexcept override {}
+  void BindSampler(u32, const Sampler&) noexcept override {}
+  void SetConstants(u32, ::std::span<const ::gecko::byte>) noexcept override {}
 
   void Draw(u32, u32, u32, u32) noexcept override {}
   void DrawIndexed(u32, u32, u32, i32, u32) noexcept override {}
+  void DrawIndirect(const Buffer&, u64, u32, u32) noexcept override {}
+  void DrawIndexedIndirect(const Buffer&, u64, u32, u32) noexcept override {}
   void Dispatch(u32, u32, u32) noexcept override {}
+  void DispatchIndirect(const Buffer&, u64) noexcept override {}
+
+  void CopyBuffer(const Buffer&, u64, const Buffer&, u64,
+                   u64) noexcept override {}
+  void CopyBufferToTexture(const Texture&, u32, u32, const Buffer&,
+                            u64) noexcept override {}
+  void CopyTextureToBuffer(const Buffer&, u64, const Texture&, u32,
+                            u32) noexcept override {}
+
+  void ResetTimestamps(const QueryPool&, u32, u32) noexcept override {}
+  void WriteTimestamp(const QueryPool&, u32) noexcept override {}
 };
 
 class NullDevice final : public GraphicsDevice
@@ -67,8 +85,11 @@ public:
   Buffer           CreateConstantBuffer(const ConstantBufferDesc&) noexcept override;
   Buffer           CreateStructuredBuffer(const StructuredBufferDesc&) noexcept override;
   Texture          CreateTexture(const TextureDesc&) noexcept override;
+  Sampler          CreateSampler(const SamplerDesc&) noexcept override;
   GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc&) noexcept override;
   ComputePipeline  CreateComputePipeline(const ComputePipelineDesc&) noexcept override;
+  QueryPool        CreateTimestampQueryPool(const QueryPoolDesc&) noexcept override;
+  u32 ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept override;
 
   void UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32,
                           u32) noexcept override;
