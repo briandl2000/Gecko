@@ -11,7 +11,6 @@
 #include "gecko/platform/platform_events.h"
 
 #include <cmath>
-#include <cstring>
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xlib.h>
 
@@ -91,9 +90,9 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
       continue;
     }
 
-    // Some KMS/DRM drivers (e.g. Raspberry Pi) report outputs as
-    // RR_Disconnected even when a CRTC is actively driving a display.
-    // Trust the CRTC assignment over the connection flag.
+    // Some KMS/DRM drivers report outputs as RR_Disconnected even when a
+    // CRTC is actively driving a display. Trust the CRTC assignment over
+    // the connection flag.
 
     ::XRRCrtcInfo* crtcInfo =
         ::XRRGetCrtcInfo(m_Display, resources, outInfo->crtc);

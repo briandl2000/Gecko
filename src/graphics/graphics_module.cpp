@@ -1,7 +1,6 @@
 #include "gecko/graphics/graphics_module.h"
 
 #include "gecko/core/scope.h"
-#include "gecko/core/services/log.h"
 #include "private/labels.h"
 
 namespace gecko::graphics {
@@ -19,8 +18,7 @@ bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
   return true;
 }
 
-void GraphicsModule::Shutdown(
-    ::gecko::IModuleRegistry& /*modules*/) noexcept
+void GraphicsModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Graphics);
 }

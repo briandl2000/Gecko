@@ -26,14 +26,14 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-shaderc
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -132,6 +132,96 @@ jobs:
             if [ -f "$exe" ]; then
               echo "--- $test ---"
               "$exe" || failed=1
+            else
+              echo "Test executable not found: $exe"
+              failed=1
+            fi
+          done
+          exit $failed
+
+  # ---------------------------------------------------------------------------
+  # Build & Test - aarch64 cross-compile (amd64 host + aarch64-linux-gnu
+  # toolchain; tests are run under qemu-user)
+  # ---------------------------------------------------------------------------
+  build-aarch64:
+    name: Build & Test (aarch64 cross)
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:25.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cross toolchain + arm64 multi-arch deps + qemu-user
+        shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          set -e
+          rm -f /etc/apt/sources.list.d/ubuntu.sources
+          printf '%s\n' \
+            'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky main restricted universe multiverse' \
+            'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky-updates main restricted universe multiverse' \
+            'deb [arch=amd64] http://security.ubuntu.com/ubuntu plucky-security main restricted universe multiverse' \
+            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky main restricted universe multiverse' \
+            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-updates main restricted universe multiverse' \
+            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-security main restricted universe multiverse' \
+            > /etc/apt/sources.list
+          dpkg --add-architecture arm64
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            gcc-15-aarch64-linux-gnu g++-15-aarch64-linux-gnu \
+            cmake ninja-build pkg-config python3 git ca-certificates file \
+            qemu-user \
+            glslc spirv-tools \
+            libvulkan-dev:arm64 \
+            libx11-dev:arm64 libxext-dev:arm64 libxrandr-dev:arm64 \
+            libwayland-dev:arm64 wayland-protocols libxkbcommon-dev:arm64
+          ln -sf /usr/bin/aarch64-linux-gnu-gcc-15 /usr/local/bin/aarch64-linux-gnu-gcc
+          ln -sf /usr/bin/aarch64-linux-gnu-g++-15 /usr/local/bin/aarch64-linux-gnu-g++
+
+      - name: Configure
+        env:
+          GECKO_PLATFORM_ID: Linux-aarch64
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/docker/aarch64-toolchain.cmake
+          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+        run: |
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" \
+            --toolchain $CMAKE_TOOLCHAIN_FILE -DGECKO_BUILD_TESTS=ON
+
+      - name: Build
+        env:
+          GECKO_PLATFORM_ID: Linux-aarch64
+        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
+
+      - name: Build tests
+        env:
+          GECKO_PLATFORM_ID: Linux-aarch64
+        run: |
+          for target in core_tests platform_tests runtime_tests math_tests graphics_tests; do
+            cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
+          done
+
+      - name: Verify aarch64 binaries
+        env:
+          GECKO_PLATFORM_ID: Linux-aarch64
+        run: |
+          file ./out/$GECKO_PLATFORM_ID/bin/Release/graphics_example | tee /tmp/arch.txt
+          grep -q "ARM aarch64" /tmp/arch.txt
+
+      - name: Run unit tests under qemu-user
+        env:
+          GECKO_PLATFORM_ID: Linux-aarch64
+          QEMU_LD_PREFIX: /usr/aarch64-linux-gnu
+        run: |
+          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
+          lib_dir="$(pwd)/out/$GECKO_PLATFORM_ID/bin/Release"
+          failed=0
+          for t in core_tests platform_tests runtime_tests math_tests graphics_tests; do
+            exe="$test_dir/$t"
+            if [ -f "$exe" ]; then
+              echo "--- $t ---"
+              LD_LIBRARY_PATH="$lib_dir" qemu-aarch64 "$exe" || failed=1
             else
               echo "Test executable not found: $exe"
               failed=1
@@ -264,14 +354,14 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake zip
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-shaderc zip
       
       - name: Set platform ID
         id: platform

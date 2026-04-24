@@ -90,8 +90,12 @@ class EventSubscription
 {
 public:
   EventSubscription() = default;
-  EventSubscription(const EventSubscription&) = delete("EventSubscription is move-only; copying would create duplicate unsubscribe");
-  EventSubscription& operator=(const EventSubscription&) = delete("EventSubscription is move-only; copying would create duplicate unsubscribe");
+  EventSubscription(const EventSubscription&) = delete (
+      "EventSubscription is move-only; copying would create duplicate "
+      "unsubscribe");
+  EventSubscription& operator=(const EventSubscription&) = delete (
+      "EventSubscription is move-only; copying would create duplicate "
+      "unsubscribe");
 
   EventSubscription(EventSubscription&& other) noexcept
       : m_Bus(other.m_Bus), m_Id(other.m_Id)

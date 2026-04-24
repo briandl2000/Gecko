@@ -33,8 +33,10 @@ class ModuleHandle
 {
 public:
   ModuleHandle() = default;
-  ModuleHandle(const ModuleHandle&) = delete("ModuleHandle is move-only; each handle has unique ownership");
-  ModuleHandle& operator=(const ModuleHandle&) = delete("ModuleHandle is move-only; each handle has unique ownership");
+  ModuleHandle(const ModuleHandle&) =
+      delete ("ModuleHandle is move-only; each handle has unique ownership");
+  ModuleHandle& operator=(const ModuleHandle&) =
+      delete ("ModuleHandle is move-only; each handle has unique ownership");
 
   GECKO_API ModuleHandle(ModuleHandle&& other) noexcept;
   GECKO_API ModuleHandle& operator=(ModuleHandle&& other) noexcept;

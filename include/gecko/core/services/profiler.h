@@ -89,8 +89,9 @@ struct ProfScope
 
   ProfScope(Label label, u32 hash, const char* name, ProfLevel lvl) noexcept;
   ~ProfScope() noexcept;
-  ProfScope(const ProfScope&) = delete("ProfScope is a stack-only RAII guard");
-  ProfScope& operator=(const ProfScope&) = delete("ProfScope is a stack-only RAII guard");
+  ProfScope(const ProfScope&) = delete ("ProfScope is a stack-only RAII guard");
+  ProfScope& operator=(const ProfScope&) =
+      delete ("ProfScope is a stack-only RAII guard");
 };
 
 }  // namespace gecko

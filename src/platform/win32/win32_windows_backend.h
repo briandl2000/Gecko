@@ -113,7 +113,8 @@ private:
       events::WindowFocusChangedPayload FocusChanged;
       events::WindowMovedPayload Moved;
       events::WindowStateChangedPayload StateChanged;
-      PayloadUnion() noexcept : Closed {} {}
+      PayloadUnion() noexcept : Closed {}
+      {}
     } Data;
     u32 PayloadSize {0};
   };

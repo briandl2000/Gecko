@@ -5,8 +5,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scripts.commands import BUILD_DIR, OUTPUT_DIR, _REPO_ROOT, is_network_path, _is_windows
+from scripts.commands import BUILD_DIR, OUTPUT_DIR, PLATFORM_ID, _REPO_ROOT, is_network_path, _is_windows
 from scripts.commands.build import _auto_configure
+
+
+def _is_cross_compile() -> bool:
+    """True when the build target platform doesn't match the host."""
+    import platform as _platform
+    arch_map = {"AMD64": "x86_64", "ARM64": "aarch64"}
+    host_arch = arch_map.get(_platform.machine(), _platform.machine())
+    host_os = "Windows" if _is_windows() else _platform.system()
+    host_id = f"{host_os}-{host_arch}"
+    return PLATFORM_ID != host_id
 
 # Unit test targets (headless, always run)
 UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests", "graphics_tests"]
@@ -105,6 +115,14 @@ def _run(args) -> int:
 
     if args.build_only:
         print(f"\nTests built successfully in {OUTPUT_DIR}/bin/{config}/tests/")
+        return 0
+
+    # Cross-compile: host can't execute target binaries (e.g. aarch64 on x86_64).
+    # Build only and point the user at the deploy helper.
+    if _is_cross_compile():
+        print(f"\nTests built for {PLATFORM_ID} in {OUTPUT_DIR}/bin/{config}/tests/")
+        print(f"Host cannot execute {PLATFORM_ID} binaries directly.")
+        print(f"Deploy and run on the target device.")
         return 0
 
     # Run tests directly (Catch2 handles test discovery and reporting)

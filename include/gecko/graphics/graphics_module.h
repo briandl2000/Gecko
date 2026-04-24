@@ -18,8 +18,8 @@ public:
 };
 
 // Explicit registration entry point (called by app/loader after services boot).
-[[nodiscard]] GECKO_API ::gecko::ModuleRegistration
-InstallGraphicsModule(::gecko::IModuleRegistry& modules) noexcept;
+[[nodiscard]] GECKO_API ::gecko::ModuleRegistration InstallGraphicsModule(
+    ::gecko::IModuleRegistry& modules) noexcept;
 
 // Access the module instance (for unified install flows).
 [[nodiscard]] GECKO_API ::gecko::IModule& GetModule() noexcept;

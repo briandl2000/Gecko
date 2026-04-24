@@ -12,8 +12,15 @@ compile_commands.json
 *.swo
 *~
 
-# Local dev scripts
+# Local-only dev scripts / config
 scripts/copy_debug.py
+# Per-developer env overrides (host/paths for remote-run helpers, etc.)
+.gecko-*.env
+
+# Safety nets — we don't vendor any of these; system Vulkan SDK is a
+# prerequisite (see docs/build.md). Blocks accidental check-ins.
+third_party/prebuilt/
+third_party/vulkan-headers/
 
 # OS
 .DS_Store

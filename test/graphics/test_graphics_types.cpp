@@ -1,4 +1,4 @@
-#include "gecko/graphics/objects.h"
+#include "gecko/graphics/graphics_types.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -98,9 +98,10 @@ TEST_CASE("VertexAttribute default is invalid", "[graphics][objects]")
   REQUIRE_FALSE(static_cast<bool>(attr));
 }
 
-TEST_CASE("VertexAttribute constructed from format is valid", "[graphics][objects]")
+TEST_CASE("VertexAttribute constructed from format is valid",
+          "[graphics][objects]")
 {
-  VertexAttribute attr{DataFormat::R32G32B32_FLOAT, "Position"};
+  VertexAttribute attr {DataFormat::R32G32B32_FLOAT, "Position"};
   REQUIRE(attr.IsValid());
   REQUIRE(attr.Size == 12);
   REQUIRE(attr.Offset == 0);
@@ -160,20 +161,21 @@ TEST_CASE("VertexBufferDesc default is invalid", "[graphics][objects]")
 
 TEST_CASE("VertexBufferDesc valid when all fields set", "[graphics][objects]")
 {
-  VertexBufferDesc desc{
+  VertexBufferDesc desc {
       .NumVertices = 100,
-      .VertexSize  = 12,
-      .Memory      = MemoryType::Dedicated,
+      .VertexSize = 12,
+      .Memory = MemoryType::Dedicated,
   };
   REQUIRE(desc.IsValid());
 }
 
-TEST_CASE("VertexBufferDesc invalid when NumVertices is 0", "[graphics][objects]")
+TEST_CASE("VertexBufferDesc invalid when NumVertices is 0",
+          "[graphics][objects]")
 {
-  VertexBufferDesc desc{
+  VertexBufferDesc desc {
       .NumVertices = 0,
-      .VertexSize  = 12,
-      .Memory      = MemoryType::Dedicated,
+      .VertexSize = 12,
+      .Memory = MemoryType::Dedicated,
   };
   REQUIRE_FALSE(desc.IsValid());
 }
@@ -188,11 +190,11 @@ TEST_CASE("TextureDesc default is invalid", "[graphics][objects]")
 
 TEST_CASE("TextureDesc valid with all required fields", "[graphics][objects]")
 {
-  TextureDesc desc{
-      .Width  = 512,
+  TextureDesc desc {
+      .Width = 512,
       .Height = 512,
       .Format = DataFormat::R8G8B8A8_UNORM,
-      .Type   = TextureType::Tex2D,
+      .Type = TextureType::Tex2D,
       .Memory = MemoryType::Dedicated,
   };
   REQUIRE(desc.IsValid());
@@ -209,9 +211,9 @@ TEST_CASE("RenderTargetDesc default is invalid", "[graphics][objects]")
 TEST_CASE("RenderTargetDesc valid with color target", "[graphics][objects]")
 {
   RenderTargetDesc desc;
-  desc.Width                 = 1280;
-  desc.Height                = 720;
-  desc.NumRenderTargets      = 1;
+  desc.Width = 1280;
+  desc.Height = 720;
+  desc.NumRenderTargets = 1;
   desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
   REQUIRE(desc.IsValid());
 }
@@ -219,18 +221,19 @@ TEST_CASE("RenderTargetDesc valid with color target", "[graphics][objects]")
 TEST_CASE("RenderTargetDesc valid with depth-only", "[graphics][objects]")
 {
   RenderTargetDesc desc;
-  desc.Width               = 1280;
-  desc.Height              = 720;
-  desc.NumRenderTargets    = 0;
-  desc.DepthStencilFormat  = DataFormat::R32_FLOAT;
+  desc.Width = 1280;
+  desc.Height = 720;
+  desc.NumRenderTargets = 0;
+  desc.DepthStencilFormat = DataFormat::R32_FLOAT;
   REQUIRE(desc.IsValid());
 }
 
-TEST_CASE("RenderTargetDesc invalid when no target format", "[graphics][objects]")
+TEST_CASE("RenderTargetDesc invalid when no target format",
+          "[graphics][objects]")
 {
   RenderTargetDesc desc;
-  desc.Width            = 1280;
-  desc.Height           = 720;
+  desc.Width = 1280;
+  desc.Height = 720;
   desc.NumRenderTargets = 1;  // format left as None
   REQUIRE_FALSE(desc.IsValid());
 }
@@ -246,9 +249,13 @@ TEST_CASE("GraphicsPipelineDesc default is invalid", "[graphics][objects]")
 TEST_CASE("GraphicsPipelineDesc valid with shader path and render target",
           "[graphics][objects]")
 {
+  static constexpr ::gecko::byte DummySpv[] = {::gecko::byte {0}};
   GraphicsPipelineDesc desc;
-  desc.VertexShaderPath       = "shaders/vert.spv";
-  desc.NumRenderTargets       = 1;
+  desc.VertexShader = ShaderCode {
+      .Format = ShaderFormat::SPIRV,
+      .Bytes = {DummySpv, sizeof(DummySpv)},
+  };
+  desc.NumRenderTargets = 1;
   desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
   REQUIRE(desc.IsValid());
 }
@@ -263,7 +270,11 @@ TEST_CASE("ComputePipelineDesc default is invalid", "[graphics][objects]")
 
 TEST_CASE("ComputePipelineDesc valid with shader path", "[graphics][objects]")
 {
-  ComputePipelineDesc desc{.ComputeShaderPath = "shaders/comp.spv"};
+  static constexpr ::gecko::byte DummySpv[] = {::gecko::byte {0}};
+  ComputePipelineDesc desc {.ComputeShader = ShaderCode {
+                                .Format = ShaderFormat::SPIRV,
+                                .Bytes = {DummySpv, sizeof(DummySpv)},
+                            }};
   REQUIRE(desc.IsValid());
 }
 
@@ -277,8 +288,8 @@ TEST_CASE("SwapchainDesc default is invalid", "[graphics][objects]")
 
 TEST_CASE("SwapchainDesc valid with width/height/format", "[graphics][objects]")
 {
-  SwapchainDesc desc{
-      .Width  = 1280,
+  SwapchainDesc desc {
+      .Width = 1280,
       .Height = 720,
   };
   REQUIRE(desc.IsValid());

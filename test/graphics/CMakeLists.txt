@@ -1,5 +1,5 @@
 add_executable(graphics_tests
-  test_objects.cpp
+  test_graphics_types.cpp
   test_null_device.cpp
 )
 
