@@ -112,9 +112,21 @@ struct IAllocator
   GECKO_API virtual void Shutdown() noexcept = 0;
 };
 
-// Never returns null — defaults to SystemAllocator before services are
-// installed.
-GECKO_API IAllocator* GetAllocator() noexcept;
+// The allocator is infrastructure, not a service. It is always available,
+// from the first instruction of main() onwards.
+//
+// - `Allocator()` returns a reference to the active IAllocator. Never null.
+//   Defaults to a process-lifetime SystemAllocator if SetAllocator() has
+//   not been called.
+// - `SetAllocator()` installs a custom IAllocator. Calls Init() on the
+//   passed allocator and returns false if Init() fails. Calling it again
+//   shuts down the previous allocator first. Pass nullptr to fall back to
+//   the default (equivalent to ResetAllocator()).
+// - `ResetAllocator()` shuts down the current allocator (if any was
+//   installed via SetAllocator) and reverts to the default SystemAllocator.
+GECKO_API IAllocator& Allocator() noexcept;
+GECKO_API bool SetAllocator(IAllocator* allocator) noexcept;
+GECKO_API void ResetAllocator() noexcept;
 
 [[nodiscard]]
 inline void* AllocBytes(u64 size,
@@ -123,13 +135,13 @@ inline void* AllocBytes(u64 size,
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
                "Alignment must be power of 2");
-  return GetAllocator()->Alloc(size, alignment);
+  return Allocator().Alloc(size, alignment);
 }
 
 inline void DeallocBytes(void* ptr) noexcept
 {
   if (ptr)
-    GetAllocator()->Free(ptr);
+    Allocator().Free(ptr);
 }
 
 template <class T>
@@ -145,11 +157,11 @@ struct LabelScope
 {
   LabelScope(Label label) noexcept
   {
-    GetAllocator()->PushLabel(label);
+    Allocator().PushLabel(label);
   }
   ~LabelScope() noexcept
   {
-    GetAllocator()->PopLabel();
+    Allocator().PopLabel();
   }
   LabelScope(const LabelScope&) = delete;
   LabelScope& operator=(const LabelScope&) = delete;

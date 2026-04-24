@@ -170,15 +170,13 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
   return true;
 }
 
-static Services CreateServices(runtime::TrackingAllocator& trackingAlloc,
-                               runtime::ThreadPoolJobSystem& jobSystem,
+static Services CreateServices(runtime::ThreadPoolJobSystem& jobSystem,
                                runtime::RingProfiler& ringProfiler,
                                runtime::RingLogger& ringLogger,
                                runtime::ModuleRegistry& moduleRegistry,
                                runtime::EventBus& eventBus)
 {
   Services services {};
-  services.Allocator = &trackingAlloc;
   services.JobSystem = &jobSystem;
   services.Profiler = &ringProfiler;
   services.Logger = &ringLogger;
@@ -198,9 +196,12 @@ static int AppMain(int argc, char** argv)
     return 2;
   }
 
-  // 1) Choose concrete implementations for core services.
+  // 1) Allocator is infrastructure — install it before anything else.
   runtime::TrackingAllocator trackingAlloc;
+  if (!SetAllocator(&trackingAlloc))
+    return 1;
 
+  // 2) Choose concrete implementations for the remaining services.
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
@@ -210,8 +211,8 @@ static int AppMain(int argc, char** argv)
   runtime::ModuleRegistry moduleRegistry;
   runtime::EventBus eventBus;
 
-  // 2) Install services (Allocator -> JobSystem -> Profiler -> Logger).
-  GECKO_BOOT((CreateServices(trackingAlloc, jobSystem, ringProfiler, ringLogger,
+  // 3) Install services (JobSystem -> Profiler -> Logger -> Modules/EventBus).
+  GECKO_BOOT((CreateServices(jobSystem, ringProfiler, ringLogger,
                              moduleRegistry, eventBus)));
 
   // 3) Configure sinks AFTER services are installed - they auto-unregister
@@ -312,6 +313,7 @@ static int AppMain(int argc, char** argv)
 
   // 5) Shutdown services in reverse order.
   GECKO_SHUTDOWN();
+  ResetAllocator();
   return result;
 }
 

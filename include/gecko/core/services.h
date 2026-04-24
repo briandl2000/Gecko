@@ -10,9 +10,11 @@
 
 namespace gecko {
 
+// Services installed via InstallServices(). Allocator is NOT a service —
+// it's infrastructure; configure it independently via SetAllocator() (see
+// memory.h).
 struct Services
 {
-  IAllocator* Allocator = nullptr;
   IJobSystem* JobSystem = nullptr;
   IProfiler* Profiler = nullptr;
   ILogger* Logger = nullptr;
@@ -25,7 +27,6 @@ GECKO_API bool InstallServices(const Services& service) noexcept;
 
 GECKO_API void UninstallServices() noexcept;
 
-GECKO_API IAllocator* GetAllocator() noexcept;
 GECKO_API IJobSystem* GetJobSystem() noexcept;
 GECKO_API IProfiler* GetProfiler() noexcept;
 GECKO_API ILogger* GetLogger() noexcept;

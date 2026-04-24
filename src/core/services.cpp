@@ -15,13 +15,20 @@ static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
 
 // Function-local static avoids the static initialization order fiasco.
+// The default SystemAllocator is alive from first use until process exit
+// and is the fallback whenever no user allocator is installed.
 static SystemAllocator& DefaultAllocator() noexcept
 {
   static SystemAllocator instance;
   return instance;
 }
 
-static std::atomic<IAllocator*> g_Allocator {nullptr};
+// User-installed allocator (via SetAllocator). Null means "use the
+// default". The Allocator() accessor never observes a torn state because
+// SetAllocator/ResetAllocator publish via memory_order_release and readers
+// load via memory_order_acquire.
+static std::atomic<IAllocator*> g_UserAllocator {nullptr};
+
 static std::atomic<IModuleRegistry*> g_Modules {nullptr};
 static std::atomic<IEventBus*> g_EventBus {nullptr};
 static std::atomic<IJobSystem*> g_JobSystem {&s_NullJobSystem};
@@ -31,7 +38,6 @@ static std::atomic<bool> g_Installed {false};
 
 struct ServiceInstallState
 {
-  bool allocator = false;
   bool jobSystem = false;
   bool profiler = false;
   bool logger = false;
@@ -67,11 +73,6 @@ static void RollbackServices(const Services& svc,
     svc.JobSystem->Shutdown();
     g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
   }
-  if (st.allocator && svc.Allocator)
-  {
-    svc.Allocator->Shutdown();
-    g_Allocator.store(&DefaultAllocator(), std::memory_order_release);
-  }
 }
 
 bool InstallServices(const Services& svc) noexcept
@@ -79,20 +80,10 @@ bool InstallServices(const Services& svc) noexcept
   if (g_Installed.load(std::memory_order_relaxed))
     return false;
 
-  GECKO_ASSERT(svc.Allocator && "Allocator is required");
   GECKO_ASSERT(svc.Modules && "ModuleRegistry is required");
   GECKO_ASSERT(svc.EventBus && "EventBus is required");
 
   ServiceInstallState st {};
-
-  // Level 0: Allocator
-  if (!svc.Allocator->Init())
-  {
-    GECKO_ASSERT(false && "Allocator failed to initialize!");
-    return false;
-  }
-  g_Allocator.store(svc.Allocator, std::memory_order_release);
-  st.allocator = true;
 
   // Level 1: JobSystem
   if (svc.JobSystem)
@@ -164,9 +155,7 @@ void UninstallServices() noexcept
   g_Logger.load(std::memory_order_relaxed)->Shutdown();
   g_Profiler.load(std::memory_order_relaxed)->Shutdown();
   g_JobSystem.load(std::memory_order_relaxed)->Shutdown();
-  g_Allocator.load(std::memory_order_relaxed)->Shutdown();
 
-  g_Allocator.store(&DefaultAllocator(), std::memory_order_release);
   g_JobSystem.store(&s_NullJobSystem, std::memory_order_release);
   g_Profiler.store(&s_NullProfiler, std::memory_order_release);
   g_Logger.store(&s_NullLogger, std::memory_order_release);
@@ -175,10 +164,40 @@ void UninstallServices() noexcept
   g_Installed.store(false, std::memory_order_release);
 }
 
-IAllocator* GetAllocator() noexcept
+IAllocator& Allocator() noexcept
 {
-  auto* alloc = g_Allocator.load(std::memory_order_acquire);
-  return alloc ? alloc : &DefaultAllocator();
+  if (auto* alloc = g_UserAllocator.load(std::memory_order_acquire))
+    return *alloc;
+  return DefaultAllocator();
+}
+
+bool SetAllocator(IAllocator* allocator) noexcept
+{
+  if (allocator == nullptr)
+  {
+    ResetAllocator();
+    return true;
+  }
+
+  // Replace path: shut down whatever was previously installed first.
+  if (auto* prev = g_UserAllocator.exchange(nullptr, std::memory_order_acq_rel))
+  {
+    prev->Shutdown();
+  }
+
+  if (!allocator->Init())
+    return false;
+
+  g_UserAllocator.store(allocator, std::memory_order_release);
+  return true;
+}
+
+void ResetAllocator() noexcept
+{
+  if (auto* prev = g_UserAllocator.exchange(nullptr, std::memory_order_acq_rel))
+  {
+    prev->Shutdown();
+  }
 }
 
 IJobSystem* GetJobSystem() noexcept
@@ -213,8 +232,8 @@ bool IsServicesInstalled() noexcept
 
 bool ValidateServices(bool fatalOnFail) noexcept
 {
-  bool ok = GetAllocator() && GetProfiler() && GetLogger() && GetJobSystem() &&
-            GetModules() && IsServicesInstalled();
+  bool ok = GetProfiler() && GetLogger() && GetJobSystem() && GetModules() &&
+            IsServicesInstalled();
 
   if (!ok && fatalOnFail)
   {

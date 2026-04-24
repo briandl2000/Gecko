@@ -9,12 +9,15 @@ TEST_CASE("Services are not installed initially", "[core][services]")
   REQUIRE_FALSE(IsServicesInstalled());
 }
 
-TEST_CASE("GetAllocator returns SystemAllocator before boot",
+TEST_CASE("Allocator returns default before any SetAllocator",
           "[core][services]")
 {
   REQUIRE_FALSE(IsServicesInstalled());
-  IAllocator* alloc = GetAllocator();
-  REQUIRE(alloc != nullptr);
+  IAllocator& alloc = Allocator();
+  // Reference-returning API: we just exercise it.
+  void* p = alloc.Alloc(16, alignof(::std::max_align_t));
+  REQUIRE(p != nullptr);
+  alloc.Free(p);
 }
 
 TEST_CASE("Install and uninstall with null services", "[core][services]")
@@ -26,7 +29,7 @@ TEST_CASE("Install and uninstall with null services", "[core][services]")
   NullModuleRegistry modules;
   NullEventBus events;
 
-  alloc.Init();
+  REQUIRE(SetAllocator(&alloc));
   jobs.Init();
   profiler.Init();
   logger.Init();
@@ -34,7 +37,6 @@ TEST_CASE("Install and uninstall with null services", "[core][services]")
   events.Init();
 
   Services svc {
-      .Allocator = &alloc,
       .JobSystem = &jobs,
       .Profiler = &profiler,
       .Logger = &logger,
@@ -46,7 +48,7 @@ TEST_CASE("Install and uninstall with null services", "[core][services]")
   REQUIRE(IsServicesInstalled());
   REQUIRE(ValidateServices(false));
 
-  REQUIRE(GetAllocator() == &alloc);
+  REQUIRE(&Allocator() == &alloc);
   REQUIRE(GetJobSystem() == &jobs);
   REQUIRE(GetProfiler() == &profiler);
   REQUIRE(GetLogger() == &logger);
@@ -54,6 +56,7 @@ TEST_CASE("Install and uninstall with null services", "[core][services]")
   REQUIRE(GetEventBus() == &events);
 
   UninstallServices();
+  ResetAllocator();
   REQUIRE_FALSE(IsServicesInstalled());
 }
 

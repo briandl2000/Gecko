@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Allocator decoupled from `Services`. Use `SetAllocator(IAllocator*)` /
+  `ResetAllocator()` for lifecycle and `Allocator()` (returns reference)
+  for access. `services.Allocator` and `GetAllocator()` removed.
+
 ## [0.0.0-alpha.3]
 
 ### Added

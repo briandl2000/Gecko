@@ -149,6 +149,9 @@ const char* BoolStr(bool v) noexcept
 int main()
 {
   runtime::TrackingAllocator trackingAlloc;
+  if (!SetAllocator(&trackingAlloc))
+    return 1;
+
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
   runtime::ImmediateLogger immediateLogger;     // Immediate logging
 
@@ -160,8 +163,7 @@ int main()
   jobSystem.SetWorkerThreadCount(4);
 
   // Use GECKO_BOOT system for proper service installation and validation
-  GECKO_BOOT((Services {.Allocator = &trackingAlloc,
-                        .JobSystem = &jobSystem,
+  GECKO_BOOT((Services {.JobSystem = &jobSystem,
                         .Profiler = &ringProfiler,
                         .Logger = &immediateLogger,
                         .Modules = &moduleRegistry,
@@ -701,6 +703,7 @@ int main()
   traceSink.Unregister();
 
   GECKO_SHUTDOWN();
+  ResetAllocator();
 
   ::std::printf("Application exited successfully\n");
   return 0;
