@@ -132,14 +132,11 @@ out/
 
 Pre-configured launch targets in `.vscode/launch.json`:
 
-- **Debug: Target (Linux)** — GDB on Linux
-- **Debug: Target (Windows)** — GDB via MSYS2 on Windows
+- **Local: Debug example** — GDB on Linux (pick Debug/Release + target)
+- **Pi: Debug example (remote gdbserver)** — see [Raspberry Pi / aarch64](#raspberry-pi--aarch64)
 
-Set breakpoints, press `F5`, pick a target. All configs build before launching.
-
-**Windows:** uses MSYS2 GDB (`C:\msys64\ucrt64\bin\gdb.exe`). The pre-launch
-task copies artifacts to `C:\Gecko\debug\` to avoid network-share + SmartScreen
-issues.
+Set breakpoints, press `F5`, pick a target. The Local target builds via
+`gk: build` before launching.
 
 ## MinGW Runtime DLLs
 
@@ -161,3 +158,57 @@ being on `PATH`.
 
 Pre-configured tasks in `.vscode/tasks.json`: **gk build**, **gk test**,
 **gk clean**. Run with `Ctrl+Shift+B` or the command palette.
+
+## Raspberry Pi / aarch64
+
+Cross-building for a Raspberry Pi runs the build inside an aarch64 Docker
+container (via QEMU binfmt) so CMake configures exactly like it would on a
+real Pi. The Pi itself is only touched by `deploy` / `run` / `gdbserver`.
+
+### Prerequisites
+
+| Tool | Install |
+|------|---------|
+| Docker | `sudo pacman -S docker` / `sudo apt-get install docker.io` |
+| QEMU user-mode | `sudo pacman -S qemu-user-static` / `sudo apt-get install qemu-user-static binfmt-support` |
+| SSH access to the Pi | key-based login to `pi@raspberrypi.local` (or whatever you configure) |
+
+Verify binfmt is registered for arm64:
+
+```bash
+ls /proc/sys/fs/binfmt_misc/ | grep -i aarch64
+# if empty:
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+```
+
+### Configuration
+
+Copy the template and edit the SSH host / remote path:
+
+```bash
+cp .gecko-pi.env.example .gecko-pi.env
+$EDITOR .gecko-pi.env       # host, dir, gdb port — all gitignored
+```
+
+### Workflow
+
+```bash
+source scripts/pi-dev.sh             # once per shell
+gk-pi build debug                    # first run builds the image (~10 min)
+gk-pi test debug                     # runs tests inside the container
+gk-pi deploy debug                   # rsync to the Pi
+gk-pi run graphics_example debug     # deploy + ssh exec on the Pi
+gk-pi gdbserver graphics_example     # used by VS Code remote launch
+gk-pi shell                          # interactive shell in the aarch64 image
+gk-pi rebuild-image                  # rebuild the Docker image from scratch
+```
+
+The image is defined in `docker/aarch64.Dockerfile`; rebuild it any time the
+Dockerfile changes with `gk-pi rebuild-image`.
+
+### VS Code
+
+Launch config **Pi: Debug example (remote gdbserver)** wires the above together:
+it invokes `gk-pi gdbserver`, connects GDB to `$GECKO_PI_HOST:$GECKO_PI_GDB_PORT`,
+and on exit runs `gk-pi fetch-logs` to pull `working_dir/` back.
+
