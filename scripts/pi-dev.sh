@@ -41,9 +41,9 @@ _gkpi_err() { printf '[gk-pi] error: %s\n' "$*" >&2; }
 # ---- docker plumbing -------------------------------------------------------
 _gkpi_require_docker() {
     if ! command -v docker >/dev/null 2>&1; then
-        _gkpi_err "docker not found in PATH. Install Docker and binfmt for arm64:"
-        _gkpi_err "    sudo pacman -S docker qemu-user-static        # Arch"
-        _gkpi_err "    sudo apt-get install docker.io qemu-user-static binfmt-support   # Debian/Ubuntu"
+        _gkpi_err "docker not found in PATH. Install:"
+        _gkpi_err "    sudo pacman -S docker                           # Arch"
+        _gkpi_err "    sudo apt-get install docker.io                  # Debian/Ubuntu"
         return 1
     fi
 }
@@ -53,10 +53,8 @@ _gkpi_ensure_image() {
     if docker image inspect "$GECKO_PI_IMAGE_TAG" >/dev/null 2>&1; then
         return 0
     fi
-    _gkpi_log "aarch64 image '$GECKO_PI_IMAGE_TAG' not present — building (one-time, ~10 min)..."
-    # Register QEMU handlers if not already (no-op on subsequent runs).
-    docker run --rm --privileged multiarch/qemu-user-static --reset -p yes >/dev/null 2>&1 || true
-    docker buildx build --platform=linux/arm64 \
+    _gkpi_log "aarch64 image '$GECKO_PI_IMAGE_TAG' not present — building (one-time, ~2 min)..."
+    docker build \
         -t "$GECKO_PI_IMAGE_TAG" \
         -f "$GECKO_PI_DOCKERFILE" \
         "$GECKO_REPO_ROOT" || return 1
@@ -65,10 +63,12 @@ _gkpi_ensure_image() {
 _gkpi_docker_run() {
     _gkpi_ensure_image || return 1
     docker run --rm -t \
-        --platform=linux/arm64 \
+        --user "$(id -u):$(id -g)" \
         -v "$GECKO_REPO_ROOT":/workspace \
         -w /workspace \
+        -e HOME=/tmp \
         -e GECKO_PLATFORM_ID=Linux-aarch64 \
+        -e CMAKE_TOOLCHAIN_FILE=/workspace/docker/aarch64-toolchain.cmake \
         "$GECKO_PI_IMAGE_TAG" \
         "$@"
 }

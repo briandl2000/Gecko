@@ -161,25 +161,18 @@ Pre-configured tasks in `.vscode/tasks.json`: **gk build**, **gk test**,
 
 ## Raspberry Pi / aarch64
 
-Cross-building for a Raspberry Pi runs the build inside an aarch64 Docker
-container (via QEMU binfmt) so CMake configures exactly like it would on a
-real Pi. The Pi itself is only touched by `deploy` / `run` / `gdbserver`.
+Cross-building for a Raspberry Pi runs the build inside an x86_64 Docker
+container that carries an `aarch64-linux-gnu` GCC 15 cross-toolchain and
+aarch64 multi-arch runtime libs. The compiler runs natively on the host — no
+QEMU emulation — so build times match a regular local build. The Pi itself
+is only touched by `deploy` / `run` / `gdbserver`.
 
 ### Prerequisites
 
 | Tool | Install |
 |------|---------|
 | Docker | `sudo pacman -S docker` / `sudo apt-get install docker.io` |
-| QEMU user-mode | `sudo pacman -S qemu-user-static` / `sudo apt-get install qemu-user-static binfmt-support` |
 | SSH access to the Pi | key-based login to `pi@raspberrypi.local` (or whatever you configure) |
-
-Verify binfmt is registered for arm64:
-
-```bash
-ls /proc/sys/fs/binfmt_misc/ | grep -i aarch64
-# if empty:
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-```
 
 ### Configuration
 
@@ -194,17 +187,18 @@ $EDITOR .gecko-pi.env       # host, dir, gdb port — all gitignored
 
 ```bash
 source scripts/pi-dev.sh             # once per shell
-gk-pi build debug                    # first run builds the image (~10 min)
+gk-pi build debug                    # first run builds the image (~2 min)
 gk-pi test debug                     # runs tests inside the container
 gk-pi deploy debug                   # rsync to the Pi
 gk-pi run graphics_example debug     # deploy + ssh exec on the Pi
 gk-pi gdbserver graphics_example     # used by VS Code remote launch
-gk-pi shell                          # interactive shell in the aarch64 image
+gk-pi shell                          # interactive shell in the container
 gk-pi rebuild-image                  # rebuild the Docker image from scratch
 ```
 
-The image is defined in `docker/aarch64.Dockerfile`; rebuild it any time the
-Dockerfile changes with `gk-pi rebuild-image`.
+The image is defined in [docker/aarch64.Dockerfile](../docker/aarch64.Dockerfile);
+its CMake toolchain lives in [docker/aarch64-toolchain.cmake](../docker/aarch64-toolchain.cmake).
+Rebuild with `gk-pi rebuild-image` after changing either.
 
 ### VS Code
 

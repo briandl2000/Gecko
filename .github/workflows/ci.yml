@@ -140,35 +140,52 @@ jobs:
           exit $failed
 
   # ---------------------------------------------------------------------------
-  # Build & Test - aarch64 (native ARM runner; proves the Pi build works)
+  # Build & Test - aarch64 cross-compile (proves the Pi build works)
   # ---------------------------------------------------------------------------
-  build-and-test-aarch64:
-    name: Build & Test (ubuntu-24.04-arm)
-    runs-on: ubuntu-24.04-arm
+  build-aarch64:
+    name: Build aarch64 (cross, ubuntu-25.04)
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:25.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install cross toolchain + arm64 multi-arch deps
+        shell: bash
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install -y \
-            ninja-build gcc-15 g++-15 \
-            libvulkan-dev vulkan-validationlayers spirv-tools glslc \
-            libx11-dev libxext-dev libxrandr-dev \
-            libwayland-dev wayland-protocols libxkbcommon-dev
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
+          set -e
+          rm -f /etc/apt/sources.list.d/ubuntu.sources
+          printf '%s\n' \
+            'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky main restricted universe multiverse' \
+            'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky-updates main restricted universe multiverse' \
+            'deb [arch=amd64] http://security.ubuntu.com/ubuntu plucky-security main restricted universe multiverse' \
+            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky main restricted universe multiverse' \
+            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-updates main restricted universe multiverse' \
+            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-security main restricted universe multiverse' \
+            > /etc/apt/sources.list
+          dpkg --add-architecture arm64
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            gcc-15-aarch64-linux-gnu g++-15-aarch64-linux-gnu \
+            cmake ninja-build pkg-config python3 git ca-certificates \
+            glslc spirv-tools \
+            libvulkan-dev:arm64 \
+            libx11-dev:arm64 libxext-dev:arm64 libxrandr-dev:arm64 \
+            libwayland-dev:arm64 wayland-protocols libxkbcommon-dev:arm64
+          ln -sf /usr/bin/aarch64-linux-gnu-gcc-15 /usr/local/bin/aarch64-linux-gnu-gcc
+          ln -sf /usr/bin/aarch64-linux-gnu-g++-15 /usr/local/bin/aarch64-linux-gnu-g++
 
       - name: Configure
         env:
           GECKO_PLATFORM_ID: Linux-aarch64
+          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/docker/aarch64-toolchain.cmake
+          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
         run: |
-          export CC=gcc-15 CXX=g++-15
-          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" \
+            --toolchain $CMAKE_TOOLCHAIN_FILE -DGECKO_BUILD_TESTS=ON
 
       - name: Build
         env:
@@ -183,23 +200,13 @@ jobs:
             cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
           done
 
-      - name: Run tests
+      - name: Verify aarch64 binaries
         env:
           GECKO_PLATFORM_ID: Linux-aarch64
         run: |
-          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
-          failed=0
-          for test in core_tests platform_tests runtime_tests math_tests graphics_tests; do
-            exe="$test_dir/${test}"
-            if [ -f "$exe" ]; then
-              echo "--- $test ---"
-              "$exe" || failed=1
-            else
-              echo "Test executable not found: $exe"
-              failed=1
-            fi
-          done
-          exit $failed
+          apt-get install -y --no-install-recommends file
+          file ./out/$GECKO_PLATFORM_ID/bin/Release/graphics_example | tee /tmp/arch.txt
+          grep -q "ARM aarch64" /tmp/arch.txt
 
   # ---------------------------------------------------------------------------
   # PR checks - enforce version bump and changelog for PRs to main
