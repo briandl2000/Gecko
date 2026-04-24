@@ -161,6 +161,9 @@ Pre-configured tasks in `.vscode/tasks.json`: **gk build**, **gk test**,
 
 ## Raspberry Pi / aarch64
 
+See [docs/pi-workflow.md](pi-workflow.md) for the full end-to-end guide
+(setup, daily commands, VS Code, troubleshooting). TL;DR below.
+
 Cross-building for a Raspberry Pi runs the build inside an x86_64 Docker
 container that carries an `aarch64-linux-gnu` GCC 15 cross-toolchain and
 aarch64 multi-arch runtime libs. The compiler runs natively on the host — no

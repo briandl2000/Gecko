@@ -11,8 +11,9 @@
 #     gk-pi gdbserver graphics_example debug   # deploy + remote gdbserver
 #     gk-pi fetch-logs               # pull ~/gecko/working_dir/ back
 #
-# Builds run in a Debian/Ubuntu aarch64 container via QEMU binfmt_misc.
-# Deploy / run / gdbserver use plain ssh+rsync to the Pi.
+# Builds run in an x86_64 container that carries an aarch64-linux-gnu cross
+# toolchain (no QEMU — host-speed compile). Deploy / run / gdbserver use
+# plain ssh+rsync to the Pi.
 #
 # Host / paths / SSH target come from ~/.gecko-pi.env (see .gecko-pi.env.example).
 
