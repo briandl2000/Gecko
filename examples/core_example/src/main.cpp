@@ -1,4 +1,4 @@
-#include "gecko/core/boot.h"
+#include "gecko/core/engine.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services.h"
 #include "gecko/core/services/events.h"
@@ -10,6 +10,7 @@
 #include "gecko/core/utility/time.h"
 #include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
+#include "gecko/runtime/core_module.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/file_log_sink.h"
 #include "gecko/runtime/module_registry.h"
@@ -497,20 +498,24 @@ int main()
 
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
   runtime::RingLogger ringLogger(1024);  // 1024 log entries in ring buffer
-  runtime::ModuleRegistry moduleRegistry;
   runtime::EventBus eventBus;
 
   // Create job system with 4 worker threads
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  // Use GECKO_BOOT system for proper service installation and validation
-  // Services are in dependency order: JobSystem -> Profiler -> Logger
-  GECKO_BOOT((Services {.JobSystem = &jobSystem,
-                        .Profiler = &ringProfiler,
-                        .Logger = &ringLogger,
-                        .Modules = &moduleRegistry,
-                        .EventBus = &eventBus}));
+  // CoreModule publishes the four foundational services. Engine
+  // discovers dependencies via Requires() / Publishes() and starts
+  // modules in topological order.
+  runtime::CoreModule coreModule(jobSystem, ringProfiler, ringLogger, eventBus);
+
+  auto engine =
+      Engine::Create({&coreModule, &runtime::GetModule(), &g_AppModule});
+  if (!engine)
+  {
+    ResetAllocator();
+    return 1;
+  }
 
   // Configure logging sinks - they auto-unregister when destroyed
   runtime::ConsoleLogSink consoleSink;
@@ -525,9 +530,6 @@ int main()
   }
 
   GECKO_INFO(app::core_example::labels::Main, gecko::VersionFullString());
-
-  (void)InstallModule(runtime::GetModule());
-  (void)InstallModule(g_AppModule);
 
   // Set up trace file sink for profiling data after services are available
   // Sink auto-unregisters when destroyed
@@ -852,8 +854,8 @@ int main()
   fileSink.Unregister();
   traceSink.Unregister();
 
-  // Use GECKO_SHUTDOWN for proper cleanup
-  GECKO_SHUTDOWN();
+  // Engine RAII destructor handles UninstallServices when scope ends
+  engine.reset();
   ResetAllocator();
 
   std::printf("\nDemo completed successfully! Check the log output above.\n");

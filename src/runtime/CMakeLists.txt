@@ -16,6 +16,8 @@ target_sources(Runtime
     trace_writer.cpp
     tracking_allocator.cpp
     runtime_module.cpp
+    core_module.cpp
+    engine.cpp
 )
 
 target_include_directories(Runtime

@@ -36,6 +36,13 @@ public:
   [[nodiscard]] GECKO_API bool StartupAllModules() noexcept override;
   GECKO_API void ShutdownAllModules() noexcept override;
 
+  [[nodiscard]] GECKO_API bool PublishServiceImpl(::gecko::ServiceId id,
+                                                  void* impl) noexcept override;
+  [[nodiscard]] GECKO_API void* GetServiceImpl(
+      ::gecko::ServiceId id) const noexcept override;
+  [[nodiscard]] GECKO_API bool UnpublishServiceImpl(
+      ::gecko::ServiceId id) noexcept override;
+
 private:
   struct Impl;
   struct ImplDeleter

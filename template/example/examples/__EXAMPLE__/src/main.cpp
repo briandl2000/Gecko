@@ -1,4 +1,4 @@
-#include "gecko/core/boot.h"
+#include "gecko/core/engine.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services.h"
 #include "gecko/core/services/log.h"
@@ -6,6 +6,7 @@
 #include "gecko/core/utility/thread.h"
 #include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
+#include "gecko/runtime/core_module.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/module_registry.h"
 #include "gecko/runtime/ring_logger.h"
@@ -46,22 +47,6 @@ ExampleModule g_AppModule;
 
 }  // namespace
 
-static ::gecko::Services CreateServices(
-    ::gecko::runtime::ThreadPoolJobSystem& jobSystem,
-    ::gecko::runtime::RingProfiler& ringProfiler,
-    ::gecko::runtime::RingLogger& ringLogger,
-    ::gecko::runtime::ModuleRegistry& moduleRegistry,
-    ::gecko::runtime::EventBus& eventBus)
-{
-  ::gecko::Services services {};
-  services.JobSystem = &jobSystem;
-  services.Profiler = &ringProfiler;
-  services.Logger = &ringLogger;
-  services.Modules = &moduleRegistry;
-  services.EventBus = &eventBus;
-  return services;
-}
-
 int main()
 {
   ::gecko::runtime::TrackingAllocator trackingAlloc;
@@ -74,11 +59,18 @@ int main()
   ::gecko::runtime::RingProfiler ringProfiler(1 << 16);
   ::gecko::runtime::RingLogger ringLogger(1024);
 
-  ::gecko::runtime::ModuleRegistry moduleRegistry;
   ::gecko::runtime::EventBus eventBus;
 
-  GECKO_BOOT((CreateServices(jobSystem, ringProfiler, ringLogger,
-                             moduleRegistry, eventBus)));
+  ::gecko::runtime::CoreModule coreModule(jobSystem, ringProfiler, ringLogger,
+                                          eventBus);
+
+  auto engine = ::gecko::Engine::Create(
+      {&coreModule, &::gecko::runtime::GetModule(), &g_AppModule});
+  if (!engine)
+  {
+    ::gecko::ResetAllocator();
+    return 1;
+  }
 
   ::gecko::runtime::ConsoleLogSink consoleSink;
   if (auto* logger = ::gecko::GetLogger())
@@ -90,13 +82,10 @@ int main()
   GECKO_INFO(app::__EXAMPLE__::labels::Main, "Gecko %s",
              ::gecko::VersionFullString());
 
-  (void)::gecko::InstallModule(::gecko::runtime::GetModule());
-  (void)::gecko::InstallModule(g_AppModule);
-
   GECKO_SLEEP_MS(16);
 
   consoleSink.Unregister();
-  GECKO_SHUTDOWN();
+  engine.reset();
   ::gecko::ResetAllocator();
   return 0;
 }

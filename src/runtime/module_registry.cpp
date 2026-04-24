@@ -20,6 +20,12 @@ struct ModuleRegistry::Impl
     bool Started {false};
   };
 
+  struct ServiceEntry
+  {
+    ::gecko::ServiceId Id {};
+    void* Impl {nullptr};
+  };
+
   static void EraseFirstU64(std::vector<u64>& v, u64 value) noexcept
   {
     for (auto it = v.begin(); it != v.end(); ++it)
@@ -72,9 +78,22 @@ struct ModuleRegistry::Impl
     rec.Started = false;
   }
 
+  [[nodiscard]] void* FindServiceImpl(::gecko::ServiceId id) const noexcept
+  {
+    for (const auto& s : Services)
+    {
+      if (s.Id == id)
+      {
+        return s.Impl;
+      }
+    }
+    return nullptr;
+  }
+
   bool Booted {false};
   std::unordered_map<u64, ModuleRecord> Modules;
   std::vector<u64> RegistrationOrder;
+  std::vector<ServiceEntry> Services;
 };
 
 void ModuleRegistry::ImplDeleter::operator()(Impl* ptr) const noexcept
@@ -116,6 +135,7 @@ void ModuleRegistry::Shutdown() noexcept
   ShutdownAllModules();
   m_impl->Modules.clear();
   m_impl->RegistrationOrder.clear();
+  m_impl->Services.clear();
   m_impl->Booted = false;
 
   // Deallocate Impl before allocator is uninstalled
@@ -277,21 +297,154 @@ bool ModuleRegistry::StartupAllModules() noexcept
   }
   m_impl->Booted = true;
 
-  std::vector<u64> startedThisCall;
-  startedThisCall.reserve(m_impl->RegistrationOrder.size());
-
+  // Build a list of (id, module*) for unstarted modules in registration
+  // order. Already-started modules are skipped (they were registered
+  // after a previous StartupAllModules).
+  struct Node
+  {
+    u64 Id {0};
+    ::gecko::IModule* Module {nullptr};
+    int InDegree {0};
+  };
+  std::vector<Node> nodes;
+  nodes.reserve(m_impl->RegistrationOrder.size());
   for (u64 id : m_impl->RegistrationOrder)
   {
     auto it = m_impl->Modules.find(id);
+    if (it == m_impl->Modules.end() || it->second.Started)
+    {
+      continue;
+    }
+    nodes.push_back(Node {id, it->second.Module, 0});
+  }
+
+  // publisherOf: ServiceId -> index into `nodes`. Diagnose duplicate
+  // publishers as an error.
+  struct PublisherEntry
+  {
+    u64 ServiceIdValue {0};
+    int NodeIndex {-1};
+  };
+  std::vector<PublisherEntry> publishers;
+  publishers.reserve(nodes.size() * 2);
+  auto findPublisher = [&](u64 sid) -> int {
+    for (const auto& p : publishers)
+    {
+      if (p.ServiceIdValue == sid)
+      {
+        return p.NodeIndex;
+      }
+    }
+    return -1;
+  };
+
+  for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
+  {
+    auto pubs = nodes[i].Module->Publishes();
+    for (const auto& pid : pubs)
+    {
+      int existing = findPublisher(pid.Value);
+      if (existing >= 0)
+      {
+        GECKO_ERROR(labels::Modules,
+                    "Duplicate service publisher: '%s' and '%s' both publish "
+                    "the same service id",
+                    nodes[existing].Module->RootLabel().Name
+                        ? nodes[existing].Module->RootLabel().Name
+                        : "(unnamed)",
+                    nodes[i].Module->RootLabel().Name
+                        ? nodes[i].Module->RootLabel().Name
+                        : "(unnamed)");
+        return false;
+      }
+      publishers.push_back(PublisherEntry {pid.Value, i});
+    }
+  }
+
+  // Build adjacency: edges[from] = list of `to`-indices (i.e. modules
+  // that depend on `from`). Compute in-degrees.
+  std::vector<std::vector<int>> edges(nodes.size());
+  for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
+  {
+    auto reqs = nodes[i].Module->Requires();
+    for (const auto& rid : reqs)
+    {
+      // Service may already be published by a prior, already-started
+      // module (registered earlier and started in a previous
+      // StartupAllModules invocation). In that case it's satisfied and
+      // contributes no edge.
+      if (m_impl->FindServiceImpl(rid) != nullptr &&
+          findPublisher(rid.Value) < 0)
+      {
+        continue;
+      }
+
+      int producer = findPublisher(rid.Value);
+      if (producer < 0)
+      {
+        GECKO_ERROR(labels::Modules,
+                    "Module '%s' requires a service that no module publishes",
+                    nodes[i].Module->RootLabel().Name
+                        ? nodes[i].Module->RootLabel().Name
+                        : "(unnamed)");
+        return false;
+      }
+      if (producer == i)
+      {
+        // self-publishes a self-required service: no edge.
+        continue;
+      }
+      edges[producer].push_back(i);
+      ++nodes[i].InDegree;
+    }
+  }
+
+  // Kahn's algorithm.
+  std::vector<int> ready;
+  ready.reserve(nodes.size());
+  for (int i = 0; i < static_cast<int>(nodes.size()); ++i)
+  {
+    if (nodes[i].InDegree == 0)
+    {
+      ready.push_back(i);
+    }
+  }
+
+  std::vector<int> order;
+  order.reserve(nodes.size());
+  while (!ready.empty())
+  {
+    int n = ready.back();
+    ready.pop_back();
+    order.push_back(n);
+    for (int m : edges[n])
+    {
+      if (--nodes[m].InDegree == 0)
+      {
+        ready.push_back(m);
+      }
+    }
+  }
+
+  if (order.size() != nodes.size())
+  {
+    GECKO_ERROR(labels::Modules,
+                "Module dependency cycle detected (%zu of %zu modules in "
+                "topological order)",
+                order.size(), nodes.size());
+    return false;
+  }
+
+  // Start in the computed order; rollback on failure.
+  std::vector<u64> startedThisCall;
+  startedThisCall.reserve(order.size());
+  for (int idx : order)
+  {
+    auto it = m_impl->Modules.find(nodes[idx].Id);
     if (it == m_impl->Modules.end())
     {
       continue;
     }
-    if (it->second.Started)
-    {
-      continue;
-    }
-
     if (!m_impl->StartupModule(*this, it->second))
     {
       for (auto rit = startedThisCall.rbegin(); rit != startedThisCall.rend();
@@ -305,8 +458,7 @@ bool ModuleRegistry::StartupAllModules() noexcept
       }
       return false;
     }
-
-    startedThisCall.push_back(id);
+    startedThisCall.push_back(nodes[idx].Id);
   }
 
   return true;
@@ -344,5 +496,50 @@ void ModuleRegistry::ShutdownAllModules() noexcept
   }
 
   m_impl->Booted = false;
+}
+
+bool ModuleRegistry::PublishServiceImpl(::gecko::ServiceId id,
+                                        void* impl) noexcept
+{
+  if (impl == nullptr)
+  {
+    return false;
+  }
+  if (!m_impl)
+  {
+    m_impl.reset(new Impl());
+  }
+  if (m_impl->FindServiceImpl(id) != nullptr)
+  {
+    return false;
+  }
+  m_impl->Services.push_back(Impl::ServiceEntry {id, impl});
+  return true;
+}
+
+void* ModuleRegistry::GetServiceImpl(::gecko::ServiceId id) const noexcept
+{
+  if (!m_impl)
+  {
+    return nullptr;
+  }
+  return m_impl->FindServiceImpl(id);
+}
+
+bool ModuleRegistry::UnpublishServiceImpl(::gecko::ServiceId id) noexcept
+{
+  if (!m_impl)
+  {
+    return false;
+  }
+  for (auto it = m_impl->Services.begin(); it != m_impl->Services.end(); ++it)
+  {
+    if (it->Id == id)
+    {
+      m_impl->Services.erase(it);
+      return true;
+    }
+  }
+  return false;
 }
 }  // namespace gecko::runtime
