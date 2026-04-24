@@ -122,7 +122,7 @@ def _run(args) -> int:
     if _is_cross_compile():
         print(f"\nTests built for {PLATFORM_ID} in {OUTPUT_DIR}/bin/{config}/tests/")
         print(f"Host cannot execute {PLATFORM_ID} binaries directly.")
-        print(f"Deploy and run on the target device (e.g. `pi-test {args.config}`).")
+        print(f"Deploy and run on the target device.")
         return 0
 
     # Run tests directly (Catch2 handles test discovery and reporting)

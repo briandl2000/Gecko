@@ -153,41 +153,30 @@ being on `PATH`.
    - Guard GCC-only builtins with `#ifdef` fallbacks
 2. **When MSVC ships C++26:** Add it as an alternate Windows compiler.
 
-## VS Code Tasks
+## VS Code Tasks & Debugging
 
-Pre-configured tasks in `.vscode/tasks.json`: **gk build**, **gk test**,
-**gk clean**. Run with `Ctrl+Shift+B` or the command palette.
+`.vscode/tasks.json` provides `gk: build debug`, `gk: build release`,
+`gk: test debug`, `gk: test release`, and `gk: format`. Default build
+task is `gk: build debug` (`Ctrl+Shift+B`).
 
-## aarch64 cross-compile
+`.vscode/launch.json` defines flat per-OS-per-config launch entries.
+Pick the one for your OS + configuration; the target (example or test
+binary) is chosen via a single `debugTarget` picker on launch.
 
-Gecko ships a Docker image that produces Linux aarch64 artefacts from an
-x86_64 host. It carries a `gcc-15-aarch64-linux-gnu` cross-toolchain and
-arm64 multi-arch runtime libs (Vulkan, X11, Wayland). The compiler runs
-natively on the host — no QEMU — so build speed matches a local x86_64
-build. CI uses the same recipe; see
-[`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+| Launch config | What it runs |
+|---|---|
+| **Linux Debug** / **Linux Release** | Native `gdb` against `out/Linux-x86_64/bin/{Debug,Release}/`. Uses `LD_LIBRARY_PATH` so the app finds `libCoreServices.so`. Prelaunch: `gk: build {debug,release}`. |
+| **Windows Debug** / **Windows Release** | MSYS2 UCRT64 `gdb.exe` against `C:\Gecko\{debug,release}\`. Prelaunch builds on the Windows machine and mirrors artefacts there — see below. |
 
-```bash
-docker build -t gecko-aarch64-dev -f docker/aarch64.Dockerfile .
+### Windows network-drive workaround
 
-docker run --rm -t \
-    --user "$(id -u):$(id -g)" \
-    -v "$PWD":/workspace -w /workspace \
-    -e HOME=/tmp \
-    -e GECKO_PLATFORM_ID=Linux-aarch64 \
-    -e CMAKE_TOOLCHAIN_FILE=/workspace/docker/aarch64-toolchain.cmake \
-    gecko-aarch64-dev \
-    python3 scripts/cli.py build debug
-```
-
-Artefacts land in `out/Linux-aarch64/bin/<Config>/` and are owned by your
-host user. Both X11 and Wayland backends are built, same as the x86_64 host
-build.
-
-The image is defined in [`docker/aarch64.Dockerfile`](../docker/aarch64.Dockerfile);
-its CMake toolchain file is
-[`docker/aarch64-toolchain.cmake`](../docker/aarch64-toolchain.cmake).
-Deploying and running those artefacts on a physical device is outside the
-repo's scope — wrap the `docker run` above in whatever personal script you
-prefer.
+A common Gecko setup is: the workspace lives on a Linux or NAS machine,
+and a Windows machine on the same LAN mounts it as a network drive
+(e.g. `Z:\`). SmartScreen refuses to launch unsigned `.exe` files from
+network drives. To work around this, the Windows launch configs build
+into `Z:\out\Windows-x86_64\bin\{Debug,Release}\` as usual, then
+mirror the artefacts to a plain local path — `C:\Gecko\debug\` or
+`C:\Gecko\release\` — before debugging. Handled by
+[`scripts/copy_debug.py`](../scripts/copy_debug.py), which is a no-op
+on Linux/macOS so the same `.vscode/` works everywhere.
 
