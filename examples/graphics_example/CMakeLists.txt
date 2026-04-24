@@ -1,3 +1,10 @@
+find_program(GECKO_GLSLC glslc HINTS $ENV{VULKAN_SDK}/bin)
+if(NOT GECKO_GLSLC)
+  message(STATUS "graphics_example: glslc not found — example disabled. "
+                 "Install the Vulkan SDK or set VULKAN_SDK to enable.")
+  return()
+endif()
+
 add_executable(graphics_example
   src/main.cpp
 )
@@ -9,27 +16,6 @@ target_link_libraries(graphics_example
     Gecko::Platform
     Gecko::Graphics
 )
-
-# ─────────────────────────────────────────────────────────────────────────
-# Shader compile rules
-#
-# Shaders live as HLSL in examples/graphics_example/shaders/*.hlsl. They are
-# compiled to SPIR-V into ${CMAKE_CURRENT_BINARY_DIR}/shaders/ at build time
-# by glslc (shipped with the Vulkan SDK). A generated header, shaders.h, is
-# written alongside and pulled in by main.cpp via `#include "shaders.h"`.
-# The header uses C++26 `#embed` to inline each .spv payload as a static
-# byte array, so there is no runtime file I/O.
-#
-# The .spv artifacts are intentionally kept out of the source tree — the
-# build directory is the single source of truth.
-# ─────────────────────────────────────────────────────────────────────────
-
-find_program(GECKO_GLSLC glslc HINTS $ENV{VULKAN_SDK}/bin)
-if(NOT GECKO_GLSLC)
-  message(WARNING "graphics_example: glslc not found; shaders will not be compiled. "
-                  "Install the Vulkan SDK or set VULKAN_SDK.")
-  return()
-endif()
 
 set(_shader_src_dir "${CMAKE_CURRENT_SOURCE_DIR}/shaders")
 set(_shader_out_dir "${CMAKE_CURRENT_BINARY_DIR}/shaders")

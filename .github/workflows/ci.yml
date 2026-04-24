@@ -26,14 +26,14 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-shaderc
       
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -354,14 +354,14 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols zip
+          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc zip
       
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
-          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake zip
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-vulkan-loader mingw-w64-ucrt-x86_64-shaderc zip
       
       - name: Set platform ID
         id: platform
