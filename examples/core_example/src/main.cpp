@@ -190,8 +190,7 @@ void MemoryStressTest()
   std::vector<std::pair<void*, size_t>> allocations;  // Store pointer and size
 
   // Get the tracking allocator to emit counters
-  auto* trackingAlloc =
-      static_cast<runtime::TrackingAllocator*>(GetAllocator());
+  auto* trackingAlloc = static_cast<runtime::TrackingAllocator*>(&Allocator());
 
   GECKO_DEBUG(app::core_example::labels::Memory,
               "Stress-testing memory with 25 random allocations "
@@ -493,6 +492,9 @@ int main()
 
   // Set up our services
   runtime::TrackingAllocator trackingAlloc;
+  if (!SetAllocator(&trackingAlloc))
+    return 1;
+
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
   runtime::RingLogger ringLogger(1024);  // 1024 log entries in ring buffer
   runtime::ModuleRegistry moduleRegistry;
@@ -503,10 +505,8 @@ int main()
   jobSystem.SetWorkerThreadCount(4);
 
   // Use GECKO_BOOT system for proper service installation and validation
-  // Services are in dependency order: Allocator -> JobSystem -> Profiler ->
-  // Logger
-  GECKO_BOOT((Services {.Allocator = &trackingAlloc,
-                        .JobSystem = &jobSystem,
+  // Services are in dependency order: JobSystem -> Profiler -> Logger
+  GECKO_BOOT((Services {.JobSystem = &jobSystem,
                         .Profiler = &ringProfiler,
                         .Logger = &ringLogger,
                         .Modules = &moduleRegistry,
@@ -854,6 +854,7 @@ int main()
 
   // Use GECKO_SHUTDOWN for proper cleanup
   GECKO_SHUTDOWN();
+  ResetAllocator();
 
   std::printf("\nDemo completed successfully! Check the log output above.\n");
   std::printf("The immediate logger writes all log messages directly without "

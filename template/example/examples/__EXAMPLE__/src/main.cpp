@@ -47,7 +47,6 @@ ExampleModule g_AppModule;
 }  // namespace
 
 static ::gecko::Services CreateServices(
-    ::gecko::runtime::TrackingAllocator& trackingAlloc,
     ::gecko::runtime::ThreadPoolJobSystem& jobSystem,
     ::gecko::runtime::RingProfiler& ringProfiler,
     ::gecko::runtime::RingLogger& ringLogger,
@@ -55,7 +54,6 @@ static ::gecko::Services CreateServices(
     ::gecko::runtime::EventBus& eventBus)
 {
   ::gecko::Services services {};
-  services.Allocator = &trackingAlloc;
   services.JobSystem = &jobSystem;
   services.Profiler = &ringProfiler;
   services.Logger = &ringLogger;
@@ -67,6 +65,8 @@ static ::gecko::Services CreateServices(
 int main()
 {
   ::gecko::runtime::TrackingAllocator trackingAlloc;
+  if (!::gecko::SetAllocator(&trackingAlloc))
+    return 1;
 
   ::gecko::runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
@@ -77,7 +77,7 @@ int main()
   ::gecko::runtime::ModuleRegistry moduleRegistry;
   ::gecko::runtime::EventBus eventBus;
 
-  GECKO_BOOT((CreateServices(trackingAlloc, jobSystem, ringProfiler, ringLogger,
+  GECKO_BOOT((CreateServices(jobSystem, ringProfiler, ringLogger,
                              moduleRegistry, eventBus)));
 
   ::gecko::runtime::ConsoleLogSink consoleSink;
@@ -97,5 +97,6 @@ int main()
 
   consoleSink.Unregister();
   GECKO_SHUTDOWN();
+  ::gecko::ResetAllocator();
   return 0;
 }

@@ -106,8 +106,7 @@ private:
   void MaybeRecordSwapchain(const RenderTarget& rt) noexcept;
   void TransitionToColorAttachment(VulkanSwapchainData* data,
                                    u32 imageIndex) noexcept;
-  void TransitionToPresent(VulkanSwapchainData* data,
-                           u32 imageIndex) noexcept;
+  void TransitionToPresent(VulkanSwapchainData* data, u32 imageIndex) noexcept;
   void TransitionImage(VkImage image, VkImageAspectFlags aspect,
                        VkImageLayout oldLayout, VkImageLayout newLayout,
                        u32 baseMip = 0, u32 mipCount = VK_REMAINING_MIP_LEVELS,

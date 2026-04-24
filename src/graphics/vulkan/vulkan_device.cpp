@@ -267,11 +267,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   if (supported13.dynamicRendering != VK_TRUE ||
       supported13.synchronization2 != VK_TRUE)
   {
-    GECKO_ERROR(
-        labels::Vulkan,
-        "VulkanDevice: required features missing (dynamicRendering=%d, "
-        "synchronization2=%d)",
-        supported13.dynamicRendering, supported13.synchronization2);
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanDevice: required features missing (dynamicRendering=%d, "
+                "synchronization2=%d)",
+                supported13.dynamicRendering, supported13.synchronization2);
     return;
   }
 
@@ -586,9 +585,8 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
     vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface,
                                               &presentModeCount, nullptr);
     ::std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface,
-                                              &presentModeCount,
-                                              presentModes.data());
+    vkGetPhysicalDeviceSurfacePresentModesKHR(
+        m_PhysicalDevice, data.Surface, &presentModeCount, presentModes.data());
     for (VkPresentModeKHR m : presentModes)
     {
       if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
@@ -2166,17 +2164,15 @@ void VulkanDevice::UploadTextureData(Texture& texture,
                                &barrier);
         };
 
-        transition(
-            x->OldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-            VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-            VK_PIPELINE_STAGE_TRANSFER_BIT);
+        transition(x->OldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+                   VK_ACCESS_TRANSFER_WRITE_BIT,
+                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                   VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-        const u32 mipW = (x->TD->Width >> x->Mip) > 0
-                             ? (x->TD->Width >> x->Mip)
-                             : 1;
-        const u32 mipH = (x->TD->Height >> x->Mip) > 0
-                             ? (x->TD->Height >> x->Mip)
-                             : 1;
+        const u32 mipW =
+            (x->TD->Width >> x->Mip) > 0 ? (x->TD->Width >> x->Mip) : 1;
+        const u32 mipH =
+            (x->TD->Height >> x->Mip) > 0 ? (x->TD->Height >> x->Mip) : 1;
 
         VkBufferImageCopy copyRegion {};
         copyRegion.imageSubresource.aspectMask = x->TD->Aspect;

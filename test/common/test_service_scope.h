@@ -20,7 +20,7 @@ struct TestServiceScope
 
   TestServiceScope()
   {
-    Alloc.Init();
+    (void)SetAllocator(&Alloc);
     Jobs.Init();
     Profiler.Init();
     Logger.Init();
@@ -28,7 +28,6 @@ struct TestServiceScope
     (void)Events.Init();
 
     Services svc {
-        .Allocator = &Alloc,
         .JobSystem = &Jobs,
         .Profiler = &Profiler,
         .Logger = &Logger,
@@ -41,6 +40,7 @@ struct TestServiceScope
   ~TestServiceScope()
   {
     UninstallServices();
+    ResetAllocator();
   }
 
   TestServiceScope(const TestServiceScope&) = delete;

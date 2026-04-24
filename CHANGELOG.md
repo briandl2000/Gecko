@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.0.0-alpha.3]
-
 ### Added
 - **Graphics module** — API-agnostic backend with `GraphicsDevice` abstract class
   - `CreateGraphicsDevice()` factory returns `Unique<GraphicsDevice>` (NullDevice by default)
@@ -21,9 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 31 unit tests covering all descriptor `IsValid()` methods and null device smoke tests
 - **graphics_example** — demonstrates window + swapchain creation, frame loop with resize handling and ESC/close events
 
+
 ### Changed
 - CI: main branch releases now use the CHANGELOG section for the release description instead of auto-generated commit notes
 - CI: dev build releases no longer include a description
+- Allocator decoupled from `Services`. Use `SetAllocator(IAllocator*)` /
+  `ResetAllocator()` for lifecycle and `Allocator()` (returns reference)
+  for access. `services.Allocator` and `GetAllocator()` removed.
 
 ## [0.0.0-alpha.2]
 

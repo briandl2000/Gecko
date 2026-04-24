@@ -86,6 +86,9 @@ struct WindowSlot
 int main()
 {
   runtime::TrackingAllocator trackingAlloc;
+  if (!SetAllocator(&trackingAlloc))
+    return 1;
+
   runtime::RingProfiler ringProfiler(1 << 16);
   runtime::ImmediateLogger ringLogger;
   ringLogger.SetThreadSafe(true);
@@ -94,8 +97,7 @@ int main()
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  GECKO_BOOT((Services {.Allocator = &trackingAlloc,
-                        .JobSystem = &jobSystem,
+  GECKO_BOOT((Services {.JobSystem = &jobSystem,
                         .Profiler = &ringProfiler,
                         .Logger = &ringLogger,
                         .Modules = &moduleRegistry,
@@ -103,7 +105,7 @@ int main()
 
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
-  
+
   if (auto* logger = GetLogger())
   {
     fileSink.RegisterWith(logger);
@@ -478,9 +480,8 @@ int main()
       // record in parallel; submission itself is serialised on the main
       // thread so the blit pass below can assume both compute textures are
       // already in SHADER_READ_ONLY when it runs.
-      const bool haveCompute =
-          plasmaPipeline.IsValid() && plasmaTex[0].IsValid() &&
-          plasmaTex[1].IsValid();
+      const bool haveCompute = plasmaPipeline.IsValid() &&
+                               plasmaTex[0].IsValid() && plasmaTex[1].IsValid();
 
       Unique<ICommandList> computeCmd[2];
       JobHandle computeJobs[2] {};
@@ -543,9 +544,8 @@ int main()
       // samples the triangle offscreen RT; Window B samples the plasma
       // compute output. One command list, one submit, one Present.
       const Texture& triSampled = offscreenRT.RenderTextures[0];
-      const bool havePlasma =
-          plasmaPipeline.IsValid() && plasmaTex[0].IsValid() &&
-          plasmaTex[1].IsValid();
+      const bool havePlasma = plasmaPipeline.IsValid() &&
+                              plasmaTex[0].IsValid() && plasmaTex[1].IsValid();
 
       // Tint pulses between 0.6 and 1.0 over time so push constants are
       // visibly affecting output.
@@ -558,10 +558,9 @@ int main()
       {
         if (!frames[i].Valid)
           continue;
-        const Texture& src =
-            (i == 1 && havePlasma) ? plasmaTex[1]
-          : (i == 0 && havePlasma) ? plasmaTex[0]
-          : triSampled;
+        const Texture& src = (i == 1 && havePlasma)   ? plasmaTex[1]
+                             : (i == 0 && havePlasma) ? plasmaTex[0]
+                                                      : triSampled;
         ClearValue scClear = ClearValue::RenderTarget(0.0F, 0.0F, 0.0F, 1.0F);
         cmd->BeginRendering(frames[i].BackBuffer, &scClear);
         cmd->SetViewport(0.0F, 0.0F,
@@ -618,8 +617,7 @@ int main()
     };
 
     ctx.SetModalFrameCallback(
-        [](void* ud) { (*static_cast<decltype(&update)>(ud))(); },
-        &update);
+        [](void* ud) { (*static_cast<decltype(&update)>(ud))(); }, &update);
 
     while (running)
     {
@@ -644,6 +642,7 @@ int main()
   traceSink.Unregister();
 
   GECKO_SHUTDOWN();
+  ResetAllocator();
   ::std::printf("Graphics example finished.\n");
   return 0;
 }

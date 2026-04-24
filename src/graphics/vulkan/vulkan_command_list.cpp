@@ -80,8 +80,8 @@ void VulkanCommandList::End() noexcept
   VULKAN_CHECK(vkEndCommandBuffer(m_CmdBuffer));
 }
 
-void VulkanCommandList::TransitionToColorAttachment(
-    VulkanSwapchainData* data, u32 imageIndex) noexcept
+void VulkanCommandList::TransitionToColorAttachment(VulkanSwapchainData* data,
+                                                    u32 imageIndex) noexcept
 {
   const VkImageLayout oldLayout = data->ImageLayouts[imageIndex];
 
