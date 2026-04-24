@@ -256,9 +256,14 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   features13.dynamicRendering = VK_TRUE;
   features13.synchronization2 = VK_TRUE;
 
+  VkPhysicalDeviceVulkan12Features features12 {};
+  features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  features12.hostQueryReset = VK_TRUE;
+  features12.pNext = &features13;
+
   VkPhysicalDeviceFeatures2 features2 {};
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  features2.pNext = &features13;
+  features2.pNext = &features12;
 
   VkDeviceCreateInfo deviceCreateInfo {};
   deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -339,6 +344,17 @@ VulkanDevice::~VulkanDevice()
   if (m_GraphicsCommandPool != VK_NULL_HANDLE)
     vkDestroyCommandPool(m_Device, m_GraphicsCommandPool, nullptr);
 
+  // Destroy any lazily-created per-thread command pools.
+  {
+    ::std::lock_guard<::std::mutex> lock(m_ThreadPoolsMutex);
+    for (auto& kv : m_ThreadPools)
+    {
+      if (kv.second != VK_NULL_HANDLE)
+        vkDestroyCommandPool(m_Device, kv.second, nullptr);
+    }
+    m_ThreadPools.clear();
+  }
+
   if (m_Device != VK_NULL_HANDLE)
     vkDestroyDevice(m_Device, nullptr);
 
@@ -352,6 +368,44 @@ VulkanDevice::~VulkanDevice()
 
   if (m_Instance != VK_NULL_HANDLE)
     vkDestroyInstance(m_Instance, nullptr);
+}
+
+VkCommandPool VulkanDevice::AcquireThreadCommandPool() noexcept
+{
+  const ::std::thread::id tid = ::std::this_thread::get_id();
+  {
+    ::std::lock_guard<::std::mutex> lock(m_ThreadPoolsMutex);
+    auto it = m_ThreadPools.find(tid);
+    if (it != m_ThreadPools.end())
+      return it->second;
+  }
+
+  VkCommandPoolCreateInfo cmdPoolCreateInfo {};
+  cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  cmdPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
+
+  VkCommandPool pool = VK_NULL_HANDLE;
+  if (vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &pool) !=
+      VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanDevice::AcquireThreadCommandPool: vkCreateCommandPool "
+                "failed");
+    return VK_NULL_HANDLE;
+  }
+
+  ::std::lock_guard<::std::mutex> lock(m_ThreadPoolsMutex);
+  m_ThreadPools[tid] = pool;
+  return pool;
+}
+
+void VulkanDevice::WaitIdleLocked() noexcept
+{
+  if (m_Device == VK_NULL_HANDLE)
+    return;
+  ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+  vkDeviceWaitIdle(m_Device);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -717,7 +771,11 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
   presentInfo.pSwapchains = scs;
   presentInfo.pImageIndices = indices;
 
-  VkResult presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+  VkResult presentResult;
+  {
+    ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
+  }
   if (presentResult == VK_ERROR_OUT_OF_DATE_KHR ||
       presentResult == VK_SUBOPTIMAL_KHR)
   {
@@ -801,15 +859,18 @@ void VulkanDevice::ExecuteGraphicsCommandList(
     primaryFence = d0->InFlight[touched.Data[0].FrameIndex];
   }
 
-  VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
-
-  for (u32 i = 1; i < touched.Count; ++i)
   {
-    auto* d = touched.Data[i].Data;
-    VkFence f = d->InFlight[touched.Data[i].FrameIndex];
-    VkSubmitInfo empty {};
-    empty.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &empty, f));
+    ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
+
+    for (u32 i = 1; i < touched.Count; ++i)
+    {
+      auto* d = touched.Data[i].Data;
+      VkFence f = d->InFlight[touched.Data[i].FrameIndex];
+      VkSubmitInfo empty {};
+      empty.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+      VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &empty, f));
+    }
   }
 
   // commandList is freed here (Unique dies at scope end)
@@ -1770,9 +1831,13 @@ void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
 void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
                                  void* ctx) noexcept
 {
+  // Use the caller's per-thread pool so this can be invoked from any
+  // thread (texture/buffer uploads may happen off the main thread).
+  VkCommandPool pool = AcquireThreadCommandPool();
+
   VkCommandBufferAllocateInfo cmdBufAllocInfo {};
   cmdBufAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  cmdBufAllocInfo.commandPool = m_GraphicsCommandPool;
+  cmdBufAllocInfo.commandPool = pool;
   cmdBufAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   cmdBufAllocInfo.commandBufferCount = 1;
 
@@ -1790,9 +1855,12 @@ void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &cmdBuf;
-  vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-  vkQueueWaitIdle(m_GraphicsQueue);
-  vkFreeCommandBuffers(m_Device, m_GraphicsCommandPool, 1, &cmdBuf);
+  {
+    ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(m_GraphicsQueue);
+  }
+  vkFreeCommandBuffers(m_Device, pool, 1, &cmdBuf);
 }
 
 void VulkanDevice::UploadTextureData(Texture& texture,

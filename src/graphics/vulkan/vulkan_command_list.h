@@ -77,6 +77,8 @@ public:
   void Dispatch(u32 x, u32 y, u32 z) noexcept override;
   void DispatchIndirect(const Buffer& buffer, u64 offset) noexcept override;
 
+  void TransitionTextureForRead(const Texture& texture) noexcept override;
+
   void CopyBuffer(const Buffer& dst, u64 dstOffset, const Buffer& src,
                   u64 srcOffset, u64 size) noexcept override;
   void CopyBufferToTexture(const Texture& dst, u32 mip, u32 slice,
@@ -109,6 +111,10 @@ private:
 
   VulkanDevice* m_Device {nullptr};
   VkCommandBuffer m_CmdBuffer {VK_NULL_HANDLE};
+  // Pool this command buffer was allocated from. Captured at construction
+  // because command buffers must be freed back to the same pool they came
+  // from, and the recording thread may differ from the destruction thread.
+  VkCommandPool m_Pool {VK_NULL_HANDLE};
   bool m_Compute {false};
 
   TouchedSwapchain m_Touched[MaxSwapchainsPerSubmit] {};

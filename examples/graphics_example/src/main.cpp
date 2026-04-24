@@ -4,6 +4,7 @@
 #include <gecko/core/scope.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/events.h>
+#include <gecko/core/services/jobs.h>
 #include <gecko/core/services/log.h>
 #include <gecko/core/services/modules.h>
 #include <gecko/core/version.h>
@@ -194,6 +195,34 @@ int main()
       GECKO_WARN(app::graphics_example::labels::Main,
                  "Offscreen render target creation failed");
 
+    // ── Storage textures written by the plasma compute shader ────
+    // Two separate outputs so two job-system workers can dispatch compute
+    // in parallel without aliasing. HLSL's `RWTexture2D<float4>` compiles
+    // to SPIR-V with an Rgba32f format operand (glslc's HLSL front-end
+    // ignores [[vk::image_format]]) — match that here.
+    TextureDesc plasmaDesc {};
+    plasmaDesc.Width = kOffscreenW;
+    plasmaDesc.Height = kOffscreenH;
+    plasmaDesc.Format = DataFormat::R32G32B32A32_FLOAT;
+    plasmaDesc.Type = TextureType::Tex2D;
+    plasmaDesc.Memory = MemoryType::Dedicated;
+    plasmaDesc.AllowUnorderedAccess = true;
+
+    Texture plasmaTex[2] {};
+    for (u32 i = 0; i < 2; ++i)
+    {
+      plasmaDesc.DebugName =
+          (i == 0) ? "PlasmaStorageTexture[0]" : "PlasmaStorageTexture[1]";
+      plasmaTex[i] = device->CreateTexture(plasmaDesc);
+    }
+    if (plasmaTex[0].IsValid() && plasmaTex[1].IsValid())
+      GECKO_INFO(app::graphics_example::labels::Main,
+                 "Plasma storage textures created (2x %ux%u)", kOffscreenW,
+                 kOffscreenH);
+    else
+      GECKO_WARN(app::graphics_example::labels::Main,
+                 "Plasma storage texture creation failed");
+
     // ── Vertex buffer for triangle ───────────────────────────────
     VertexBufferDesc vbDesc;
     vbDesc.NumVertices = 3;
@@ -267,6 +296,27 @@ int main()
     blitPDesc.DebugName = "BlitPipeline";
 
     GraphicsPipeline blitPipeline = device->CreateGraphicsPipeline(blitPDesc);
+
+    // ── Pipeline 3: plasma compute -> plasmaTex ──────────────────
+    ComputePipelineDesc plasmaPDesc;
+    plasmaPDesc.ComputeShader = ShaderCode {
+        .Format = ShaderFormat::SPIRV,
+        .Bytes = {reinterpret_cast<const gecko::byte*>(shaders::PlasmaComp),
+                  sizeof(shaders::PlasmaComp)},
+    };
+    plasmaPDesc.PipelineResources[0] =
+        PipelineResource::RWTextureBinding(1, ShaderType::Compute);
+    plasmaPDesc.NumPipelineResources = 1;
+    plasmaPDesc.PushConstantBytes = 16;  // float Time + 3 pad
+    plasmaPDesc.DebugName = "PlasmaComputePipeline";
+
+    ComputePipeline plasmaPipeline = device->CreateComputePipeline(plasmaPDesc);
+    if (plasmaPipeline.IsValid())
+      GECKO_INFO(app::graphics_example::labels::Main,
+                 "Compute pipeline ready (plasma)");
+    else
+      GECKO_WARN(app::graphics_example::labels::Main,
+                 "Plasma compute pipeline creation failed");
 
     SamplerDesc blitSamplerDesc {};
     blitSamplerDesc.Filter = SamplerFilter::Linear;
@@ -404,6 +454,49 @@ int main()
                            ::std::chrono::steady_clock::now() - startTime)
                            .count();
 
+      // ── Parallel compute ─────────────────────────────────────────
+      // Record two plasma dispatches on separate job-system workers, each
+      // writing into its own storage texture. This exercises the engine's
+      // per-thread Vulkan command pools + queue-submit mutex. We only
+      // record in parallel; submission itself is serialised on the main
+      // thread so the blit pass below can assume both compute textures are
+      // already in SHADER_READ_ONLY when it runs.
+      const bool haveCompute =
+          plasmaPipeline.IsValid() && plasmaTex[0].IsValid() &&
+          plasmaTex[1].IsValid();
+
+      Unique<ICommandList> computeCmd[2];
+      JobHandle computeJobs[2] {};
+
+      if (haveCompute)
+      {
+        for (u32 i = 0; i < 2; ++i)
+        {
+          const f32 tOffset = (i == 0) ? 0.0F : 3.14159F;
+          computeJobs[i] = SubmitJob([&, i, time, tOffset]() {
+            computeCmd[i] = device->CreateComputeCommandList();
+            if (!computeCmd[i])
+              return;
+            computeCmd[i]->Begin();
+            computeCmd[i]->BindPipeline(plasmaPipeline);
+            computeCmd[i]->BindRWTexture(0, plasmaTex[i]);
+            f32 pc[4] = {time + tOffset, 0.0F, 0.0F, 0.0F};
+            computeCmd[i]->SetConstants(
+                0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
+            const u32 gx = (kOffscreenW + 15) / 16;
+            const u32 gy = (kOffscreenH + 15) / 16;
+            computeCmd[i]->Dispatch(gx, gy, 1);
+            computeCmd[i]->TransitionTextureForRead(plasmaTex[i]);
+            computeCmd[i]->End();
+          });
+        }
+        WaitForJobs(computeJobs, 2);
+        // Submit from the main thread, in deterministic order.
+        for (u32 i = 0; i < 2; ++i)
+          if (computeCmd[i])
+            device->ExecuteComputeCommandList(::std::move(computeCmd[i]));
+      }
+
       // Pass 1: render the spinning-coloured triangle into the offscreen RT
       // using an indirect draw + time push constant.
       ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
@@ -429,9 +522,13 @@ int main()
       cmd->EndRendering();
       // After EndRendering the offscreen target is in SHADER_READ_ONLY.
 
-      // Pass 2 & 3: fullscreen-quad blit the same offscreen RT into both
-      // swapchain back buffers.  One command list, one submit, one Present.
-      const Texture& sampled = offscreenRT.RenderTextures[0];
+      // Pass 2 & 3: fullscreen-quad blit into each swapchain. Window A
+      // samples the triangle offscreen RT; Window B samples the plasma
+      // compute output. One command list, one submit, one Present.
+      const Texture& triSampled = offscreenRT.RenderTextures[0];
+      const bool havePlasma =
+          plasmaPipeline.IsValid() && plasmaTex[0].IsValid() &&
+          plasmaTex[1].IsValid();
 
       // Tint pulses between 0.6 and 1.0 over time so push constants are
       // visibly affecting output.
@@ -444,6 +541,10 @@ int main()
       {
         if (!frames[i].Valid)
           continue;
+        const Texture& src =
+            (i == 1 && havePlasma) ? plasmaTex[1]
+          : (i == 0 && havePlasma) ? plasmaTex[0]
+          : triSampled;
         ClearValue scClear = ClearValue::RenderTarget(0.0F, 0.0F, 0.0F, 1.0F);
         cmd->BeginRendering(frames[i].BackBuffer, &scClear);
         cmd->SetViewport(0.0F, 0.0F,
@@ -452,7 +553,7 @@ int main()
         cmd->SetScissor(0, 0, frames[i].BackBuffer.Desc.Width,
                         frames[i].BackBuffer.Desc.Height);
         cmd->BindPipeline(blitPipeline);
-        cmd->BindTexture(0, sampled);
+        cmd->BindTexture(0, src);
         cmd->BindSampler(1, blitSampler);
         cmd->SetConstants(0, {reinterpret_cast<const gecko::byte*>(tintArr),
                               sizeof(tintArr)});

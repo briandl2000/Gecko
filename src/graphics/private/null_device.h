@@ -75,6 +75,9 @@ public:
   void DispatchIndirect(const Buffer&, u64) noexcept override
   {}
 
+  void TransitionTextureForRead(const Texture&) noexcept override
+  {}
+
   void CopyBuffer(const Buffer&, u64, const Buffer&, u64, u64) noexcept override
   {}
   void CopyBufferToTexture(const Texture&, u32, u32, const Buffer&,

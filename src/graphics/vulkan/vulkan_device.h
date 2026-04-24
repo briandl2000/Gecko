@@ -4,6 +4,10 @@
 #include "gecko/graphics/graphics_device.h"
 #include "vulkan_types.h"
 
+#include <mutex>
+#include <thread>
+#include <unordered_map>
+
 namespace gecko::graphics {
 
 // ── VulkanDevice ──────────────────────────────────────────────────────────
@@ -81,6 +85,17 @@ public:
   {
     return m_GraphicsCommandPool;
   }
+
+  /// Return a command pool owned by the calling thread, lazily creating
+  /// one on first use. Use this instead of `GraphicsCommandPool()` when
+  /// allocating/freeing/resetting command buffers so that command-list
+  /// recording can safely happen on job-system worker threads.
+  /// The pool is destroyed when the device is destroyed.
+  [[nodiscard]] VkCommandPool AcquireThreadCommandPool() noexcept;
+
+  /// Locked `vkDeviceWaitIdle`. Queues are externally synchronised with
+  /// submit, so waiting on device idle needs to share the submit mutex.
+  void WaitIdleLocked() noexcept;
   [[nodiscard]] VmaAllocator Allocator() const noexcept
   {
     return m_Allocator;
@@ -127,6 +142,16 @@ private:
   u32 m_PresentQueueFamily {0};
 
   VkCommandPool m_GraphicsCommandPool {VK_NULL_HANDLE};
+
+  // Per-thread command pools for thread-safe command-list recording.
+  // Protected by m_ThreadPoolsMutex. Entries are never removed during the
+  // device's lifetime — freed together in the destructor.
+  ::std::mutex m_ThreadPoolsMutex;
+  ::std::unordered_map<::std::thread::id, VkCommandPool> m_ThreadPools;
+
+  // Serialises vkQueueSubmit / vkQueuePresentKHR since Vulkan queues are
+  // externally synchronised and may be touched from any thread.
+  ::std::mutex m_QueueMutex;
 
   VmaAllocator m_Allocator {VK_NULL_HANDLE};
 

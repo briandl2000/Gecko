@@ -125,6 +125,13 @@ public:
   GECKO_API virtual void DispatchIndirect(const Buffer& buffer,
                                           u64 offset) noexcept = 0;
 
+  /// Transition a texture that was last written as a UAV (e.g. by a compute
+  /// Dispatch) into the `SHADER_READ_ONLY` state so it can be sampled by a
+  /// subsequent graphics pass via `BindTexture`. Must be called *outside*
+  /// any `BeginRendering` / `EndRendering` pair.
+  GECKO_API virtual void TransitionTextureForRead(
+      const Texture& texture) noexcept = 0;
+
   // ── Copy commands ─────────────────────────────────────────────
 
   GECKO_API virtual void CopyBuffer(const Buffer& dst, u64 dstOffset,

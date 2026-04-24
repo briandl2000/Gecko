@@ -12,9 +12,11 @@ VulkanCommandList::VulkanCommandList(VulkanDevice& device,
                                      bool compute) noexcept
     : m_Device(&device), m_Compute(compute)
 {
+  m_Pool = device.AcquireThreadCommandPool();
+
   VkCommandBufferAllocateInfo allocInfo {};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  allocInfo.commandPool = device.GraphicsCommandPool();
+  allocInfo.commandPool = m_Pool;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = 1;
   VULKAN_CHECK(
@@ -43,12 +45,11 @@ VulkanCommandList::~VulkanCommandList()
 {
   if (m_Device == nullptr)
     return;
-  vkDeviceWaitIdle(m_Device->Device());
+  m_Device->WaitIdleLocked();
   if (m_DescPool != VK_NULL_HANDLE)
     vkDestroyDescriptorPool(m_Device->Device(), m_DescPool, nullptr);
-  if (m_CmdBuffer != VK_NULL_HANDLE)
-    vkFreeCommandBuffers(m_Device->Device(), m_Device->GraphicsCommandPool(), 1,
-                         &m_CmdBuffer);
+  if (m_CmdBuffer != VK_NULL_HANDLE && m_Pool != VK_NULL_HANDLE)
+    vkFreeCommandBuffers(m_Device->Device(), m_Pool, 1, &m_CmdBuffer);
 }
 
 void VulkanCommandList::Begin() noexcept
@@ -708,6 +709,21 @@ void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   vkCmdDispatchIndirect(m_CmdBuffer, bd->Buffer, offset);
+}
+
+void VulkanCommandList::TransitionTextureForRead(
+    const Texture& texture) noexcept
+{
+  if (!texture.Data)
+    return;
+  auto* td = static_cast<VulkanTextureData*>(texture.Data.get());
+  if (td->Image == VK_NULL_HANDLE)
+    return;
+  if (td->CurrentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+    return;
+  TransitionImage(td->Image, td->Aspect, td->CurrentLayout,
+                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
 void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,

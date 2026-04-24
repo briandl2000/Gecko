@@ -29,6 +29,7 @@ set(_shader_list
   "triangle.frag.hlsl|frag|triangle.frag.spv|"
   "fullscreen.vert.hlsl|vert|fullscreen.vert.spv|"
   "fullscreen.frag.hlsl|frag|fullscreen.frag.spv|"
+  "plasma.comp.hlsl|comp|plasma.comp.spv|"
 )
 
 set(_spv_outputs "")
@@ -88,6 +89,9 @@ file(WRITE "${OUT}"
 "};\n"
 "alignas(4) inline constexpr unsigned char FullscreenFrag[] = {\n"
 "#embed \"fullscreen.frag.spv\"\n"
+"};\n"
+"alignas(4) inline constexpr unsigned char PlasmaComp[] = {\n"
+"#embed \"plasma.comp.spv\"\n"
 "};\n"
 "\n"
 "#if defined(__clang__)\n"
