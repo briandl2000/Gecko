@@ -12,11 +12,12 @@ compile_commands.json
 *.swo
 *~
 
-# Local dev scripts
+# Local-only dev scripts (Pi cross-compile stays on the developer's machine)
 scripts/copy_debug.py
 scripts/aarch64-linux-toolchain.cmake
 
-# Cross-compile prebuilts + fetched headers (populated by scripts/fetch_pi_vulkan.sh)
+# Safety nets — we don't vendor any of these; system Vulkan SDK is a
+# prerequisite (see docs/build.md). Blocks accidental check-ins.
 third_party/prebuilt/
 third_party/vulkan-headers/
 
