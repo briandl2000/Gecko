@@ -45,7 +45,9 @@ VulkanCommandList::~VulkanCommandList()
 {
   if (m_Device == nullptr)
     return;
-  m_Device->WaitIdleLocked();
+  // Safe to free directly: VulkanDevice::ReapPending only destroys entries
+  // whose fence has signalled (GPU done), and app-side destruction before
+  // Execute* means no GPU work was submitted with this command buffer.
   if (m_DescPool != VK_NULL_HANDLE)
     vkDestroyDescriptorPool(m_Device->Device(), m_DescPool, nullptr);
   if (m_CmdBuffer != VK_NULL_HANDLE && m_Pool != VK_NULL_HANDLE)
@@ -63,7 +65,8 @@ void VulkanCommandList::Begin() noexcept
   VULKAN_CHECK(vkBeginCommandBuffer(m_CmdBuffer, &beginInfo));
 
   m_TouchedCount = 0;
-  m_ActiveSwapchainImage = VK_NULL_HANDLE;
+  m_ActiveSwapchain = nullptr;
+  m_ActiveSwapchainImageIndex = 0;
   m_ActiveOffscreenRT = nullptr;
   m_CurrentPipeline = nullptr;
   m_CurrentDescSet = VK_NULL_HANDLE;
@@ -77,34 +80,49 @@ void VulkanCommandList::End() noexcept
   VULKAN_CHECK(vkEndCommandBuffer(m_CmdBuffer));
 }
 
-void VulkanCommandList::TransitionToColorAttachment(VkImage image) noexcept
+void VulkanCommandList::TransitionToColorAttachment(
+    VulkanSwapchainData* data, u32 imageIndex) noexcept
 {
+  const VkImageLayout oldLayout = data->ImageLayouts[imageIndex];
+
   VkImageMemoryBarrier barrier {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  barrier.oldLayout = oldLayout;
   barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = image;
+  barrier.image = data->Images[imageIndex];
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.levelCount = 1;
   barrier.subresourceRange.layerCount = 1;
-  barrier.srcAccessMask = 0;
+  barrier.srcAccessMask =
+      (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) ? 0 : 0;
   barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-  vkCmdPipelineBarrier(m_CmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+
+  const VkPipelineStageFlags srcStage =
+      (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+          ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+          : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+  vkCmdPipelineBarrier(m_CmdBuffer, srcStage,
                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
                        nullptr, 0, nullptr, 1, &barrier);
+
+  data->ImageLayouts[imageIndex] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 }
 
-void VulkanCommandList::TransitionToPresent(VkImage image) noexcept
+void VulkanCommandList::TransitionToPresent(VulkanSwapchainData* data,
+                                            u32 imageIndex) noexcept
 {
+  const VkImageLayout oldLayout = data->ImageLayouts[imageIndex];
+
   VkImageMemoryBarrier barrier {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-  barrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+  barrier.oldLayout = oldLayout;
   barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
   barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-  barrier.image = image;
+  barrier.image = data->Images[imageIndex];
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.levelCount = 1;
   barrier.subresourceRange.layerCount = 1;
@@ -114,6 +132,8 @@ void VulkanCommandList::TransitionToPresent(VkImage image) noexcept
                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                        VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
                        nullptr, 1, &barrier);
+
+  data->ImageLayouts[imageIndex] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 }
 
 // Generic two-sided layout transition used for offscreen RTs flipping
@@ -122,7 +142,9 @@ void VulkanCommandList::TransitionToPresent(VkImage image) noexcept
 void VulkanCommandList::TransitionImage(VkImage image,
                                         VkImageAspectFlags aspect,
                                         VkImageLayout oldLayout,
-                                        VkImageLayout newLayout) noexcept
+                                        VkImageLayout newLayout, u32 baseMip,
+                                        u32 mipCount, u32 baseLayer,
+                                        u32 layerCount) noexcept
 {
   if (oldLayout == newLayout)
     return;
@@ -135,8 +157,10 @@ void VulkanCommandList::TransitionImage(VkImage image,
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
   barrier.image = image;
   barrier.subresourceRange.aspectMask = aspect;
-  barrier.subresourceRange.levelCount = 1;
-  barrier.subresourceRange.layerCount = 1;
+  barrier.subresourceRange.baseMipLevel = baseMip;
+  barrier.subresourceRange.levelCount = mipCount;
+  barrier.subresourceRange.baseArrayLayer = baseLayer;
+  barrier.subresourceRange.layerCount = layerCount;
 
   VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
@@ -215,7 +239,8 @@ void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
                MaxSwapchainsPerSubmit);
     return;
   }
-  m_Touched[m_TouchedCount++] = {rtd->SwapchainData, rtd->FrameIndex};
+  m_Touched[m_TouchedCount++] = {rtd->SwapchainData, rtd->FrameIndex,
+                                 rtd->ImageIndex};
 }
 
 void VulkanCommandList::BeginRendering(const RenderTarget& color,
@@ -229,8 +254,9 @@ void VulkanCommandList::BeginRendering(const RenderTarget& color,
 
   if (rtd->RTKind == VulkanRTData::Kind::Swapchain)
   {
-    TransitionToColorAttachment(rtd->Image);
-    m_ActiveSwapchainImage = rtd->Image;
+    TransitionToColorAttachment(rtd->SwapchainData, rtd->ImageIndex);
+    m_ActiveSwapchain = rtd->SwapchainData;
+    m_ActiveSwapchainImageIndex = rtd->ImageIndex;
   }
   else
   {
@@ -280,6 +306,7 @@ void VulkanCommandList::BeginRendering(
   VkRenderingAttachmentInfo colorAtts[RenderTargetDesc::MaxRenderTargets] {};
   u32 width = 0;
   u32 height = 0;
+  u32 validCount = 0;
 
   for (u32 i = 0; i < colors.size(); ++i)
   {
@@ -291,24 +318,26 @@ void VulkanCommandList::BeginRendering(
     MaybeRecordSwapchain(*c);
     if (rtd->RTKind == VulkanRTData::Kind::Swapchain)
     {
-      TransitionToColorAttachment(rtd->Image);
-      m_ActiveSwapchainImage = rtd->Image;
+      TransitionToColorAttachment(rtd->SwapchainData, rtd->ImageIndex);
+      m_ActiveSwapchain = rtd->SwapchainData;
+      m_ActiveSwapchainImageIndex = rtd->ImageIndex;
     }
 
-    colorAtts[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAtts[i].imageView = rtd->ImageView;
-    colorAtts[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    const u32 slot = validCount++;
+    colorAtts[slot].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAtts[slot].imageView = rtd->ImageView;
+    colorAtts[slot].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     const bool hasClear = clears.size() > i;
-    colorAtts[i].loadOp =
+    colorAtts[slot].loadOp =
         hasClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
-    colorAtts[i].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAtts[slot].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     if (hasClear)
     {
-      colorAtts[i].clearValue.color.float32[0] = clears[i].Color[0];
-      colorAtts[i].clearValue.color.float32[1] = clears[i].Color[1];
-      colorAtts[i].clearValue.color.float32[2] = clears[i].Color[2];
-      colorAtts[i].clearValue.color.float32[3] = clears[i].Color[3];
+      colorAtts[slot].clearValue.color.float32[0] = clears[i].Color[0];
+      colorAtts[slot].clearValue.color.float32[1] = clears[i].Color[1];
+      colorAtts[slot].clearValue.color.float32[2] = clears[i].Color[2];
+      colorAtts[slot].clearValue.color.float32[3] = clears[i].Color[3];
     }
     width = c->Desc.Width;
     height = c->Desc.Height;
@@ -318,7 +347,7 @@ void VulkanCommandList::BeginRendering(
   renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
   renderingInfo.renderArea.extent = {width, height};
   renderingInfo.layerCount = 1;
-  renderingInfo.colorAttachmentCount = static_cast<u32>(colors.size());
+  renderingInfo.colorAttachmentCount = validCount;
   renderingInfo.pColorAttachments = colorAtts;
   // Depth handling is deferred with offscreen RT implementation.
   (void)depth;
@@ -329,10 +358,11 @@ void VulkanCommandList::EndRendering() noexcept
 {
   vkCmdEndRendering(m_CmdBuffer);
 
-  if (m_ActiveSwapchainImage != VK_NULL_HANDLE)
+  if (m_ActiveSwapchain != nullptr)
   {
-    TransitionToPresent(m_ActiveSwapchainImage);
-    m_ActiveSwapchainImage = VK_NULL_HANDLE;
+    TransitionToPresent(m_ActiveSwapchain, m_ActiveSwapchainImageIndex);
+    m_ActiveSwapchain = nullptr;
+    m_ActiveSwapchainImageIndex = 0;
   }
 
   if (m_ActiveOffscreenRT != nullptr)

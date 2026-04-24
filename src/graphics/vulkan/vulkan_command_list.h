@@ -17,6 +17,7 @@ public:
   {
     VulkanSwapchainData* Data {nullptr};
     u32 FrameIndex {0};
+    u32 ImageIndex {0};
   };
 
   struct TouchedView
@@ -103,11 +104,15 @@ public:
 
 private:
   void MaybeRecordSwapchain(const RenderTarget& rt) noexcept;
-  void TransitionToColorAttachment(VkImage image) noexcept;
-  void TransitionToPresent(VkImage image) noexcept;
+  void TransitionToColorAttachment(VulkanSwapchainData* data,
+                                   u32 imageIndex) noexcept;
+  void TransitionToPresent(VulkanSwapchainData* data,
+                           u32 imageIndex) noexcept;
   void TransitionImage(VkImage image, VkImageAspectFlags aspect,
-                       VkImageLayout oldLayout,
-                       VkImageLayout newLayout) noexcept;
+                       VkImageLayout oldLayout, VkImageLayout newLayout,
+                       u32 baseMip = 0, u32 mipCount = VK_REMAINING_MIP_LEVELS,
+                       u32 baseLayer = 0,
+                       u32 layerCount = VK_REMAINING_ARRAY_LAYERS) noexcept;
 
   VulkanDevice* m_Device {nullptr};
   VkCommandBuffer m_CmdBuffer {VK_NULL_HANDLE};
@@ -121,7 +126,8 @@ private:
   u32 m_TouchedCount {0};
 
   // Track the single-RT rendering in-progress for proper layout transitions.
-  VkImage m_ActiveSwapchainImage {VK_NULL_HANDLE};
+  VulkanSwapchainData* m_ActiveSwapchain {nullptr};
+  u32 m_ActiveSwapchainImageIndex {0};
   struct VulkanRTData* m_ActiveOffscreenRT {nullptr};
 
   // Pipeline currently bound for graphics; used by BindTexture to source

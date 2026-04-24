@@ -25,6 +25,7 @@
 #include "vulkan_surface.h"
 #include "vulkan_util.h"
 
+#include <cstdint>
 #include <cstring>
 #include <string_view>
 #include <vector>
@@ -251,6 +252,29 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   ::std::vector<const char*> deviceExts = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
+  // Query supported features so we only enable what the physical device
+  // actually exposes.
+  VkPhysicalDeviceVulkan13Features supported13 {};
+  supported13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+  VkPhysicalDeviceVulkan12Features supported12 {};
+  supported12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  supported12.pNext = &supported13;
+  VkPhysicalDeviceFeatures2 supported2 {};
+  supported2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  supported2.pNext = &supported12;
+  vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supported2);
+
+  if (supported13.dynamicRendering != VK_TRUE ||
+      supported13.synchronization2 != VK_TRUE)
+  {
+    GECKO_ERROR(
+        labels::Vulkan,
+        "VulkanDevice: required features missing (dynamicRendering=%d, "
+        "synchronization2=%d)",
+        supported13.dynamicRendering, supported13.synchronization2);
+    return;
+  }
+
   VkPhysicalDeviceVulkan13Features features13 {};
   features13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
   features13.dynamicRendering = VK_TRUE;
@@ -258,7 +282,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   VkPhysicalDeviceVulkan12Features features12 {};
   features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-  features12.hostQueryReset = VK_TRUE;
+  // hostQueryReset is optional — only enable when supported, otherwise
+  // fall back to cmdResetQueryPool (see CreateTimestampQueryPool).
+  m_HasHostQueryReset = (supported12.hostQueryReset == VK_TRUE);
+  features12.hostQueryReset = m_HasHostQueryReset ? VK_TRUE : VK_FALSE;
   features12.pNext = &features13;
 
   VkPhysicalDeviceFeatures2 features2 {};
@@ -335,6 +362,15 @@ VulkanDevice::~VulkanDevice()
   if (m_Device != VK_NULL_HANDLE)
     vkDeviceWaitIdle(m_Device);
 
+  // GPU is idle — drain deferred command lists and the tracker-fence pool.
+  DrainPending();
+  for (VkFence f : m_FreeFences)
+  {
+    if (f != VK_NULL_HANDLE)
+      vkDestroyFence(m_Device, f, nullptr);
+  }
+  m_FreeFences.clear();
+
   if (m_DescriptorPool != VK_NULL_HANDLE)
     vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
 
@@ -408,6 +444,82 @@ void VulkanDevice::WaitIdleLocked() noexcept
   vkDeviceWaitIdle(m_Device);
 }
 
+VkFence VulkanDevice::AcquireTrackerFence() noexcept
+{
+  {
+    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    if (!m_FreeFences.empty())
+    {
+      VkFence f = m_FreeFences.back();
+      m_FreeFences.pop_back();
+      vkResetFences(m_Device, 1, &f);
+      return f;
+    }
+  }
+  VkFenceCreateInfo fenceCreateInfo {};
+  fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  VkFence f = VK_NULL_HANDLE;
+  if (vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &f) != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanDevice::AcquireTrackerFence: vkCreateFence failed");
+    return VK_NULL_HANDLE;
+  }
+  return f;
+}
+
+void VulkanDevice::ReleaseTrackerFence(VkFence fence) noexcept
+{
+  if (fence == VK_NULL_HANDLE)
+    return;
+  ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+  m_FreeFences.push_back(fence);
+}
+
+void VulkanDevice::ReapPending() noexcept
+{
+  ::std::vector<PendingSubmit> completed;
+  {
+    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    for (auto it = m_Pending.begin(); it != m_Pending.end();)
+    {
+      if (it->Fence != VK_NULL_HANDLE &&
+          vkGetFenceStatus(m_Device, it->Fence) == VK_SUCCESS)
+      {
+        completed.emplace_back(::std::move(*it));
+        it = m_Pending.erase(it);
+      }
+      else
+      {
+        ++it;
+      }
+    }
+  }
+  // Recycle fences and destroy the command lists outside the mutex so
+  // ~VulkanCommandList can't deadlock on device-side state.
+  for (auto& entry : completed)
+  {
+    entry.Cmd.reset();
+    ReleaseTrackerFence(entry.Fence);
+  }
+}
+
+void VulkanDevice::DrainPending() noexcept
+{
+  // Caller must have already ensured the GPU is idle (vkDeviceWaitIdle).
+  ::std::vector<PendingSubmit> pending;
+  {
+    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    pending.swap(m_Pending);
+  }
+  for (auto& entry : pending)
+  {
+    entry.Cmd.reset();
+    if (entry.Fence != VK_NULL_HANDLE)
+      vkDestroyFence(m_Device, entry.Fence, nullptr);
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Swapchain
 // ─────────────────────────────────────────────────────────────────────────
@@ -443,6 +555,12 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
   u32 formatCount = 0;
   vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface,
                                        &formatCount, nullptr);
+  if (formatCount == 0)
+  {
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanDevice: surface reports zero supported formats");
+    return false;
+  }
   ::std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
   vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface,
                                        &formatCount, surfaceFormats.data());
@@ -460,10 +578,26 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
   }
   data.Format = chosenFormat.format;
 
-  // Present mode
-  VkPresentModeKHR presentMode = data.Desc.VSync
-                                     ? VK_PRESENT_MODE_FIFO_KHR
-                                     : VK_PRESENT_MODE_IMMEDIATE_KHR;
+  // Present mode — FIFO is guaranteed; only pick IMMEDIATE if supported.
+  VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+  if (!data.Desc.VSync)
+  {
+    u32 presentModeCount = 0;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface,
+                                              &presentModeCount, nullptr);
+    ::std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface,
+                                              &presentModeCount,
+                                              presentModes.data());
+    for (VkPresentModeKHR m : presentModes)
+    {
+      if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
+      {
+        presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        break;
+      }
+    }
+  }
 
   // Image count
   u32 imageCount = data.Desc.NumBackBuffers;
@@ -508,6 +642,7 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
 
   for (u32 i = 0; i < realCount; ++i)
   {
+    data.ImageLayouts[i] = VK_IMAGE_LAYOUT_UNDEFINED;
     VkImageViewCreateInfo viewCreateInfo {};
     viewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewCreateInfo.image = data.Images[i];
@@ -520,7 +655,10 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
                                    &data.ImageViews[i]));
   }
 
-  // Sync objects (once, per-frame-in-flight)
+  // Sync objects.
+  // ImageAvailable + InFlight are per-frame-in-flight. RenderFinished is
+  // per-image: the present engine may still be holding the semaphore by
+  // the time the frame slot recycles, so it can't be reused across frames.
   if (data.InFlight[0] == VK_NULL_HANDLE)
   {
     VkSemaphoreCreateInfo semaphoreCreateInfo {};
@@ -532,10 +670,18 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
     {
       VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr,
                                      &data.ImageAvailable[i]));
-      VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr,
-                                     &data.RenderFinished[i]));
       VULKAN_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr,
                                  &data.InFlight[i]));
+    }
+  }
+  {
+    VkSemaphoreCreateInfo semaphoreCreateInfo {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    for (u32 i = 0; i < data.ImageCount; ++i)
+    {
+      if (data.RenderFinished[i] == VK_NULL_HANDLE)
+        VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr,
+                                       &data.RenderFinished[i]));
     }
   }
 
@@ -567,13 +713,18 @@ void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data,
     {
       if (data.ImageAvailable[i] != VK_NULL_HANDLE)
         vkDestroySemaphore(m_Device, data.ImageAvailable[i], nullptr);
-      if (data.RenderFinished[i] != VK_NULL_HANDLE)
-        vkDestroySemaphore(m_Device, data.RenderFinished[i], nullptr);
       if (data.InFlight[i] != VK_NULL_HANDLE)
         vkDestroyFence(m_Device, data.InFlight[i], nullptr);
       data.ImageAvailable[i] = VK_NULL_HANDLE;
-      data.RenderFinished[i] = VK_NULL_HANDLE;
       data.InFlight[i] = VK_NULL_HANDLE;
+    }
+    for (u32 i = 0; i < MaxSwapchainImages; ++i)
+    {
+      if (data.RenderFinished[i] != VK_NULL_HANDLE)
+      {
+        vkDestroySemaphore(m_Device, data.RenderFinished[i], nullptr);
+        data.RenderFinished[i] = VK_NULL_HANDLE;
+      }
     }
     if (data.Surface != VK_NULL_HANDLE)
     {
@@ -591,6 +742,12 @@ Swapchain VulkanDevice::CreateSwapchain(
     return Swapchain {};
 
   VulkanSwapchainData* data = AllocObject<VulkanSwapchainData>();
+  if (data == nullptr)
+  {
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanDevice::CreateSwapchain: allocation failed");
+    return Swapchain {};
+  }
   data->Native = native;
   data->Desc = desc;
 
@@ -652,8 +809,6 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
   // values and this is a no-op.
   data->Desc.Width = swapchain.Desc.Width;
   data->Desc.Height = swapchain.Desc.Height;
-  const u32 oldW = data->Extent.width;
-  const u32 oldH = data->Extent.height;
   vkDeviceWaitIdle(m_Device);
   VkSwapchainKHR old = data->Swapchain;
   data->Swapchain = VK_NULL_HANDLE;
@@ -672,12 +827,14 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 
   swapchain.Desc.Width = data->Extent.width;
   swapchain.Desc.Height = data->Extent.height;
-  GECKO_INFO(labels::Vulkan, "VulkanDevice: swapchain resized %ux%u -> %ux%u",
-             oldW, oldH, data->Extent.width, data->Extent.height);
 }
 
 FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 {
+  // Reclaim completed command lists from previous submits before doing
+  // anything else this frame.
+  ReapPending();
+
   FrameContext ctx {};
   if (!swapchain.Data)
     return ctx;
@@ -710,11 +867,17 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 
   // Build a RenderTarget wrapper around the acquired image.
   VulkanRTData* rtd = AllocObject<VulkanRTData>();
+  if (rtd == nullptr)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::BeginFrame: allocation failed");
+    return ctx;
+  }
   rtd->RTKind = VulkanRTData::Kind::Swapchain;
   rtd->Image = data->Images[imageIndex];
   rtd->ImageView = data->ImageViews[imageIndex];
   rtd->SwapchainData = data;
   rtd->FrameIndex = frame;
+  rtd->ImageIndex = imageIndex;
 
   RenderTarget rt;
   rt.Desc.Width = data->Extent.width;
@@ -756,7 +919,7 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
     auto* data = static_cast<VulkanSwapchainData*>(f.SC->Data.get());
     scs[count] = data->Swapchain;
     indices[count] = f.ImageIndex;
-    waits[count] = data->RenderFinished[f.FrameIndex];
+    waits[count] = data->RenderFinished[f.ImageIndex];
     ++count;
   }
 
@@ -829,11 +992,12 @@ void VulkanDevice::ExecuteGraphicsCommandList(
   for (u32 i = 0; i < touched.Count && i < kMax; ++i)
   {
     auto* data = touched.Data[i].Data;
-    u32 idx = touched.Data[i].FrameIndex;
-    waitSems[waitCount] = data->ImageAvailable[idx];
+    const u32 frameIdx = touched.Data[i].FrameIndex;
+    const u32 imageIdx = touched.Data[i].ImageIndex;
+    waitSems[waitCount] = data->ImageAvailable[frameIdx];
     waitStages[waitCount] = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     ++waitCount;
-    sigSems[sigCount] = data->RenderFinished[idx];
+    sigSems[sigCount] = data->RenderFinished[imageIdx];
     ++sigCount;
   }
 
@@ -859,6 +1023,13 @@ void VulkanDevice::ExecuteGraphicsCommandList(
     primaryFence = d0->InFlight[touched.Data[0].FrameIndex];
   }
 
+  // Acquire a tracker fence so we can safely defer destruction of this
+  // command list until the GPU is done with it — no vkDeviceWaitIdle needed.
+  VkFence trackerFence = AcquireTrackerFence();
+  const bool useTrackerAsPrimary = (primaryFence == VK_NULL_HANDLE);
+  if (useTrackerAsPrimary)
+    primaryFence = trackerFence;
+
   {
     ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
     VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
@@ -871,10 +1042,22 @@ void VulkanDevice::ExecuteGraphicsCommandList(
       empty.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
       VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &empty, f));
     }
+
+    // If the real submit was already using a swapchain fence as primary,
+    // we still need the tracker to fire — push an empty submit for it.
+    if (!useTrackerAsPrimary && trackerFence != VK_NULL_HANDLE)
+    {
+      VkSubmitInfo empty {};
+      empty.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+      VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &empty, trackerFence));
+    }
   }
 
-  // commandList is freed here (Unique dies at scope end)
-  (void)commandList;
+  // Defer destruction until trackerFence signals (reaped by BeginFrame).
+  {
+    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    m_Pending.push_back({trackerFence, ::std::move(commandList)});
+  }
 }
 
 void VulkanDevice::ExecuteComputeCommandList(
@@ -1183,7 +1366,16 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   td->Width = desc.Width;
   td->Height = desc.Height;
   td->IsRenderTarget = desc.IsRenderTarget || desc.IsDepthStencil;
-  td->Aspect = isDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+  if (isDepth)
+  {
+    td->Aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+    if (HasStencilComponent(desc.Format))
+      td->Aspect |= VK_IMAGE_ASPECT_STENCIL_BIT;
+  }
+  else
+  {
+    td->Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+  }
 
   if (vmaCreateImage(m_Allocator, &imageCreateInfo, &allocCreateInfo,
                      &td->Image, &td->Allocation, nullptr) != VK_SUCCESS)
@@ -1245,11 +1437,36 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
     return VK_NULL_HANDLE;
   }
 
+  // SPIR-V requires codeSize to be a multiple of 4 and pCode to be 4-byte
+  // aligned. Copy into an aligned temporary if the caller's buffer isn't.
+  const usize byteCount = code.Bytes.size();
+  const auto* rawBytes = code.Bytes.data();
+  if (byteCount == 0 || (byteCount % 4) != 0)
+  {
+    GECKO_ERROR(
+        labels::Vulkan,
+        "VulkanDevice: SPIRV blob size %zu is not a multiple of 4 bytes",
+        byteCount);
+    return VK_NULL_HANDLE;
+  }
+
   VkShaderModuleCreateInfo shaderModuleCreateInfo {};
   shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  shaderModuleCreateInfo.codeSize = code.Bytes.size();
-  shaderModuleCreateInfo.pCode =
-      reinterpret_cast<const u32*>(code.Bytes.data());
+  shaderModuleCreateInfo.codeSize = byteCount;
+
+  ::std::vector<u32> alignedCopy;
+  const bool isAligned =
+      (reinterpret_cast<::std::uintptr_t>(rawBytes) % alignof(u32)) == 0;
+  if (isAligned)
+  {
+    shaderModuleCreateInfo.pCode = reinterpret_cast<const u32*>(rawBytes);
+  }
+  else
+  {
+    alignedCopy.resize(byteCount / sizeof(u32));
+    ::std::memcpy(alignedCopy.data(), rawBytes, byteCount);
+    shaderModuleCreateInfo.pCode = alignedCopy.data();
+  }
 
   VkShaderModule m = VK_NULL_HANDLE;
   if (vkCreateShaderModule(m_Device, &shaderModuleCreateInfo, nullptr, &m) !=
@@ -1745,8 +1962,26 @@ QueryPool VulkanDevice::CreateTimestampQueryPool(
   }
 
   // Reset the whole pool up front so WriteTimestamp is legal before the
-  // first Reset call on a command list.
-  vkResetQueryPool(m_Device, vkPool, 0, desc.Count);
+  // first Reset call on a command list. Prefer host reset when supported;
+  // otherwise issue a one-time command-buffer reset.
+  if (m_HasHostQueryReset)
+  {
+    vkResetQueryPool(m_Device, vkPool, 0, desc.Count);
+  }
+  else
+  {
+    struct ResetCtx
+    {
+      VkQueryPool Pool;
+      u32 Count;
+    } rc {vkPool, desc.Count};
+    OneTimeSubmit(
+        [](VkCommandBuffer cb, void* ctx) {
+          auto* r = static_cast<ResetCtx*>(ctx);
+          vkCmdResetQueryPool(cb, r->Pool, 0, r->Count);
+        },
+        &rc);
+  }
 
   auto* qd = AllocObject<VulkanQueryPoolData>();
   qd->QueryPool = vkPool;
@@ -1932,16 +2167,23 @@ void VulkanDevice::UploadTextureData(Texture& texture,
         };
 
         transition(
-            VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
+            x->OldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
             VK_ACCESS_TRANSFER_WRITE_BIT, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
             VK_PIPELINE_STAGE_TRANSFER_BIT);
+
+        const u32 mipW = (x->TD->Width >> x->Mip) > 0
+                             ? (x->TD->Width >> x->Mip)
+                             : 1;
+        const u32 mipH = (x->TD->Height >> x->Mip) > 0
+                             ? (x->TD->Height >> x->Mip)
+                             : 1;
 
         VkBufferImageCopy copyRegion {};
         copyRegion.imageSubresource.aspectMask = x->TD->Aspect;
         copyRegion.imageSubresource.mipLevel = x->Mip;
         copyRegion.imageSubresource.baseArrayLayer = x->Slice;
         copyRegion.imageSubresource.layerCount = 1;
-        copyRegion.imageExtent = {x->TD->Width, x->TD->Height, 1};
+        copyRegion.imageExtent = {mipW, mipH, 1};
         vkCmdCopyBufferToImage(cmdBuf, x->Src, x->TD->Image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
                                &copyRegion);

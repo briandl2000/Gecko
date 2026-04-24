@@ -46,17 +46,18 @@ Drop order in your `main` should therefore be:
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │  FrameContext f = device->BeginFrame(swapchain);               │
+│  auto cmd = device->CreateGraphicsCommandList();               │
 │                                                                │
-│  cmd.Begin();                                                  │
-│    cmd.BeginRendering(f.BackBuffer, &clear);                   │
-│    cmd.SetViewport(...);  cmd.SetScissor(...);                 │
-│    cmd.BindPipeline(pipeline);                                 │
-│    cmd.BindVertexBuffer(0, vb);                                │
-│    cmd.Draw(3);                                                │
-│    cmd.EndRendering();                                         │
-│  cmd.End();                                                    │
+│  cmd->Begin();                                                 │
+│    cmd->BeginRendering(f.BackBuffer, &clear);                  │
+│    cmd->SetViewport(...);  cmd->SetScissor(...);               │
+│    cmd->BindPipeline(pipeline);                                │
+│    cmd->BindVertexBuffer(vb);                                  │
+│    cmd->Draw(3);                                               │
+│    cmd->EndRendering();                                        │
+│  cmd->End();                                                   │
 │                                                                │
-│  device->SubmitGraphics(cmd);                                  │
+│  device->ExecuteGraphicsCommandList(::std::move(cmd));         │
 │  device->Present(f);                                           │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -84,22 +85,23 @@ pass all the frame contexts you want to flip:
 ```cpp
 FrameContext fA = device->BeginFrame(swapA);
 FrameContext fB = device->BeginFrame(swapB);
+auto cmd = device->CreateGraphicsCommandList();
 
-cmd.Begin();
-  cmd.BeginRendering(offscreenRT, &clear);   // offscreen
+cmd->Begin();
+  cmd->BeginRendering(offscreenRT, &clear);   // offscreen
     /* ... */
-  cmd.EndRendering();
+  cmd->EndRendering();
 
-  cmd.BeginRendering(fA.BackBuffer, &clear); // window A
+  cmd->BeginRendering(fA.BackBuffer, &clear); // window A
     /* ... */
-  cmd.EndRendering();
+  cmd->EndRendering();
 
-  cmd.BeginRendering(fB.BackBuffer, &clear); // window B
+  cmd->BeginRendering(fB.BackBuffer, &clear); // window B
     /* ... */
-  cmd.EndRendering();
-cmd.End();
+  cmd->EndRendering();
+cmd->End();
 
-device->SubmitGraphics(cmd);
+device->ExecuteGraphicsCommandList(::std::move(cmd));
 device->Present(::std::array{fA, fB});
 ```
 
@@ -117,8 +119,8 @@ struct ShaderCode {
 };
 ```
 
-Examples compile GLSL → SPIR-V via `glslangValidator` as a CMake custom
-command and embed the resulting `.spv` bytes at load time.
+Examples compile HLSL → SPIR-V via `glslc` (shaderc) as a CMake custom
+command and embed the resulting `.spv` bytes at load time using `#embed`.
 
 ## Resizing
 

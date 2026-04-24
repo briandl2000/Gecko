@@ -7,6 +7,7 @@
 #include <mutex>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 namespace gecko::graphics {
 
@@ -153,6 +154,24 @@ private:
   // externally synchronised and may be touched from any thread.
   ::std::mutex m_QueueMutex;
 
+  // Deferred command-list destruction: each Execute* submits with a tracker
+  // fence and pushes the owning Unique here. ReapPending() runs each frame
+  // and drops entries whose fence is signalled (GPU done → safe to free).
+  // This avoids a vkDeviceWaitIdle stall on every command-list teardown.
+  struct PendingSubmit
+  {
+    VkFence Fence;
+    Unique<ICommandList> Cmd;
+  };
+  ::std::mutex m_PendingMutex;
+  ::std::vector<PendingSubmit> m_Pending;
+  ::std::vector<VkFence> m_FreeFences;
+
+  [[nodiscard]] VkFence AcquireTrackerFence() noexcept;
+  void ReleaseTrackerFence(VkFence fence) noexcept;
+  void ReapPending() noexcept;
+  void DrainPending() noexcept;
+
   VmaAllocator m_Allocator {VK_NULL_HANDLE};
 
   VkDescriptorPool m_DescriptorPool {VK_NULL_HANDLE};
@@ -161,6 +180,7 @@ private:
 
   f32 m_TimestampPeriodNs {1.0F};
   bool m_HasDebugUtils {false};
+  bool m_HasHostQueryReset {false};
   bool m_Valid {false};
 };
 

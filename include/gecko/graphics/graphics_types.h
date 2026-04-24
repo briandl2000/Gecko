@@ -246,6 +246,17 @@ enum class ColorWriteMask : u8
   }
 }
 
+[[nodiscard]] constexpr bool HasStencilComponent(DataFormat format) noexcept
+{
+  switch (format)
+  {
+  case DataFormat::D24_UNORM_S8_UINT:
+    return true;
+  default:
+    return false;
+  }
+}
+
 [[nodiscard]] constexpr u32 CalculateNumberOfMips(u32 width,
                                                   u32 height) noexcept
 {

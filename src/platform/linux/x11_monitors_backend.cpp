@@ -11,7 +11,6 @@
 #include "gecko/platform/platform_events.h"
 
 #include <cmath>
-#include <cstring>
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xlib.h>
 

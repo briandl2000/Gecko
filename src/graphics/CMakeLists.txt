@@ -1,11 +1,5 @@
 include(FetchContent)
 
-# VMA — header-only, pinned tag. Fetched at configure time.
-FetchContent_Declare(VulkanMemoryAllocator
-  GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
-  GIT_TAG        v3.2.1)
-FetchContent_MakeAvailable(VulkanMemoryAllocator)
-
 # Vulkan SDK is a prerequisite for the Vulkan backend (see docs/build.md).
 # find_package(Vulkan) works for both system/package-manager installs and the
 # LunarG SDK (which sets $VULKAN_SDK).
@@ -28,6 +22,13 @@ if(NOT Vulkan_FOUND)
   message(STATUS "")
 else()
   message(STATUS "Gecko: Vulkan ${Vulkan_VERSION} — building Vulkan backend")
+
+  # VMA — header-only, pinned tag. Only fetched when Vulkan is available so
+  # offline/air-gapped configures without the SDK don't need network access.
+  FetchContent_Declare(VulkanMemoryAllocator
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+    GIT_TAG        v3.2.1)
+  FetchContent_MakeAvailable(VulkanMemoryAllocator)
 endif()
 
 add_library(Graphics STATIC)

@@ -30,10 +30,18 @@ struct VulkanSwapchainData
   u32 ImageCount {0};
   VkImage Images[MaxSwapchainImages] {};
   VkImageView ImageViews[MaxSwapchainImages] {};
+  // Tracked layout per swapchain image so TransitionToColorAttachment can
+  // pick the correct oldLayout. Images come back UNDEFINED from the driver;
+  // after their first Present they're in PRESENT_SRC_KHR.
+  VkImageLayout ImageLayouts[MaxSwapchainImages] {};
 
   // Per-frame sync (indexed by FrameIndex)
   VkSemaphore ImageAvailable[MaxFramesInFlight] {};
-  VkSemaphore RenderFinished[MaxFramesInFlight] {};
+  // Signaled by submit, waited on by vkQueuePresentKHR. Must be per-image
+  // (not per-frame-in-flight) — the present engine may still be using it
+  // by the time the frame slot recycles. See Khronos swapchain semaphore
+  // reuse guidance.
+  VkSemaphore RenderFinished[MaxSwapchainImages] {};
   VkFence InFlight[MaxFramesInFlight] {};
 
   u32 FrameIndex {0};     ///< wraps mod MaxFramesInFlight
@@ -81,6 +89,7 @@ struct VulkanRTData
   // Only valid when RTKind == Swapchain
   VulkanSwapchainData* SwapchainData {nullptr};
   u32 FrameIndex {0};
+  u32 ImageIndex {0};
 
   // Only valid when RTKind == Offscreen. Non-owning pointers into the
   // Texture::Data payloads stored on the parent RenderTarget; the command

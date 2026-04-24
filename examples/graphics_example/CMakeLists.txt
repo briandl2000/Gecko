@@ -117,5 +117,10 @@ add_dependencies(graphics_example graphics_example_shaders)
 
 target_include_directories(graphics_example PRIVATE "${_shader_out_dir}")
 # Embed search path so `#embed "triangle.vert.spv"` inside the generated
-# header resolves to the compiled blobs.
-target_compile_options(graphics_example PRIVATE --embed-dir=${_shader_out_dir})
+# header resolves to the compiled blobs. GCC 15+ and recent Clang both use
+# `--embed-dir=`; gate the flag on those compilers so future MSVC builds
+# don't choke on an unknown option.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(graphics_example PRIVATE
+    --embed-dir=${_shader_out_dir})
+endif()
