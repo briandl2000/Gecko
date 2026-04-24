@@ -140,17 +140,18 @@ jobs:
           exit $failed
 
   # ---------------------------------------------------------------------------
-  # Build & Test - aarch64 cross-compile (proves the Pi build works)
+  # Build & Test - aarch64 cross-compile (amd64 host + aarch64-linux-gnu
+  # toolchain; tests are run under qemu-user)
   # ---------------------------------------------------------------------------
   build-aarch64:
-    name: Build aarch64 (cross, ubuntu-25.04)
+    name: Build & Test (aarch64 cross)
     runs-on: ubuntu-latest
     container:
       image: ubuntu:25.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install cross toolchain + arm64 multi-arch deps
+      - name: Install cross toolchain + arm64 multi-arch deps + qemu-user
         shell: bash
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -169,7 +170,8 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             gcc-15-aarch64-linux-gnu g++-15-aarch64-linux-gnu \
-            cmake ninja-build pkg-config python3 git ca-certificates \
+            cmake ninja-build pkg-config python3 git ca-certificates file \
+            qemu-user \
             glslc spirv-tools \
             libvulkan-dev:arm64 \
             libx11-dev:arm64 libxext-dev:arm64 libxrandr-dev:arm64 \
@@ -204,9 +206,28 @@ jobs:
         env:
           GECKO_PLATFORM_ID: Linux-aarch64
         run: |
-          apt-get install -y --no-install-recommends file
           file ./out/$GECKO_PLATFORM_ID/bin/Release/graphics_example | tee /tmp/arch.txt
           grep -q "ARM aarch64" /tmp/arch.txt
+
+      - name: Run unit tests under qemu-user
+        env:
+          GECKO_PLATFORM_ID: Linux-aarch64
+          QEMU_LD_PREFIX: /usr/aarch64-linux-gnu
+        run: |
+          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
+          lib_dir="$(pwd)/out/$GECKO_PLATFORM_ID/bin/Release"
+          failed=0
+          for t in core_tests platform_tests runtime_tests math_tests graphics_tests; do
+            exe="$test_dir/$t"
+            if [ -f "$exe" ]; then
+              echo "--- $t ---"
+              LD_LIBRARY_PATH="$lib_dir" qemu-aarch64 "$exe" || failed=1
+            else
+              echo "Test executable not found: $exe"
+              failed=1
+            fi
+          done
+          exit $failed
 
   # ---------------------------------------------------------------------------
   # PR checks - enforce version bump and changelog for PRs to main

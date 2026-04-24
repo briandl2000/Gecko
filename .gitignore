@@ -14,8 +14,8 @@ compile_commands.json
 
 # Local-only dev scripts / config
 scripts/copy_debug.py
-# Per-developer Pi host/paths — see .gecko-pi.env.example
-.gecko-pi.env
+# Per-developer env overrides (host/paths for remote-run helpers, etc.)
+.gecko-*.env
 
 # Safety nets — we don't vendor any of these; system Vulkan SDK is a
 # prerequisite (see docs/build.md). Blocks accidental check-ins.

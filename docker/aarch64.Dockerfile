@@ -11,7 +11,7 @@
 # Build once:
 #   docker build -t gecko-aarch64-dev -f docker/aarch64.Dockerfile .
 #
-# Everyday use: `source scripts/pi-dev.sh` then `gk-pi <subcommand>`.
+# See docs/build.md for the `docker run` incantation used locally and in CI.
 FROM ubuntu:25.04
 
 ENV DEBIAN_FRONTEND=noninteractive \

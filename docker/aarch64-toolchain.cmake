@@ -1,6 +1,6 @@
 # Gecko: aarch64 cross-compile toolchain used inside the docker/aarch64 image.
 #
-# Run via scripts/pi-dev.sh — sets CMAKE_TOOLCHAIN_FILE to this file inside the
+# Activated by setting CMAKE_TOOLCHAIN_FILE to this file inside the
 # container. Not intended for host-side use: paths below assume the multi-arch
 # layout that the Dockerfile provisions.
 

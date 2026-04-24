@@ -133,7 +133,6 @@ out/
 Pre-configured launch targets in `.vscode/launch.json`:
 
 - **Local: Debug example** — GDB on Linux (pick Debug/Release + target)
-- **Pi: Debug example (remote gdbserver)** — see [Raspberry Pi / aarch64](#raspberry-pi--aarch64)
 
 Set breakpoints, press `F5`, pick a target. The Local target builds via
 `gk: build` before launching.
@@ -159,53 +158,36 @@ being on `PATH`.
 Pre-configured tasks in `.vscode/tasks.json`: **gk build**, **gk test**,
 **gk clean**. Run with `Ctrl+Shift+B` or the command palette.
 
-## Raspberry Pi / aarch64
+## aarch64 cross-compile
 
-See [docs/pi-workflow.md](pi-workflow.md) for the full end-to-end guide
-(setup, daily commands, VS Code, troubleshooting). TL;DR below.
-
-Cross-building for a Raspberry Pi runs the build inside an x86_64 Docker
-container that carries an `aarch64-linux-gnu` GCC 15 cross-toolchain and
-aarch64 multi-arch runtime libs. The compiler runs natively on the host — no
-QEMU emulation — so build times match a regular local build. The Pi itself
-is only touched by `deploy` / `run` / `gdbserver`.
-
-### Prerequisites
-
-| Tool | Install |
-|------|---------|
-| Docker | `sudo pacman -S docker` / `sudo apt-get install docker.io` |
-| SSH access to the Pi | key-based login to `pi@raspberrypi.local` (or whatever you configure) |
-
-### Configuration
-
-Copy the template and edit the SSH host / remote path:
+Gecko ships a Docker image that produces Linux aarch64 artefacts from an
+x86_64 host. It carries a `gcc-15-aarch64-linux-gnu` cross-toolchain and
+arm64 multi-arch runtime libs (Vulkan, X11, Wayland). The compiler runs
+natively on the host — no QEMU — so build speed matches a local x86_64
+build. CI uses the same recipe; see
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
 
 ```bash
-cp .gecko-pi.env.example .gecko-pi.env
-$EDITOR .gecko-pi.env       # host, dir, gdb port — all gitignored
+docker build -t gecko-aarch64-dev -f docker/aarch64.Dockerfile .
+
+docker run --rm -t \
+    --user "$(id -u):$(id -g)" \
+    -v "$PWD":/workspace -w /workspace \
+    -e HOME=/tmp \
+    -e GECKO_PLATFORM_ID=Linux-aarch64 \
+    -e CMAKE_TOOLCHAIN_FILE=/workspace/docker/aarch64-toolchain.cmake \
+    gecko-aarch64-dev \
+    python3 scripts/cli.py build debug
 ```
 
-### Workflow
+Artefacts land in `out/Linux-aarch64/bin/<Config>/` and are owned by your
+host user. Both X11 and Wayland backends are built, same as the x86_64 host
+build.
 
-```bash
-source scripts/pi-dev.sh             # once per shell
-gk-pi build debug                    # first run builds the image (~2 min)
-gk-pi test debug                     # runs tests inside the container
-gk-pi deploy debug                   # rsync to the Pi
-gk-pi run graphics_example debug     # deploy + ssh exec on the Pi
-gk-pi gdbserver graphics_example     # used by VS Code remote launch
-gk-pi shell                          # interactive shell in the container
-gk-pi rebuild-image                  # rebuild the Docker image from scratch
-```
-
-The image is defined in [docker/aarch64.Dockerfile](../docker/aarch64.Dockerfile);
-its CMake toolchain lives in [docker/aarch64-toolchain.cmake](../docker/aarch64-toolchain.cmake).
-Rebuild with `gk-pi rebuild-image` after changing either.
-
-### VS Code
-
-Launch config **Pi: Debug example (remote gdbserver)** wires the above together:
-it invokes `gk-pi gdbserver`, connects GDB to `$GECKO_PI_HOST:$GECKO_PI_GDB_PORT`,
-and on exit runs `gk-pi fetch-logs` to pull `working_dir/` back.
+The image is defined in [`docker/aarch64.Dockerfile`](../docker/aarch64.Dockerfile);
+its CMake toolchain file is
+[`docker/aarch64-toolchain.cmake`](../docker/aarch64-toolchain.cmake).
+Deploying and running those artefacts on a physical device is outside the
+repo's scope — wrap the `docker run` above in whatever personal script you
+prefer.
 
