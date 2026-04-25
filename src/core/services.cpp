@@ -1,6 +1,7 @@
 #include "gecko/core/services.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/profiler.h"
 #include "private/labels.h"
@@ -12,6 +13,7 @@ namespace gecko {
 static NullJobSystem s_NullJobSystem;
 static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
+static NullEventBus s_NullEventBus;
 static NullModuleRegistry s_NullModuleRegistry;
 
 // Function-local static avoids the static initialization order fiasco.
@@ -119,8 +121,11 @@ ILogger* GetLogger() noexcept
 IEventBus* GetEventBus() noexcept
 {
   if (auto* m = g_Modules.load(std::memory_order_acquire))
-    return m->Service<IEventBus>();
-  return nullptr;
+  {
+    if (auto* impl = m->Service<IEventBus>())
+      return impl;
+  }
+  return &s_NullEventBus;
 }
 
 }  // namespace gecko

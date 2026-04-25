@@ -10,6 +10,7 @@ TEST_CASE("Service accessors return Null fallbacks before engine boot",
   REQUIRE(GetJobSystem() != nullptr);
   REQUIRE(GetProfiler() != nullptr);
   REQUIRE(GetLogger() != nullptr);
+  REQUIRE(GetEventBus() != nullptr);
   REQUIRE(GetModules() != nullptr);
 }
 
