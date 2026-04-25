@@ -16,6 +16,24 @@
 
 namespace gecko::platform {
 
+namespace {
+
+// Services this module needs live during Startup/Shutdown.
+// Topological sort uses these to start the publisher first.
+constexpr ::gecko::ServiceId kRequired[] = {
+    ::gecko::ServiceIdOf<::gecko::ILogger>(),
+    ::gecko::ServiceIdOf<::gecko::IProfiler>(),
+    ::gecko::ServiceIdOf<::gecko::IJobSystem>(),
+    ::gecko::ServiceIdOf<::gecko::IEventBus>(),
+};
+
+}  // namespace
+
+::std::span<const ::gecko::ServiceId> PlatformModule::Requires() const noexcept
+{
+  return ::std::span<const ::gecko::ServiceId> {kRequired};
+}
+
 bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Platform);

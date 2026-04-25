@@ -1,6 +1,10 @@
 #pragma once
 
+#include "gecko/core/services/events.h"
+#include "gecko/core/services/jobs.h"
+#include "gecko/core/services/log.h"
 #include "gecko/core/services/modules.h"
+#include "gecko/core/services/profiler.h"
 
 namespace gecko::platform {
 
@@ -21,6 +25,12 @@ public:
   {
     return labels::Platform;
   }
+
+  // Platform startup/shutdown emits diagnostics via GECKO_INFO/WARN/FUNC
+  // and may submit jobs / events. Declare the dependency so the
+  // registry's topological sort starts the services-publisher first.
+  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Requires()
+      const noexcept override;
 
   [[nodiscard]] GECKO_API bool Startup(
       ::gecko::IModuleRegistry& modules) noexcept override;

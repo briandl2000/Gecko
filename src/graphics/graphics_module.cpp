@@ -5,9 +5,25 @@
 
 namespace gecko::graphics {
 
+namespace {
+
+constexpr ::gecko::ServiceId kRequired[] = {
+    ::gecko::ServiceIdOf<::gecko::ILogger>(),
+    ::gecko::ServiceIdOf<::gecko::IProfiler>(),
+    ::gecko::ServiceIdOf<::gecko::IJobSystem>(),
+    ::gecko::ServiceIdOf<::gecko::IEventBus>(),
+};
+
+}  // namespace
+
 constexpr ::gecko::Label GraphicsModule::RootLabel() const noexcept
 {
   return labels::Graphics;
+}
+
+::std::span<const ::gecko::ServiceId> GraphicsModule::Requires() const noexcept
+{
+  return ::std::span<const ::gecko::ServiceId> {kRequired};
 }
 
 bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
