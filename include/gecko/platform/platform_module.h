@@ -6,6 +6,7 @@
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/modules.h"
 #include "gecko/core/services/profiler.h"
+#include "gecko/platform/input.h"
 #include "gecko/platform/monitors_interface.h"
 #include "gecko/platform/platform_config.h"
 #include "gecko/platform/windows_interface.h"
@@ -66,6 +67,7 @@ private:
   ::gecko::EventEmitter m_Emitter {};
   ::gecko::Unique<IWindowsBackend> m_Windows;
   ::gecko::Unique<IMonitorsBackend> m_Monitors;
+  ::gecko::Unique<IInput> m_Input;
 };
 
 // ── Service accessors ────────────────────────────────────────────────

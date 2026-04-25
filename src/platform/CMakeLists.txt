@@ -8,6 +8,8 @@ target_sources(Platform
     platform_config.cpp
     platform_io.cpp
     platform_module.cpp
+    input.cpp
+    window_event_input.cpp
     windows_interface.cpp
 
     private/null_monitors_backend.cpp

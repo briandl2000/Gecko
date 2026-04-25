@@ -2,6 +2,8 @@
 
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
+#include "private/null_input.h"
+#include "private/window_event_input.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -26,13 +28,15 @@ constexpr ::gecko::ServiceId kRequired[] = {
 constexpr ::gecko::ServiceId kPublishes[] = {
     ::gecko::ServiceIdOf<IWindowsBackend>(),
     ::gecko::ServiceIdOf<IMonitorsBackend>(),
+    ::gecko::ServiceIdOf<IInput>(),
 };
 
 // File-scope pointers populated by Startup, cleared by Shutdown.
-// Free-function accessors (GetWindows/GetMonitors/PumpEvents/...) read
+// Free-function accessors (GetWindows/GetMonitors/GetInput/...) read
 // these.
 IWindowsBackend* g_Windows = nullptr;
 IMonitorsBackend* g_Monitors = nullptr;
+IInput* g_Input = nullptr;
 ::gecko::EventEmitter* g_Emitter = nullptr;
 
 }  // namespace
@@ -75,6 +79,14 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
   }
   m_Monitors->EnumerateMonitors();
 
+  // Input service: subscribes to window events on the bus.
+  m_Input = ::gecko::CreateUnique<WindowEventInput>();
+  if (!m_Input)
+  {
+    GECKO_ERROR(labels::Platform, "Failed to create input service");
+    return false;
+  }
+
   if (!modules.PublishService<IWindowsBackend>(m_Windows.get()))
   {
     GECKO_ERROR(labels::Platform, "PublishService<IWindowsBackend> failed");
@@ -86,9 +98,17 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
     (void)modules.UnpublishService<IWindowsBackend>();
     return false;
   }
+  if (!modules.PublishService<IInput>(m_Input.get()))
+  {
+    GECKO_ERROR(labels::Platform, "PublishService<IInput> failed");
+    (void)modules.UnpublishService<IMonitorsBackend>();
+    (void)modules.UnpublishService<IWindowsBackend>();
+    return false;
+  }
 
   g_Windows = m_Windows.get();
   g_Monitors = m_Monitors.get();
+  g_Input = m_Input.get();
   g_Emitter = &m_Emitter;
 
   return true;
@@ -99,12 +119,15 @@ void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
   GECKO_FUNC(labels::Platform);
 
   g_Emitter = nullptr;
+  g_Input = nullptr;
   g_Monitors = nullptr;
   g_Windows = nullptr;
 
+  (void)modules.UnpublishService<IInput>();
   (void)modules.UnpublishService<IMonitorsBackend>();
   (void)modules.UnpublishService<IWindowsBackend>();
 
+  m_Input.reset();
   m_Monitors.reset();
   m_Windows.reset();
   m_Emitter = {};
@@ -124,6 +147,11 @@ IWindowsBackend* GetWindows() noexcept
 IMonitorsBackend* GetMonitors() noexcept
 {
   return g_Monitors;
+}
+
+IInput* GetInput() noexcept
+{
+  return g_Input;
 }
 
 void PumpEvents() noexcept
