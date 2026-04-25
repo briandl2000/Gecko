@@ -1,5 +1,6 @@
 add_library(Platform STATIC)
 add_library(Gecko::Platform ALIAS Platform)
+set_target_properties(Platform PROPERTIES OUTPUT_NAME "GeckoPlatform")
 
 target_sources(Platform
   PRIVATE

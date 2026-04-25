@@ -10,34 +10,21 @@
 
 namespace gecko {
 
-// Services installed via InstallServices(). Allocator is NOT a service —
-// it's infrastructure; configure it independently via SetAllocator() (see
-// memory.h).
-struct Services
-{
-  IJobSystem* JobSystem = nullptr;
-  IProfiler* Profiler = nullptr;
-  ILogger* Logger = nullptr;
-  IModuleRegistry* Modules = nullptr;
-  IEventBus* EventBus = nullptr;
-};
-
-[[nodiscard]]
-GECKO_API bool InstallServices(const Services& service) noexcept;
-
-GECKO_API void UninstallServices() noexcept;
-
+// Service accessors. Each returns the implementation published by the
+// active module registry, or a Null fallback if the engine has not yet
+// booted (or the service was never published). They never return null.
 GECKO_API IJobSystem* GetJobSystem() noexcept;
 GECKO_API IProfiler* GetProfiler() noexcept;
 GECKO_API ILogger* GetLogger() noexcept;
 GECKO_API IModuleRegistry* GetModules() noexcept;
 GECKO_API IEventBus* GetEventBus() noexcept;
 
-GECKO_API bool IsServicesInstalled() noexcept;
+namespace detail {
 
-GECKO_API bool ValidateServices(bool fatalOnFail) noexcept;
+// Engine-only: install/uninstall the active module registry. User code
+// must not call these — use Engine::Create() instead.
+GECKO_API void SetActiveModuleRegistry(IModuleRegistry* registry) noexcept;
+
+}  // namespace detail
 
 }  // namespace gecko
-#ifndef GECKO_REQUIRE_INSTALL
-#define GECKO_REQUIRE_INSTALL 1
-#endif

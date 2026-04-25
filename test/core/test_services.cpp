@@ -4,60 +4,24 @@
 
 using namespace gecko;
 
-TEST_CASE("Services are not installed initially", "[core][services]")
+TEST_CASE("Service accessors return Null fallbacks before engine boot",
+          "[core][services]")
 {
-  REQUIRE_FALSE(IsServicesInstalled());
+  REQUIRE(GetJobSystem() != nullptr);
+  REQUIRE(GetProfiler() != nullptr);
+  REQUIRE(GetLogger() != nullptr);
+  REQUIRE(GetEventBus() != nullptr);
+  REQUIRE(GetModules() != nullptr);
 }
 
 TEST_CASE("Allocator returns default before any SetAllocator",
           "[core][services]")
 {
-  REQUIRE_FALSE(IsServicesInstalled());
   IAllocator& alloc = Allocator();
   // Reference-returning API: we just exercise it.
   void* p = alloc.Alloc(16, alignof(::std::max_align_t));
   REQUIRE(p != nullptr);
   alloc.Free(p);
-}
-
-TEST_CASE("Install and uninstall with null services", "[core][services]")
-{
-  SystemAllocator alloc;
-  NullJobSystem jobs;
-  NullProfiler profiler;
-  NullLogger logger;
-  NullModuleRegistry modules;
-  NullEventBus events;
-
-  REQUIRE(SetAllocator(&alloc));
-  jobs.Init();
-  profiler.Init();
-  logger.Init();
-  REQUIRE(modules.Init());
-  events.Init();
-
-  Services svc {
-      .JobSystem = &jobs,
-      .Profiler = &profiler,
-      .Logger = &logger,
-      .Modules = &modules,
-      .EventBus = &events,
-  };
-
-  REQUIRE(InstallServices(svc));
-  REQUIRE(IsServicesInstalled());
-  REQUIRE(ValidateServices(false));
-
-  REQUIRE(&Allocator() == &alloc);
-  REQUIRE(GetJobSystem() == &jobs);
-  REQUIRE(GetProfiler() == &profiler);
-  REQUIRE(GetLogger() == &logger);
-  REQUIRE(GetModules() == &modules);
-  REQUIRE(GetEventBus() == &events);
-
-  UninstallServices();
-  ResetAllocator();
-  REQUIRE_FALSE(IsServicesInstalled());
 }
 
 TEST_CASE("NullJobSystem runs inline", "[core][services]")

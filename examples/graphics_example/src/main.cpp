@@ -1,6 +1,6 @@
 #include <chrono>
 #include <cmath>
-#include <gecko/core/boot.h>
+#include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/events.h>
@@ -15,7 +15,6 @@
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
 #include <gecko/runtime/immediate_logger.h>
-#include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
@@ -92,16 +91,20 @@ int main()
   runtime::RingProfiler ringProfiler(1 << 16);
   runtime::ImmediateLogger ringLogger;
   ringLogger.SetThreadSafe(true);
-  runtime::ModuleRegistry moduleRegistry;
   runtime::EventBus eventBus;
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  GECKO_BOOT((Services {.JobSystem = &jobSystem,
-                        .Profiler = &ringProfiler,
-                        .Logger = &ringLogger,
-                        .Modules = &moduleRegistry,
-                        .EventBus = &eventBus}));
+  runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler, ringLogger,
+                                            eventBus);
+  platform::PlatformModule platformModule;
+
+  auto engine = Engine::Create({&runtimeModule, &platformModule, &g_AppModule});
+  if (!engine)
+  {
+    ResetAllocator();
+    return 1;
+  }
 
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
@@ -117,10 +120,6 @@ int main()
 
   GECKO_FUNC(app::graphics_example::labels::Main);
   GECKO_INFO(app::graphics_example::labels::Main, gecko::VersionFullString());
-
-  (void)InstallModule(runtime::GetModule());
-  (void)InstallModule(platform::GetModule());
-  (void)InstallModule(g_AppModule);
 
   if (!traceSink.IsOpen())
   {
@@ -641,7 +640,7 @@ int main()
   fileSink.Unregister();
   traceSink.Unregister();
 
-  GECKO_SHUTDOWN();
+  engine.reset();
   ResetAllocator();
   ::std::printf("Graphics example finished.\n");
   return 0;

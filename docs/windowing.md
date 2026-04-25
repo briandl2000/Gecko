@@ -569,16 +569,17 @@ If the selected backend is unavailable at runtime, falls back to `Null`.
 
 ## Module installation
 
-The platform system is packaged as a module. Install it after `GECKO_BOOT`:
+The platform system is packaged as a module. Stack-construct one and pass
+it to `Engine::Create`:
 
 ```cpp
 #include <gecko/platform/platform_module.h>
 
-// After GECKO_BOOT(...)
-(void)InstallModule(platform::GetModule());
+platform::PlatformModule platformModule;
+auto engine = Engine::Create({&runtimeModule, &platformModule, &appModule});
 ```
 
-The module handles internal initialization and cleanup. `PlatformContext` can be created after the module is installed.
+The module handles internal initialization and cleanup. `PlatformContext` can be created after the engine has started.
 
 ---
 

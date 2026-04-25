@@ -1,6 +1,6 @@
 #include <cstdio>
 #include <cstring>
-#include <gecko/core/boot.h>
+#include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
@@ -13,7 +13,6 @@
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
-#include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_logger.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
@@ -170,21 +169,6 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
   return true;
 }
 
-static Services CreateServices(runtime::ThreadPoolJobSystem& jobSystem,
-                               runtime::RingProfiler& ringProfiler,
-                               runtime::RingLogger& ringLogger,
-                               runtime::ModuleRegistry& moduleRegistry,
-                               runtime::EventBus& eventBus)
-{
-  Services services {};
-  services.JobSystem = &jobSystem;
-  services.Profiler = &ringProfiler;
-  services.Logger = &ringLogger;
-  services.Modules = &moduleRegistry;
-  services.EventBus = &eventBus;
-  return services;
-}
-
 static int AppMain(int argc, char** argv)
 {
   int result = 0;
@@ -208,12 +192,20 @@ static int AppMain(int argc, char** argv)
   runtime::RingProfiler ringProfiler(1 << 16);
   runtime::RingLogger ringLogger(1024);
 
-  runtime::ModuleRegistry moduleRegistry;
   runtime::EventBus eventBus;
 
-  // 3) Install services (JobSystem -> Profiler -> Logger -> Modules/EventBus).
-  GECKO_BOOT((CreateServices(jobSystem, ringProfiler, ringLogger,
-                             moduleRegistry, eventBus)));
+  runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler, ringLogger,
+                                            eventBus);
+  platform::PlatformModule platformModule;
+
+  // 3) Boot the engine. Modules are started in topological order based
+  // on each module's Requires() / Publishes() declarations.
+  auto engine = Engine::Create({&runtimeModule, &platformModule, &g_AppModule});
+  if (!engine)
+  {
+    ResetAllocator();
+    return 1;
+  }
 
   // 3) Configure sinks AFTER services are installed - they auto-unregister
   // when destroyed
@@ -228,11 +220,6 @@ static int AppMain(int argc, char** argv)
   }
 
   GECKO_INFO(app::app_skeleton::labels::Main, gecko::VersionFullString());
-
-  // Register library modules after boot (now that logging is configured).
-  (void)InstallModule(runtime::GetModule());
-  (void)InstallModule(platform::GetModule());
-  (void)InstallModule(g_AppModule);
 
   // Trace sink auto-unregisters when destroyed
   runtime::TraceFileSink traceSink("gecko_trace.json");
@@ -311,8 +298,9 @@ static int AppMain(int argc, char** argv)
   fileSink.Unregister();
   traceSink.Unregister();
 
-  // 5) Shutdown services in reverse order.
-  GECKO_SHUTDOWN();
+  // 5) Shutdown: ~Engine() runs UninstallServices when `engine` goes out
+  // of scope. Allocator is infrastructure, reset it explicitly.
+  engine.reset();
   ResetAllocator();
   return result;
 }

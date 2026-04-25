@@ -19,6 +19,11 @@ u32 HashThreadId() noexcept
   return static_cast<u32>(id ^ (id >> 32));
 }
 
+u32 ThisThreadId() noexcept
+{
+  return HashThreadId();
+}
+
 u32 HardwareThreadCount() noexcept
 {
   return ::std::max(1u, ::std::thread::hardware_concurrency());

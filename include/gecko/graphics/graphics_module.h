@@ -1,14 +1,25 @@
 #pragma once
 
+#include "gecko/core/services/events.h"
+#include "gecko/core/services/jobs.h"
+#include "gecko/core/services/log.h"
 #include "gecko/core/services/modules.h"
+#include "gecko/core/services/profiler.h"
 
 namespace gecko::graphics {
 
-// Graphics library's module.
+// Graphics library's module. Stack-construct one and pass it to
+// Engine::Create({...}).
 class GraphicsModule final : public ::gecko::IModule
 {
 public:
   [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
+      const noexcept override;
+
+  // Graphics startup/shutdown emits diagnostics. Declare the dependency
+  // on the foundational services so the topo sort orders us after the
+  // services-publisher (and after PlatformModule, transitively).
+  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Requires()
       const noexcept override;
 
   [[nodiscard]] GECKO_API bool Startup(
@@ -16,12 +27,5 @@ public:
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 };
-
-// Explicit registration entry point (called by app/loader after services boot).
-[[nodiscard]] GECKO_API ::gecko::ModuleRegistration InstallGraphicsModule(
-    ::gecko::IModuleRegistry& modules) noexcept;
-
-// Access the module instance (for unified install flows).
-[[nodiscard]] GECKO_API ::gecko::IModule& GetModule() noexcept;
 
 }  // namespace gecko::graphics

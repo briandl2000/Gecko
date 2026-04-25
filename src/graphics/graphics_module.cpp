@@ -5,11 +5,25 @@
 
 namespace gecko::graphics {
 
-static GraphicsModule s_GraphicsModule;
+namespace {
+
+constexpr ::gecko::ServiceId kRequired[] = {
+    ::gecko::ServiceIdOf<::gecko::ILogger>(),
+    ::gecko::ServiceIdOf<::gecko::IProfiler>(),
+    ::gecko::ServiceIdOf<::gecko::IJobSystem>(),
+    ::gecko::ServiceIdOf<::gecko::IEventBus>(),
+};
+
+}  // namespace
 
 constexpr ::gecko::Label GraphicsModule::RootLabel() const noexcept
 {
   return labels::Graphics;
+}
+
+::std::span<const ::gecko::ServiceId> GraphicsModule::Requires() const noexcept
+{
+  return ::std::span<const ::gecko::ServiceId> {kRequired};
 }
 
 bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
@@ -21,17 +35,6 @@ bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 void GraphicsModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Graphics);
-}
-
-::gecko::ModuleRegistration InstallGraphicsModule(
-    ::gecko::IModuleRegistry& modules) noexcept
-{
-  return modules.RegisterStatic(s_GraphicsModule);
-}
-
-::gecko::IModule& GetModule() noexcept
-{
-  return s_GraphicsModule;
 }
 
 }  // namespace gecko::graphics

@@ -1,4 +1,4 @@
-#include <gecko/core/boot.h>
+#include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
@@ -11,7 +11,6 @@
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
 #include <gecko/runtime/immediate_logger.h>
-#include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
@@ -155,19 +154,22 @@ int main()
   runtime::RingProfiler ringProfiler(1 << 16);  // 64K events
   runtime::ImmediateLogger immediateLogger;     // Immediate logging
 
-  runtime::ModuleRegistry moduleRegistry;
   runtime::EventBus eventBus;
 
   // Create job system with 4 worker threads
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  // Use GECKO_BOOT system for proper service installation and validation
-  GECKO_BOOT((Services {.JobSystem = &jobSystem,
-                        .Profiler = &ringProfiler,
-                        .Logger = &immediateLogger,
-                        .Modules = &moduleRegistry,
-                        .EventBus = &eventBus}));
+  runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler,
+                                            immediateLogger, eventBus);
+  platform::PlatformModule platformModule;
+
+  auto engine = Engine::Create({&runtimeModule, &platformModule, &g_AppModule});
+  if (!engine)
+  {
+    ResetAllocator();
+    return 1;
+  }
   // Set up trace file sink for profiling data after services are available
   runtime::TraceFileSink traceSink("gecko_trace.json");
 
@@ -195,11 +197,6 @@ int main()
   {
     GECKO_FUNC(app::platform_example::labels::Main);
     GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
-
-    // Register library modules after boot (now that logging is configured).
-    (void)InstallModule(runtime::GetModule());
-    (void)InstallModule(platform::GetModule());
-    (void)InstallModule(g_AppModule);
 
     PlatformConfig cfg = {};
     cfg.Backend = DisplayBackendKind::Auto;
@@ -702,7 +699,7 @@ int main()
   fileSink.Unregister();
   traceSink.Unregister();
 
-  GECKO_SHUTDOWN();
+  engine.reset();
   ResetAllocator();
 
   ::std::printf("Application exited successfully\n");

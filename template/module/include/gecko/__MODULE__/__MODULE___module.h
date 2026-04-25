@@ -4,7 +4,8 @@
 
 namespace gecko::__MODULE__ {
 
-// __MODULE_CAMEL__ library's module.
+// __MODULE_CAMEL__ library's module. Stack-construct one and pass &it
+// into Engine::Create({...}).
 class __MODULE_CAMEL__Module final : public ::gecko::IModule
 {
 public:
@@ -16,12 +17,5 @@ public:
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 };
-
-// Explicit registration entry point (called by app/loader after services boot).
-[[nodiscard]] GECKO_API ::gecko::ModuleRegistration
-Install__MODULE_CAMEL__Module(::gecko::IModuleRegistry& modules) noexcept;
-
-// Access the module instance (for unified install flows).
-[[nodiscard]] GECKO_API ::gecko::IModule& GetModule() noexcept;
 
 }  // namespace gecko::__MODULE__

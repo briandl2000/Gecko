@@ -1,5 +1,6 @@
 add_library(Core STATIC)
 add_library(Gecko::Core ALIAS Core)
+set_target_properties(Core PROPERTIES OUTPUT_NAME "GeckoCore")
 
 # Enable position independent code for static lib that links into shared libs
 set_target_properties(Core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -24,6 +25,7 @@ target_sources(Core
 # Ensures singleton consistency across plugins/DLLs
 add_library(CoreServices SHARED)
 add_library(Gecko::CoreServices ALIAS CoreServices)
+set_target_properties(CoreServices PROPERTIES OUTPUT_NAME "GeckoCoreServices")
 
 # Export all symbols on Windows to create the .lib import library
 set_target_properties(CoreServices PROPERTIES
@@ -37,9 +39,15 @@ endif()
 target_sources(CoreServices
   PRIVATE
     services.cpp
+    services/engine.cpp
+    services/module_registry.cpp
 )
 
 target_link_libraries(CoreServices PUBLIC Gecko::Core)
+
+target_include_directories(CoreServices
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_include_directories(Core
   PUBLIC

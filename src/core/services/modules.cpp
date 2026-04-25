@@ -7,29 +7,6 @@
 
 namespace gecko {
 
-ModuleResult InstallModule(IModule& module) noexcept
-{
-  GECKO_FUNC(core::labels::Modules);
-
-  Label rootLabel = module.RootLabel();
-  GECKO_INFO(core::labels::Modules, "Installing module '%s'",
-             rootLabel.Name ? rootLabel.Name : "<unnamed>");
-
-  ModuleRegistration reg = GetModules()->RegisterStatic(module);
-  if (reg.Ok())
-  {
-    GECKO_DEBUG(core::labels::Modules, "Module '%s' installed successfully",
-                rootLabel.Name ? rootLabel.Name : "<unnamed>");
-    reg.Handle.Release();
-  }
-  else
-  {
-    GECKO_ERROR(core::labels::Modules, "Failed to install module '%s'",
-                rootLabel.Name ? rootLabel.Name : "<unnamed>");
-  }
-  return reg.Result;
-}
-
 ModuleHandle::ModuleHandle(IModuleRegistry* modules, Label label) noexcept
     : m_modules {modules}, m_label {label}
 {}
@@ -63,14 +40,6 @@ ModuleHandle::~ModuleHandle() noexcept
 
 void ModuleHandle::Reset() noexcept
 {
-  GECKO_FUNC(core::labels::Modules);
-
-  if (m_modules && m_label.IsValid())
-  {
-    GECKO_TRACE(core::labels::Modules, "Unregistering module '%s'",
-                m_label.Name ? m_label.Name : "<unnamed>");
-  }
-
   m_modules = nullptr;
   m_label = {};
 }
@@ -118,5 +87,18 @@ bool NullModuleRegistry::StartupAllModules() noexcept
 }
 void NullModuleRegistry::ShutdownAllModules() noexcept
 {}
+
+bool NullModuleRegistry::PublishServiceImpl(ServiceId, void*) noexcept
+{
+  return false;
+}
+void* NullModuleRegistry::GetServiceImpl(ServiceId) const noexcept
+{
+  return nullptr;
+}
+bool NullModuleRegistry::UnpublishServiceImpl(ServiceId) noexcept
+{
+  return false;
+}
 
 }  // namespace gecko
