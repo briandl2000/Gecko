@@ -2,7 +2,9 @@
 
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
+#include "gecko/platform/platform_io.h"
 #include "gecko/platform/threading.h"
+#include "private/native_platform_io.h"
 #include "private/native_threading.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
@@ -32,6 +34,7 @@ constexpr ::gecko::ServiceId kRequired[] = {
 // declare these in their own Requires() to enforce ordering.
 constexpr ::gecko::ServiceId kPublished[] = {
     ::gecko::ServiceIdOf<IThreading>(),
+    ::gecko::ServiceIdOf<IPlatformIO>(),
 };
 
 }  // namespace
@@ -75,12 +78,36 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
     return false;
   }
 
+  m_PlatformIO = CreateNativePlatformIO();
+  if (m_PlatformIO == nullptr)
+  {
+    GECKO_ERROR(labels::Platform, "CreateNativePlatformIO returned null");
+    (void)modules.UnpublishService<IThreading>();
+    m_Threading.reset();
+    return false;
+  }
+
+  if (!modules.PublishService<IPlatformIO>(m_PlatformIO.get()))
+  {
+    GECKO_ERROR(labels::Platform, "Failed to publish IPlatformIO");
+    m_PlatformIO.reset();
+    (void)modules.UnpublishService<IThreading>();
+    m_Threading.reset();
+    return false;
+  }
+
   return true;
 }
 
 void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
 {
   GECKO_FUNC(labels::Platform);
+
+  if (m_PlatformIO != nullptr)
+  {
+    (void)modules.UnpublishService<IPlatformIO>();
+    m_PlatformIO.reset();
+  }
 
   if (m_Threading != nullptr)
   {

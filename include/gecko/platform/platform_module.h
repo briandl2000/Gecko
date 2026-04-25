@@ -10,6 +10,7 @@
 namespace gecko::platform {
 
 struct IThreading;
+struct IPlatformIO;
 
 namespace labels {
 inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
@@ -47,6 +48,7 @@ public:
 
 private:
   ::gecko::Unique<IThreading> m_Threading;
+  ::gecko::Unique<IPlatformIO> m_PlatformIO;
 };
 
 }  // namespace gecko::platform
