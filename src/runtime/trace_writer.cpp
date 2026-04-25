@@ -11,7 +11,7 @@ namespace gecko::runtime {
 
 namespace {
 
-inline void WriteFmt(::gecko::platform::IFileWriter& w, const char* fmt,
+inline void WriteFmt(::gecko::platform::FileWriter& w, const char* fmt,
                      ...) noexcept
 {
   char buf[1024];
@@ -27,7 +27,7 @@ inline void WriteFmt(::gecko::platform::IFileWriter& w, const char* fmt,
   w.WriteString(::std::string_view {buf, len});
 }
 
-inline void WriteSep(::gecko::platform::IFileWriter& w, bool& first) noexcept
+inline void WriteSep(::gecko::platform::FileWriter& w, bool& first) noexcept
 {
   if (!first)
     w.WriteString(",");
@@ -48,7 +48,7 @@ bool TraceWriter::Open(const char* path)
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
   Close();
-  m_Writer = ::gecko::platform::GetPlatformIO()->OpenWrite(
+  m_Writer = ::gecko::platform::OpenWrite(
       path, ::gecko::platform::WriteMode::Truncate);
   if (!m_Writer)
     return false;

@@ -26,7 +26,7 @@ public:
   virtual void Flush() noexcept override;
 
 private:
-  ::gecko::Unique<::gecko::platform::IFileWriter> m_Writer {};
+  ::gecko::Unique<::gecko::platform::FileWriter> m_Writer {};
   bool m_First {true};
   u64 m_Time0Ns {0};
   std::vector<ProfEvent> m_BufferedEvents {};

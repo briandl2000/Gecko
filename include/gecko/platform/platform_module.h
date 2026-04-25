@@ -1,6 +1,5 @@
 #pragma once
 
-#include "gecko/core/ptr.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/jobs.h"
 #include "gecko/core/services/log.h"
@@ -9,17 +8,18 @@
 
 namespace gecko::platform {
 
-struct IThreading;
-struct IPlatformIO;
-
 namespace labels {
 inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
 }
 
 // Platform library's module. Stack-construct one and pass &platform into
-// Engine::Create({...}). Owns and publishes the platform-provided
-// services (IThreading today, IPlatformIO next) and is the lifecycle
-// node for platform-wide setup such as Win32 timer resolution.
+// Engine::Create({...}). The platform module currently owns no state of
+// its own; it exists as a lifecycle node for one-shot platform setup
+// (Win32 multimedia timer resolution today, more later).
+//
+// Filesystem and threading APIs are stateless namespace functions
+// (`gecko::platform::Read`, `gecko::platform::HardwareThreadCount`, ...)
+// not services — see copilot_context/MODULE_API_SHAPING.md.
 class PlatformModule final : public ::gecko::IModule
 {
 public:
@@ -32,23 +32,16 @@ public:
     return labels::Platform;
   }
 
-  // Platform startup/shutdown emits diagnostics via GECKO_INFO/WARN/FUNC
-  // and may submit jobs / events. Declare the dependency so the
-  // registry's topological sort starts the services-publisher first.
+  // Startup emits diagnostics via GECKO_INFO/WARN/FUNC. Declare the
+  // dependencies so the registry's topological sort wires up logging
+  // before us.
   [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Requires()
-      const noexcept override;
-
-  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Publishes()
       const noexcept override;
 
   [[nodiscard]] GECKO_API bool Startup(
       ::gecko::IModuleRegistry& modules) noexcept override;
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
-
-private:
-  ::gecko::Unique<IThreading> m_Threading;
-  ::gecko::Unique<IPlatformIO> m_PlatformIO;
 };
 
 }  // namespace gecko::platform

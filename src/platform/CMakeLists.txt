@@ -9,7 +9,6 @@ target_sources(Platform
     platform_context.cpp
     platform_io.cpp
     platform_module.cpp
-    threading.cpp
     windows_interface.cpp
 
     private/null_monitors_backend.cpp

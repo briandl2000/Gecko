@@ -10,7 +10,7 @@ namespace gecko::runtime {
 FileLogSink::FileLogSink(const char* path)
 {
   GECKO_ASSERT(path && "File path cannot be null");
-  m_Writer = ::gecko::platform::GetPlatformIO()->OpenWrite(
+  m_Writer = ::gecko::platform::OpenWrite(
       path, ::gecko::platform::WriteMode::Truncate);
 }
 

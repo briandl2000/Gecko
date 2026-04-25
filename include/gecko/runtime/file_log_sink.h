@@ -14,7 +14,7 @@ public:
   virtual void Write(const LogMessage& message) noexcept override;
 
 private:
-  ::gecko::Unique<::gecko::platform::IFileWriter> m_Writer {};
+  ::gecko::Unique<::gecko::platform::FileWriter> m_Writer {};
 };
 
 }  // namespace gecko::runtime

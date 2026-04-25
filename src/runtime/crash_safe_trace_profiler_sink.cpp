@@ -11,7 +11,7 @@ namespace gecko::runtime {
 
 namespace {
 
-inline void WriteFmt(::gecko::platform::IFileWriter& w, const char* fmt,
+inline void WriteFmt(::gecko::platform::FileWriter& w, const char* fmt,
                      ...) noexcept
 {
   char buf[1024];
@@ -33,7 +33,7 @@ CrashSafeTraceProfilerSink::CrashSafeTraceProfilerSink(const char* path)
 {
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
-  m_Writer = ::gecko::platform::GetPlatformIO()->OpenWrite(
+  m_Writer = ::gecko::platform::OpenWrite(
       path, ::gecko::platform::WriteMode::Truncate);
 
   if (m_Writer)
@@ -112,7 +112,7 @@ void CrashSafeTraceProfilerSink::Flush() noexcept
 }
 
 void CrashSafeTraceProfilerSink::WriteJsonEventTo(
-    ::gecko::platform::IFileWriter& w, const ProfEvent& event,
+    ::gecko::platform::FileWriter& w, const ProfEvent& event,
     u64 time0Ns) noexcept
 {
   const double timeUs = (double)(event.TimestampNs - time0Ns) / 1000.0;

@@ -13,6 +13,7 @@ For the canonical, non-scattered overview of how Gecko is structured and how to 
 - [API Usage Guide](#api-usage-guide)
 - [Best Practices](#best-practices)
 - [Common Patterns](#common-patterns)
+- [Module API Shaping](#module-api-shaping)
 
 ## Coding Standards
 
@@ -947,6 +948,44 @@ void ExpensiveFunction()
   GECKO_PROF_COUNTER(labels::Main, "items_processed", itemCount);
 }
 ```
+
+---
+
+## Module API Shaping
+
+When designing a new public API in a module, choose its shape based on the state it owns. This is a hard rule, not a guideline.
+
+### Vocabulary
+
+A **module** is an entire library (Core, Platform, Runtime, Math, Graphics, …). Each module has a **module interface object** — a single concrete class (`CoreServicesModule`, `PlatformModule`, `RuntimeModule`, …) that owns the module's lifecycle state, gets stack-constructed by the application, and participates in `Engine::Create({...})`.
+
+The module's namespace (`::gecko::core`, `::gecko::platform`, …) and the module interface object together make up the module's public surface. Both are "the module"; the namespace is not a smaller component within the module.
+
+### The matrix
+
+| State | Shape |
+| --- | --- |
+| **None.** Pure thunks over OS calls, queries, transforms. | **Free functions in the module namespace.** No interface, no service, no global accessor. e.g. `gecko::platform::Exists(path)`, `gecko::platform::HardwareThreadCount()`. |
+| **Small fixed state** — a handful of values, no allocations. | **Members on the module interface object** with a global getter that returns the module pointer. e.g. `GetPlatformModule()->FrameCount`. |
+| **Large or dynamic state** — owns memory, threads, sockets, caches; multiple impls; per-test substitution makes sense. | **Service pattern.** `IFoo` interface in Core (or owning module), `NullFoo` deny-all default, concrete impl in providing module, `Services{...}` install, `GetFoo()` accessor. e.g. `ILogger`, `IJobSystem`, `IEventBus`, `IProfiler`. |
+
+### Edge cases
+
+- **Per-instance opaque handles** (open files, allocators, timers) are *not* services. They are move-only RAII objects returned from a factory function. The factory function itself follows the matrix above. Example: `gecko::platform::OpenWrite(path, mode) → Unique<FileWriter>`. The `FileWriter` is an abstract base so backends can plug different implementations; nobody publishes it as a service.
+
+- **Cross-cutting platform queries** (filesystem IO, threading info, time) hold no module state. They are *namespace functions*, even though the Linux/Win32 implementations live in different `.cpp` files behind `#ifdef`. Compile-time backend selection is preferred over runtime service dispatch when the backend is fixed at build time.
+
+- **When in doubt, prefer the lowest-overhead shape that fits.** Promote to a higher shape only when state grows or substitutability becomes a real requirement.
+
+### Backend file layout
+
+For namespace-function modules with per-OS backends, every backend `.cpp` has a sibling `.h` even when the header has no public symbols. The header is reserved for internal helpers shared across multiple backend translation units (e.g. `linux/platform_io_linux.h` declares `linux_io::ToCString`). This keeps the layout consistent with the class-based backends elsewhere (e.g. `linux/wayland_windows_backend.{h,cpp}`).
+
+### Consequences
+
+- A module's public namespace can have implementation files split per backend (e.g. `src/platform/linux/platform_io_linux.cpp` implements the Linux variants of `gecko::platform::Read/Write/...`), as long as exactly one set of definitions wins per build.
+- Tests for stateless namespace APIs use real OS resources (temp dirs, threads, …). They cannot mock the API itself; substitute at the *consumer* boundary instead (e.g. inject a path prefix), or move the state-holding part behind the service pattern if mocking is required.
+- The matrix is the default. Document deviations in the relevant ticket.
 
 ---
 

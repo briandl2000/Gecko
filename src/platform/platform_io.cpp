@@ -1,9 +1,5 @@
 #include "gecko/platform/platform_io.h"
 
-#include "gecko/core/services.h"
-#include "gecko/core/services/modules.h"
-#include "private/native_platform_io.h"
-
 #include <utility>
 
 namespace gecko::platform {
@@ -29,7 +25,9 @@ bool PathView::IsAbsolute() const noexcept
 
 PathView PathView::ParentDir() const noexcept
 {
-  auto pos = m_View.rfind('/');
+  if (m_View.empty())
+    return PathView {};
+  auto pos = m_View.find_last_of('/');
   if (pos == ::std::string_view::npos)
     return PathView {};
   if (pos == 0)
@@ -39,43 +37,44 @@ PathView PathView::ParentDir() const noexcept
 
 PathView PathView::Filename() const noexcept
 {
-  auto pos = m_View.rfind('/');
+  if (m_View.empty())
+    return PathView {};
+  auto pos = m_View.find_last_of('/');
   if (pos == ::std::string_view::npos)
-    return *this;
+    return PathView {m_View};
   return PathView {m_View.substr(pos + 1)};
 }
 
 PathView PathView::Stem() const noexcept
 {
-  auto fname = Filename().View();
-  if (fname.empty())
+  auto fn = Filename().View();
+  if (fn.empty())
     return PathView {};
-  // Skip a leading dot so ".bashrc" -> stem is "" (matches std::filesystem).
-  ::std::size_t start = 0;
-  while (start < fname.size() && fname[start] == '.')
-    ++start;
-  if (start == fname.size())
-    return PathView {fname.substr(0, 0)};
-  auto dot = fname.rfind('.');
-  if (dot == ::std::string_view::npos || dot < start)
-    return PathView {fname};
-  return PathView {fname.substr(0, dot)};
+  // Leading '.' on dotfiles (".bashrc") is part of the basename, not a
+  // separator. Treat a leading '.' as no extension and return empty
+  // stem to match the header contract.
+  if (fn.front() == '.')
+  {
+    auto dot = fn.find_last_of('.');
+    if (dot == 0)
+      return PathView {};
+    return PathView {fn.substr(0, dot)};
+  }
+  auto dot = fn.find_last_of('.');
+  if (dot == ::std::string_view::npos)
+    return PathView {fn};
+  return PathView {fn.substr(0, dot)};
 }
 
 PathView PathView::Extension() const noexcept
 {
-  auto fname = Filename().View();
-  if (fname.empty())
+  auto fn = Filename().View();
+  if (fn.empty())
     return PathView {};
-  ::std::size_t start = 0;
-  while (start < fname.size() && fname[start] == '.')
-    ++start;
-  if (start == fname.size())
+  auto dot = fn.find_last_of('.');
+  if (dot == ::std::string_view::npos || dot == 0)
     return PathView {};
-  auto dot = fname.rfind('.');
-  if (dot == ::std::string_view::npos || dot < start)
-    return PathView {};
-  return PathView {fname.substr(dot)};
+  return PathView {fn.substr(dot)};
 }
 
 // ── ReadResult ──────────────────────────────────────────────────────
@@ -105,7 +104,7 @@ ReadResult::~ReadResult() noexcept = default;
 
 ::std::span<const ::std::byte> ReadResult::Data() const noexcept
 {
-  return ::std::span<const ::std::byte> {m_Bytes.data(), m_Bytes.size()};
+  return {m_Bytes.data(), m_Bytes.size()};
 }
 
 ::std::vector<::std::byte> ReadResult::Take() noexcept
@@ -153,19 +152,19 @@ MappedFile::~MappedFile() noexcept
   Reset();
 }
 
-::std::span<const ::std::byte> MappedFile::Data() const noexcept
-{
-  return ::std::span<const ::std::byte> {m_Data, m_Size};
-}
-
 void MappedFile::Reset() noexcept
 {
-  if (m_Deleter != nullptr && m_Handle != nullptr)
+  if (m_Deleter && m_Handle)
     m_Deleter(m_Handle);
   m_Data = nullptr;
   m_Size = 0;
   m_Handle = nullptr;
   m_Deleter = nullptr;
+}
+
+::std::span<const ::std::byte> MappedFile::Data() const noexcept
+{
+  return {m_Data, m_Size};
 }
 
 // ── DirIter ─────────────────────────────────────────────────────────
@@ -204,58 +203,26 @@ DirIter::~DirIter() noexcept
 
 bool DirIter::Next(DirEntry& out) noexcept
 {
-  if (m_Handle == nullptr || m_Next == nullptr)
+  if (!m_Handle || !m_Next)
     return false;
   return m_Next(m_Handle, out);
 }
 
 void DirIter::Close() noexcept
 {
-  if (m_Close != nullptr && m_Handle != nullptr)
+  if (m_Close && m_Handle)
     m_Close(m_Handle);
   m_Handle = nullptr;
   m_Next = nullptr;
   m_Close = nullptr;
 }
 
-// ── IFileWriter helper ──────────────────────────────────────────────
+// ── FileWriter helpers ──────────────────────────────────────────────
 
-bool IFileWriter::WriteString(::std::string_view text) noexcept
+bool FileWriter::WriteString(::std::string_view text) noexcept
 {
   return Write(
       {reinterpret_cast<const ::std::byte*>(text.data()), text.size()});
-}
-
-// ── Accessor ────────────────────────────────────────────────────────
-
-namespace {
-
-// Lazily-constructed default backend. When no PlatformModule has booted
-// we still want filesystem IO to work for callers like FileLogSink, so
-// we fall back to the real native backend rather than the deny-all
-// NullPlatformIO. NullPlatformIO remains the type-level default for
-// IPlatformIO (returned when even the native factory fails) and is
-// useful in tests that want to assert "no IO happened".
-::gecko::Unique<IPlatformIO>& DefaultBackend() noexcept
-{
-  static ::gecko::Unique<IPlatformIO> instance = CreateNativePlatformIO();
-  return instance;
-}
-
-NullPlatformIO s_NullPlatformIO;
-
-}  // namespace
-
-IPlatformIO* GetPlatformIO() noexcept
-{
-  if (auto* modules = ::gecko::GetModules())
-  {
-    if (auto* impl = modules->Service<IPlatformIO>())
-      return impl;
-  }
-  if (auto& fallback = DefaultBackend(); fallback != nullptr)
-    return fallback.get();
-  return &s_NullPlatformIO;
 }
 
 }  // namespace gecko::platform

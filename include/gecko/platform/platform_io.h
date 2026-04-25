@@ -12,10 +12,21 @@
 #include <string_view>
 #include <vector>
 
+// Filesystem and process-info utilities.
+//
+// These are stateless namespace functions backed by the OS. The Linux
+// and Win32 implementations live in src/platform/{linux,win32}/ and are
+// selected at compile time. There is no IPlatformIO service: per the
+// API shaping matrix in copilot_context/MODULE_API_SHAPING.md a
+// stateless API is exposed as namespace functions, not as a service.
+//
+// Path arguments are forward-slash PathView values; the Win32 backend
+// converts to native UTF-16 + backslashes at the syscall boundary.
+
 namespace gecko::platform {
 
-// Result of a Stat() call. All fields are best-effort; backends that
-// cannot determine MTimeEpoch return -1.
+// ── Plain data ──────────────────────────────────────────────────────
+
 struct FileStat
 {
   ::gecko::u64 Size {0};
@@ -25,12 +36,29 @@ struct FileStat
 
 enum class WriteMode : ::gecko::u8
 {
-  Truncate,  // open and truncate to zero before writing
-  Append,    // open and seek to end before writing
+  Truncate,
+  Append,
 };
 
-// Move-only owner of a buffer read from disk. Test for success via Ok()
-// or operator bool. On failure, Data() is empty.
+struct WriteResult
+{
+  bool Ok {false};
+  ::gecko::u64 BytesWritten {0};
+
+  explicit operator bool() const noexcept
+  {
+    return Ok;
+  }
+};
+
+struct DirEntry
+{
+  ::std::string Name {};
+  bool IsDirectory {false};
+};
+
+// ── Move-only owning result types ───────────────────────────────────
+
 class GECKO_API ReadResult
 {
 public:
@@ -56,9 +84,6 @@ public:
   {
     return m_Bytes.size();
   }
-
-  // Take ownership of the underlying buffer. After this the result
-  // reverts to a default-constructed (empty, !Ok) state.
   [[nodiscard]] ::std::vector<::std::byte> Take() noexcept;
 
 private:
@@ -66,9 +91,6 @@ private:
   bool m_Ok {false};
 };
 
-// Move-only RAII holder of a memory mapping. The deleter is supplied by
-// the backend and frees the platform mapping handle when the object is
-// destroyed or moved-into.
 class GECKO_API MappedFile
 {
 public:
@@ -107,60 +129,6 @@ private:
   Deleter m_Deleter {nullptr};
 };
 
-struct WriteResult
-{
-  bool Ok {false};
-  ::gecko::u64 BytesWritten {0};
-
-  explicit operator bool() const noexcept
-  {
-    return Ok;
-  }
-};
-
-// Streaming write handle. Returned from IPlatformIO::OpenWrite and
-// owned by the caller via ::gecko::Unique. Destroying the handle
-// closes the underlying file. All methods are noexcept; on error
-// they return false / 0 and leave the handle usable for further
-// attempts.
-struct IFileWriter
-{
-  GECKO_API virtual ~IFileWriter() = default;
-
-  // Writes the full span. Returns true on success, false on partial
-  // write or error.
-  GECKO_API virtual bool Write(
-      ::std::span<const ::std::byte> data) noexcept = 0;
-
-  // Convenience overload for text payloads.
-  GECKO_API bool WriteString(::std::string_view text) noexcept;
-
-  // Flushes any buffered bytes to the OS. Does not fsync.
-  GECKO_API virtual bool Flush() noexcept = 0;
-
-  // Absolute seek from the start of the file. Negative offset means
-  // "from end" (offset of -2 = two bytes before EOF). Returns the
-  // resulting absolute position, or u64(-1) on failure.
-  GECKO_API virtual ::gecko::u64 Seek(::gecko::i64 offset,
-                                      bool fromEnd) noexcept = 0;
-
-  // Current absolute position, or u64(-1) on failure.
-  [[nodiscard]] GECKO_API virtual ::gecko::u64 Tell() noexcept = 0;
-};
-
-// One result of a directory iteration. Name is the basename only (no
-// path separator); the caller may join with the directory path if it
-// needs the full path.
-struct DirEntry
-{
-  ::std::string Name {};
-  bool IsDirectory {false};
-};
-
-// Move-only iterator over directory contents. Use:
-//   auto it = io.IterateDir("logs");
-//   DirEntry entry;
-//   while (it.Next(entry)) { ... }
 class GECKO_API DirIter
 {
 public:
@@ -185,11 +153,7 @@ public:
     return Ok();
   }
 
-  // Reads the next entry into out. Returns true if an entry was
-  // produced, false at end-of-directory or on error.
   [[nodiscard]] bool Next(DirEntry& out) noexcept;
-
-  // Releases the platform handle eagerly. Safe to call repeatedly.
   void Close() noexcept;
 
 private:
@@ -198,123 +162,71 @@ private:
   CloseFn m_Close {nullptr};
 };
 
-// Platform-provided filesystem service. Published by PlatformModule;
-// access via ::gecko::platform::GetPlatformIO() which never returns
-// null (falls back to NullPlatformIO when no PlatformModule is active).
+// Streaming write handle. Created by OpenWrite; owned by the caller.
+// Destruction closes the file. Not a service: each instance is an
+// opaque RAII handle around an OS file descriptor.
+class GECKO_API FileWriter
+{
+public:
+  virtual ~FileWriter() = default;
+
+  // Write the full span; returns false on partial-write or error.
+  virtual bool Write(::std::span<const ::std::byte> data) noexcept = 0;
+
+  // Convenience for text payloads.
+  bool WriteString(::std::string_view text) noexcept;
+
+  // Flush buffered bytes to the OS (no fsync).
+  virtual bool Flush() noexcept = 0;
+
+  // Absolute seek. fromEnd=true makes offset relative to EOF.
+  // Returns the resulting position, or u64(-1) on failure.
+  virtual ::gecko::u64 Seek(::gecko::i64 offset, bool fromEnd) noexcept = 0;
+
+  // Current absolute position, or u64(-1) on failure.
+  [[nodiscard]] virtual ::gecko::u64 Tell() noexcept = 0;
+};
+
+// ── Public API: stateless free functions ────────────────────────────
 //
-// Path arguments are forward-slash PathView values. Backends are
-// responsible for normalising to native syscall conventions internally.
-struct IPlatformIO
-{
-  GECKO_API virtual ~IPlatformIO() = default;
+// All paths are forward-slash PathView. All functions are noexcept and
+// return false / empty / nullopt on error.
 
-  // Read --------------------------------------------------------------
-  [[nodiscard]] GECKO_API virtual bool Exists(PathView path) noexcept = 0;
-  [[nodiscard]] GECKO_API virtual ::std::optional<FileStat> Stat(
-      PathView path) noexcept = 0;
-  [[nodiscard]] GECKO_API virtual ReadResult Read(PathView path) noexcept = 0;
-  [[nodiscard]] GECKO_API virtual MappedFile Map(PathView path) noexcept = 0;
+// Existence and metadata
+[[nodiscard]] GECKO_API bool Exists(PathView path) noexcept;
+[[nodiscard]] GECKO_API ::std::optional<FileStat> Stat(PathView path) noexcept;
 
-  // Write -------------------------------------------------------------
-  GECKO_API virtual WriteResult Write(PathView path,
-                                      ::std::span<const ::std::byte> data,
-                                      WriteMode mode) noexcept = 0;
+// Whole-file read
+[[nodiscard]] GECKO_API ReadResult Read(PathView path) noexcept;
 
-  // Atomic write: writes data to a sibling .tmp file and renames over
-  // the target on success. Returns false if any step fails; the .tmp
-  // file is removed on failure when possible.
-  [[nodiscard]] GECKO_API virtual bool AtomicWrite(
-      PathView path, ::std::span<const ::std::byte> data) noexcept = 0;
+// Memory map (read-only)
+[[nodiscard]] GECKO_API MappedFile Map(PathView path) noexcept;
 
-  // Opens path for streaming writes. Parent directory must already
-  // exist (callers can ensure via CreateDir(..., true)). Returns null
-  // on failure. Append mode positions the cursor at end-of-file but
-  // does NOT enable POSIX O_APPEND atomic-append semantics; subsequent
-  // Seek + Write calls may overwrite anywhere in the file.
-  [[nodiscard]] GECKO_API virtual ::gecko::Unique<IFileWriter> OpenWrite(
-      PathView path, WriteMode mode) noexcept = 0;
+// Whole-file write (truncate or append)
+GECKO_API WriteResult Write(PathView path, ::std::span<const ::std::byte> data,
+                            WriteMode mode) noexcept;
 
-  // Filesystem --------------------------------------------------------
-  GECKO_API virtual bool CreateDir(PathView path, bool recursive) noexcept = 0;
-  GECKO_API virtual bool Remove(PathView path) noexcept = 0;
-  [[nodiscard]] GECKO_API virtual DirIter IterateDir(
-      PathView path) noexcept = 0;
+// Atomic replace via tmp+rename (with fsync on Linux, MOVEFILE_REPLACE
+// on Win32). Returns false on any step failure.
+[[nodiscard]] GECKO_API bool AtomicWrite(
+    PathView path, ::std::span<const ::std::byte> data) noexcept;
 
-  // Well-known paths --------------------------------------------------
-  // Returned as owning std::string in forward-slash form. Empty string
-  // on failure. ExePath includes the executable name; WorkingDir does
-  // not.
-  [[nodiscard]] GECKO_API virtual ::std::string ExePath() noexcept = 0;
-  [[nodiscard]] GECKO_API virtual ::std::string WorkingDir() noexcept = 0;
-  [[nodiscard]] GECKO_API virtual ::std::string UserDataDir(
-      ::std::string_view appName) noexcept = 0;
-};
+// Streaming write handle. Append mode positions cursor at EOF but does
+// NOT enable POSIX O_APPEND; subsequent Seek+Write may overwrite
+// anywhere. Returns null on failure.
+[[nodiscard]] GECKO_API ::gecko::Unique<FileWriter> OpenWrite(
+    PathView path, WriteMode mode) noexcept;
 
-// Default fallback used when no PlatformModule has booted. Reports no
-// files exist; all reads fail; all writes fail. Suitable for unit tests
-// that do not exercise IO and want a deterministic deny-all environment.
-struct GECKO_API NullPlatformIO final : IPlatformIO
-{
-  [[nodiscard]] bool Exists(PathView /*path*/) noexcept override
-  {
-    return false;
-  }
-  [[nodiscard]] ::std::optional<FileStat> Stat(
-      PathView /*path*/) noexcept override
-  {
-    return ::std::nullopt;
-  }
-  [[nodiscard]] ReadResult Read(PathView /*path*/) noexcept override
-  {
-    return {};
-  }
-  [[nodiscard]] MappedFile Map(PathView /*path*/) noexcept override
-  {
-    return {};
-  }
-  WriteResult Write(PathView /*path*/, ::std::span<const ::std::byte> /*data*/,
-                    WriteMode /*mode*/) noexcept override
-  {
-    return {};
-  }
-  [[nodiscard]] bool AtomicWrite(
-      PathView /*path*/,
-      ::std::span<const ::std::byte> /*data*/) noexcept override
-  {
-    return false;
-  }
-  [[nodiscard]] ::gecko::Unique<IFileWriter> OpenWrite(
-      PathView /*path*/, WriteMode /*mode*/) noexcept override
-  {
-    return {};
-  }
-  bool CreateDir(PathView /*path*/, bool /*recursive*/) noexcept override
-  {
-    return false;
-  }
-  bool Remove(PathView /*path*/) noexcept override
-  {
-    return false;
-  }
-  [[nodiscard]] DirIter IterateDir(PathView /*path*/) noexcept override
-  {
-    return {};
-  }
-  [[nodiscard]] ::std::string ExePath() noexcept override
-  {
-    return {};
-  }
-  [[nodiscard]] ::std::string WorkingDir() noexcept override
-  {
-    return {};
-  }
-  [[nodiscard]] ::std::string UserDataDir(
-      ::std::string_view /*appName*/) noexcept override
-  {
-    return {};
-  }
-};
+// Directory operations
+GECKO_API bool CreateDir(PathView path, bool recursive) noexcept;
+GECKO_API bool Remove(PathView path) noexcept;
+[[nodiscard]] GECKO_API DirIter IterateDir(PathView path) noexcept;
 
-[[nodiscard]] GECKO_API IPlatformIO* GetPlatformIO() noexcept;
+// Well-known paths (forward-slash, owning string; empty on failure).
+// ExePath includes the executable name; WorkingDir does not.
+[[nodiscard]] GECKO_API ::std::string ExePath() noexcept;
+[[nodiscard]] GECKO_API ::std::string WorkingDir() noexcept;
+[[nodiscard]] GECKO_API ::std::string UserDataDir(
+    ::std::string_view appName) noexcept;
 
 }  // namespace gecko::platform
