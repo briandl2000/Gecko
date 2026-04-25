@@ -29,6 +29,7 @@ endif()
 add_executable(platform_feature_tests
   feature_monitors.cpp
   feature_windows.cpp
+  feature_input.cpp
 )
 
 target_link_libraries(platform_feature_tests

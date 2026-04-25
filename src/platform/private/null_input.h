@@ -64,6 +64,10 @@ public:
   {
     return {};
   }
+  [[nodiscard]] WindowHandle HoveredWindow() const noexcept override
+  {
+    return {};
+  }
 };
 
 }  // namespace gecko::platform

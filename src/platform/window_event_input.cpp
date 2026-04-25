@@ -33,6 +33,10 @@ WindowEventInput::WindowEventInput() noexcept
       ::gecko::SubscribeEvent(events::WindowMouseWheel, &OnMouseWheel, this);
   m_FocusSub = ::gecko::SubscribeEvent(events::WindowFocusChanged,
                                        &OnFocusChanged, this);
+  m_MouseEnteredSub = ::gecko::SubscribeEvent(events::WindowMouseEntered,
+                                              &OnMouseEntered, this);
+  m_MouseExitedSub =
+      ::gecko::SubscribeEvent(events::WindowMouseExited, &OnMouseExited, this);
 }
 
 WindowEventInput::~WindowEventInput() noexcept = default;
@@ -114,6 +118,11 @@ WindowHandle WindowEventInput::FocusedWindow() const noexcept
   return m_FocusedWindow;
 }
 
+WindowHandle WindowEventInput::HoveredWindow() const noexcept
+{
+  return m_HoveredWindow;
+}
+
 // ── Event handlers ──────────────────────────────────────────────
 
 void WindowEventInput::OnKey(void* user, const ::gecko::EventMeta&,
@@ -166,6 +175,25 @@ void WindowEventInput::OnFocusChanged(void* user, const ::gecko::EventMeta&,
     self->m_FocusedWindow = p->Window;
   else if (self->m_FocusedWindow == p->Window)
     self->m_FocusedWindow = {};
+}
+
+void WindowEventInput::OnMouseEntered(void* user, const ::gecko::EventMeta&,
+                                      ::gecko::EventView view) noexcept
+{
+  auto* self = static_cast<WindowEventInput*>(user);
+  const auto* p =
+      reinterpret_cast<const events::WindowMouseEnteredPayload*>(view.Data());
+  self->m_HoveredWindow = p->Window;
+}
+
+void WindowEventInput::OnMouseExited(void* user, const ::gecko::EventMeta&,
+                                     ::gecko::EventView view) noexcept
+{
+  auto* self = static_cast<WindowEventInput*>(user);
+  const auto* p =
+      reinterpret_cast<const events::WindowMouseExitedPayload*>(view.Data());
+  if (self->m_HoveredWindow == p->Window)
+    self->m_HoveredWindow = {};
 }
 
 }  // namespace gecko::platform

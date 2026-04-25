@@ -89,6 +89,7 @@ private:
     bool Resizable {true};
     bool AlwaysOnTop {false};
     bool Alive {true};
+    bool MouseInside {false};
     ::std::string TitleStorage;
     // Saved style/position for fullscreen restoration.
     ::DWORD SavedStyle {0};
@@ -113,6 +114,8 @@ private:
       events::WindowFocusChangedPayload FocusChanged;
       events::WindowMovedPayload Moved;
       events::WindowStateChangedPayload StateChanged;
+      events::WindowMouseEnteredPayload MouseEntered;
+      events::WindowMouseExitedPayload MouseExited;
       PayloadUnion() noexcept : Closed {}
       {}
     } Data;

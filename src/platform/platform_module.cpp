@@ -158,6 +158,10 @@ void PumpEvents() noexcept
 {
   if (!g_Windows || !g_Monitors || !g_Emitter)
     return;
+  // Roll input edges + clear scroll BEFORE pumping so the events
+  // dispatched on this frame's bus turn into "this frame" state.
+  if (g_Input)
+    g_Input->NewFrame();
   g_Windows->PumpEvents(*g_Emitter);
   g_Monitors->PumpEvents(*g_Emitter);
 }

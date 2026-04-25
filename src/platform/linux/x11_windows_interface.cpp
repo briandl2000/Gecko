@@ -103,7 +103,8 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 
   long mask = ExposureMask | StructureNotifyMask | KeyPressMask |
               KeyReleaseMask | ButtonPressMask | ButtonReleaseMask |
-              PointerMotionMask | FocusChangeMask;
+              PointerMotionMask | FocusChangeMask | EnterWindowMask |
+              LeaveWindowMask;
   ::XSelectInput(m_Display, w, mask);
 
   ::XStoreName(m_Display, w, desc.Title ? desc.Title : "Gecko");
@@ -373,6 +374,28 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
         gecko::SendEvent(emitter, events::WindowFocusChanged,
                          events::WindowFocusChangedPayload {WindowHandle {id},
                                                             now, focused});
+      }
+    }
+    break;
+
+    case EnterNotify: {
+      const u64 id = FindWindowId(event.xcrossing.window);
+      if (id != 0)
+      {
+        gecko::SendEvent(
+            emitter, events::WindowMouseEntered,
+            events::WindowMouseEnteredPayload {WindowHandle {id}, now});
+      }
+    }
+    break;
+
+    case LeaveNotify: {
+      const u64 id = FindWindowId(event.xcrossing.window);
+      if (id != 0)
+      {
+        gecko::SendEvent(
+            emitter, events::WindowMouseExited,
+            events::WindowMouseExitedPayload {WindowHandle {id}, now});
       }
     }
     break;

@@ -81,4 +81,11 @@ WindowHandle FocusedWindow() noexcept
   return {};
 }
 
+WindowHandle HoveredWindow() noexcept
+{
+  if (auto* in = SafeInput())
+    return in->HoveredWindow();
+  return {};
+}
+
 }  // namespace gecko::platform

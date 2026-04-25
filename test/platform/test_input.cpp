@@ -110,6 +110,24 @@ void EmitFocus(WindowHandle w, bool focused) noexcept
   (void)::gecko::DispatchEvents();
 }
 
+void EmitMouseEntered(WindowHandle w) noexcept
+{
+  auto emitter =
+      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowMouseEnteredPayload payload {.Window = w, .TimeNs = 0};
+  ::gecko::SendEvent(emitter, events::WindowMouseEntered, payload);
+  (void)::gecko::DispatchEvents();
+}
+
+void EmitMouseExited(WindowHandle w) noexcept
+{
+  auto emitter =
+      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowMouseExitedPayload payload {.Window = w, .TimeNs = 0};
+  ::gecko::SendEvent(emitter, events::WindowMouseExited, payload);
+  (void)::gecko::DispatchEvents();
+}
+
 }  // namespace
 
 TEST_CASE("Input service is published after PlatformModule startup",
@@ -237,4 +255,125 @@ TEST_CASE("Input: focus tracking", "[platform][input]")
   REQUIRE(in->FocusedWindow() == w);
   EmitFocus(w, false);
   REQUIRE_FALSE(in->FocusedWindow().IsValid());
+}
+
+TEST_CASE("Input: hover tracking via Entered/Exited", "[platform][input]")
+{
+  InputTestScope scope;
+  auto* in = GetInput();
+  REQUIRE_FALSE(in->HoveredWindow().IsValid());
+
+  WindowHandle w1 {10};
+  WindowHandle w2 {11};
+  EmitMouseEntered(w1);
+  REQUIRE(in->HoveredWindow() == w1);
+
+  // Move from w1 to w2 (real backends will emit Exited(w1) +
+  // Entered(w2), but a single Entered should also do the right thing).
+  EmitMouseEntered(w2);
+  REQUIRE(in->HoveredWindow() == w2);
+
+  EmitMouseExited(w2);
+  REQUIRE_FALSE(in->HoveredWindow().IsValid());
+
+  // Exit on a non-current window must not clobber state.
+  EmitMouseEntered(w1);
+  EmitMouseExited(w2);
+  REQUIRE(in->HoveredWindow() == w1);
+}
+
+TEST_CASE("Input: free-function HoveredWindow forwards to service",
+          "[platform][input]")
+{
+  InputTestScope scope;
+  WindowHandle w {99};
+  EmitMouseEntered(w);
+  REQUIRE(HoveredWindow() == w);
+}
+
+TEST_CASE("Input: PumpEvents auto-calls NewFrame on the input service",
+          "[platform][input]")
+{
+  // Null backend has no real OS events but PumpEvents should still
+  // call NewFrame() on the input service. We verify by setting up a
+  // pressed-edge before pumping and confirming it clears afterwards.
+  InputTestScope scope;
+  auto* in = GetInput();
+
+  EmitKey(KeyCode::A, true);
+  REQUIRE(in->WasKeyPressed(KeyCode::A));
+
+  PumpEvents();  // should call NewFrame() under the hood
+  (void)DispatchEvents();
+  REQUIRE_FALSE(in->WasKeyPressed(KeyCode::A));
+  REQUIRE(in->IsKeyDown(KeyCode::A));
+}
+
+// ── MockInput ────────────────────────────────────────────────────────
+
+#include "gecko/platform/mock_input.h"
+
+TEST_CASE("MockInput: keys + edges", "[platform][input][mock]")
+{
+  MockInput m;
+  REQUIRE_FALSE(m.IsKeyDown(KeyCode::A));
+
+  m.PressKey(KeyCode::A);
+  REQUIRE(m.IsKeyDown(KeyCode::A));
+  REQUIRE(m.WasKeyPressed(KeyCode::A));
+
+  m.EndFrame();
+  REQUIRE(m.IsKeyDown(KeyCode::A));
+  REQUIRE_FALSE(m.WasKeyPressed(KeyCode::A));
+
+  m.ReleaseKey(KeyCode::A);
+  REQUIRE(m.WasKeyReleased(KeyCode::A));
+}
+
+TEST_CASE("MockInput: mouse + scroll + focus + hover",
+          "[platform][input][mock]")
+{
+  MockInput m;
+  WindowHandle w {3};
+
+  m.SetMousePosition({50, 80}, w);
+  REQUIRE(m.GetMousePosition().X == 50);
+  REQUIRE(m.GetMousePosition(w).Y == 80);
+
+  m.EndFrame();
+  m.SetMousePosition({60, 100}, w);
+  REQUIRE(m.GetMouseDelta().X == 10);
+  REQUIRE(m.GetMouseDelta().Y == 20);
+
+  m.AddScroll(0.0f, 1.5f);
+  m.AddScroll(0.0f, 0.5f);
+  REQUIRE(m.GetMouseScrollY() == 2.0f);
+  m.EndFrame();
+  REQUIRE(m.GetMouseScrollY() == 0.0f);
+
+  m.PressMouseButton(MouseButton::Right);
+  REQUIRE(m.IsMouseButtonDown(MouseButton::Right));
+  REQUIRE(m.WasMouseButtonPressed(MouseButton::Right));
+
+  m.SetFocusedWindow(w);
+  m.SetHoveredWindow(w);
+  REQUIRE(m.FocusedWindow() == w);
+  REQUIRE(m.HoveredWindow() == w);
+
+  m.Reset();
+  REQUIRE_FALSE(m.IsKeyDown(KeyCode::A));
+  REQUIRE_FALSE(m.IsMouseButtonDown(MouseButton::Right));
+  REQUIRE_FALSE(m.FocusedWindow().IsValid());
+}
+
+TEST_CASE("MockInput: usable as IInput via base pointer",
+          "[platform][input][mock]")
+{
+  MockInput m;
+  IInput* in = &m;
+  m.PressKey(KeyCode::Space);
+  REQUIRE(in->IsKeyDown(KeyCode::Space));
+  in->NewFrame();  // alias of EndFrame
+  m.ReleaseKey(KeyCode::Space);
+  REQUIRE(in->WasKeyReleased(KeyCode::Space));
 }

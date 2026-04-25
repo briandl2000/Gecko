@@ -47,6 +47,10 @@ inline constexpr gecko::EventCode WindowMoved =
     gecko::MakeEventCode(detail::PlatformModuleId, 0x000B);
 inline constexpr gecko::EventCode WindowStateChanged =
     gecko::MakeEventCode(detail::PlatformModuleId, 0x000C);
+inline constexpr gecko::EventCode WindowMouseEntered =
+    gecko::MakeEventCode(detail::PlatformModuleId, 0x000D);
+inline constexpr gecko::EventCode WindowMouseExited =
+    gecko::MakeEventCode(detail::PlatformModuleId, 0x000E);
 
 // Monitor
 inline constexpr gecko::EventCode MonitorConnected =
@@ -152,6 +156,18 @@ struct WindowStateChangedPayload
   u64 TimeNs;
   WindowState OldState;
   WindowState NewState;
+};
+
+struct WindowMouseEnteredPayload
+{
+  WindowHandle Window;
+  u64 TimeNs;
+};
+
+struct WindowMouseExitedPayload
+{
+  WindowHandle Window;
+  u64 TimeNs;
 };
 
 // ──────────────────────────────────────────────────────────────────────────

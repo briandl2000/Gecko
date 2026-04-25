@@ -52,6 +52,7 @@ public:
   [[nodiscard]] float GetMouseScrollY() const noexcept override;
 
   [[nodiscard]] WindowHandle FocusedWindow() const noexcept override;
+  [[nodiscard]] WindowHandle HoveredWindow() const noexcept override;
 
 private:
   // Event handlers (registered as static C-style callbacks).
@@ -65,6 +66,10 @@ private:
                            ::gecko::EventView view) noexcept;
   static void OnFocusChanged(void* user, const ::gecko::EventMeta& meta,
                              ::gecko::EventView view) noexcept;
+  static void OnMouseEntered(void* user, const ::gecko::EventMeta& meta,
+                             ::gecko::EventView view) noexcept;
+  static void OnMouseExited(void* user, const ::gecko::EventMeta& meta,
+                            ::gecko::EventView view) noexcept;
 
   // ── State ────────────────────────────────────────────────────
   ::std::array<bool, KeyCount> m_KeyDown {};
@@ -79,6 +84,7 @@ private:
   float m_ScrollY {0.0f};
 
   WindowHandle m_FocusedWindow {};
+  WindowHandle m_HoveredWindow {};
   WindowHandle m_LastMouseWindow {};
   MousePosition m_LastMouseWindowPos {};
 
@@ -88,6 +94,8 @@ private:
   ::gecko::EventSubscription m_MouseButtonSub;
   ::gecko::EventSubscription m_MouseWheelSub;
   ::gecko::EventSubscription m_FocusSub;
+  ::gecko::EventSubscription m_MouseEnteredSub;
+  ::gecko::EventSubscription m_MouseExitedSub;
 };
 
 }  // namespace gecko::platform

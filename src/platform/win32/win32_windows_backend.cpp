@@ -886,10 +886,39 @@ void Win32WindowsBackend::PumpEvents(
     const i32 x = GET_X_LPARAM(lParam);
     const i32 y = GET_Y_LPARAM(lParam);
 
+    if (!entry->MouseInside)
+    {
+      entry->MouseInside = true;
+      ::TRACKMOUSEEVENT tme {};
+      tme.cbSize = sizeof(tme);
+      tme.dwFlags = TME_LEAVE;
+      tme.hwndTrack = hwnd;
+      ::TrackMouseEvent(&tme);
+
+      StagedEvent enterEv;
+      enterEv.Code = events::WindowMouseEntered;
+      enterEv.Data.MouseEntered = {wh, NowNsSafe()};
+      enterEv.PayloadSize =
+          static_cast<u32>(sizeof(events::WindowMouseEnteredPayload));
+      self->m_Staged.push_back(enterEv);
+    }
+
     StagedEvent ev;
     ev.Code = events::WindowMouseMove;
     ev.Data.MouseMove = {wh, NowNsSafe(), x, y};
     ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseMovePayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_MOUSELEAVE: {
+    if (!entry)
+      break;
+    entry->MouseInside = false;
+    StagedEvent ev;
+    ev.Code = events::WindowMouseExited;
+    ev.Data.MouseExited = {wh, NowNsSafe()};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseExitedPayload));
     self->m_Staged.push_back(ev);
     break;
   }

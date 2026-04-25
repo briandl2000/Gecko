@@ -65,8 +65,13 @@ public:
   [[nodiscard]] GECKO_API virtual float GetMouseScrollX() const noexcept = 0;
   [[nodiscard]] GECKO_API virtual float GetMouseScrollY() const noexcept = 0;
 
-  // ── Window focus ──────────────────────────────────────────────
+  // ── Window focus / hover ──────────────────────────────────────
   [[nodiscard]] GECKO_API virtual WindowHandle FocusedWindow()
+      const noexcept = 0;
+  // The window the mouse cursor is currently over (across any of our
+  // windows). InvalidWindowHandle when the cursor is outside all of
+  // them or has not entered any since startup.
+  [[nodiscard]] GECKO_API virtual WindowHandle HoveredWindow()
       const noexcept = 0;
 };
 
@@ -93,5 +98,6 @@ public:
 [[nodiscard]] GECKO_API float GetMouseScrollY() noexcept;
 
 [[nodiscard]] GECKO_API WindowHandle FocusedWindow() noexcept;
+[[nodiscard]] GECKO_API WindowHandle HoveredWindow() noexcept;
 
 }  // namespace gecko::platform

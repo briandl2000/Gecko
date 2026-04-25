@@ -1372,6 +1372,11 @@ void WaylandWindowsBackend::OnPointerEnter(::wl_pointer* /*pointer*/,
     auto it = m_Windows.find(m_FocusedPointer);
     if (it != m_Windows.end())
       ApplyCursorVisibility(it->second);
+
+    m_Staged.push_back(
+        MakeStagedEvent(events::WindowMouseEntered,
+                        events::WindowMouseEnteredPayload {
+                            WindowHandle {m_FocusedPointer}, NowNsSafe()}));
   }
 }
 
@@ -1379,6 +1384,13 @@ void WaylandWindowsBackend::OnPointerLeave(::wl_pointer* /*pointer*/,
                                            u32 /*serial*/,
                                            ::wl_surface* /*surface*/) noexcept
 {
+  if (m_FocusedPointer != 0)
+  {
+    m_Staged.push_back(
+        MakeStagedEvent(events::WindowMouseExited,
+                        events::WindowMouseExitedPayload {
+                            WindowHandle {m_FocusedPointer}, NowNsSafe()}));
+  }
   m_FocusedPointer = 0;
 }
 

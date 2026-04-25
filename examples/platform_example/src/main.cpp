@@ -5,6 +5,7 @@
 #include <gecko/core/services/modules.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
+#include <gecko/platform/input.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
@@ -102,6 +103,8 @@ void PrintHelp() noexcept
   GECKO_INFO(app::platform_example::labels::Main, "  Other:");
   GECKO_INFO(app::platform_example::labels::Main, "    [H] Print this help");
   GECKO_INFO(app::platform_example::labels::Main, "    [I] Print window info");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "    [P] Print input snapshot (mouse / keys / focus / hover)");
   GECKO_INFO(app::platform_example::labels::Main, "    [Escape] Quit");
   GECKO_INFO(app::platform_example::labels::Main,
              "═════════════════════════════════════════════════════");
@@ -580,6 +583,46 @@ int main()
           case KeyCode::Escape:
             state->Running = false;
             break;
+
+          case KeyCode::P: {
+            // Demonstrate the IInput service: poll current state.
+            auto* input = ::gecko::platform::GetInput();
+            if (!input)
+              break;
+            auto pos = input->GetMousePosition();
+            auto delta = input->GetMouseDelta();
+            const auto focused = input->FocusedWindow();
+            const auto hovered = input->HoveredWindow();
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "── Input snapshot ────────────────────────");
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "  Mouse:    pos=(%d, %d)  delta=(%d, %d)  scrollY=%.2f",
+                       pos.X, pos.Y, delta.X, delta.Y,
+                       static_cast<double>(input->GetMouseScrollY()));
+            GECKO_INFO(
+                app::platform_example::labels::Main,
+                "  Buttons:  L=%s R=%s M=%s",
+                input->IsMouseButtonDown(MouseButton::Left) ? "down" : "up",
+                input->IsMouseButtonDown(MouseButton::Right) ? "down" : "up",
+                input->IsMouseButtonDown(MouseButton::Middle) ? "down" : "up");
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "  Shift held: %s    Ctrl held: %s",
+                       input->IsKeyDown(KeyCode::LeftShift) ||
+                               input->IsKeyDown(KeyCode::RightShift)
+                           ? "yes"
+                           : "no",
+                       input->IsKeyDown(KeyCode::LeftControl) ||
+                               input->IsKeyDown(KeyCode::RightControl)
+                           ? "yes"
+                           : "no");
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "  Focused window: %llu   Hovered window: %llu",
+                       static_cast<unsigned long long>(focused.Id),
+                       static_cast<unsigned long long>(hovered.Id));
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "─────────────────────────────────────────");
+            break;
+          }
 
           default:
             break;
