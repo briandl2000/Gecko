@@ -10,6 +10,7 @@ target_sources(Platform
     platform_module.cpp
     input.cpp
     clipboard.cpp
+    terminal.cpp
     window_event_input.cpp
     windows_interface.cpp
 
