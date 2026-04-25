@@ -194,8 +194,8 @@ static int AppMain(int argc, char** argv)
 
   runtime::EventBus eventBus;
 
-  runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler, ringLogger,
-                                       eventBus);
+  runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler, ringLogger,
+                                            eventBus);
   platform::PlatformModule platformModule;
 
   // 3) Boot the engine. Modules are started in topological order based

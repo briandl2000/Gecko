@@ -18,7 +18,7 @@ struct TestServiceScope
   NullProfiler profiler;
   NullLogger logger;
   EventBus eventBus;
-  RuntimeModule runtimeMod;
+  CoreServicesModule runtimeMod;
   ::std::optional<::gecko::Engine> engine;
 
   TestServiceScope() : runtimeMod(jobs, profiler, logger, eventBus)

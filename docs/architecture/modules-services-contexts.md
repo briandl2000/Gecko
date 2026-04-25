@@ -32,7 +32,7 @@ live in Platform, while *threaded job system* lives in Runtime.
 | --------- | ------------------ | ----------- | ----------------------- | -------------------------------- |
 | Library   | Program-wide       | Build sys   | n/a (source artifact)   | `GeckoCore`, `GeckoPlatform`     |
 | Service   | Engine boot-time   | User code   | Yes                     | `ILogger`, `IJobSystem`          |
-| Module    | Engine boot-time   | User code   | n/a (publishes services)| `RuntimeModule`, `PlatformModule`|
+| Module    | Engine boot-time   | User code   | n/a (publishes services)| `CoreServicesModule`, `PlatformModule`|
 | System    | Module-internal    | Module      | No (private)            | Job dispatcher inside Runtime    |
 | Context   | Scoped (RAII)      | User code   | No (handle, not service)| `PlatformContext`                |
 
@@ -80,7 +80,7 @@ runtime::RingProfiler         profiler {1 << 16};
 runtime::RingLogger           logger {1024};
 runtime::EventBus             events;
 
-runtime::RuntimeModule  rt {jobs, profiler, logger, events};
+runtime::CoreServicesModule  rt {jobs, profiler, logger, events};
 platform::PlatformModule plat;
 MyAppModule              app;
 

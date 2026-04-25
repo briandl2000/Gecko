@@ -16,23 +16,25 @@ constexpr ::gecko::ServiceId Published[] = {
 
 }  // namespace
 
-RuntimeModule::RuntimeModule(IJobSystem& jobs, IProfiler& profiler,
-                             ILogger& logger, IEventBus& eventBus) noexcept
+CoreServicesModule::CoreServicesModule(IJobSystem& jobs, IProfiler& profiler,
+                                       ILogger& logger,
+                                       IEventBus& eventBus) noexcept
     : m_jobs {&jobs}, m_profiler {&profiler}, m_logger {&logger},
       m_eventBus {&eventBus}
 {}
 
-::gecko::Label RuntimeModule::RootLabel() const noexcept
+::gecko::Label CoreServicesModule::RootLabel() const noexcept
 {
   return labels::Runtime;
 }
 
-::std::span<const ::gecko::ServiceId> RuntimeModule::Publishes() const noexcept
+::std::span<const ::gecko::ServiceId> CoreServicesModule::Publishes()
+    const noexcept
 {
   return ::std::span<const ::gecko::ServiceId> {Published};
 }
 
-bool RuntimeModule::Startup(::gecko::IModuleRegistry& modules) noexcept
+bool CoreServicesModule::Startup(::gecko::IModuleRegistry& modules) noexcept
 {
   // Rollback helper: undoes whatever was already done before a failure
   // mid-Startup. Engine/ModuleRegistry will not call Shutdown() on a
@@ -116,7 +118,7 @@ bool RuntimeModule::Startup(::gecko::IModuleRegistry& modules) noexcept
   return true;
 }
 
-void RuntimeModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
+void CoreServicesModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
 {
   modules.UnpublishService<IEventBus>();
   modules.UnpublishService<ILogger>();

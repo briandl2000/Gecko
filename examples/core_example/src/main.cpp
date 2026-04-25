@@ -502,11 +502,11 @@ int main()
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  // RuntimeModule publishes the four foundational services. Engine
+  // CoreServicesModule publishes the four foundational services. Engine
   // discovers dependencies via Requires() / Publishes() and starts
   // modules in topological order.
-  runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler, ringLogger,
-                                       eventBus);
+  runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler, ringLogger,
+                                            eventBus);
 
   auto engine = Engine::Create({&runtimeModule, &g_AppModule});
   if (!engine)

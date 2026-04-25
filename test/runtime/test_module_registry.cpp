@@ -18,7 +18,7 @@ struct TestServiceScope
   NullProfiler profiler;
   NullLogger logger;
   EventBus eventBus;
-  RuntimeModule runtimeMod;
+  CoreServicesModule runtimeMod;
   ::std::optional<::gecko::Engine> engine;
 
   TestServiceScope() : runtimeMod(jobs, profiler, logger, eventBus)
@@ -65,6 +65,53 @@ public:
   void Shutdown(IModuleRegistry&) noexcept override
   {
     m_ShutdownCalled = true;
+  }
+};
+
+// Module that records the live service pointers it observes during
+// Startup/Shutdown. Declares Requires() over the four foundational
+// services so the topological sort orders the publisher before us.
+class ServiceSpyModule : public IModule
+{
+public:
+  Label m_Label;
+  IJobSystem* m_StartupJobs = nullptr;
+  IProfiler* m_StartupProfiler = nullptr;
+  ILogger* m_StartupLogger = nullptr;
+  IEventBus* m_StartupEvents = nullptr;
+  IJobSystem* m_ShutdownJobs = nullptr;
+
+  explicit ServiceSpyModule(const char* name) : m_Label(MakeLabel(name))
+  {}
+
+  Label RootLabel() const noexcept override
+  {
+    return m_Label;
+  }
+
+  ::std::span<const ::gecko::ServiceId> Requires() const noexcept override
+  {
+    static constexpr ::gecko::ServiceId required[] = {
+        ::gecko::ServiceIdOf<IJobSystem>(),
+        ::gecko::ServiceIdOf<IProfiler>(),
+        ::gecko::ServiceIdOf<ILogger>(),
+        ::gecko::ServiceIdOf<IEventBus>(),
+    };
+    return ::std::span<const ::gecko::ServiceId> {required};
+  }
+
+  bool Startup(IModuleRegistry&) noexcept override
+  {
+    m_StartupJobs = GetJobSystem();
+    m_StartupProfiler = GetProfiler();
+    m_StartupLogger = GetLogger();
+    m_StartupEvents = GetEventBus();
+    return true;
+  }
+
+  void Shutdown(IModuleRegistry&) noexcept override
+  {
+    m_ShutdownJobs = GetJobSystem();
   }
 };
 
@@ -179,9 +226,50 @@ TEST_CASE("ModuleRegistry ForEachModule visits all modules",
       },
       &visitCount);
 
-  // Engine starts the test scope with a RuntimeModule already registered;
+  // Engine starts the test scope with a CoreServicesModule already registered;
   // the two MockModules registered above bring the total to three.
   REQUIRE(visitCount == 3);
 
   scope.modules().ShutdownAllModules();
+}
+
+TEST_CASE(
+    "Topological sort starts services-publisher before a Requires()-declaring "
+    "module so its Startup observes live, non-null service implementations",
+    "[runtime][modules][topo]")
+{
+  // Build the engine ourselves so we can register the spy module up
+  // front and observe the topological start order. The spy is
+  // intentionally registered *before* CoreServicesModule to prove that
+  // ordering is driven by Requires()/Publishes(), not registration
+  // order.
+  SystemAllocator alloc;
+  REQUIRE(SetAllocator(&alloc));
+
+  NullJobSystem jobs;
+  NullProfiler profiler;
+  NullLogger logger;
+  EventBus events;
+  CoreServicesModule services(jobs, profiler, logger, events);
+  ServiceSpyModule spy {"test.spy"};
+
+  auto engine = ::gecko::Engine::Create({&spy, &services});
+  REQUIRE(engine.has_value());
+
+  // The four service pointers observed during spy.Startup must point
+  // to the user-supplied implementations (jobs/profiler/logger/events),
+  // not the global Null fallbacks. If the topo sort ran services first,
+  // GetX() routes through the live registry and returns those.
+  REQUIRE(spy.m_StartupJobs == &jobs);
+  REQUIRE(spy.m_StartupProfiler == &profiler);
+  REQUIRE(spy.m_StartupLogger == &logger);
+  REQUIRE(spy.m_StartupEvents == &events);
+
+  engine.reset();
+
+  // Shutdown order is the reverse of startup, so the spy must have
+  // shut down BEFORE services were unpublished -> still live.
+  REQUIRE(spy.m_ShutdownJobs == &jobs);
+
+  ResetAllocator();
 }

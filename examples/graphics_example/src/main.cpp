@@ -95,8 +95,8 @@ int main()
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler, ringLogger,
-                                       eventBus);
+  runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler, ringLogger,
+                                            eventBus);
   platform::PlatformModule platformModule;
 
   auto engine = Engine::Create({&runtimeModule, &platformModule, &g_AppModule});

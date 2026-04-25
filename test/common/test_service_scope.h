@@ -19,7 +19,7 @@ struct TestServiceScope
   NullProfiler Profiler;
   NullLogger Logger;
   runtime::EventBus Events;
-  runtime::RuntimeModule Runtime;
+  runtime::CoreServicesModule Runtime;
   ::std::optional<::gecko::Engine> EngineHandle;
 
   TestServiceScope() : Runtime(Jobs, Profiler, Logger, Events)

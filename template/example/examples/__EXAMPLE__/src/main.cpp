@@ -60,7 +60,7 @@ int main()
 
   ::gecko::runtime::EventBus eventBus;
 
-  ::gecko::runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler,
+  ::gecko::runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler,
                                                 ringLogger, eventBus);
 
   auto engine = ::gecko::Engine::Create({&runtimeModule, &g_AppModule});

@@ -24,7 +24,7 @@ namespace gecko {
 //   MyJobSystem jobs;
 //   MyProfiler  profiler;
 //   MyLogger    logger;
-//   ::gecko::runtime::RuntimeModule runtimeModule(jobs, profiler, logger,
+//   ::gecko::runtime::CoreServicesModule runtimeModule(jobs, profiler, logger,
 //                                                 events);
 //   ::gecko::platform::PlatformModule platformModule;
 //   MyAppModule  app;

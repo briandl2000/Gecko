@@ -13,25 +13,25 @@ namespace labels {
 inline constexpr ::gecko::Label Runtime = ::gecko::MakeLabel("gecko.runtime");
 }
 
-// RuntimeModule is the lifecycle node for the Runtime library.
+// CoreServicesModule is the lifecycle node for the Runtime library.
 //
 // The Runtime layer (Core <- Platform <- Runtime <- Program) is where the
 // concrete implementations of the four foundational service interfaces
 // declared in Core live: IJobSystem, IProfiler, ILogger, IEventBus. It is
 // therefore Runtime's job to publish those impls to the registry.
 //
-// Ownership rule: RuntimeModule does NOT own the impls — the user
+// Ownership rule: CoreServicesModule does NOT own the impls — the user
 // constructs them on the stack (or wherever) and passes references in.
-// RuntimeModule is responsible for Init/Shutdown and PublishService /
+// CoreServicesModule is responsible for Init/Shutdown and PublishService /
 // UnpublishService bookkeeping.
 //
 // Required by every engine instance: pass &runtimeModule as the first
 // module to Engine::Create({...}).
-class RuntimeModule final : public ::gecko::IModule
+class CoreServicesModule final : public ::gecko::IModule
 {
 public:
-  GECKO_API RuntimeModule(IJobSystem& jobs, IProfiler& profiler,
-                          ILogger& logger, IEventBus& eventBus) noexcept;
+  GECKO_API CoreServicesModule(IJobSystem& jobs, IProfiler& profiler,
+                               ILogger& logger, IEventBus& eventBus) noexcept;
 
   [[nodiscard]] GECKO_API ::gecko::Label RootLabel() const noexcept override;
 
