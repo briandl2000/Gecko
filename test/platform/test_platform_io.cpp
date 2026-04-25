@@ -98,17 +98,20 @@ TEST_CASE("PathView decomposition", "[platform][io][path]")
   }
 }
 
-// ── Null fallback ──────────────────────────────────────────────────────
+// ── Default backend fallback ───────────────────────────────────────────
 
-TEST_CASE("GetPlatformIO returns NullPlatformIO before engine boots",
+TEST_CASE("GetPlatformIO returns a working backend before engine boots",
           "[platform][io]")
 {
+  // When no PlatformModule has booted, GetPlatformIO falls back to the
+  // native backend so IO callers (e.g. FileLogSink in apps that don't
+  // include PlatformModule) still work. Nonexistent path queries should
+  // be cleanly false.
   IPlatformIO* io = GetPlatformIO();
   REQUIRE(io != nullptr);
-  REQUIRE_FALSE(io->Exists("anything"));
-  REQUIRE_FALSE(io->Stat("anything").has_value());
-  REQUIRE_FALSE(io->Read("anything").Ok());
-  REQUIRE_FALSE(io->AtomicWrite("anything", ::std::span<const ::std::byte> {}));
+  REQUIRE_FALSE(io->Exists("/this/path/does/not/exist/12345"));
+  REQUIRE_FALSE(io->Stat("/this/path/does/not/exist/12345").has_value());
+  REQUIRE_FALSE(io->Read("/this/path/does/not/exist/12345").Ok());
 }
 
 // ── End-to-end against real backend ───────────────────────────────────

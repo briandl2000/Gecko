@@ -2,6 +2,7 @@
 
 #include "gecko/core/services.h"
 #include "gecko/core/services/modules.h"
+#include "private/native_platform_io.h"
 
 #include <utility>
 
@@ -229,6 +230,18 @@ bool IFileWriter::WriteString(::std::string_view text) noexcept
 
 namespace {
 
+// Lazily-constructed default backend. When no PlatformModule has booted
+// we still want filesystem IO to work for callers like FileLogSink, so
+// we fall back to the real native backend rather than the deny-all
+// NullPlatformIO. NullPlatformIO remains the type-level default for
+// IPlatformIO (returned when even the native factory fails) and is
+// useful in tests that want to assert "no IO happened".
+::gecko::Unique<IPlatformIO>& DefaultBackend() noexcept
+{
+  static ::gecko::Unique<IPlatformIO> instance = CreateNativePlatformIO();
+  return instance;
+}
+
 NullPlatformIO s_NullPlatformIO;
 
 }  // namespace
@@ -240,6 +253,8 @@ IPlatformIO* GetPlatformIO() noexcept
     if (auto* impl = modules->Service<IPlatformIO>())
       return impl;
   }
+  if (auto& fallback = DefaultBackend(); fallback != nullptr)
+    return fallback.get();
   return &s_NullPlatformIO;
 }
 
