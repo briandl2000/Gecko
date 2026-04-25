@@ -967,7 +967,29 @@ The module's namespace (`::gecko::core`, `::gecko::platform`, …) and the modul
 | --- | --- |
 | **None.** Pure thunks over OS calls, queries, transforms. | **Free functions in the module namespace.** No interface, no service, no global accessor. e.g. `gecko::platform::Exists(path)`, `gecko::platform::HardwareThreadCount()`. |
 | **Small fixed state** — a handful of values, no allocations. | **Members on the module interface object** with a global getter that returns the module pointer. e.g. `GetPlatformModule()->FrameCount`. |
-| **Large or dynamic state** — owns memory, threads, sockets, caches; multiple impls; per-test substitution makes sense. | **Service pattern.** `IFoo` interface in Core (or owning module), `NullFoo` deny-all default, concrete impl in providing module, `Services{...}` install, `GetFoo()` accessor. e.g. `ILogger`, `IJobSystem`, `IEventBus`, `IProfiler`. |
+| **Large or dynamic state** — owns memory, threads, sockets, caches; multiple impls; per-test substitution makes sense. | **Service pattern.** `IFoo` interface in Core (or owning module), `NullFoo` deny-all default, concrete impl, `Services{...}` install path, `GetFoo()` accessor. e.g. `ILogger`, `IJobSystem`, `IEventBus`, `IProfiler`. |
+
+### User-pluggable vs self-installed services
+
+Services come in two flavours:
+
+- **User-pluggable** — the application benefits from supplying a custom
+  implementation. The app constructs the impl and passes it to the
+  module's constructor or `Services{...}` install. Examples: `ILogger`
+  (ring sink vs file sink vs custom), `IProfiler`, `IJobSystem`,
+  `IEventBus`, `IAllocator`. Test-only fakes also live here.
+
+- **Self-installed** — there is one canonical implementation per build
+  target (typically OS-bound). The module creates it internally in
+  `Startup()` and publishes it; no app injection is needed. Examples:
+  `IWindowsBackend`, `IMonitorsBackend`, `IInput`. Construction may
+  consult build flags or runtime config to pick X11 vs Wayland vs Null,
+  but the choice isn't surfaced as an app-supplied object.
+
+Decision rule: **"Would a user benefit from supplying their own
+implementation?"** If yes, user-pluggable. If no, self-installed. Both
+shapes still register the impl via `IModuleRegistry::PublishService` and
+are accessed via `GetFoo()` — only the *ownership* differs.
 
 ### Edge cases
 
