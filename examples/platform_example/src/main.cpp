@@ -105,6 +105,10 @@ void PrintHelp() noexcept
   GECKO_INFO(app::platform_example::labels::Main, "    [I] Print window info");
   GECKO_INFO(app::platform_example::labels::Main,
              "    [P] Print input snapshot (mouse / keys / focus / hover)");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "    Mouse buttons / scroll / focus / hover are also logged");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "    automatically every frame as they change.");
   GECKO_INFO(app::platform_example::labels::Main, "    [Escape] Quit");
   GECKO_INFO(app::platform_example::labels::Main,
              "═════════════════════════════════════════════════════");
@@ -687,6 +691,84 @@ int main()
         },
         nullptr);
 
+    // ── Per-frame IInput watcher ───────────────────────────────────
+    // Demonstrates polling the IInput service every frame. We log only
+    // edges + state changes so the console doesn't flood with every
+    // mouse-move sample.
+    struct InputWatch
+    {
+      WindowHandle LastFocused {};
+      WindowHandle LastHovered {};
+      bool Initialized {false};
+    } inputWatch;
+
+    auto pollInput = [&]() {
+      auto* input = ::gecko::platform::GetInput();
+      if (!input)
+        return;
+
+      // Mouse button edges (this frame).
+      static constexpr struct
+      {
+        MouseButton Btn;
+        const char* Name;
+      } btns[] = {{MouseButton::Left, "Left"},
+                  {MouseButton::Right, "Right"},
+                  {MouseButton::Middle, "Middle"}};
+      for (const auto& b : btns)
+      {
+        if (input->WasMouseButtonPressed(b.Btn))
+        {
+          auto p = input->GetMousePosition();
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: %s mouse pressed  at (%d, %d)", b.Name, p.X, p.Y);
+        }
+        if (input->WasMouseButtonReleased(b.Btn))
+        {
+          auto p = input->GetMousePosition();
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: %s mouse released at (%d, %d)", b.Name, p.X, p.Y);
+        }
+      }
+
+      // Scroll wheel (accumulated this frame).
+      const float scrollY = input->GetMouseScrollY();
+      if (scrollY != 0.0f)
+      {
+        GECKO_INFO(app::platform_example::labels::Main, "Input: scrollY=%.2f",
+                   static_cast<double>(scrollY));
+      }
+
+      // Focused / hovered window changes.
+      const auto focused = input->FocusedWindow();
+      const auto hovered = input->HoveredWindow();
+      if (!inputWatch.Initialized)
+      {
+        inputWatch.LastFocused = focused;
+        inputWatch.LastHovered = hovered;
+        inputWatch.Initialized = true;
+      }
+      else
+      {
+        if (focused.Id != inputWatch.LastFocused.Id)
+        {
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: focused window %llu → %llu",
+                     static_cast<unsigned long long>(inputWatch.LastFocused.Id),
+                     static_cast<unsigned long long>(focused.Id));
+          inputWatch.LastFocused = focused;
+        }
+        if (hovered.Id != inputWatch.LastHovered.Id)
+        {
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: hovered window %llu → %llu",
+                     static_cast<unsigned long long>(inputWatch.LastHovered.Id),
+                     static_cast<unsigned long long>(hovered.Id));
+          inputWatch.LastHovered = hovered;
+        }
+      }
+    };
+
     // ── Frame callback (shared between normal loop and modal timer) ──
     auto doFrame = [&]() {
       GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "Frame");
@@ -695,6 +777,7 @@ int main()
                           "DispatchEvents");
         (void)gecko::DispatchEvents();
       }
+      pollInput();
       GECKO_PRECISE_SLEEP_NS(16'000'000);
     };
 
