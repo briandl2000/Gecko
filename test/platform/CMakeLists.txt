@@ -4,6 +4,7 @@ add_executable(platform_tests
   test_platform_io.cpp
   test_threading.cpp
   test_input.cpp
+  test_clipboard.cpp
 )
 
 target_link_libraries(platform_tests

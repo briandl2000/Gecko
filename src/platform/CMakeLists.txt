@@ -9,6 +9,7 @@ target_sources(Platform
     platform_io.cpp
     platform_module.cpp
     input.cpp
+    clipboard.cpp
     window_event_input.cpp
     windows_interface.cpp
 
