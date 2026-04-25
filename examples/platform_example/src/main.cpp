@@ -5,7 +5,6 @@
 #include <gecko/core/services/modules.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
-#include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
@@ -198,11 +197,6 @@ int main()
     GECKO_FUNC(app::platform_example::labels::Main);
     GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
 
-    PlatformConfig cfg = {};
-    cfg.Backend = DisplayBackendKind::Auto;
-
-    PlatformContext ctx = PlatformContext(cfg);
-
     // ── Create main window — resizable, decorated ──────────────────
     WindowDesc windowDesc;
     windowDesc.Title = "Gecko Platform Example";
@@ -211,7 +205,8 @@ int main()
     windowDesc.Resizable = true;
     windowDesc.Mode = WindowMode::Windowed;
 
-    WindowHandle window = ctx.Windows().CreateWindow(windowDesc);
+    WindowHandle window =
+        ::gecko::platform::GetWindows()->CreateWindow(windowDesc);
     GECKO_INFO(app::platform_example::labels::Main,
                "Creating application window...");
     if (!window.IsValid())
@@ -226,47 +221,49 @@ int main()
 
     // ── Print initial window info ──────────────────────────────────
     {
-      DpiInfo dpi = ctx.Windows().GetDpi(window);
+      DpiInfo dpi = ::gecko::platform::GetWindows()->GetDpi(window);
       GECKO_INFO(app::platform_example::labels::Main,
                  "Window DPI: %u (scale %.2f)", dpi.Dpi,
                  static_cast<double>(dpi.Scale));
 
-      Extent2D size = ctx.Windows().GetClientSize(window);
+      Extent2D size = ::gecko::platform::GetWindows()->GetClientSize(window);
       GECKO_INFO(app::platform_example::labels::Main, "Client size: %ux%u",
                  size.Width, size.Height);
 
-      math::Int2 pos = ctx.Windows().GetPosition(window);
+      math::Int2 pos = ::gecko::platform::GetWindows()->GetPosition(window);
       GECKO_INFO(app::platform_example::labels::Main,
                  "Window position: (%d, %d)", pos.X, pos.Y);
 
-      NativeWindowHandle native = ctx.Windows().GetNativeWindowHandle(window);
+      NativeWindowHandle native =
+          ::gecko::platform::GetWindows()->GetNativeWindowHandle(window);
       GECKO_INFO(app::platform_example::labels::Main,
                  "Native handle: backend=%u, handle=%p",
                  static_cast<unsigned>(native.Backend), native.Handle);
 
       GECKO_INFO(app::platform_example::labels::Main, "Decorated: %s",
-                 BoolStr(ctx.Windows().IsDecorated(window)));
+                 BoolStr(::gecko::platform::GetWindows()->IsDecorated(window)));
       GECKO_INFO(app::platform_example::labels::Main, "Resizable: %s",
-                 BoolStr(ctx.Windows().IsResizable(window)));
+                 BoolStr(::gecko::platform::GetWindows()->IsResizable(window)));
       GECKO_INFO(app::platform_example::labels::Main, "Window mode: %s",
-                 WindowModeToString(ctx.Windows().GetWindowMode(window)));
+                 WindowModeToString(
+                     ::gecko::platform::GetWindows()->GetWindowMode(window)));
       GECKO_INFO(app::platform_example::labels::Main, "Window state: %s",
-                 WindowStateToString(ctx.Windows().GetWindowState(window)));
-      GECKO_INFO(app::platform_example::labels::Main, "Always on top: %s",
-                 BoolStr(ctx.Windows().IsAlwaysOnTop(window)));
+                 WindowStateToString(
+                     ::gecko::platform::GetWindows()->GetWindowState(window)));
+      GECKO_INFO(
+          app::platform_example::labels::Main, "Always on top: %s",
+          BoolStr(::gecko::platform::GetWindows()->IsAlwaysOnTop(window)));
     }
 
     // ── App state for event callbacks ───────────────────────────────
     struct AppState
     {
-      PlatformContext* Ctx;
       WindowHandle MainWindow;
       ::std::vector<WindowHandle> Spawned;
       bool Running {true};
     };
 
     AppState appState;
-    appState.Ctx = &ctx;
     appState.MainWindow = window;
 
     // ── Print keybindings ─────────────────────────────────────────
@@ -296,7 +293,7 @@ int main()
               GECKO_INFO(app::platform_example::labels::Main,
                          "Child window %llu closed",
                          static_cast<unsigned long long>(it->Id));
-              state->Ctx->Windows().DestroyWindow(*it);
+              ::gecko::platform::GetWindows()->DestroyWindow(*it);
               spawned.erase(it);
               break;
             }
@@ -316,7 +313,7 @@ int main()
           if (!payload->Down || payload->Repeat)
             return;
 
-          auto& windows = state->Ctx->Windows();
+          auto& windows = *::gecko::platform::GetWindows();
           const WindowHandle main = state->MainWindow;
 
           switch (payload->Key)
@@ -659,18 +656,19 @@ int main()
     };
 
     // Register for Win32 modal drag/resize so the app keeps ticking.
-    ctx.SetModalFrameCallback(
+    ::gecko::platform::SetModalFrameCallback(
         [](void* ud) { (*static_cast<decltype(&doFrame)>(ud))(); }, &doFrame);
 
     // ── Main loop (runs until user quits) ──────────────────────────
     GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
-    while (appState.Running && ctx.Windows().IsWindowAlive(window))
+    while (appState.Running &&
+           ::gecko::platform::GetWindows()->IsWindowAlive(window))
     {
       GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "MainLoop");
 
       {
         GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "PumpEvents");
-        ctx.PumpEvents();
+        ::gecko::platform::PumpEvents();
       }
 
       doFrame();
@@ -679,19 +677,19 @@ int main()
     // ── Cleanup — destroy all spawned windows, then main ───────────
     for (auto& h : appState.Spawned)
     {
-      if (ctx.Windows().IsWindowAlive(h))
+      if (::gecko::platform::GetWindows()->IsWindowAlive(h))
       {
         GECKO_INFO(app::platform_example::labels::Main,
                    "Destroying spawned window (id=%llu)",
                    static_cast<unsigned long long>(h.Id));
-        ctx.Windows().DestroyWindow(h);
+        ::gecko::platform::GetWindows()->DestroyWindow(h);
       }
     }
     appState.Spawned.clear();
 
     GECKO_INFO(app::platform_example::labels::Main,
                "Destroying main window...");
-    ctx.Windows().DestroyWindow(window);
+    ::gecko::platform::GetWindows()->DestroyWindow(window);
 
     // Unregister sinks before shutting down services
   }

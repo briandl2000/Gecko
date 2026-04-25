@@ -23,9 +23,24 @@ constexpr ::gecko::ServiceId kRequired[] = {
     ::gecko::ServiceIdOf<::gecko::IEventBus>(),
 };
 
+constexpr ::gecko::ServiceId kPublishes[] = {
+    ::gecko::ServiceIdOf<IWindowsBackend>(),
+    ::gecko::ServiceIdOf<IMonitorsBackend>(),
+};
+
+// File-scope pointers populated by Startup, cleared by Shutdown.
+// Free-function accessors (GetWindows/GetMonitors/PumpEvents/...) read
+// these.
+IWindowsBackend* g_Windows = nullptr;
+IMonitorsBackend* g_Monitors = nullptr;
+::gecko::EventEmitter* g_Emitter = nullptr;
+
 }  // namespace
 
-PlatformModule::PlatformModule() noexcept = default;
+PlatformModule::PlatformModule(const PlatformConfig& config) noexcept
+    : m_Config(Resolve(config))
+{}
+
 PlatformModule::~PlatformModule() noexcept = default;
 
 ::std::span<const ::gecko::ServiceId> PlatformModule::Requires() const noexcept
@@ -33,7 +48,12 @@ PlatformModule::~PlatformModule() noexcept = default;
   return ::std::span<const ::gecko::ServiceId> {kRequired};
 }
 
-bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
+::std::span<const ::gecko::ServiceId> PlatformModule::Publishes() const noexcept
+{
+  return ::std::span<const ::gecko::ServiceId> {kPublishes};
+}
+
+bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
 {
   GECKO_FUNC(labels::Platform);
 
@@ -45,16 +65,80 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
     GECKO_WARN(labels::Platform, "timeBeginPeriod(1) failed");
 #endif
 
+  m_Emitter = ::gecko::CreateEmitterForModule(labels::Platform);
+  m_Windows = IWindowsBackend::Create(m_Config);
+  m_Monitors = IMonitorsBackend::Create(m_Config);
+  if (!m_Windows || !m_Monitors)
+  {
+    GECKO_ERROR(labels::Platform, "Failed to create platform backends");
+    return false;
+  }
+  m_Monitors->EnumerateMonitors();
+
+  if (!modules.PublishService<IWindowsBackend>(m_Windows.get()))
+  {
+    GECKO_ERROR(labels::Platform, "PublishService<IWindowsBackend> failed");
+    return false;
+  }
+  if (!modules.PublishService<IMonitorsBackend>(m_Monitors.get()))
+  {
+    GECKO_ERROR(labels::Platform, "PublishService<IMonitorsBackend> failed");
+    (void)modules.UnpublishService<IWindowsBackend>();
+    return false;
+  }
+
+  g_Windows = m_Windows.get();
+  g_Monitors = m_Monitors.get();
+  g_Emitter = &m_Emitter;
+
   return true;
 }
 
-void PlatformModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
+void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
 {
   GECKO_FUNC(labels::Platform);
+
+  g_Emitter = nullptr;
+  g_Monitors = nullptr;
+  g_Windows = nullptr;
+
+  (void)modules.UnpublishService<IMonitorsBackend>();
+  (void)modules.UnpublishService<IWindowsBackend>();
+
+  m_Monitors.reset();
+  m_Windows.reset();
+  m_Emitter = {};
 
 #if defined(GECKO_PLATFORM_WINDOWS)
   ::timeEndPeriod(1);
 #endif
+}
+
+// ── Free function accessors ─────────────────────────────────────────
+
+IWindowsBackend* GetWindows() noexcept
+{
+  return g_Windows;
+}
+
+IMonitorsBackend* GetMonitors() noexcept
+{
+  return g_Monitors;
+}
+
+void PumpEvents() noexcept
+{
+  if (!g_Windows || !g_Monitors || !g_Emitter)
+    return;
+  g_Windows->PumpEvents(*g_Emitter);
+  g_Monitors->PumpEvents(*g_Emitter);
+}
+
+void SetModalFrameCallback(IWindowsBackend::ModalFrameFn callback,
+                           void* userData) noexcept
+{
+  if (g_Windows)
+    g_Windows->SetModalFrameCallback(callback, userData);
 }
 
 }  // namespace gecko::platform

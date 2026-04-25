@@ -12,9 +12,9 @@ TEST_CASE("Live backend: enumerate monitors returns at least one",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
-  const u32 count = scope.Ctx.Monitors().GetMonitorCount();
+  const u32 count = ::gecko::platform::GetMonitors()->GetMonitorCount();
   REQUIRE(count >= 1);
 }
 
@@ -23,9 +23,9 @@ TEST_CASE("Live backend: primary monitor exists",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
-  MonitorHandle primary = scope.Ctx.Monitors().GetPrimaryMonitor();
+  MonitorHandle primary = ::gecko::platform::GetMonitors()->GetPrimaryMonitor();
   REQUIRE(primary.IsValid());
 }
 
@@ -34,16 +34,17 @@ TEST_CASE("Live backend: monitor handle by index is valid",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
-  const u32 count = scope.Ctx.Monitors().GetMonitorCount();
+  const u32 count = ::gecko::platform::GetMonitors()->GetMonitorCount();
   REQUIRE(count >= 1);
 
-  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
+  MonitorHandle h = ::gecko::platform::GetMonitors()->GetMonitorHandle(0);
   REQUIRE(h.IsValid());
 
   // Out-of-range index fails cleanly
-  MonitorHandle invalid = scope.Ctx.Monitors().GetMonitorHandle(count);
+  MonitorHandle invalid =
+      ::gecko::platform::GetMonitors()->GetMonitorHandle(count);
   REQUIRE_FALSE(invalid.IsValid());
 }
 
@@ -52,11 +53,11 @@ TEST_CASE("Live backend: monitor properties are populated",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
-  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
+  MonitorHandle h = ::gecko::platform::GetMonitors()->GetMonitorHandle(0);
 
-  MonitorInfo info = scope.Ctx.Monitors().GetMonitorProperties(h);
+  MonitorInfo info = ::gecko::platform::GetMonitors()->GetMonitorProperties(h);
   REQUIRE(info.Bounds.Width() > 0);
   REQUIRE(info.Bounds.Height() > 0);
   REQUIRE(info.Dpi > 0);
@@ -69,11 +70,11 @@ TEST_CASE("Live backend: monitor name is non-empty",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
-  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
+  MonitorHandle h = ::gecko::platform::GetMonitors()->GetMonitorHandle(0);
 
-  MonitorInfo info = scope.Ctx.Monitors().GetMonitorProperties(h);
+  MonitorInfo info = ::gecko::platform::GetMonitors()->GetMonitorProperties(h);
   REQUIRE(info.Name[0] != '\0');
 }
 
@@ -82,11 +83,11 @@ TEST_CASE("Live backend: monitor bounds and work area are valid",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
-  MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(0);
+  MonitorHandle h = ::gecko::platform::GetMonitors()->GetMonitorHandle(0);
 
-  MonitorBounds mb = scope.Ctx.Monitors().GetMonitorBounds(h);
+  MonitorBounds mb = ::gecko::platform::GetMonitors()->GetMonitorBounds(h);
   REQUIRE_FALSE(mb.Bounds.IsEmpty());
   REQUIRE_FALSE(mb.WorkArea.IsEmpty());
 }
@@ -96,17 +97,18 @@ TEST_CASE("Live backend: all monitors have consistent data",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
-  const u32 count = scope.Ctx.Monitors().GetMonitorCount();
+  const u32 count = ::gecko::platform::GetMonitors()->GetMonitorCount();
   bool foundPrimary = false;
 
   for (u32 i = 0; i < count; ++i)
   {
-    MonitorHandle h = scope.Ctx.Monitors().GetMonitorHandle(i);
+    MonitorHandle h = ::gecko::platform::GetMonitors()->GetMonitorHandle(i);
     REQUIRE(h.IsValid());
 
-    MonitorInfo info = scope.Ctx.Monitors().GetMonitorProperties(h);
+    MonitorInfo info =
+        ::gecko::platform::GetMonitors()->GetMonitorProperties(h);
     REQUIRE(info.Bounds.Width() > 0);
     REQUIRE(info.Bounds.Height() > 0);
     REQUIRE(info.Dpi > 0);
@@ -123,9 +125,9 @@ TEST_CASE("Live backend: pump monitor events does not crash",
 {
   test::FeaturePlatformScope scope;
 
-  scope.Ctx.Monitors().EnumerateMonitors();
+  ::gecko::platform::GetMonitors()->EnumerateMonitors();
 
   // Pump several times — should be safe even with no changes
   for (int i = 0; i < 5; ++i)
-    scope.Ctx.PumpEvents();
+    ::gecko::platform::PumpEvents();
 }

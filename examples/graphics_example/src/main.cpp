@@ -9,7 +9,6 @@
 #include <gecko/core/services/modules.h>
 #include <gecko/core/version.h>
 #include <gecko/graphics/graphics_device.h>
-#include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
@@ -135,8 +134,6 @@ int main()
   {
     GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "main");
 
-    PlatformContext ctx(PlatformConfig {});
-
     // ── Two windows ───────────────────────────────────────────────
     WindowSlot slots[2];
     const char* titles[2] = {
@@ -152,7 +149,7 @@ int main()
       wd.Resizable = true;
       wd.Mode = WindowMode::Windowed;
 
-      slots[i].Handle = ctx.Windows().CreateWindow(wd);
+      slots[i].Handle = ::gecko::platform::GetWindows()->CreateWindow(wd);
       if (!slots[i].Handle.IsValid())
       {
         GECKO_ERROR(app::graphics_example::labels::Main,
@@ -173,8 +170,10 @@ int main()
     for (u32 i = 0; i < 2; ++i)
     {
       NativeWindowHandle native =
-          ctx.Windows().GetNativeWindowHandle(slots[i].Handle);
-      Extent2D sz = ctx.Windows().GetClientSize(slots[i].Handle);
+          ::gecko::platform::GetWindows()->GetNativeWindowHandle(
+              slots[i].Handle);
+      Extent2D sz =
+          ::gecko::platform::GetWindows()->GetClientSize(slots[i].Handle);
 
       SwapchainDesc scDesc;
       scDesc.Width = sz.Width;
@@ -388,10 +387,9 @@ int main()
 
     struct ResizeContext
     {
-      PlatformContext* Ctx {nullptr};
       WindowSlot* Slots {nullptr};
     };
-    ResizeContext rctx {&ctx, slots};
+    ResizeContext rctx {slots};
 
     auto resizeSub = SubscribeEvent(
         events::WindowResized,
@@ -615,22 +613,22 @@ int main()
       renderFrame();
     };
 
-    ctx.SetModalFrameCallback(
+    ::gecko::platform::SetModalFrameCallback(
         [](void* ud) { (*static_cast<decltype(&update)>(ud))(); }, &update);
 
     while (running)
     {
-      ctx.PumpEvents();
+      ::gecko::platform::PumpEvents();
       update();
     }
 
-    ctx.SetModalFrameCallback(nullptr, nullptr);
+    ::gecko::platform::SetModalFrameCallback(nullptr, nullptr);
 
     // Destroy in reverse order.
     for (u32 i = 0; i < 2; ++i)
     {
       device->DestroySwapchain(slots[i].SC);
-      ctx.Windows().DestroyWindow(slots[i].Handle);
+      ::gecko::platform::GetWindows()->DestroyWindow(slots[i].Handle);
     }
 
     GECKO_INFO(app::graphics_example::labels::Main, "Shutdown complete");

@@ -6,7 +6,6 @@ target_sources(Platform
   PRIVATE
     monitors_interface.cpp
     platform_config.cpp
-    platform_context.cpp
     platform_io.cpp
     platform_module.cpp
     windows_interface.cpp
