@@ -204,6 +204,17 @@ the same process, it's a context.
 
 - **Plugin loader**: Platform-side `ILibraryLoader` service for
   `dlopen`/`LoadLibrary`. Lands when there's an actual plugin.
+- **Plugin ABI rule**: today plugins must be built with the **same
+  compiler, same C++ standard library, and same STL configuration** as
+  the host (one toolchain per process). Reasoning: `IModule` is a
+  virtual C++ interface and we return `std::span<const ServiceId>` from
+  `Publishes()` / `Requires()`. Vtable layout (Itanium vs MSVC ABI),
+  exception model (DWARF vs SEH), and `std::span` field order are all
+  implementation-defined and not stable across toolchains. A future
+  cross-toolchain plugin entry would need a separate C ABI shim
+  (`extern "C" gecko_plugin_register(GeckoPluginV1*)` with POD-only
+  types and function pointers); this is deferred until a plugin loader
+  exists to validate it.
 - **Core-as-shared**: Currently `Core` is `STATIC` and `CoreServices`
   is `SHARED`. The split is plugin-compatible: plugins link `Core`
   statically (utilities, no globals) and `CoreServices` dynamically
