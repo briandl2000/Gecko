@@ -7,6 +7,21 @@
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/window.h"
 
+// <windows.h> defines CreateWindow as a macro that expands to
+// CreateWindowA / CreateWindowW. That collides with our IWindowsBackend
+// API. Drop the macro defensively so our header survives any include
+// order. Win32 backend code uses CreateWindowExA/W directly, so this
+// does not affect engine internals.
+#ifdef CreateWindow
+#  undef CreateWindow
+#endif
+#ifdef CreateWindowA
+#  undef CreateWindowA
+#endif
+#ifdef CreateWindowW
+#  undef CreateWindowW
+#endif
+
 namespace gecko::platform {
 
 class IWindowsBackend
