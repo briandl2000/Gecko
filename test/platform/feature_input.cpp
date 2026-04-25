@@ -7,8 +7,11 @@
 
 #include "feature_platform_scope.h"
 #include "gecko/platform/input.h"
+#include "gecko/platform/windows_interface.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
+#include <thread>
 
 using namespace gecko;
 using namespace gecko::platform;
@@ -72,4 +75,47 @@ TEST_CASE("Live backend: IInput accessors safe to query with no input",
   (void)in->WasKeyPressed(KeyCode::Space);
   (void)in->WasMouseButtonReleased(MouseButton::Right);
   SUCCEED();
+}
+
+// ── Visible / interactive showcase ────────────────────────────────
+//
+// Tagged [.visible] so it's hidden from the default test run. Run with:
+//
+//   gk test debug --visible
+//
+// (or the binary directly: platform_feature_tests "[.visible]")
+//
+// Opens a real window, pumps for ~3 seconds so the user can actually
+// see the backend doing its thing, then asserts the IInput service
+// stayed coherent across the loop (no service drop-out, no crash on
+// repeated NewFrame via PumpEvents).
+TEST_CASE("Live backend: visible IInput showcase",
+          "[.visible][feature][platform][input][window]")
+{
+  ::gecko::test::FeaturePlatformScope scope;
+
+  WindowDesc desc;
+  desc.Title = "Gecko IInput showcase — move/click/scroll, then wait";
+  desc.Size = {640, 360};
+  desc.Visible = true;
+
+  WindowHandle win = GetWindows()->CreateWindow(desc);
+  REQUIRE(win.IsValid());
+  REQUIRE(GetInput() != nullptr);
+
+  // Pump for ~3 seconds so the window actually renders and the user
+  // can see + interact with it. Sleep keeps CPU low without blocking
+  // the event loop; PumpEvents itself drives the IInput frame model.
+  using clock = ::std::chrono::steady_clock;
+  const auto deadline = clock::now() + ::std::chrono::seconds(3);
+  while (clock::now() < deadline)
+  {
+    PumpEvents();
+    (void)::gecko::DispatchEvents();
+    REQUIRE(GetInput() != nullptr);
+    ::std::this_thread::sleep_for(::std::chrono::milliseconds(16));
+  }
+
+  REQUIRE(GetWindows()->IsWindowAlive(win));
+  GetWindows()->DestroyWindow(win);
 }

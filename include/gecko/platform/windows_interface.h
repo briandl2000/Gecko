@@ -13,13 +13,13 @@
 // order. Win32 backend code uses CreateWindowExA/W directly, so this
 // does not affect engine internals.
 #ifdef CreateWindow
-#  undef CreateWindow
+#undef CreateWindow
 #endif
 #ifdef CreateWindowA
-#  undef CreateWindowA
+#undef CreateWindowA
 #endif
 #ifdef CreateWindowW
-#  undef CreateWindowW
+#undef CreateWindowW
 #endif
 
 namespace gecko::platform {
