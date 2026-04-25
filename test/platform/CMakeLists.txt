@@ -1,6 +1,7 @@
 add_executable(platform_tests
   test_window_types.cpp
   test_platform_context.cpp
+  test_threading.cpp
 )
 
 target_link_libraries(platform_tests

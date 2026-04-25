@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gecko/core/ptr.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/jobs.h"
 #include "gecko/core/services/log.h"
@@ -8,18 +9,22 @@
 
 namespace gecko::platform {
 
+struct IThreading;
+
 namespace labels {
 inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
 }
 
 // Platform library's module. Stack-construct one and pass &platform into
-// Engine::Create({...}). The module owns no service implementations
-// itself; it is the lifecycle node for platform-wide setup (timer
-// resolution, etc.) and will publish IPlatform-style services in a
-// later iteration.
+// Engine::Create({...}). Owns and publishes the platform-provided
+// services (IThreading today, IPlatformIO next) and is the lifecycle
+// node for platform-wide setup such as Win32 timer resolution.
 class PlatformModule final : public ::gecko::IModule
 {
 public:
+  PlatformModule() noexcept;
+  ~PlatformModule() noexcept override;
+
   [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
       const noexcept override
   {
@@ -32,10 +37,16 @@ public:
   [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Requires()
       const noexcept override;
 
+  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Publishes()
+      const noexcept override;
+
   [[nodiscard]] GECKO_API bool Startup(
       ::gecko::IModuleRegistry& modules) noexcept override;
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
+
+private:
+  ::gecko::Unique<IThreading> m_Threading;
 };
 
 }  // namespace gecko::platform

@@ -8,6 +8,7 @@ target_sources(Platform
     platform_config.cpp
     platform_context.cpp
     platform_module.cpp
+    threading.cpp
     windows_interface.cpp
 
     private/null_monitors_backend.cpp
@@ -15,6 +16,9 @@ target_sources(Platform
 )
 
 if(UNIX AND NOT APPLE)
+  target_sources(Platform PRIVATE
+    linux/threading_linux.cpp
+  )
   find_package(X11)
   if(X11_FOUND)
     target_sources(Platform PRIVATE
@@ -155,6 +159,7 @@ elseif(WIN32)
   target_sources(Platform PRIVATE
     win32/win32_monitors_backend.cpp
     win32/win32_windows_backend.cpp
+    win32/threading_win32.cpp
   )
   target_link_libraries(Platform PRIVATE winmm shcore user32)
 endif()
