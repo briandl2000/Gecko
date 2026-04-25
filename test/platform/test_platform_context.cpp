@@ -3,8 +3,8 @@
 #include "gecko/platform/platform_config.h"
 #include "gecko/platform/platform_context.h"
 #include "gecko/platform/platform_events.h"
-#include "gecko/runtime/core_module.h"
 #include "gecko/runtime/event_bus.h"
+#include "gecko/runtime/runtime_module.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
@@ -22,13 +22,13 @@ struct TestServiceScope
   NullProfiler profiler;
   NullLogger logger;
   runtime::EventBus events;
-  runtime::CoreModule core;
+  runtime::RuntimeModule runtimeMod;
   ::std::optional<::gecko::Engine> engine;
 
-  TestServiceScope() : core(jobs, profiler, logger, events)
+  TestServiceScope() : runtimeMod(jobs, profiler, logger, events)
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = ::gecko::Engine::Create({&core});
+    engine = ::gecko::Engine::Create({&runtimeMod});
   }
 
   ~TestServiceScope()

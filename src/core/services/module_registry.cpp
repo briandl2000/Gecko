@@ -1,4 +1,4 @@
-#include "gecko/runtime/module_registry.h"
+#include "private/module_registry.h"
 
 #include "gecko/core/assert.h"
 #include "gecko/core/scope.h"
@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace gecko::runtime {
+namespace gecko::core::detail {
 
 struct ModuleRegistry::Impl
 {
@@ -145,7 +145,7 @@ void ModuleRegistry::Shutdown() noexcept
 ::gecko::ModuleRegistration ModuleRegistry::RegisterStatic(
     ::gecko::IModule& module) noexcept
 {
-  GECKO_FUNC(labels::Modules);
+  GECKO_FUNC(::gecko::core::labels::Modules);
 
   if (!m_impl)
   {
@@ -153,19 +153,21 @@ void ModuleRegistry::Shutdown() noexcept
   }
 
   const ::gecko::Label root = module.RootLabel();
-  GECKO_INFO(labels::Modules, "RegisterStatic: %s",
+  GECKO_INFO(::gecko::core::labels::Modules, "RegisterStatic: %s",
              root.Name ? root.Name : "(unnamed)");
 
   if (!root.IsValid())
   {
-    GECKO_WARN(labels::Modules, "RegisterStatic failed: invalid root label");
+    GECKO_WARN(::gecko::core::labels::Modules,
+               "RegisterStatic failed: invalid root label");
     return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
                                         ::gecko::ModuleResult::InvalidArgument};
   }
 
   if (m_impl->Modules.contains(root.Id))
   {
-    GECKO_WARN(labels::Modules, "RegisterStatic failed: duplicate module %s",
+    GECKO_WARN(::gecko::core::labels::Modules,
+               "RegisterStatic failed: duplicate module %s",
                root.Name ? root.Name : "(unnamed)");
     return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
                                         ::gecko::ModuleResult::DuplicateModule};
@@ -175,7 +177,7 @@ void ModuleRegistry::Shutdown() noexcept
   auto* eventBus = ::gecko::GetEventBus();
   if (eventBus && !eventBus->RegisterModule(root.Id))
   {
-    GECKO_WARN(labels::Modules,
+    GECKO_WARN(::gecko::core::labels::Modules,
                "RegisterStatic failed: module ID %llu already registered with "
                "event bus for %s",
                static_cast<unsigned long long>(root.Id),
@@ -203,14 +205,14 @@ void ModuleRegistry::Shutdown() noexcept
     if (!m_impl->StartupModule(*this, *inserted))
     {
       (void)Unregister(root);
-      GECKO_ERROR(labels::Modules, "Startup failed for %s",
+      GECKO_ERROR(::gecko::core::labels::Modules, "Startup failed for %s",
                   root.Name ? root.Name : "(unnamed)");
       return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
                                           ::gecko::ModuleResult::StartupFailed};
     }
   }
 
-  GECKO_INFO(labels::Modules, "Registered: %s",
+  GECKO_INFO(::gecko::core::labels::Modules, "Registered: %s",
              root.Name ? root.Name : "(unnamed)");
   return ::gecko::ModuleRegistration {MakeHandle(root),
                                       ::gecko::ModuleResult::Ok};
@@ -223,12 +225,13 @@ void ModuleRegistry::Shutdown() noexcept
     return ::gecko::ModuleResult::NotFound;
   }
 
-  GECKO_INFO(labels::Modules, "Unregister: %s",
+  GECKO_INFO(::gecko::core::labels::Modules, "Unregister: %s",
              module.Name ? module.Name : "(unnamed)");
   auto it = m_impl->Modules.find(module.Id);
   if (it == m_impl->Modules.end())
   {
-    GECKO_WARN(labels::Modules, "Unregister failed: not found %s",
+    GECKO_WARN(::gecko::core::labels::Modules,
+               "Unregister failed: not found %s",
                module.Name ? module.Name : "(unnamed)");
     return ::gecko::ModuleResult::NotFound;
   }
@@ -246,7 +249,7 @@ void ModuleRegistry::Shutdown() noexcept
 
   Impl::EraseFirstU64(m_impl->RegistrationOrder, module.Id);
   m_impl->Modules.erase(it);
-  GECKO_INFO(labels::Modules, "Unregistered: %s",
+  GECKO_INFO(::gecko::core::labels::Modules, "Unregistered: %s",
              module.Name ? module.Name : "(unnamed)");
   return ::gecko::ModuleResult::Ok;
 }
@@ -346,7 +349,7 @@ bool ModuleRegistry::StartupAllModules() noexcept
       int existing = findPublisher(pid.Value);
       if (existing >= 0)
       {
-        GECKO_ERROR(labels::Modules,
+        GECKO_ERROR(::gecko::core::labels::Modules,
                     "Duplicate service publisher: '%s' and '%s' both publish "
                     "the same service id",
                     nodes[existing].Module->RootLabel().Name
@@ -382,7 +385,7 @@ bool ModuleRegistry::StartupAllModules() noexcept
       int producer = findPublisher(rid.Value);
       if (producer < 0)
       {
-        GECKO_ERROR(labels::Modules,
+        GECKO_ERROR(::gecko::core::labels::Modules,
                     "Module '%s' requires a service that no module publishes",
                     nodes[i].Module->RootLabel().Name
                         ? nodes[i].Module->RootLabel().Name
@@ -428,7 +431,7 @@ bool ModuleRegistry::StartupAllModules() noexcept
 
   if (order.size() != nodes.size())
   {
-    GECKO_ERROR(labels::Modules,
+    GECKO_ERROR(::gecko::core::labels::Modules,
                 "Module dependency cycle detected (%zu of %zu modules in "
                 "topological order)",
                 order.size(), nodes.size());
@@ -477,7 +480,7 @@ void ModuleRegistry::ShutdownAllModules() noexcept
     return;
   }
 
-  GECKO_INFO(labels::Modules, "ShutdownAllModules (booted=%s)",
+  GECKO_INFO(::gecko::core::labels::Modules, "ShutdownAllModules (booted=%s)",
              m_impl->Booted ? "true" : "false");
 
   for (auto rit = m_impl->RegistrationOrder.rbegin();
@@ -488,7 +491,7 @@ void ModuleRegistry::ShutdownAllModules() noexcept
     {
       if (it->second.Started)
       {
-        GECKO_INFO(labels::Modules, "Shutdown: %s",
+        GECKO_INFO(::gecko::core::labels::Modules, "Shutdown: %s",
                    it->second.Root.Name ? it->second.Root.Name : "(unnamed)");
         m_impl->ShutdownModule(*this, it->second);
       }
@@ -542,4 +545,4 @@ bool ModuleRegistry::UnpublishServiceImpl(::gecko::ServiceId id) noexcept
   }
   return false;
 }
-}  // namespace gecko::runtime
+}  // namespace gecko::core::detail

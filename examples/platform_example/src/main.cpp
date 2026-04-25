@@ -8,11 +8,9 @@
 #include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
-#include <gecko/runtime/core_module.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
 #include <gecko/runtime/immediate_logger.h>
-#include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
@@ -162,11 +160,11 @@ int main()
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  runtime::CoreModule coreModule(jobSystem, ringProfiler, immediateLogger,
-                                 eventBus);
+  runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler, immediateLogger,
+                                       eventBus);
+  platform::PlatformModule platformModule;
 
-  auto engine = Engine::Create({&coreModule, &runtime::GetModule(),
-                                &platform::GetModule(), &g_AppModule});
+  auto engine = Engine::Create({&runtimeModule, &platformModule, &g_AppModule});
   if (!engine)
   {
     ResetAllocator();

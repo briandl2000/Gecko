@@ -16,8 +16,6 @@
 
 namespace gecko::platform {
 
-static PlatformModule s_PlatformModule;
-
 bool PlatformModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_FUNC(labels::Platform);
@@ -40,17 +38,6 @@ void PlatformModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 #if defined(GECKO_PLATFORM_WINDOWS)
   ::timeEndPeriod(1);
 #endif
-}
-
-::gecko::ModuleRegistration InstallPlatformModule(
-    ::gecko::IModuleRegistry& modules) noexcept
-{
-  return modules.RegisterStatic(s_PlatformModule);
-}
-
-::gecko::IModule& GetModule() noexcept
-{
-  return s_PlatformModule;
 }
 
 }  // namespace gecko::platform

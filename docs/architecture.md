@@ -1,5 +1,11 @@
 # Architecture
 
+> The mental model behind libraries, modules, services, systems, and
+> contexts is documented in detail at
+> [architecture/modules-services-contexts.md](architecture/modules-services-contexts.md).
+> Read that first if you're adding subsystems or touching `Engine` /
+> `IModule` / the service registry.
+
 ## TL;DR
 
 - Core = interfaces + tiny utilities

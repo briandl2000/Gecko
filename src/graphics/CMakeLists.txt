@@ -33,6 +33,7 @@ endif()
 
 add_library(Graphics STATIC)
 add_library(Gecko::Graphics ALIAS Graphics)
+set_target_properties(Graphics PROPERTIES OUTPUT_NAME "GeckoGraphics")
 
 target_sources(Graphics PRIVATE
   graphics_module.cpp

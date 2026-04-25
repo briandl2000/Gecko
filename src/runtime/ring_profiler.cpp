@@ -10,14 +10,6 @@
 #include <algorithm>
 #include <vector>
 
-namespace gecko {
-
-u32 ThisThreadId() noexcept
-{
-  return HashThreadId();
-}
-}  // namespace gecko
-
 namespace gecko::runtime {
 
 // Reentrancy guard: Prevents profiler from profiling itself

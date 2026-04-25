@@ -1,5 +1,6 @@
 add_library(Runtime STATIC)
 add_library(Gecko::Runtime ALIAS Runtime)
+set_target_properties(Runtime PROPERTIES OUTPUT_NAME "GeckoRuntime")
 
 target_sources(Runtime
   PRIVATE
@@ -8,7 +9,6 @@ target_sources(Runtime
     event_bus.cpp
     file_log_sink.cpp
     immediate_logger.cpp
-    module_registry.cpp
     ring_logger.cpp
     ring_profiler.cpp
     thread_pool_job_system.cpp
@@ -16,8 +16,6 @@ target_sources(Runtime
     trace_writer.cpp
     tracking_allocator.cpp
     runtime_module.cpp
-    core_module.cpp
-    engine.cpp
 )
 
 target_include_directories(Runtime

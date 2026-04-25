@@ -8,7 +8,11 @@ namespace labels {
 inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
 }
 
-// Platform library's module.
+// Platform library's module. Stack-construct one and pass &platform into
+// Engine::Create({...}). The module owns no service implementations
+// itself; it is the lifecycle node for platform-wide setup (timer
+// resolution, etc.) and will publish IPlatform-style services in a
+// later iteration.
 class PlatformModule final : public ::gecko::IModule
 {
 public:
@@ -23,12 +27,5 @@ public:
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 };
-
-// Explicit registration entry point (called by app/loader after services boot).
-[[nodiscard]] GECKO_API ::gecko::ModuleRegistration InstallPlatformModule(
-    ::gecko::IModuleRegistry& modules) noexcept;
-
-// Access the platform module instance (for unified install flows).
-[[nodiscard]] GECKO_API ::gecko::IModule& GetModule() noexcept;
 
 }  // namespace gecko::platform

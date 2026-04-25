@@ -1,7 +1,7 @@
 #include "gecko/core/engine.h"
 #include "gecko/core/services.h"
-#include "gecko/runtime/core_module.h"
 #include "gecko/runtime/event_bus.h"
+#include "gecko/runtime/runtime_module.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <optional>
@@ -18,13 +18,13 @@ struct TestServiceScope
   NullProfiler profiler;
   NullLogger logger;
   EventBus eventBus;
-  CoreModule core;
+  RuntimeModule runtimeMod;
   ::std::optional<::gecko::Engine> engine;
 
-  TestServiceScope() : core(jobs, profiler, logger, eventBus)
+  TestServiceScope() : runtimeMod(jobs, profiler, logger, eventBus)
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = ::gecko::Engine::Create({&core});
+    engine = ::gecko::Engine::Create({&runtimeMod});
   }
 
   ~TestServiceScope()

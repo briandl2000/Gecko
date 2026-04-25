@@ -11,10 +11,8 @@
 #include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
-#include <gecko/runtime/core_module.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
-#include <gecko/runtime/module_registry.h>
 #include <gecko/runtime/ring_logger.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
@@ -196,12 +194,13 @@ static int AppMain(int argc, char** argv)
 
   runtime::EventBus eventBus;
 
-  runtime::CoreModule coreModule(jobSystem, ringProfiler, ringLogger, eventBus);
+  runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler, ringLogger,
+                                       eventBus);
+  platform::PlatformModule platformModule;
 
   // 3) Boot the engine. Modules are started in topological order based
   // on each module's Requires() / Publishes() declarations.
-  auto engine = Engine::Create({&coreModule, &runtime::GetModule(),
-                                &platform::GetModule(), &g_AppModule});
+  auto engine = Engine::Create({&runtimeModule, &platformModule, &g_AppModule});
   if (!engine)
   {
     ResetAllocator();

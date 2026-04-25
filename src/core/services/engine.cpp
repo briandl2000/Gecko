@@ -1,7 +1,7 @@
 #include "gecko/core/engine.h"
 
 #include "gecko/core/services.h"
-#include "gecko/runtime/module_registry.h"
+#include "private/module_registry.h"
 
 namespace gecko {
 
@@ -10,7 +10,7 @@ namespace gecko {
 {
   Engine engine;
   engine.m_registry = ::std::unique_ptr<IModuleRegistry>(
-      new (::std::nothrow)::gecko::runtime::ModuleRegistry());
+      new (::std::nothrow)::gecko::core::detail::ModuleRegistry());
   if (!engine.m_registry)
   {
     return ::std::nullopt;

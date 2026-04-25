@@ -10,10 +10,8 @@
 #include "gecko/core/utility/time.h"
 #include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
-#include "gecko/runtime/core_module.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/file_log_sink.h"
-#include "gecko/runtime/module_registry.h"
 #include "gecko/runtime/ring_logger.h"
 #include "gecko/runtime/ring_profiler.h"
 #include "gecko/runtime/runtime_module.h"
@@ -504,13 +502,13 @@ int main()
   runtime::ThreadPoolJobSystem jobSystem;
   jobSystem.SetWorkerThreadCount(4);
 
-  // CoreModule publishes the four foundational services. Engine
+  // RuntimeModule publishes the four foundational services. Engine
   // discovers dependencies via Requires() / Publishes() and starts
   // modules in topological order.
-  runtime::CoreModule coreModule(jobSystem, ringProfiler, ringLogger, eventBus);
+  runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler, ringLogger,
+                                       eventBus);
 
-  auto engine =
-      Engine::Create({&coreModule, &runtime::GetModule(), &g_AppModule});
+  auto engine = Engine::Create({&runtimeModule, &g_AppModule});
   if (!engine)
   {
     ResetAllocator();

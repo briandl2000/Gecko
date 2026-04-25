@@ -6,9 +6,8 @@
 #include "gecko/core/utility/thread.h"
 #include "gecko/core/version.h"
 #include "gecko/runtime/console_log_sink.h"
-#include "gecko/runtime/core_module.h"
+#include "gecko/runtime/runtime_module.h"
 #include "gecko/runtime/event_bus.h"
-#include "gecko/runtime/module_registry.h"
 #include "gecko/runtime/ring_logger.h"
 #include "gecko/runtime/ring_profiler.h"
 #include "gecko/runtime/runtime_module.h"
@@ -61,11 +60,10 @@ int main()
 
   ::gecko::runtime::EventBus eventBus;
 
-  ::gecko::runtime::CoreModule coreModule(jobSystem, ringProfiler, ringLogger,
-                                          eventBus);
+  ::gecko::runtime::RuntimeModule runtimeModule(jobSystem, ringProfiler,
+                                                ringLogger, eventBus);
 
-  auto engine = ::gecko::Engine::Create(
-      {&coreModule, &::gecko::runtime::GetModule(), &g_AppModule});
+  auto engine = ::gecko::Engine::Create({&runtimeModule, &g_AppModule});
   if (!engine)
   {
     ::gecko::ResetAllocator();
