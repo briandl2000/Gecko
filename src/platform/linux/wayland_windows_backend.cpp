@@ -1314,19 +1314,16 @@ void WaylandWindowsBackend::OnKeyboardKey(::wl_keyboard* /*kb*/, u32 /*serial*/,
 
   if (down && m_XkbState)
   {
-    char buf[8] {};
-    const int len =
-        ::xkb_state_key_get_utf8(m_XkbState, xkbCode, buf, sizeof(buf));
-    if (len == 1)
+    const ::gecko::u32 cp = ::xkb_state_key_get_utf32(m_XkbState, xkbCode);
+    // Skip C0 controls except tab/CR/LF, and DEL.
+    const bool keep = cp != 0 &&
+                      !(cp < 32 && cp != '\t' && cp != '\n' && cp != '\r') &&
+                      cp != 127;
+    if (keep)
     {
-      const unsigned char c = static_cast<unsigned char>(buf[0]);
-      if (c >= 32)
-      {
-        m_Staged.push_back(MakeStagedEvent(
-            events::WindowChar,
-            events::WindowCharPayload {WindowHandle {m_FocusedKeyboard}, now,
-                                       static_cast<u32>(c)}));
-      }
+      m_Staged.push_back(MakeStagedEvent(
+          events::WindowChar, events::WindowCharPayload {
+                                  WindowHandle {m_FocusedKeyboard}, now, cp}));
     }
   }
 #else

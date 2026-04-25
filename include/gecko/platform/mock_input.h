@@ -4,6 +4,8 @@
 #include "gecko/platform/input.h"
 
 #include <array>
+#include <string>
+#include <string_view>
 
 namespace gecko::platform {
 
@@ -101,6 +103,10 @@ public:
   {
     return m_HoveredWindow;
   }
+  [[nodiscard]] ::std::string_view GetTypedText() const noexcept override
+  {
+    return m_TypedText;
+  }
 
   // ── Test mutators ──────────────────────────────────────────
   void PressKey(KeyCode key) noexcept
@@ -138,6 +144,44 @@ public:
     m_HoveredWindow = w;
   }
 
+  // Append text to the per-frame typed-text buffer. Pass UTF-8 (as
+  // would be produced by IME / xkb / Win32 character translation).
+  // Cleared on EndFrame().
+  void TypeText(::std::string_view utf8) noexcept
+  {
+    m_TypedText.append(utf8);
+  }
+  // Convenience: append a single Unicode codepoint as UTF-8.
+  void TypeChar(::gecko::u32 codepoint) noexcept
+  {
+    char buf[4];
+    if (codepoint < 0x80)
+    {
+      m_TypedText.push_back(static_cast<char>(codepoint));
+    }
+    else if (codepoint < 0x800)
+    {
+      buf[0] = static_cast<char>(0xC0 | (codepoint >> 6));
+      buf[1] = static_cast<char>(0x80 | (codepoint & 0x3F));
+      m_TypedText.append(buf, 2);
+    }
+    else if (codepoint < 0x10000)
+    {
+      buf[0] = static_cast<char>(0xE0 | (codepoint >> 12));
+      buf[1] = static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+      buf[2] = static_cast<char>(0x80 | (codepoint & 0x3F));
+      m_TypedText.append(buf, 3);
+    }
+    else if (codepoint < 0x110000)
+    {
+      buf[0] = static_cast<char>(0xF0 | (codepoint >> 18));
+      buf[1] = static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F));
+      buf[2] = static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F));
+      buf[3] = static_cast<char>(0x80 | (codepoint & 0x3F));
+      m_TypedText.append(buf, 4);
+    }
+  }
+
   // Roll current → previous, clear scroll. Equivalent to NewFrame().
   void EndFrame() noexcept
   {
@@ -146,6 +190,7 @@ public:
     m_MousePosPrev = m_MousePos;
     m_ScrollX = 0.0f;
     m_ScrollY = 0.0f;
+    m_TypedText.clear();
   }
 
   // Reset everything to zero.
@@ -162,6 +207,7 @@ public:
     m_MouseWindow = {};
     m_FocusedWindow = {};
     m_HoveredWindow = {};
+    m_TypedText.clear();
   }
 
 private:
@@ -187,6 +233,7 @@ private:
   WindowHandle m_MouseWindow {};
   WindowHandle m_FocusedWindow {};
   WindowHandle m_HoveredWindow {};
+  ::std::string m_TypedText {};
 };
 
 }  // namespace gecko::platform

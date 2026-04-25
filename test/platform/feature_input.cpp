@@ -119,3 +119,41 @@ TEST_CASE("Live backend: visible IInput showcase",
   REQUIRE(GetWindows()->IsWindowAlive(win));
   GetWindows()->DestroyWindow(win);
 }
+
+// Showcase for IInput::GetTypedText. Opens a window for ~5 s and logs
+// whatever the user types. Always passes — the goal is a visible demo
+// that the OS → events::WindowChar → IInput::GetTypedText pipeline is
+// alive on the current backend.
+TEST_CASE("Live backend: visible IInput typed-text showcase",
+          "[.visible][feature][platform][input][text][window]")
+{
+  ::gecko::test::FeaturePlatformScope scope;
+
+  WindowDesc desc;
+  desc.Title = "Gecko text-input showcase \xE2\x80\x94 type something";
+  desc.Size = {640, 200};
+  desc.Visible = true;
+
+  WindowHandle win = GetWindows()->CreateWindow(desc);
+  REQUIRE(win.IsValid());
+
+  auto* in = GetInput();
+  REQUIRE(in != nullptr);
+
+  ::std::string accumulated;
+  using clock = ::std::chrono::steady_clock;
+  const auto deadline = clock::now() + ::std::chrono::seconds(5);
+  while (clock::now() < deadline)
+  {
+    PumpEvents();
+    (void)::gecko::DispatchEvents();
+    accumulated.append(in->GetTypedText());
+    ::std::this_thread::sleep_for(::std::chrono::milliseconds(16));
+  }
+
+  // No assertion on content — depends on user. Just keep it visible
+  // in the output so the developer can eyeball the result.
+  WARN("accumulated typed text: \"" << accumulated << "\"");
+
+  GetWindows()->DestroyWindow(win);
+}

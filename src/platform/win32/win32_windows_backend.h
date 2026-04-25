@@ -95,6 +95,8 @@ private:
     ::DWORD SavedStyle {0};
     ::DWORD SavedExStyle {0};
     ::RECT SavedRect {};
+    // High surrogate held for the next WM_CHAR (UTF-16 → codepoint).
+    ::gecko::u16 PendingHighSurrogate {0};
   };
 
   struct StagedEvent

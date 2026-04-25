@@ -298,14 +298,60 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
         XComposeStatus compose {};
         const int len =
             ::XLookupString(&event.xkey, buf, sizeof(buf), &sym, &compose);
-        if (len == 1)
+        // Decode the UTF-8 (XLookupString returns Latin-1, but for the
+        // ASCII subset that's identical to UTF-8 — full Unicode requires
+        // an XIM input context which we don't currently set up). Skip
+        // C0 control characters except tab/CR/LF.
+        if (len > 0)
         {
-          const unsigned char c = static_cast<unsigned char>(buf[0]);
-          if (c >= 32)
+          const auto* bytes = reinterpret_cast<const unsigned char*>(buf);
+          int i = 0;
+          while (i < len)
           {
-            gecko::SendEvent(emitter, events::WindowChar,
-                             events::WindowCharPayload {WindowHandle {id}, now,
-                                                        static_cast<u32>(c)});
+            ::gecko::u32 cp = 0;
+            int consumed = 1;
+            const unsigned char b0 = bytes[i];
+            if (b0 < 0x80)
+            {
+              cp = b0;
+            }
+            else if ((b0 & 0xE0) == 0xC0 && i + 1 < len)
+            {
+              cp = ::gecko::u32(b0 & 0x1F) << 6 |
+                   ::gecko::u32(bytes[i + 1] & 0x3F);
+              consumed = 2;
+            }
+            else if ((b0 & 0xF0) == 0xE0 && i + 2 < len)
+            {
+              cp = ::gecko::u32(b0 & 0x0F) << 12 |
+                   ::gecko::u32(bytes[i + 1] & 0x3F) << 6 |
+                   ::gecko::u32(bytes[i + 2] & 0x3F);
+              consumed = 3;
+            }
+            else if ((b0 & 0xF8) == 0xF0 && i + 3 < len)
+            {
+              cp = ::gecko::u32(b0 & 0x07) << 18 |
+                   ::gecko::u32(bytes[i + 1] & 0x3F) << 12 |
+                   ::gecko::u32(bytes[i + 2] & 0x3F) << 6 |
+                   ::gecko::u32(bytes[i + 3] & 0x3F);
+              consumed = 4;
+            }
+            else
+            {
+              // Latin-1 byte (XLookupString fallback) outside ASCII.
+              cp = b0;
+            }
+            i += consumed;
+
+            // Skip C0 controls but keep tab/CR/LF.
+            if (cp < 32 && cp != '\t' && cp != '\n' && cp != '\r')
+              continue;
+            if (cp == 127)
+              continue;
+
+            gecko::SendEvent(
+                emitter, events::WindowChar,
+                events::WindowCharPayload {WindowHandle {id}, now, cp});
           }
         }
       }

@@ -2,6 +2,8 @@
 
 #include "gecko/platform/input.h"
 
+#include <string_view>
+
 namespace gecko::platform {
 
 // No-op input service used when nothing else is published. Returns
@@ -65,6 +67,10 @@ public:
     return {};
   }
   [[nodiscard]] WindowHandle HoveredWindow() const noexcept override
+  {
+    return {};
+  }
+  [[nodiscard]] ::std::string_view GetTypedText() const noexcept override
   {
     return {};
   }

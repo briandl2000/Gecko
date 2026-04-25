@@ -4,6 +4,8 @@
 #include "gecko/platform/input.h"
 
 #include <array>
+#include <string>
+#include <string_view>
 
 namespace gecko::platform {
 
@@ -54,10 +56,14 @@ public:
   [[nodiscard]] WindowHandle FocusedWindow() const noexcept override;
   [[nodiscard]] WindowHandle HoveredWindow() const noexcept override;
 
+  [[nodiscard]] ::std::string_view GetTypedText() const noexcept override;
+
 private:
   // Event handlers (registered as static C-style callbacks).
   static void OnKey(void* user, const ::gecko::EventMeta& meta,
                     ::gecko::EventView view) noexcept;
+  static void OnChar(void* user, const ::gecko::EventMeta& meta,
+                     ::gecko::EventView view) noexcept;
   static void OnMouseMove(void* user, const ::gecko::EventMeta& meta,
                           ::gecko::EventView view) noexcept;
   static void OnMouseButton(void* user, const ::gecko::EventMeta& meta,
@@ -88,8 +94,12 @@ private:
   WindowHandle m_LastMouseWindow {};
   MousePosition m_LastMouseWindowPos {};
 
+  // Per-frame UTF-8 typed text. Cleared on NewFrame().
+  ::std::string m_TypedText {};
+
   // ── Subscriptions ────────────────────────────────────────────
   ::gecko::EventSubscription m_KeySub;
+  ::gecko::EventSubscription m_CharSub;
   ::gecko::EventSubscription m_MouseMoveSub;
   ::gecko::EventSubscription m_MouseButtonSub;
   ::gecko::EventSubscription m_MouseWheelSub;

@@ -25,6 +25,7 @@ namespace {
 WindowEventInput::WindowEventInput() noexcept
 {
   m_KeySub = ::gecko::SubscribeEvent(events::WindowKey, &OnKey, this);
+  m_CharSub = ::gecko::SubscribeEvent(events::WindowChar, &OnChar, this);
   m_MouseMoveSub =
       ::gecko::SubscribeEvent(events::WindowMouseMove, &OnMouseMove, this);
   m_MouseButtonSub =
@@ -48,6 +49,7 @@ void WindowEventInput::NewFrame() noexcept
   m_MousePosPrev = m_MousePos;
   m_ScrollX = 0.0f;
   m_ScrollY = 0.0f;
+  m_TypedText.clear();
 }
 
 bool WindowEventInput::IsKeyDown(KeyCode key) const noexcept
@@ -123,6 +125,11 @@ WindowHandle WindowEventInput::HoveredWindow() const noexcept
   return m_HoveredWindow;
 }
 
+::std::string_view WindowEventInput::GetTypedText() const noexcept
+{
+  return m_TypedText;
+}
+
 // ── Event handlers ──────────────────────────────────────────────
 
 void WindowEventInput::OnKey(void* user, const ::gecko::EventMeta&,
@@ -132,6 +139,43 @@ void WindowEventInput::OnKey(void* user, const ::gecko::EventMeta&,
   const auto* p =
       reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
   self->m_KeyDown[KeyIndex(p->Key)] = (p->Down != 0);
+}
+
+void WindowEventInput::OnChar(void* user, const ::gecko::EventMeta&,
+                              ::gecko::EventView view) noexcept
+{
+  auto* self = static_cast<WindowEventInput*>(user);
+  const auto* p =
+      reinterpret_cast<const events::WindowCharPayload*>(view.Data());
+  const ::gecko::u32 cp = p->Codepoint;
+
+  // Encode the codepoint as UTF-8 and append to the per-frame buffer.
+  char buf[4];
+  if (cp < 0x80)
+  {
+    self->m_TypedText.push_back(static_cast<char>(cp));
+  }
+  else if (cp < 0x800)
+  {
+    buf[0] = static_cast<char>(0xC0 | (cp >> 6));
+    buf[1] = static_cast<char>(0x80 | (cp & 0x3F));
+    self->m_TypedText.append(buf, 2);
+  }
+  else if (cp < 0x10000)
+  {
+    buf[0] = static_cast<char>(0xE0 | (cp >> 12));
+    buf[1] = static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    buf[2] = static_cast<char>(0x80 | (cp & 0x3F));
+    self->m_TypedText.append(buf, 3);
+  }
+  else if (cp < 0x110000)
+  {
+    buf[0] = static_cast<char>(0xF0 | (cp >> 18));
+    buf[1] = static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+    buf[2] = static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    buf[3] = static_cast<char>(0x80 | (cp & 0x3F));
+    self->m_TypedText.append(buf, 4);
+  }
 }
 
 void WindowEventInput::OnMouseMove(void* user, const ::gecko::EventMeta&,

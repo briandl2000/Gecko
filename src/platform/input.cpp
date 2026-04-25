@@ -88,4 +88,11 @@ WindowHandle HoveredWindow() noexcept
   return {};
 }
 
+::std::string_view GetTypedText() noexcept
+{
+  if (auto* in = SafeInput())
+    return in->GetTypedText();
+  return {};
+}
+
 }  // namespace gecko::platform

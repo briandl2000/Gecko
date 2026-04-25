@@ -377,3 +377,78 @@ TEST_CASE("MockInput: usable as IInput via base pointer",
   m.ReleaseKey(KeyCode::Space);
   REQUIRE(in->WasKeyReleased(KeyCode::Space));
 }
+
+// ── Text input ───────────────────────────────────────────────────────
+
+namespace {
+void EmitChar(WindowHandle w, ::gecko::u32 codepoint) noexcept
+{
+  auto emitter =
+      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowCharPayload payload {
+      .Window = w, .TimeNs = 0, .Codepoint = codepoint};
+  ::gecko::SendEvent(emitter, events::WindowChar, payload);
+  (void)::gecko::DispatchEvents();
+}
+}  // namespace
+
+TEST_CASE("Input: GetTypedText collects ASCII WindowChar events",
+          "[platform][input][text]")
+{
+  InputTestScope scope;
+  auto* in = GetInput();
+
+  WindowHandle w {1};
+  EmitChar(w, 'H');
+  EmitChar(w, 'i');
+  REQUIRE(in->GetTypedText() == "Hi");
+
+  in->NewFrame();
+  REQUIRE(in->GetTypedText().empty());
+}
+
+TEST_CASE("Input: GetTypedText encodes non-ASCII codepoints as UTF-8",
+          "[platform][input][text]")
+{
+  InputTestScope scope;
+  auto* in = GetInput();
+
+  WindowHandle w {1};
+  // U+00E9 LATIN SMALL LETTER E WITH ACUTE  → C3 A9
+  EmitChar(w, 0x00E9u);
+  // U+20AC EURO SIGN                        → E2 82 AC
+  EmitChar(w, 0x20ACu);
+  // U+1F600 GRINNING FACE                   → F0 9F 98 80
+  EmitChar(w, 0x1F600u);
+
+  const auto t = in->GetTypedText();
+  REQUIRE(t == "\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80");
+}
+
+TEST_CASE("Input: GetTypedText free function forwards to service",
+          "[platform][input][text]")
+{
+  InputTestScope scope;
+  WindowHandle w {1};
+  EmitChar(w, 'A');
+  EmitChar(w, 'B');
+  REQUIRE(GetTypedText() == "AB");
+}
+
+TEST_CASE("MockInput: TypeText / TypeChar build a UTF-8 buffer",
+          "[platform][input][mock][text]")
+{
+  MockInput m;
+  REQUIRE(m.GetTypedText().empty());
+
+  m.TypeText("hi ");
+  m.TypeChar('!');
+  m.TypeChar(0x00E9u);   // é
+  m.TypeChar(0x20ACu);   // €
+  m.TypeChar(0x1F600u);  // 😀
+
+  REQUIRE(m.GetTypedText() == "hi !\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80");
+
+  m.EndFrame();
+  REQUIRE(m.GetTypedText().empty());
+}

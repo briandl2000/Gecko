@@ -868,13 +868,42 @@ void Win32WindowsBackend::PumpEvents(
   case WM_CHAR: {
     if (!entry)
       break;
-    // Skip control characters
-    if (wParam < 32 && wParam != '\t' && wParam != '\n' && wParam != '\r')
+    const ::gecko::u32 unit = static_cast<::gecko::u32>(wParam);
+
+    // Combine UTF-16 surrogate pairs into a single codepoint.
+    ::gecko::u32 codepoint = 0;
+    if (unit >= 0xD800 && unit <= 0xDBFF)
+    {
+      // High surrogate — wait for the low surrogate in the next WM_CHAR.
+      entry->PendingHighSurrogate = static_cast<::gecko::u16>(unit);
+      break;
+    }
+    if (unit >= 0xDC00 && unit <= 0xDFFF)
+    {
+      // Low surrogate — combine with stored high surrogate.
+      if (entry->PendingHighSurrogate == 0)
+        break;  // unpaired, drop
+      codepoint = 0x10000 +
+                  ((::gecko::u32(entry->PendingHighSurrogate) - 0xD800) << 10) +
+                  (unit - 0xDC00);
+      entry->PendingHighSurrogate = 0;
+    }
+    else
+    {
+      entry->PendingHighSurrogate = 0;
+      codepoint = unit;
+    }
+
+    // Skip control characters except tab/CR/LF.
+    if (codepoint < 32 && codepoint != '\t' && codepoint != '\n' &&
+        codepoint != '\r')
+      break;
+    if (codepoint == 127)
       break;
 
     StagedEvent ev;
     ev.Code = events::WindowChar;
-    ev.Data.Char = {wh, NowNsSafe(), static_cast<u32>(wParam)};
+    ev.Data.Char = {wh, NowNsSafe(), codepoint};
     ev.PayloadSize = static_cast<u32>(sizeof(events::WindowCharPayload));
     self->m_Staged.push_back(ev);
     break;

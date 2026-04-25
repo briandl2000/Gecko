@@ -5,6 +5,8 @@
 #include "gecko/platform/input_codes.h"
 #include "gecko/platform/window.h"
 
+#include <string_view>
+
 namespace gecko::platform {
 
 // Window-relative mouse coordinates (origin top-left), in pixels.
@@ -73,6 +75,16 @@ public:
   // them or has not entered any since startup.
   [[nodiscard]] GECKO_API virtual WindowHandle HoveredWindow()
       const noexcept = 0;
+
+  // ── Text input ────────────────────────────────────────────────
+  // UTF-8 text typed since the last NewFrame(). Cleared on NewFrame.
+  // Reflects modifier + IME-resolved characters (so Shift+a → "A",
+  // AltGr → "€", etc.). Suitable for driving UI text fields.
+  //
+  // The returned view is valid until the next IInput call; copy it
+  // if you need to keep it across frames.
+  [[nodiscard]] GECKO_API virtual ::std::string_view GetTypedText()
+      const noexcept = 0;
 };
 
 // Service accessor — available between PlatformModule::Startup and
@@ -99,5 +111,7 @@ public:
 
 [[nodiscard]] GECKO_API WindowHandle FocusedWindow() noexcept;
 [[nodiscard]] GECKO_API WindowHandle HoveredWindow() noexcept;
+
+[[nodiscard]] GECKO_API ::std::string_view GetTypedText() noexcept;
 
 }  // namespace gecko::platform
