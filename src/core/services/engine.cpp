@@ -1,5 +1,6 @@
 #include "gecko/core/engine.h"
 
+#include "gecko/core/assert.h"
 #include "gecko/core/services.h"
 #include "private/module_registry.h"
 
@@ -94,6 +95,9 @@ Engine& Engine::operator=(Engine&& other) noexcept
 
 IModuleRegistry& Engine::Modules() noexcept
 {
+  // Precondition: not moved-from. Calling Modules() on a moved-from
+  // Engine is a contract violation.
+  GECKO_ASSERT(m_registry != nullptr);
   return *m_registry;
 }
 

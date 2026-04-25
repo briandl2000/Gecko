@@ -56,6 +56,9 @@ public:
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
 
+  // Returns the live module registry. Precondition: this Engine has not
+  // been moved from. Calling Modules() on a moved-from instance is a
+  // contract violation and triggers an assertion.
   [[nodiscard]] GECKO_API IModuleRegistry& Modules() noexcept;
 
 private:
