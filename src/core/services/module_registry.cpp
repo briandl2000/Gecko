@@ -64,6 +64,7 @@ struct ModuleRegistry::Impl
       return false;
     }
     rec.Started = true;
+    StartupOrder.push_back(rec.Root.Id);
     return true;
   }
 
@@ -76,6 +77,17 @@ struct ModuleRegistry::Impl
     GECKO_ASSERT(rec.Module != nullptr);
     rec.Module->Shutdown(self);
     rec.Started = false;
+    // Drop from StartupOrder so any later batch can re-walk a clean
+    // record. Linear scan is fine: this list is short and shutdown is
+    // not on a hot path.
+    for (auto it = StartupOrder.begin(); it != StartupOrder.end(); ++it)
+    {
+      if (*it == rec.Root.Id)
+      {
+        StartupOrder.erase(it);
+        break;
+      }
+    }
   }
 
   [[nodiscard]] void* FindServiceImpl(::gecko::ServiceId id) const noexcept
@@ -93,6 +105,12 @@ struct ModuleRegistry::Impl
   bool Booted {false};
   std::unordered_map<u64, ModuleRecord> Modules;
   std::vector<u64> RegistrationOrder;
+  // Order in which modules actually completed Startup successfully.
+  // Shutdown iterates this in reverse, so dependents are torn down
+  // before the modules they depend on. This may differ from
+  // RegistrationOrder when StartupAllModules() topologically reorders
+  // a batch.
+  std::vector<u64> StartupOrder;
   std::vector<ServiceEntry> Services;
 };
 
@@ -498,18 +516,22 @@ void ModuleRegistry::ShutdownAllModules() noexcept
   GECKO_INFO(::gecko::core::labels::Modules, "ShutdownAllModules (booted=%s)",
              m_impl->Booted ? "true" : "false");
 
-  for (auto rit = m_impl->RegistrationOrder.rbegin();
-       rit != m_impl->RegistrationOrder.rend(); ++rit)
+  // Shutdown in REVERSE order of successful Startup completion. This is
+  // the inverse of the topological order computed by StartupAllModules
+  // (or the registration order for late-auto-started modules), so a
+  // module is always torn down before any module it transitively
+  // depended on. ShutdownModule erases from StartupOrder, so we copy
+  // the ids out first to avoid iterator invalidation.
+  std::vector<u64> shutdownOrder(m_impl->StartupOrder.rbegin(),
+                                 m_impl->StartupOrder.rend());
+  for (u64 id : shutdownOrder)
   {
-    auto it = m_impl->Modules.find(*rit);
-    if (it != m_impl->Modules.end())
+    auto it = m_impl->Modules.find(id);
+    if (it != m_impl->Modules.end() && it->second.Started)
     {
-      if (it->second.Started)
-      {
-        GECKO_INFO(::gecko::core::labels::Modules, "Shutdown: %s",
-                   it->second.Root.Name ? it->second.Root.Name : "(unnamed)");
-        m_impl->ShutdownModule(*this, it->second);
-      }
+      GECKO_INFO(::gecko::core::labels::Modules, "Shutdown: %s",
+                 it->second.Root.Name ? it->second.Root.Name : "(unnamed)");
+      m_impl->ShutdownModule(*this, it->second);
     }
   }
 
