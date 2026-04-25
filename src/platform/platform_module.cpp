@@ -18,14 +18,14 @@ namespace gecko::platform {
 
 namespace {
 
-constexpr ::gecko::ServiceId kRequired[] = {
+constexpr ::gecko::ServiceId RequiredServices[] = {
     ::gecko::ServiceIdOf<::gecko::ILogger>(),
     ::gecko::ServiceIdOf<::gecko::IProfiler>(),
     ::gecko::ServiceIdOf<::gecko::IJobSystem>(),
     ::gecko::ServiceIdOf<::gecko::IEventBus>(),
 };
 
-constexpr ::gecko::ServiceId kPublishes[] = {
+constexpr ::gecko::ServiceId PublishedServices[] = {
     ::gecko::ServiceIdOf<IWindowsBackend>(),
     ::gecko::ServiceIdOf<IMonitorsBackend>(),
     ::gecko::ServiceIdOf<IInput>(),
@@ -49,12 +49,12 @@ PlatformModule::~PlatformModule() noexcept = default;
 
 ::std::span<const ::gecko::ServiceId> PlatformModule::Requires() const noexcept
 {
-  return ::std::span<const ::gecko::ServiceId> {kRequired};
+  return ::std::span<const ::gecko::ServiceId> {RequiredServices};
 }
 
 ::std::span<const ::gecko::ServiceId> PlatformModule::Publishes() const noexcept
 {
-  return ::std::span<const ::gecko::ServiceId> {kPublishes};
+  return ::std::span<const ::gecko::ServiceId> {PublishedServices};
 }
 
 bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept

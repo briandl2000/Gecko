@@ -175,10 +175,10 @@ bool Exists(PathView path) noexcept
   ULARGE_INTEGER ft {};
   ft.LowPart = data.ftLastWriteTime.dwLowDateTime;
   ft.HighPart = data.ftLastWriteTime.dwHighDateTime;
-  constexpr ::gecko::u64 kFiletimeUnixDelta = 116444736000000000ULL;
-  if (ft.QuadPart >= kFiletimeUnixDelta)
+  constexpr ::gecko::u64 FiletimeUnixDelta = 116444736000000000ULL;
+  if (ft.QuadPart >= FiletimeUnixDelta)
     fs.MTimeEpoch = static_cast<::gecko::i64>(
-        (ft.QuadPart - kFiletimeUnixDelta) / 10000000ULL);
+        (ft.QuadPart - FiletimeUnixDelta) / 10000000ULL);
   fs.IsDirectory = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
   return fs;
 }

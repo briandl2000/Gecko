@@ -132,8 +132,8 @@ private:
   void ApplyDecorations(::HWND hwnd, bool decorated, bool resizable) noexcept;
   ::DWORD MakeStyle(const WindowDesc& desc) const noexcept;
 
-  static constexpr UINT_PTR kModalTimerId {1};
-  static constexpr ::UINT kModalTimerIntervalMs {16};
+  static constexpr UINT_PTR ModalTimerId {1};
+  static constexpr ::UINT ModalTimerIntervalMs {16};
 
   u64 m_NextId {0};
   ::ATOM m_WndClass {0};

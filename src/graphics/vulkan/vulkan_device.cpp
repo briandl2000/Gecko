@@ -979,15 +979,15 @@ void VulkanDevice::ExecuteGraphicsCommandList(
   VkCommandBuffer cmdBuf = cl->CommandBuffer();
 
   // Gather wait/signal semaphores from touched swapchains
-  constexpr u32 kMax = MaxSwapchainsPerSubmit;
-  VkSemaphore waitSems[kMax] {};
-  VkSemaphore sigSems[kMax] {};
-  VkPipelineStageFlags waitStages[kMax] {};
+  constexpr u32 MaxSems = MaxSwapchainsPerSubmit;
+  VkSemaphore waitSems[MaxSems] {};
+  VkSemaphore sigSems[MaxSems] {};
+  VkPipelineStageFlags waitStages[MaxSems] {};
   u32 waitCount = 0;
   u32 sigCount = 0;
 
   auto touched = cl->TouchedSwapchains();
-  for (u32 i = 0; i < touched.Count && i < kMax; ++i)
+  for (u32 i = 0; i < touched.Count && i < MaxSems; ++i)
   {
     auto* data = touched.Data[i].Data;
     const u32 frameIdx = touched.Data[i].FrameIndex;

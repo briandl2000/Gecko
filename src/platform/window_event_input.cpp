@@ -11,13 +11,13 @@ namespace {
 [[nodiscard]] inline ::gecko::usize ButtonIndex(MouseButton b) noexcept
 {
   const auto v = static_cast<::gecko::usize>(b);
-  return v < WindowEventInput::kMouseButtonCount ? v : 0;
+  return v < WindowEventInput::MouseButtonCount ? v : 0;
 }
 
 [[nodiscard]] inline ::gecko::usize KeyIndex(KeyCode k) noexcept
 {
   const auto v = static_cast<::gecko::usize>(k);
-  return v < WindowEventInput::kKeyCount ? v : 0;
+  return v < WindowEventInput::KeyCount ? v : 0;
 }
 
 }  // namespace

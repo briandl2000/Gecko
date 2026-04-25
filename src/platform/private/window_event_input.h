@@ -21,9 +21,9 @@ class WindowEventInput final : public IInput
 {
 public:
   // Number of distinct KeyCode values we track (0x00-0xFF).
-  static constexpr ::gecko::usize kKeyCount = 256;
+  static constexpr ::gecko::usize KeyCount = 256;
   // Number of distinct MouseButton values (Left/Right/Middle/X1/X2).
-  static constexpr ::gecko::usize kMouseButtonCount = 5;
+  static constexpr ::gecko::usize MouseButtonCount = 5;
 
   WindowEventInput() noexcept;
   ~WindowEventInput() noexcept override;
@@ -67,11 +67,11 @@ private:
                              ::gecko::EventView view) noexcept;
 
   // ── State ────────────────────────────────────────────────────
-  ::std::array<bool, kKeyCount> m_KeyDown {};
-  ::std::array<bool, kKeyCount> m_KeyDownPrev {};
+  ::std::array<bool, KeyCount> m_KeyDown {};
+  ::std::array<bool, KeyCount> m_KeyDownPrev {};
 
-  ::std::array<bool, kMouseButtonCount> m_MouseDown {};
-  ::std::array<bool, kMouseButtonCount> m_MouseDownPrev {};
+  ::std::array<bool, MouseButtonCount> m_MouseDown {};
+  ::std::array<bool, MouseButtonCount> m_MouseDownPrev {};
 
   MousePosition m_MousePos {};      // current, focused-window-relative
   MousePosition m_MousePosPrev {};  // previous frame

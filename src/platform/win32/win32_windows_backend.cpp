@@ -111,7 +111,7 @@ MouseButton WmButtonToMouseButton(::UINT msg) noexcept
   }
 }
 
-constexpr wchar_t kWndClassName[] = L"GeckoWindowClass";
+constexpr wchar_t WndClassName[] = L"GeckoWindowClass";
 
 }  // namespace
 
@@ -132,7 +132,7 @@ Win32WindowsBackend::Win32WindowsBackend() noexcept
   wc.lpfnWndProc = WndProc;
   wc.hInstance = ::GetModuleHandleW(nullptr);
   wc.hCursor = ::LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
-  wc.lpszClassName = kWndClassName;
+  wc.lpszClassName = WndClassName;
   m_WndClass = ::RegisterClassExW(&wc);
 
   GECKO_INFO(labels::General, "Win32WindowsBackend: initialized");
@@ -148,7 +148,7 @@ Win32WindowsBackend::~Win32WindowsBackend() noexcept
   m_Windows.clear();
 
   if (m_WndClass)
-    ::UnregisterClassW(kWndClassName, ::GetModuleHandleW(nullptr));
+    ::UnregisterClassW(WndClassName, ::GetModuleHandleW(nullptr));
 
   if (s_Instance == this)
     s_Instance = nullptr;
@@ -235,7 +235,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), titleLen);
 
   ::HWND hwnd =
-      ::CreateWindowExW(exStyle, kWndClassName, wTitle.data(), style,
+      ::CreateWindowExW(exStyle, WndClassName, wTitle.data(), style,
                         CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,
                         nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
 
@@ -1011,17 +1011,17 @@ void Win32WindowsBackend::PumpEvents(
     // Windows enters a modal loop during drag/resize that blocks our
     // PumpEvents.  Start a fast timer so we can keep flushing staged
     // events (resize, move, etc.) while the modal loop is running.
-    ::SetTimer(hwnd, kModalTimerId, kModalTimerIntervalMs, nullptr);
+    ::SetTimer(hwnd, ModalTimerId, ModalTimerIntervalMs, nullptr);
     break;
   }
 
   case WM_EXITSIZEMOVE: {
-    ::KillTimer(hwnd, kModalTimerId);
+    ::KillTimer(hwnd, ModalTimerId);
     break;
   }
 
   case WM_TIMER: {
-    if (wParam == kModalTimerId)
+    if (wParam == ModalTimerId)
     {
       self->FlushStagedEvents();
       if (self->m_ModalFrameCallback)

@@ -119,12 +119,12 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
   u64 sequence = entry.Sequence.load(std::memory_order_acquire);
 
   // Bounded retry to prevent infinite loop with single-threaded job systems
-  constexpr int kMaxRetries = 1000;
+  constexpr int MaxRetries = 1000;
   int retries = 0;
 
   while (static_cast<i64>(sequence) - static_cast<i64>(position) != 0)
   {
-    if (++retries > kMaxRetries)
+    if (++retries > MaxRetries)
     {
       // Ring is full and we can't make progress - fallback to direct write
       // The slot we claimed is "lost" but we don't hang
