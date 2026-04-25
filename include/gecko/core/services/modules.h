@@ -37,7 +37,8 @@ enum class ModuleResult : u8
   InvalidArgument,
   DuplicateModule,
   NotFound,
-  StartupFailed
+  StartupFailed,
+  OutOfMemory
 };
 
 struct IModule

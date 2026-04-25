@@ -120,9 +120,12 @@ bool ModuleRegistry::Init() noexcept
       return false;
     }
   }
-  // Service init corresponds to "engine booted": newly registered modules
-  // should be started immediately.
-  m_impl->Booted = true;
+  // Init() prepares storage but does NOT mark the registry as booted.
+  // StartupAllModules() is responsible for setting Booted=true after it
+  // has computed the topological start order. This lets Engine::Create
+  // register every module first and then start them in dependency order.
+  // Modules registered AFTER StartupAllModules() will auto-start because
+  // Booted will be true at that point.
   return true;
 }
 
@@ -149,7 +152,12 @@ void ModuleRegistry::Shutdown() noexcept
 
   if (!m_impl)
   {
-    m_impl.reset(new Impl());
+    m_impl.reset(new (::std::nothrow) Impl());
+    if (!m_impl)
+    {
+      return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
+                                          ::gecko::ModuleResult::OutOfMemory};
+    }
   }
 
   const ::gecko::Label root = module.RootLabel();
@@ -296,7 +304,11 @@ bool ModuleRegistry::StartupAllModules() noexcept
 {
   if (!m_impl)
   {
-    m_impl.reset(new Impl());
+    m_impl.reset(new (::std::nothrow) Impl());
+    if (!m_impl)
+    {
+      return false;
+    }
   }
   m_impl->Booted = true;
 
@@ -351,13 +363,14 @@ bool ModuleRegistry::StartupAllModules() noexcept
       {
         GECKO_ERROR(::gecko::core::labels::Modules,
                     "Duplicate service publisher: '%s' and '%s' both publish "
-                    "the same service id",
+                    "service id 0x%016llx",
                     nodes[existing].Module->RootLabel().Name
                         ? nodes[existing].Module->RootLabel().Name
                         : "(unnamed)",
                     nodes[i].Module->RootLabel().Name
                         ? nodes[i].Module->RootLabel().Name
-                        : "(unnamed)");
+                        : "(unnamed)",
+                    static_cast<unsigned long long>(pid.Value));
         return false;
       }
       publishers.push_back(PublisherEntry {pid.Value, i});
@@ -386,10 +399,12 @@ bool ModuleRegistry::StartupAllModules() noexcept
       if (producer < 0)
       {
         GECKO_ERROR(::gecko::core::labels::Modules,
-                    "Module '%s' requires a service that no module publishes",
+                    "Module '%s' requires service id 0x%016llx but no "
+                    "registered module publishes it",
                     nodes[i].Module->RootLabel().Name
                         ? nodes[i].Module->RootLabel().Name
-                        : "(unnamed)");
+                        : "(unnamed)",
+                    static_cast<unsigned long long>(rid.Value));
         return false;
       }
       if (producer == i)
@@ -510,7 +525,11 @@ bool ModuleRegistry::PublishServiceImpl(::gecko::ServiceId id,
   }
   if (!m_impl)
   {
-    m_impl.reset(new Impl());
+    m_impl.reset(new (::std::nothrow) Impl());
+    if (!m_impl)
+    {
+      return false;
+    }
   }
   if (m_impl->FindServiceImpl(id) != nullptr)
   {
