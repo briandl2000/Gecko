@@ -1,8 +1,10 @@
 #pragma once
 
+#include "gecko/core/ptr.h"
 #include "gecko/core/types.h"
 #include "gecko/platform/platform_io.h"
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -112,6 +114,19 @@ public:
     return true;
   }
 
+  ::gecko::Unique<::gecko::platform::IFileWriter> OpenWrite(
+      ::gecko::platform::PathView path,
+      ::gecko::platform::WriteMode mode) noexcept override
+  {
+    auto key = ::std::string {path.View()};
+    if (mode == ::gecko::platform::WriteMode::Truncate)
+      m_Files[key].clear();
+    else
+      (void)m_Files[key];  // ensure entry exists for append
+    EnsureParents(path);
+    return ::gecko::CreateUnique<TestFileWriter>(&m_Files[key]);
+  }
+
   bool CreateDir(::gecko::platform::PathView path,
                  bool recursive) noexcept override
   {
@@ -181,6 +196,53 @@ public:
   }
 
 private:
+  class TestFileWriter final : public ::gecko::platform::IFileWriter
+  {
+  public:
+    explicit TestFileWriter(::std::vector<::std::byte>* slot) noexcept
+        : m_Slot(slot)
+    {}
+
+    bool Write(::std::span<const ::std::byte> data) noexcept override
+    {
+      if (!m_Slot)
+        return false;
+      auto pos = static_cast<::std::size_t>(m_Pos);
+      if (pos + data.size() > m_Slot->size())
+        m_Slot->resize(pos + data.size());
+      ::std::copy(data.begin(), data.end(), m_Slot->begin() + pos);
+      m_Pos += data.size();
+      return true;
+    }
+
+    bool Flush() noexcept override
+    {
+      return m_Slot != nullptr;
+    }
+
+    ::gecko::u64 Seek(::gecko::i64 offset, bool fromEnd) noexcept override
+    {
+      if (!m_Slot)
+        return static_cast<::gecko::u64>(-1);
+      ::gecko::i64 base =
+          fromEnd ? static_cast<::gecko::i64>(m_Slot->size()) : 0;
+      ::gecko::i64 absolute = base + offset;
+      if (absolute < 0)
+        return static_cast<::gecko::u64>(-1);
+      m_Pos = static_cast<::gecko::u64>(absolute);
+      return m_Pos;
+    }
+
+    ::gecko::u64 Tell() noexcept override
+    {
+      return m_Pos;
+    }
+
+  private:
+    ::std::vector<::std::byte>* m_Slot {nullptr};
+    ::gecko::u64 m_Pos {0};
+  };
+
   void EnsureParents(::gecko::platform::PathView path) noexcept
   {
     auto sv = path.View();

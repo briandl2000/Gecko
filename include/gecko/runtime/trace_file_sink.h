@@ -1,8 +1,9 @@
 #pragma once
 
+#include "gecko/core/ptr.h"
 #include "gecko/core/services/profiler.h"
+#include "gecko/platform/platform_io.h"
 
-#include <cstdio>
 #include <mutex>
 #include <vector>
 
@@ -16,7 +17,7 @@ public:
 
   bool IsOpen() const noexcept
   {
-    return m_File != nullptr;
+    return m_Writer != nullptr;
   }
 
   virtual void Write(const ProfEvent& event) noexcept override;
@@ -25,11 +26,11 @@ public:
   virtual void Flush() noexcept override;
 
 private:
-  std::FILE* m_File {nullptr};
+  ::gecko::Unique<::gecko::platform::IFileWriter> m_Writer {};
   bool m_First {true};
   u64 m_Time0Ns {0};
   std::vector<ProfEvent> m_BufferedEvents {};
-  std::mutex m_Mutex {};  // Thread safety for multi-threaded access
+  std::mutex m_Mutex {};
 
   void WriteJsonEvent(const ProfEvent& event) noexcept;
   void FlushBufferedEvents() noexcept;

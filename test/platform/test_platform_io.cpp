@@ -241,3 +241,79 @@ TEST_CASE("TestPlatformIO basic round-trip", "[platform][io][fake]")
   REQUIRE(io.Remove("/x/file.txt"));
   REQUIRE_FALSE(io.Exists("/x/file.txt"));
 }
+
+// ── Streaming writer tests ─────────────────────────────────────────────
+
+TEST_CASE("OpenWrite streaming on real fs", "[platform][io][stream]")
+{
+  PlatformScope scope;
+  auto* io = ::gecko::platform::GetPlatformIO();
+
+  ::std::string root = io->WorkingDir() + "/.test_io_stream";
+  REQUIRE(io->CreateDir(root, /*recursive=*/true));
+  ::std::string path = root + "/streamed.txt";
+
+  // Truncate write
+  {
+    auto w = io->OpenWrite(path, ::gecko::platform::WriteMode::Truncate);
+    REQUIRE(w);
+    REQUIRE(w->WriteString("alpha"));
+    REQUIRE(w->WriteString("\n"));
+    REQUIRE(w->Flush());
+  }
+  auto r1 = io->Read(path);
+  REQUIRE(r1.Ok());
+  REQUIRE(r1.Size() == 6);
+
+  // Append
+  {
+    auto w = io->OpenWrite(path, ::gecko::platform::WriteMode::Append);
+    REQUIRE(w);
+    REQUIRE(w->WriteString("beta"));
+  }
+  auto r2 = io->Read(path);
+  REQUIRE(r2.Size() == 10);
+
+  // Seek-back overwrite (as crash-safe sink does)
+  {
+    auto w = io->OpenWrite(path, ::gecko::platform::WriteMode::Append);
+    REQUIRE(w);
+    auto pos = w->Seek(-2, /*fromEnd=*/true);
+    REQUIRE(pos == 8);
+    REQUIRE(w->WriteString("xx"));
+  }
+  auto r3 = io->Read(path);
+  REQUIRE(r3.Size() == 10);
+  // Last two bytes should now be "xx".
+  auto sp = r3.Data();
+  REQUIRE(static_cast<char>(sp[8]) == 'x');
+  REQUIRE(static_cast<char>(sp[9]) == 'x');
+
+  REQUIRE(io->Remove(path));
+  REQUIRE(io->Remove(root));
+}
+
+TEST_CASE("TestPlatformIO streaming writer", "[platform][io][fake]")
+{
+  ::gecko::test::TestPlatformIO io;
+
+  {
+    auto w = io.OpenWrite("/log/a.txt", ::gecko::platform::WriteMode::Truncate);
+    REQUIRE(w);
+    REQUIRE(w->WriteString("hello"));
+    REQUIRE(w->Tell() == 5);
+  }
+  auto r = io.Read("/log/a.txt");
+  REQUIRE(r.Size() == 5);
+
+  {
+    auto w = io.OpenWrite("/log/a.txt", ::gecko::platform::WriteMode::Append);
+    REQUIRE(w);
+    REQUIRE(w->Seek(-1, true) == 4);  // seek before final 'o'
+    REQUIRE(w->WriteString("p!"));
+  }
+  auto r2 = io.Read("/log/a.txt");
+  REQUIRE(r2.Size() == 6);
+  REQUIRE(static_cast<char>(r2.Data()[4]) == 'p');
+  REQUIRE(static_cast<char>(r2.Data()[5]) == '!');
+}

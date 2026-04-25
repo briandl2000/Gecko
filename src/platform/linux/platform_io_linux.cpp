@@ -213,6 +213,9 @@ public:
     return true;
   }
 
+  ::gecko::Unique<IFileWriter> OpenWrite(PathView path,
+                                         WriteMode mode) noexcept override;
+
   bool CreateDir(PathView path, bool recursive) noexcept override
   {
     auto p = ToCString(path);
@@ -352,6 +355,84 @@ public:
     return base;
   }
 };
+
+class LinuxFileWriter final : public IFileWriter
+{
+public:
+  explicit LinuxFileWriter(int fd) noexcept : m_Fd(fd)
+  {}
+
+  ~LinuxFileWriter() noexcept override
+  {
+    if (m_Fd >= 0)
+      ::close(m_Fd);
+  }
+
+  bool Write(::std::span<const ::std::byte> data) noexcept override
+  {
+    if (m_Fd < 0)
+      return false;
+    ::std::size_t total = 0;
+    while (total < data.size())
+    {
+      ssize_t n = ::write(m_Fd, data.data() + total, data.size() - total);
+      if (n < 0)
+      {
+        if (errno == EINTR)
+          continue;
+        return false;
+      }
+      total += static_cast<::std::size_t>(n);
+    }
+    return true;
+  }
+
+  bool Flush() noexcept override
+  {
+    // write() is unbuffered at the libc layer for raw fds; nothing to
+    // do beyond what the OS already has. Return ok if the fd is live.
+    return m_Fd >= 0;
+  }
+
+  ::gecko::u64 Seek(::gecko::i64 offset, bool fromEnd) noexcept override
+  {
+    if (m_Fd < 0)
+      return static_cast<::gecko::u64>(-1);
+    off_t r = ::lseek(m_Fd, static_cast<off_t>(offset),
+                      fromEnd ? SEEK_END : SEEK_SET);
+    if (r < 0)
+      return static_cast<::gecko::u64>(-1);
+    return static_cast<::gecko::u64>(r);
+  }
+
+  ::gecko::u64 Tell() noexcept override
+  {
+    if (m_Fd < 0)
+      return static_cast<::gecko::u64>(-1);
+    off_t r = ::lseek(m_Fd, 0, SEEK_CUR);
+    if (r < 0)
+      return static_cast<::gecko::u64>(-1);
+    return static_cast<::gecko::u64>(r);
+  }
+
+private:
+  int m_Fd {-1};
+};
+
+::gecko::Unique<IFileWriter> LinuxPlatformIO::OpenWrite(PathView path,
+                                                        WriteMode mode) noexcept
+{
+  auto p = ToCString(path);
+  int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+  if (mode == WriteMode::Truncate)
+    flags |= O_TRUNC;
+  int fd = ::open(p.c_str(), flags, 0644);
+  if (fd < 0)
+    return {};
+  if (mode == WriteMode::Append)
+    ::lseek(fd, 0, SEEK_END);
+  return ::gecko::CreateUnique<LinuxFileWriter>(fd);
+}
 
 }  // namespace
 

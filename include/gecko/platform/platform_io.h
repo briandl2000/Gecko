@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/api.h"
+#include "gecko/core/ptr.h"
 #include "gecko/core/types.h"
 #include "gecko/platform/path_view.h"
 
@@ -117,6 +118,36 @@ struct WriteResult
   }
 };
 
+// Streaming write handle. Returned from IPlatformIO::OpenWrite and
+// owned by the caller via ::gecko::Unique. Destroying the handle
+// closes the underlying file. All methods are noexcept; on error
+// they return false / 0 and leave the handle usable for further
+// attempts.
+struct IFileWriter
+{
+  GECKO_API virtual ~IFileWriter() = default;
+
+  // Writes the full span. Returns true on success, false on partial
+  // write or error.
+  GECKO_API virtual bool Write(
+      ::std::span<const ::std::byte> data) noexcept = 0;
+
+  // Convenience overload for text payloads.
+  GECKO_API bool WriteString(::std::string_view text) noexcept;
+
+  // Flushes any buffered bytes to the OS. Does not fsync.
+  GECKO_API virtual bool Flush() noexcept = 0;
+
+  // Absolute seek from the start of the file. Negative offset means
+  // "from end" (offset of -2 = two bytes before EOF). Returns the
+  // resulting absolute position, or u64(-1) on failure.
+  GECKO_API virtual ::gecko::u64 Seek(::gecko::i64 offset,
+                                      bool fromEnd) noexcept = 0;
+
+  // Current absolute position, or u64(-1) on failure.
+  [[nodiscard]] GECKO_API virtual ::gecko::u64 Tell() noexcept = 0;
+};
+
 // One result of a directory iteration. Name is the basename only (no
 // path separator); the caller may join with the directory path if it
 // needs the full path.
@@ -195,6 +226,14 @@ struct IPlatformIO
   [[nodiscard]] GECKO_API virtual bool AtomicWrite(
       PathView path, ::std::span<const ::std::byte> data) noexcept = 0;
 
+  // Opens path for streaming writes. Parent directory must already
+  // exist (callers can ensure via CreateDir(..., true)). Returns null
+  // on failure. Append mode positions the cursor at end-of-file but
+  // does NOT enable POSIX O_APPEND atomic-append semantics; subsequent
+  // Seek + Write calls may overwrite anywhere in the file.
+  [[nodiscard]] GECKO_API virtual ::gecko::Unique<IFileWriter> OpenWrite(
+      PathView path, WriteMode mode) noexcept = 0;
+
   // Filesystem --------------------------------------------------------
   GECKO_API virtual bool CreateDir(PathView path, bool recursive) noexcept = 0;
   GECKO_API virtual bool Remove(PathView path) noexcept = 0;
@@ -243,6 +282,11 @@ struct GECKO_API NullPlatformIO final : IPlatformIO
       ::std::span<const ::std::byte> /*data*/) noexcept override
   {
     return false;
+  }
+  [[nodiscard]] ::gecko::Unique<IFileWriter> OpenWrite(
+      PathView /*path*/, WriteMode /*mode*/) noexcept override
+  {
+    return {};
   }
   bool CreateDir(PathView /*path*/, bool /*recursive*/) noexcept override
   {

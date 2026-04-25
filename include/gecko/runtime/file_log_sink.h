@@ -1,8 +1,8 @@
 #pragma once
 
+#include "gecko/core/ptr.h"
 #include "gecko/core/services/log.h"
-
-#include <cstdio>
+#include "gecko/platform/platform_io.h"
 
 namespace gecko::runtime {
 
@@ -14,7 +14,7 @@ public:
   virtual void Write(const LogMessage& message) noexcept override;
 
 private:
-  std::FILE* m_File {nullptr};
+  ::gecko::Unique<::gecko::platform::IFileWriter> m_Writer {};
 };
 
 }  // namespace gecko::runtime

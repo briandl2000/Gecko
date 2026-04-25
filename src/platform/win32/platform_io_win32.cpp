@@ -291,6 +291,9 @@ public:
     return true;
   }
 
+  ::gecko::Unique<IFileWriter> OpenWrite(PathView path,
+                                         WriteMode mode) noexcept override;
+
   bool CreateDir(PathView path, bool recursive) noexcept override
   {
     auto w = ToWide(path);
@@ -470,6 +473,90 @@ public:
     return base;
   }
 };
+
+class Win32FileWriter final : public IFileWriter
+{
+public:
+  explicit Win32FileWriter(HANDLE h) noexcept : m_Handle(h)
+  {}
+
+  ~Win32FileWriter() noexcept override
+  {
+    if (m_Handle != INVALID_HANDLE_VALUE)
+      ::CloseHandle(m_Handle);
+  }
+
+  bool Write(::std::span<const ::std::byte> data) noexcept override
+  {
+    if (m_Handle == INVALID_HANDLE_VALUE)
+      return false;
+    ::std::size_t total = 0;
+    while (total < data.size())
+    {
+      DWORD chunk = static_cast<DWORD>(
+          ::std::min<::std::size_t>(data.size() - total, 1u << 24));
+      DWORD wrote = 0;
+      if (!::WriteFile(m_Handle, data.data() + total, chunk, &wrote, nullptr))
+        return false;
+      total += wrote;
+    }
+    return true;
+  }
+
+  bool Flush() noexcept override
+  {
+    if (m_Handle == INVALID_HANDLE_VALUE)
+      return false;
+    return ::FlushFileBuffers(m_Handle) != 0;
+  }
+
+  ::gecko::u64 Seek(::gecko::i64 offset, bool fromEnd) noexcept override
+  {
+    if (m_Handle == INVALID_HANDLE_VALUE)
+      return static_cast<::gecko::u64>(-1);
+    LARGE_INTEGER li {};
+    li.QuadPart = offset;
+    LARGE_INTEGER out {};
+    if (!::SetFilePointerEx(m_Handle, li, &out,
+                            fromEnd ? FILE_END : FILE_BEGIN))
+      return static_cast<::gecko::u64>(-1);
+    return static_cast<::gecko::u64>(out.QuadPart);
+  }
+
+  ::gecko::u64 Tell() noexcept override
+  {
+    if (m_Handle == INVALID_HANDLE_VALUE)
+      return static_cast<::gecko::u64>(-1);
+    LARGE_INTEGER zero {};
+    LARGE_INTEGER out {};
+    if (!::SetFilePointerEx(m_Handle, zero, &out, FILE_CURRENT))
+      return static_cast<::gecko::u64>(-1);
+    return static_cast<::gecko::u64>(out.QuadPart);
+  }
+
+private:
+  HANDLE m_Handle {INVALID_HANDLE_VALUE};
+};
+
+::gecko::Unique<IFileWriter> Win32PlatformIO::OpenWrite(PathView path,
+                                                        WriteMode mode) noexcept
+{
+  auto w = ToWide(path);
+  if (w.empty())
+    return {};
+  DWORD disposition = (mode == WriteMode::Append) ? OPEN_ALWAYS : CREATE_ALWAYS;
+  HANDLE h = ::CreateFileW(w.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
+                           disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (h == INVALID_HANDLE_VALUE)
+    return {};
+  if (mode == WriteMode::Append)
+  {
+    LARGE_INTEGER zero {};
+    LARGE_INTEGER out {};
+    ::SetFilePointerEx(h, zero, &out, FILE_END);
+  }
+  return ::gecko::CreateUnique<Win32FileWriter>(h);
+}
 
 }  // namespace
 

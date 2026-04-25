@@ -217,6 +217,14 @@ void DirIter::Close() noexcept
   m_Close = nullptr;
 }
 
+// ── IFileWriter helper ──────────────────────────────────────────────
+
+bool IFileWriter::WriteString(::std::string_view text) noexcept
+{
+  return Write(
+      {reinterpret_cast<const ::std::byte*>(text.data()), text.size()});
+}
+
 // ── Accessor ────────────────────────────────────────────────────────
 
 namespace {
