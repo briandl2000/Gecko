@@ -34,8 +34,6 @@ private:
   void WriteEvent(const ProfEvent& event) noexcept;
   void WriteSeparator() noexcept;
   void EnsureValidJson() noexcept;
-  void WriteJsonEventTo(::gecko::platform::FileWriter* w,
-                        const ProfEvent& event, u64 time0Ns) noexcept;
 };
 
 }  // namespace gecko::runtime

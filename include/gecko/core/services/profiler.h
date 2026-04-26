@@ -125,6 +125,11 @@ GECKO_API u32 ThisThreadId() noexcept;
 GECKO_API void SetThreadProfilerName(const char* name) noexcept;
 GECKO_API const char* GetThreadProfilerName() noexcept;
 
+// Cross-thread lookup: returns the name registered for the given TID by
+// SetThreadProfilerName (any thread), or nullptr. Used by sinks emitting
+// thread_name metadata.
+GECKO_API const char* LookupThreadProfilerName(u32 threadId) noexcept;
+
 struct ProfScope
 {
   Label ScopeLabel {};                  // 16 bytes

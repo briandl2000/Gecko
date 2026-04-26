@@ -2,12 +2,14 @@
 
 #include "gecko/core/assert.h"
 #include "gecko/platform/platform_io.h"
+#include "private/chrome_trace_format.h"
 #include "private/file_writer_format.h"
 
 namespace gecko::runtime {
 
 namespace {
 
+using ::gecko::runtime::detail::WriteChromeTraceEvent;
 using ::gecko::runtime::detail::WriteFmt;
 
 }  // namespace
@@ -72,7 +74,7 @@ void CrashSafeTraceProfilerSink::WriteEvent(const ProfEvent& event) noexcept
   m_Writer->Seek(-2, /*fromEnd=*/true);
 
   WriteSeparator();
-  WriteJsonEventTo(m_Writer.get(), event, m_Time0Ns);
+  WriteChromeTraceEvent(m_Writer.get(), event, m_Time0Ns);
   m_Writer->WriteString("]}");
 }
 
@@ -92,47 +94,6 @@ void CrashSafeTraceProfilerSink::EnsureValidJson() noexcept
 void CrashSafeTraceProfilerSink::Flush() noexcept
 {
   EnsureValidJson();
-}
-
-void CrashSafeTraceProfilerSink::WriteJsonEventTo(
-    ::gecko::platform::FileWriter* w, const ProfEvent& event,
-    u64 time0Ns) noexcept
-{
-  const double timeUs = (double)(event.TimestampNs - time0Ns) / 1000.0;
-  const char* name = event.Name ? event.Name : "Unknown";
-  const char* label = event.EventLabel.Name ? event.EventLabel.Name : "label";
-
-  switch (event.Kind)
-  {
-  case ProfEventKind::ZoneBegin:
-    WriteFmt(w,
-             "{\"name\":\"%s\",\"cat\":\"%s "
-             "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-             name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-             event.ThreadId);
-    break;
-  case ProfEventKind::ZoneEnd:
-    WriteFmt(w,
-             "{\"name\":\"%s\",\"cat\":\"%s "
-             "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-             name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-             event.ThreadId);
-    break;
-  case ProfEventKind::FrameMark:
-    WriteFmt(w,
-             "{\"name\":\"%s\",\"cat\":\"frame\",\"ph\":\"i\",\"s\":\"t\","
-             "\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-             name, timeUs, event.ThreadId);
-    break;
-  case ProfEventKind::Counter:
-    WriteFmt(
-        w,
-        "{\"name\":\"%s\",\"cat\":\"%s "
-        "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-        (unsigned long long)event.Value);
-    break;
-  }
 }
 
 }  // namespace gecko::runtime
