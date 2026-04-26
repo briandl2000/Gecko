@@ -508,31 +508,30 @@ int main()
                                plasmaTex[0].IsValid() && plasmaTex[1].IsValid();
 
       Unique<ICommandList> computeCmd[2];
-      JobHandle computeJobs[2] {};
 
       if (haveCompute)
       {
+        // Record both compute command lists on the main render thread
+        // (no job-system fan-out) so the profiler trace shows them on
+        // the main row instead of scattering across job workers.
         for (u32 i = 0; i < 2; ++i)
         {
           const f32 tOffset = (i == 0) ? 0.0F : 3.14159F;
-          computeJobs[i] = SubmitJob([&, i, time, tOffset]() {
-            computeCmd[i] = device->CreateComputeCommandList();
-            if (!computeCmd[i])
-              return;
-            computeCmd[i]->Begin();
-            computeCmd[i]->BindPipeline(plasmaPipeline);
-            computeCmd[i]->BindRWTexture(0, plasmaTex[i]);
-            f32 pc[4] = {time + tOffset, 0.0F, 0.0F, 0.0F};
-            computeCmd[i]->SetConstants(
-                0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
-            const u32 gx = (OffscreenW + 15) / 16;
-            const u32 gy = (OffscreenH + 15) / 16;
-            computeCmd[i]->Dispatch(gx, gy, 1);
-            computeCmd[i]->TransitionTextureForRead(plasmaTex[i]);
-            computeCmd[i]->End();
-          });
+          computeCmd[i] = device->CreateComputeCommandList();
+          if (!computeCmd[i])
+            continue;
+          computeCmd[i]->Begin();
+          computeCmd[i]->BindPipeline(plasmaPipeline);
+          computeCmd[i]->BindRWTexture(0, plasmaTex[i]);
+          f32 pc[4] = {time + tOffset, 0.0F, 0.0F, 0.0F};
+          computeCmd[i]->SetConstants(
+              0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
+          const u32 gx = (OffscreenW + 15) / 16;
+          const u32 gy = (OffscreenH + 15) / 16;
+          computeCmd[i]->Dispatch(gx, gy, 1);
+          computeCmd[i]->TransitionTextureForRead(plasmaTex[i]);
+          computeCmd[i]->End();
         }
-        WaitForJobs(computeJobs, 2);
         // Submit from the main thread, in deterministic order.
         for (u32 i = 0; i < 2; ++i)
           if (computeCmd[i])
