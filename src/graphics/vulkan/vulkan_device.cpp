@@ -74,6 +74,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 
 VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::Ctor");
+
   // ── Instance ──────────────────────────────────────────────────
 
   VkApplicationInfo appInfo {};
@@ -738,6 +740,8 @@ Swapchain VulkanDevice::CreateSwapchain(
     const ::gecko::platform::NativeWindowHandle& native,
     const SwapchainDesc& desc) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::CreateSwapchain");
+
   if (!m_Valid)
     return Swapchain {};
 
@@ -800,6 +804,8 @@ void VulkanDevice::DestroySwapchain(Swapchain& swapchain) noexcept
 
 void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::ResizeSwapchain");
+
   if (!swapchain.Data)
     return;
   auto* data = static_cast<VulkanSwapchainData*>(swapchain.Data.get());
@@ -845,12 +851,19 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
     return ctx;
 
   const u32 frame = data->FrameIndex;
-  vkWaitForFences(m_Device, 1, &data->InFlight[frame], VK_TRUE, UINT64_MAX);
+  {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkWaitForFences");
+    vkWaitForFences(m_Device, 1, &data->InFlight[frame], VK_TRUE, UINT64_MAX);
+  }
 
   u32 imageIndex = 0;
-  VkResult ar = vkAcquireNextImageKHR(m_Device, data->Swapchain, UINT64_MAX,
-                                      data->ImageAvailable[frame],
-                                      VK_NULL_HANDLE, &imageIndex);
+  VkResult ar = VK_SUCCESS;
+  {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkAcquireNextImageKHR");
+    ar = vkAcquireNextImageKHR(m_Device, data->Swapchain, UINT64_MAX,
+                               data->ImageAvailable[frame], VK_NULL_HANDLE,
+                               &imageIndex);
+  }
   if (ar == VK_ERROR_OUT_OF_DATE_KHR)
   {
     ResizeSwapchain(swapchain);
@@ -1488,6 +1501,9 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
 GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
     const GraphicsPipelineDesc& desc) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Vulkan,
+                         "VulkanDevice::CreateGraphicsPipeline");
+
   if (!desc.IsValid() || !m_Valid)
     return GraphicsPipeline {};
 
@@ -1767,6 +1783,8 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
 ComputePipeline VulkanDevice::CreateComputePipeline(
     const ComputePipelineDesc& desc) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::CreateComputePipeline");
+
   if (!desc.IsValid() || !m_Valid)
     return ComputePipeline {};
 

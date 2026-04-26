@@ -741,11 +741,14 @@ CursorMode Win32WindowsBackend::GetCursorMode(
 void Win32WindowsBackend::PumpEvents(
     const gecko::EventEmitter& emitter) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General,
+                                  "Win32WindowsBackend::PumpEvents");
   m_CurrentEmitter = &emitter;
 
   ::MSG msg;
   while (::PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
   {
+    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General, "DispatchMessage");
     ::TranslateMessage(&msg);
     ::DispatchMessageW(&msg);
   }

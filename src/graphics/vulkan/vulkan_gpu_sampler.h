@@ -59,7 +59,7 @@ private:
     QueryPool Pool {};
     std::vector<ZoneRecord> Zones {};
     u32 NextQuery {0};
-    bool Pending {false};  // submitted, awaiting resolve
+    bool Pending {false};     // submitted, awaiting resolve
     u64 CpuFrameStartNs {0};  // CPU NowNs sampled at BeginFrame
   };
 

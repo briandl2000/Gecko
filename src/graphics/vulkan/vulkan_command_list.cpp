@@ -396,6 +396,8 @@ void VulkanCommandList::EndRendering() noexcept
 void VulkanCommandList::SetViewport(f32 x, f32 y, f32 write, f32 h, f32 minD,
                                     f32 maxD) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::SetViewport");
   VkViewport viewport {};
   viewport.x = x;
   viewport.y =
@@ -409,6 +411,8 @@ void VulkanCommandList::SetViewport(f32 x, f32 y, f32 write, f32 h, f32 minD,
 
 void VulkanCommandList::SetScissor(i32 x, i32 y, u32 write, u32 h) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::SetScissor");
   VkRect2D rect {};
   rect.offset = {x, y};
   rect.extent = {write, h};
@@ -445,6 +449,8 @@ VkDescriptorSet EnsureCurrentDescSet(VulkanCommandList* self, VkDevice device,
 
 void VulkanCommandList::BindPipeline(const GraphicsPipeline& pipeline) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindPipeline(gfx)");
   if (!pipeline.Data)
     return;
   auto* pd = static_cast<VulkanPipelineData*>(pipeline.Data.get());
@@ -455,6 +461,8 @@ void VulkanCommandList::BindPipeline(const GraphicsPipeline& pipeline) noexcept
 
 void VulkanCommandList::BindPipeline(const ComputePipeline& pipeline) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindPipeline(cs)");
   if (!pipeline.Data)
     return;
   auto* pd = static_cast<VulkanPipelineData*>(pipeline.Data.get());
@@ -466,6 +474,8 @@ void VulkanCommandList::BindPipeline(const ComputePipeline& pipeline) noexcept
 void VulkanCommandList::BindVertexBuffer(const Buffer& buffer,
                                          u32 slot) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindVertexBuffer");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
@@ -475,6 +485,8 @@ void VulkanCommandList::BindVertexBuffer(const Buffer& buffer,
 
 void VulkanCommandList::BindIndexBuffer(const Buffer& buffer) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindIndexBuffer");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
@@ -484,6 +496,8 @@ void VulkanCommandList::BindIndexBuffer(const Buffer& buffer) noexcept
 void VulkanCommandList::BindConstantBuffer(u32 slot,
                                            const Buffer& buffer) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindConstantBuffer");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !buffer.Data)
     return;
@@ -520,6 +534,8 @@ void VulkanCommandList::BindConstantBuffer(u32 slot,
 
 void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindTexture");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE)
     return;
@@ -562,6 +578,8 @@ void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
 
 void VulkanCommandList::BindRWTexture(u32 slot, const Texture& texture) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindRWTexture");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !texture.Data)
     return;
@@ -605,6 +623,8 @@ void VulkanCommandList::BindRWTexture(u32 slot, const Texture& texture) noexcept
 
 void VulkanCommandList::BindSampler(u32 slot, const Sampler& sampler) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BindSampler");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !sampler.Data)
     return;
@@ -692,6 +712,8 @@ void VulkanCommandList::BindRWStructuredBuffer(u32 slot,
 void VulkanCommandList::SetConstants(
     u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::SetConstants");
   if (m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->PushConstantBytes == 0 || bytes.empty())
     return;
@@ -708,6 +730,7 @@ void VulkanCommandList::SetConstants(
 void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
                              u32 firstVertex, u32 firstInstance) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan, "VulkanCommandList::Draw");
   vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex,
             firstInstance);
 }
@@ -716,6 +739,8 @@ void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
                                     u32 firstIndex, i32 vertexOffset,
                                     u32 firstInstance) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::DrawIndexed");
   vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex,
                    vertexOffset, firstInstance);
 }
@@ -723,6 +748,8 @@ void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
 void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
                                      u32 drawCount, u32 stride) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::DrawIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
@@ -732,6 +759,8 @@ void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
 void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
                                             u32 drawCount, u32 stride) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::DrawIndexedIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
@@ -748,6 +777,8 @@ void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
                                          u64 offset) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::DispatchIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
@@ -757,6 +788,8 @@ void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
 void VulkanCommandList::TransitionTextureForRead(
     const Texture& texture) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(
+      labels::Vulkan, "VulkanCommandList::TransitionTextureForRead");
   if (!texture.Data)
     return;
   auto* td = static_cast<VulkanTextureData*>(texture.Data.get());
@@ -773,6 +806,8 @@ void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,
                                    const Buffer& src, u64 srcOffset,
                                    u64 size) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::CopyBuffer");
   if (!dst.Data || !src.Data || size == 0)
     return;
   auto* dd = static_cast<VulkanBufferData*>(dst.Data.get());
@@ -788,6 +823,8 @@ void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
                                             u32 slice, const Buffer& src,
                                             u64 srcOffset) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::CopyBufferToTexture");
   if (!dst.Data || !src.Data)
     return;
   auto* td = static_cast<VulkanTextureData*>(dst.Data.get());
@@ -816,6 +853,8 @@ void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
                                             const Texture& src, u32 mip,
                                             u32 slice) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::CopyTextureToBuffer");
   if (!dst.Data || !src.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(dst.Data.get());

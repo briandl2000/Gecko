@@ -198,6 +198,8 @@ std::size_t EventBus::Dispatch(std::size_t maxCount) noexcept
 
   for (const auto& qEvent : events)
   {
+    GECKO_PROF_SCOPE_NAMED_DETAILED(runtime::labels::General,
+                                    "Dispatch::Notify");
     EventView view {qEvent.payloadStorage, qEvent.payloadSize};
     NotifySubscribers(qEvent.meta.code, qEvent.meta, view,
                       SubscriptionDelivery::Queued);

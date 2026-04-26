@@ -262,8 +262,7 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
 
     try
     {
-      // Don't profile individual jobs in worker thread - too much overhead
-      // during init
+      GECKO_PROF_SCOPE_NAMED_DETAILED(labels::JobSystem, "JobSystem::Run");
       job->Function();
       job->Completed.store(true, std::memory_order_release);
     }

@@ -164,8 +164,7 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
   const f64 period = static_cast<f64>(m_Device->TimestampPeriodNs());
   const u64 gpuFrameStart = ts[0];
   const u64 cpuFrameStart = slot.CpuFrameStartNs;
-  auto rebase = [&](u64 tick) noexcept -> u64
-  {
+  auto rebase = [&](u64 tick) noexcept -> u64 {
     const f64 deltaNs = static_cast<f64>(tick - gpuFrameStart) * period;
     return cpuFrameStart + static_cast<u64>(deltaNs);
   };
