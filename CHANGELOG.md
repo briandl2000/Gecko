@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Platform IO** — `gecko::platform` namespace functions: `Exists`, `Stat`, `Read`, `Map`, `Write`, `AtomicWrite`, `OpenWrite`, `CreateDir`, `Remove`, `IterateDir`, plus well-known paths (`ExePath`, `WorkingDir`, `UserDataDir`). Move-only `ReadResult`, `MappedFile`, `DirIter`, and `FileWriter` handles. Linux + Win32 backends.
+- **Platform threading** — namespace functions for thread naming, sleep, yield, and hardware concurrency (Linux + Win32).
+- **Platform input** — `IInput` service with key/mouse state, press/release edges, scroll, mouse position, focused/hovered window, and UTF-8 typed text. Auto `NewFrame()` on event-bus drain. `MockInput` test fake under `test/common/`.
+- **Platform clipboard** — `Get`/`Set` text on X11 and Win32 (Wayland TODO).
+- **Platform terminal** — `Print` / `PrintLine` UTF-8 API with optional ANSI color; TTY detection suppresses color when redirected. Win32 forces CP_UTF8 and enables VT mode.
+- **`platform_example`** — polls `IInput` every frame and logs changes; `--visible` test flag for IInput showcase.
 - **Graphics module** — API-agnostic backend with `GraphicsDevice` abstract class
   - `CreateGraphicsDevice()` factory returns `Unique<GraphicsDevice>` (NullDevice by default)
   - Full GPU resource API: `Buffer`, `Texture`, `RenderTarget`, `GraphicsPipeline`, `ComputePipeline`, `Swapchain`
@@ -20,10 +26,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **graphics_example** — demonstrates window + swapchain creation, frame loop with resize handling and ESC/close events
 
 ### Changed
+- `IWindowsBackend` and `IMonitorsBackend` promoted to services; `PlatformModule` now supports caller-owned backend injection.
+- Runtime trace/log sinks (`TraceFileSink`, `CrashSafeTraceProfilerSink`, `TraceWriter`) migrated to `FileWriter`.
+- `DirIter::Next()` returns `::std::optional<DirEntry>` (was out-reference).
+- Constants drop the `k` prefix per coding standard.
 - CI: main branch releases now use the CHANGELOG section for the release description instead of auto-generated commit notes
 - CI: dev build releases no longer include a description
 - Allocator decoupled from `Services`. Use `SetAllocator(IAllocator*)` / `ResetAllocator()` for lifecycle and `Allocator()` (returns reference) for access. `services.Allocator` and `GetAllocator()` removed.
 - **Module-published services** — modules now declare what they `Publishes()` and `Requires()`; `Engine::Create({...})` starts them in topological order. Replaces the `Services` struct, `Install/UninstallServices`, and `GECKO_BOOT`/`GECKO_SHUTDOWN`. `runtime::CoreServicesModule` publishes the four foundational services (`IJobSystem`, `IProfiler`, `ILogger`, `IEventBus`); `Engine` itself owns the registry and lives in the `GeckoCoreServices` shared library.
+
+### Fixed
+- `CreateDir(recursive=true)` no longer writes one byte past `std::string`/`std::wstring` `size()` when terminating path segments (Linux + Win32).
+- Trace sink `WriteFmt` helpers no longer truncate at 1024 bytes — heap fallback via two-pass `vsnprintf` ensures full JSON records.
+- `ConsoleLogSink` heap path no longer overruns its `std::string` buffer by one byte.
+
+### Removed
+- `NullInput` class (replaced by event-driven default).
 
 ## [0.0.0-alpha.2]
 
