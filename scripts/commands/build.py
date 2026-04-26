@@ -12,6 +12,34 @@ _CONFIGS = {
     "release": "Release",
 }
 
+# Test targets are EXCLUDE_FROM_ALL in CMake (to keep `cmake --build` fast for
+# development); when GECKO_BUILD_TESTS=ON we still want `gk build` to build
+# them so cross-compile flows (gk-pi, Windows mirror) get test binaries
+# alongside the engine and examples. Keep this in sync with
+# scripts/commands/test.py.
+_TEST_TARGETS = (
+    "core_tests",
+    "platform_tests",
+    "runtime_tests",
+    "math_tests",
+    "graphics_tests",
+    "platform_feature_tests",
+)
+
+
+def _tests_enabled() -> bool:
+    cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
+    if not os.path.isfile(cache_file):
+        return False
+    try:
+        with open(cache_file) as f:
+            for line in f:
+                if line.strip() == "GECKO_BUILD_TESTS:BOOL=ON":
+                    return True
+    except OSError:
+        return False
+    return False
+
 
 def _auto_configure() -> int:
     """Auto-configure CMake when the build directory doesn't exist yet."""
@@ -81,11 +109,31 @@ def _run(args) -> int:
         if result.returncode != 0:
             return result.returncode
 
+        if _tests_enabled():
+            result = subprocess.run(
+                ["cmake", "--build", build_dir_rel, "--config", "Debug",
+                 "--target", *_TEST_TARGETS],
+                cwd=_REPO_ROOT,
+                check=False,
+            )
+            if result.returncode != 0:
+                return result.returncode
+
         result = subprocess.run(
             ["cmake", "--build", build_dir_rel, "--config", "Release"],
             cwd=_REPO_ROOT,
             check=False,
         )
+        if result.returncode != 0:
+            return result.returncode
+
+        if _tests_enabled():
+            result = subprocess.run(
+                ["cmake", "--build", build_dir_rel, "--config", "Release",
+                 "--target", *_TEST_TARGETS],
+                cwd=_REPO_ROOT,
+                check=False,
+            )
         return result.returncode
     else:
         cmake_config = _CONFIGS[args.config]
@@ -94,4 +142,14 @@ def _run(args) -> int:
             cwd=_REPO_ROOT,
             check=False,
         )
+        if result.returncode != 0:
+            return result.returncode
+
+        if _tests_enabled():
+            result = subprocess.run(
+                ["cmake", "--build", build_dir_rel, "--config", cmake_config,
+                 "--target", *_TEST_TARGETS],
+                cwd=_REPO_ROOT,
+                check=False,
+            )
         return result.returncode

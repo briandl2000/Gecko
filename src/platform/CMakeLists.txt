@@ -6,8 +6,12 @@ target_sources(Platform
   PRIVATE
     monitors_interface.cpp
     platform_config.cpp
-    platform_context.cpp
+    platform_io.cpp
     platform_module.cpp
+    input.cpp
+    clipboard.cpp
+    terminal.cpp
+    window_event_input.cpp
     windows_interface.cpp
 
     private/null_monitors_backend.cpp
@@ -15,6 +19,10 @@ target_sources(Platform
 )
 
 if(UNIX AND NOT APPLE)
+  target_sources(Platform PRIVATE
+    linux/platform_io_linux.cpp
+    linux/threading_linux.cpp
+  )
   find_package(X11)
   if(X11_FOUND)
     target_sources(Platform PRIVATE
@@ -155,8 +163,10 @@ elseif(WIN32)
   target_sources(Platform PRIVATE
     win32/win32_monitors_backend.cpp
     win32/win32_windows_backend.cpp
+    win32/platform_io_win32.cpp
+    win32/threading_win32.cpp
   )
-  target_link_libraries(Platform PRIVATE winmm shcore user32)
+  target_link_libraries(Platform PRIVATE winmm shcore user32 ole32)
 endif()
 
 target_include_directories(Platform

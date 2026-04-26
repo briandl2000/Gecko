@@ -26,7 +26,7 @@ target_include_directories(Runtime
 
 target_compile_definitions(Runtime PUBLIC GECKO_PLATFORM_API)
 
-target_link_libraries(Runtime PUBLIC Gecko::Core Gecko::CoreServices)
+target_link_libraries(Runtime PUBLIC Gecko::Core Gecko::CoreServices Gecko::Platform)
 
 install(TARGETS Runtime
   EXPORT ${GECKO_EXPORT_SET_NAME}

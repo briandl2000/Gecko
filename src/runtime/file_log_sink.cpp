@@ -1,35 +1,24 @@
 #include "gecko/runtime/file_log_sink.h"
 
-#include <cstdio>
-#if defined(GECKO_PLATFORM_WINDOWS)
-#include <share.h>
-#include <stdio.h>
-#endif
-
 #include "gecko/core/assert.h"
+#include "gecko/platform/platform_io.h"
+
+#include <cstdio>
 
 namespace gecko::runtime {
 
 FileLogSink::FileLogSink(const char* path)
 {
   GECKO_ASSERT(path && "File path cannot be null");
-
-#if defined(GECKO_PLATFORM_WINDOWS)
-  m_File = _fsopen(path, "wb", _SH_DENYNO);
-#else
-  m_File = std::fopen(path, "wb");
-#endif
+  m_Writer = ::gecko::platform::OpenWrite(
+      path, ::gecko::platform::WriteMode::Truncate);
 }
 
-FileLogSink::~FileLogSink()
-{
-  if (m_File)
-    std::fclose(m_File);
-}
+FileLogSink::~FileLogSink() = default;
 
 void FileLogSink::Write(const LogMessage& message) noexcept
 {
-  if (!m_File)
+  if (!m_Writer)
     return;
 
   GECKO_ASSERT(message.Text && "Log message text cannot be null");
@@ -37,8 +26,16 @@ void FileLogSink::Write(const LogMessage& message) noexcept
   const char* label =
       message.MessageLabel.Name ? message.MessageLabel.Name : "label";
 
-  std::fprintf(m_File, "[%s][%s][t%u] %s\n", LevelName(message.Level), label,
-               message.ThreadId, message.Text ? message.Text : "");
-  std::fflush(m_File);
+  char buf[2048];
+  int n = std::snprintf(buf, sizeof(buf), "[%s][%s][t%u] %s\n",
+                        LevelName(message.Level), label, message.ThreadId,
+                        message.Text ? message.Text : "");
+  if (n <= 0)
+    return;
+  ::std::size_t len = (n >= static_cast<int>(sizeof(buf)))
+                          ? sizeof(buf) - 1
+                          : static_cast<::std::size_t>(n);
+  m_Writer->WriteString(::std::string_view {buf, len});
+  m_Writer->Flush();
 }
 }  // namespace gecko::runtime

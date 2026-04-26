@@ -1,8 +1,8 @@
 #include "gecko/core/engine.h"
 #include "gecko/core/services.h"
-#include "gecko/platform/platform_config.h"
-#include "gecko/platform/platform_context.h"
+#include "gecko/platform/input.h"
 #include "gecko/platform/platform_events.h"
+#include "gecko/platform/platform_module.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/runtime_module.h"
 
@@ -23,12 +23,23 @@ struct TestServiceScope
   NullLogger logger;
   runtime::EventBus events;
   runtime::CoreServicesModule runtimeMod;
+  PlatformModule platformMod;
   ::std::optional<::gecko::Engine> engine;
 
-  TestServiceScope() : runtimeMod(jobs, profiler, logger, events)
+  static PlatformConfig MakeNullConfig() noexcept
+  {
+    PlatformConfig cfg;
+    cfg.Backend = DisplayBackendKind::Null;
+    return cfg;
+  }
+
+  TestServiceScope()
+      : runtimeMod(jobs, profiler, logger, events),
+        platformMod(MakeNullConfig())
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = ::gecko::Engine::Create({&runtimeMod});
+    engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
+    REQUIRE(engine.has_value());
   }
 
   ~TestServiceScope()
@@ -44,61 +55,45 @@ TEST_CASE("Null backend: create and destroy window", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  WindowHandle win = GetWindows()->CreateWindow({});
   REQUIRE(win.IsValid());
-  REQUIRE(ctx.Windows().IsWindowAlive(win));
+  REQUIRE(GetWindows()->IsWindowAlive(win));
 
-  ctx.Windows().DestroyWindow(win);
-  REQUIRE_FALSE(ctx.Windows().IsWindowAlive(win));
+  GetWindows()->DestroyWindow(win);
+  REQUIRE_FALSE(GetWindows()->IsWindowAlive(win));
 }
 
 TEST_CASE("Null backend: client size matches desc", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
   WindowDesc desc;
   desc.Size = {800, 600};
-  WindowHandle win = ctx.Windows().CreateWindow(desc);
+  WindowHandle win = GetWindows()->CreateWindow(desc);
   REQUIRE(win.IsValid());
 
-  Extent2D size = ctx.Windows().GetClientSize(win);
+  Extent2D size = GetWindows()->GetClientSize(win);
   REQUIRE(size.Width == 800);
   REQUIRE(size.Height == 600);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: set title doesn't crash", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  WindowHandle win = ctx.Windows().CreateWindow({});
-  ctx.Windows().SetTitle(win, "Test Title");
-  ctx.Windows().DestroyWindow(win);
+  WindowHandle win = GetWindows()->CreateWindow({});
+  GetWindows()->SetTitle(win, "Test Title");
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: request close enqueues event", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  WindowHandle win = ctx.Windows().CreateWindow({});
-  REQUIRE(ctx.Windows().RequestClose(win));
+  WindowHandle win = GetWindows()->CreateWindow({});
+  REQUIRE(GetWindows()->RequestClose(win));
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
@@ -108,25 +103,21 @@ TEST_CASE("Null backend: request close enqueues event", "[platform][context]")
       },
       &received);
 
-  ctx.PumpEvents();
+  PumpEvents();
   (void)gecko::DispatchEvents();
 
   REQUIRE(received == 1);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: multiple windows", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  WindowHandle w1 = ctx.Windows().CreateWindow({});
-  WindowHandle w2 = ctx.Windows().CreateWindow({});
-  WindowHandle w3 = ctx.Windows().CreateWindow({});
+  WindowHandle w1 = GetWindows()->CreateWindow({});
+  WindowHandle w2 = GetWindows()->CreateWindow({});
+  WindowHandle w3 = GetWindows()->CreateWindow({});
   REQUIRE(w1.IsValid());
   REQUIRE(w2.IsValid());
   REQUIRE(w3.IsValid());
@@ -134,45 +125,37 @@ TEST_CASE("Null backend: multiple windows", "[platform][context]")
   REQUIRE(w1 != w2);
   REQUIRE(w2 != w3);
 
-  REQUIRE(ctx.Windows().IsWindowAlive(w1));
-  REQUIRE(ctx.Windows().IsWindowAlive(w2));
-  REQUIRE(ctx.Windows().IsWindowAlive(w3));
+  REQUIRE(GetWindows()->IsWindowAlive(w1));
+  REQUIRE(GetWindows()->IsWindowAlive(w2));
+  REQUIRE(GetWindows()->IsWindowAlive(w3));
 
-  ctx.Windows().DestroyWindow(w2);
-  REQUIRE(ctx.Windows().IsWindowAlive(w1));
-  REQUIRE_FALSE(ctx.Windows().IsWindowAlive(w2));
-  REQUIRE(ctx.Windows().IsWindowAlive(w3));
+  GetWindows()->DestroyWindow(w2);
+  REQUIRE(GetWindows()->IsWindowAlive(w1));
+  REQUIRE_FALSE(GetWindows()->IsWindowAlive(w2));
+  REQUIRE(GetWindows()->IsWindowAlive(w3));
 
-  ctx.Windows().DestroyWindow(w1);
-  ctx.Windows().DestroyWindow(w3);
+  GetWindows()->DestroyWindow(w1);
+  GetWindows()->DestroyWindow(w3);
 }
 
 TEST_CASE("Null backend: DPI info has defaults", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  WindowHandle win = GetWindows()->CreateWindow({});
 
-  WindowHandle win = ctx.Windows().CreateWindow({});
-
-  DpiInfo dpi = ctx.Windows().GetDpi(win);
+  DpiInfo dpi = GetWindows()->GetDpi(win);
   REQUIRE(dpi.Dpi > 0);
   REQUIRE(dpi.Scale > 0.0f);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: PumpEvents doesn't crash", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  ctx.PumpEvents();
+  PumpEvents();
 }
 
 TEST_CASE("Null backend: invalid window operations are safe",
@@ -180,71 +163,55 @@ TEST_CASE("Null backend: invalid window operations are safe",
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
   WindowHandle invalid;
-  REQUIRE_FALSE(ctx.Windows().IsWindowAlive(invalid));
-  REQUIRE_FALSE(ctx.Windows().RequestClose(invalid));
-  ctx.Windows().DestroyWindow(invalid);
+  REQUIRE_FALSE(GetWindows()->IsWindowAlive(invalid));
+  REQUIRE_FALSE(GetWindows()->RequestClose(invalid));
+  GetWindows()->DestroyWindow(invalid);
 }
 
 TEST_CASE("Null backend: set and get client size", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  WindowHandle win = GetWindows()->CreateWindow({});
 
-  WindowHandle win = ctx.Windows().CreateWindow({});
-
-  ctx.Windows().SetClientSize(win, {1024, 768});
-  Extent2D size = ctx.Windows().GetClientSize(win);
+  GetWindows()->SetClientSize(win, {1024, 768});
+  Extent2D size = GetWindows()->GetClientSize(win);
   REQUIRE(size.Width == 1024);
   REQUIRE(size.Height == 768);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: get title returns desc title", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
   WindowDesc desc;
   desc.Title = "My Window";
-  WindowHandle win = ctx.Windows().CreateWindow(desc);
+  WindowHandle win = GetWindows()->CreateWindow(desc);
 
-  const char* title = ctx.Windows().GetTitle(win);
+  const char* title = GetWindows()->GetTitle(win);
   REQUIRE(::std::strcmp(title, "My Window") == 0);
 
-  ctx.Windows().SetTitle(win, "Updated");
-  REQUIRE(::std::strcmp(ctx.Windows().GetTitle(win), "Updated") == 0);
+  GetWindows()->SetTitle(win, "Updated");
+  REQUIRE(::std::strcmp(GetWindows()->GetTitle(win), "Updated") == 0);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: set and get position", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  WindowHandle win = GetWindows()->CreateWindow({});
 
-  WindowHandle win = ctx.Windows().CreateWindow({});
-
-  ctx.Windows().SetPosition(win, {100, 200});
-  auto pos = ctx.Windows().GetPosition(win);
+  GetWindows()->SetPosition(win, {100, 200});
+  auto pos = GetWindows()->GetPosition(win);
   REQUIRE(pos.X == 100);
   REQUIRE(pos.Y == 200);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: set position fires WindowMoved event",
@@ -252,11 +219,7 @@ TEST_CASE("Null backend: set position fires WindowMoved event",
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  WindowHandle win = GetWindows()->CreateWindow({});
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
@@ -266,34 +229,30 @@ TEST_CASE("Null backend: set position fires WindowMoved event",
       },
       &received);
 
-  ctx.Windows().SetPosition(win, {50, 75});
-  ctx.PumpEvents();
+  GetWindows()->SetPosition(win, {50, 75});
+  PumpEvents();
   (void)gecko::DispatchEvents();
 
   REQUIRE(received == 1);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: set and get window state", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  WindowHandle win = GetWindows()->CreateWindow({});
 
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  REQUIRE(GetWindows()->GetWindowState(win) == WindowState::Normal);
 
-  REQUIRE(ctx.Windows().GetWindowState(win) == WindowState::Normal);
+  GetWindows()->SetWindowState(win, WindowState::Minimized);
+  REQUIRE(GetWindows()->GetWindowState(win) == WindowState::Minimized);
 
-  ctx.Windows().SetWindowState(win, WindowState::Minimized);
-  REQUIRE(ctx.Windows().GetWindowState(win) == WindowState::Minimized);
+  GetWindows()->SetWindowState(win, WindowState::Maximized);
+  REQUIRE(GetWindows()->GetWindowState(win) == WindowState::Maximized);
 
-  ctx.Windows().SetWindowState(win, WindowState::Maximized);
-  REQUIRE(ctx.Windows().GetWindowState(win) == WindowState::Maximized);
-
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: set state fires WindowStateChanged event",
@@ -301,11 +260,7 @@ TEST_CASE("Null backend: set state fires WindowStateChanged event",
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  WindowHandle win = GetWindows()->CreateWindow({});
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
@@ -315,87 +270,71 @@ TEST_CASE("Null backend: set state fires WindowStateChanged event",
       },
       &received);
 
-  ctx.Windows().SetWindowState(win, WindowState::Hidden);
-  ctx.PumpEvents();
+  GetWindows()->SetWindowState(win, WindowState::Hidden);
+  PumpEvents();
   (void)gecko::DispatchEvents();
 
   REQUIRE(received == 1);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: decorated get/set", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  WindowHandle win = GetWindows()->CreateWindow({});
 
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  REQUIRE(GetWindows()->IsDecorated(win) == true);
 
-  REQUIRE(ctx.Windows().IsDecorated(win) == true);
+  GetWindows()->SetDecorated(win, false);
+  REQUIRE(GetWindows()->IsDecorated(win) == false);
 
-  ctx.Windows().SetDecorated(win, false);
-  REQUIRE(ctx.Windows().IsDecorated(win) == false);
+  GetWindows()->SetDecorated(win, true);
+  REQUIRE(GetWindows()->IsDecorated(win) == true);
 
-  ctx.Windows().SetDecorated(win, true);
-  REQUIRE(ctx.Windows().IsDecorated(win) == true);
-
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: cursor mode get/set", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  WindowHandle win = GetWindows()->CreateWindow({});
 
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  REQUIRE(GetWindows()->GetCursorMode(win) == CursorMode::Normal);
 
-  REQUIRE(ctx.Windows().GetCursorMode(win) == CursorMode::Normal);
+  GetWindows()->SetCursorMode(win, CursorMode::Hidden);
+  REQUIRE(GetWindows()->GetCursorMode(win) == CursorMode::Hidden);
 
-  ctx.Windows().SetCursorMode(win, CursorMode::Hidden);
-  REQUIRE(ctx.Windows().GetCursorMode(win) == CursorMode::Hidden);
+  GetWindows()->SetCursorMode(win, CursorMode::Locked);
+  REQUIRE(GetWindows()->GetCursorMode(win) == CursorMode::Locked);
 
-  ctx.Windows().SetCursorMode(win, CursorMode::Locked);
-  REQUIRE(ctx.Windows().GetCursorMode(win) == CursorMode::Locked);
-
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: request focus does not crash", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  WindowHandle win = GetWindows()->CreateWindow({});
 
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  GetWindows()->RequestFocus(win);
 
-  ctx.Windows().RequestFocus(win);
-
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 TEST_CASE("Null backend: hidden window has Hidden state", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
   WindowDesc desc;
   desc.Visible = false;
-  WindowHandle win = ctx.Windows().CreateWindow(desc);
+  WindowHandle win = GetWindows()->CreateWindow(desc);
 
-  REQUIRE(ctx.Windows().GetWindowState(win) == WindowState::Hidden);
+  REQUIRE(GetWindows()->GetWindowState(win) == WindowState::Hidden);
 
-  ctx.Windows().DestroyWindow(win);
+  GetWindows()->DestroyWindow(win);
 }
 
 // ── Monitor backend tests ──────────────────────────────────────────────
@@ -405,22 +344,14 @@ TEST_CASE("Null monitor backend: enumerates one virtual monitor",
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  REQUIRE(ctx.Monitors().GetMonitorCount() == 1);
+  REQUIRE(GetMonitors()->GetMonitorCount() == 1);
 }
 
 TEST_CASE("Null monitor backend: primary monitor exists", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  MonitorHandle primary = ctx.Monitors().GetPrimaryMonitor();
+  MonitorHandle primary = GetMonitors()->GetPrimaryMonitor();
   REQUIRE(primary.IsValid());
 }
 
@@ -428,14 +359,10 @@ TEST_CASE("Null monitor backend: get handle by index", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  MonitorHandle h = ctx.Monitors().GetMonitorHandle(0);
+  MonitorHandle h = GetMonitors()->GetMonitorHandle(0);
   REQUIRE(h.IsValid());
 
-  MonitorHandle invalid = ctx.Monitors().GetMonitorHandle(99);
+  MonitorHandle invalid = GetMonitors()->GetMonitorHandle(99);
   REQUIRE_FALSE(invalid.IsValid());
 }
 
@@ -444,13 +371,9 @@ TEST_CASE("Null monitor backend: monitor properties are valid",
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  MonitorHandle h = GetMonitors()->GetMonitorHandle(0);
 
-  MonitorHandle h = ctx.Monitors().GetMonitorHandle(0);
-
-  MonitorInfo info = ctx.Monitors().GetMonitorProperties(h);
+  MonitorInfo info = GetMonitors()->GetMonitorProperties(h);
   REQUIRE(info.IsPrimary);
   REQUIRE(info.Dpi > 0);
   REQUIRE(info.RefreshRateMilliHz > 0);
@@ -461,13 +384,9 @@ TEST_CASE("Null monitor backend: bounds and work area", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
+  MonitorHandle h = GetMonitors()->GetMonitorHandle(0);
 
-  MonitorHandle h = ctx.Monitors().GetMonitorHandle(0);
-
-  MonitorBounds mb = ctx.Monitors().GetMonitorBounds(h);
+  MonitorBounds mb = GetMonitors()->GetMonitorBounds(h);
   REQUIRE_FALSE(mb.Bounds.IsEmpty());
   REQUIRE_FALSE(mb.WorkArea.IsEmpty());
 }
@@ -477,15 +396,11 @@ TEST_CASE("Null monitor backend: invalid handle returns false",
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
   MonitorHandle invalid;
-  MonitorInfo info = ctx.Monitors().GetMonitorProperties(invalid);
+  MonitorInfo info = GetMonitors()->GetMonitorProperties(invalid);
   REQUIRE(info.Bounds.IsEmpty());
 
-  MonitorBounds mb = ctx.Monitors().GetMonitorBounds(invalid);
+  MonitorBounds mb = GetMonitors()->GetMonitorBounds(invalid);
   REQUIRE(mb.Bounds.IsEmpty());
   REQUIRE(mb.WorkArea.IsEmpty());
 }
@@ -497,11 +412,7 @@ TEST_CASE("Null backend: destroy window enqueues WindowClosed event",
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
-  cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-
-  WindowHandle win = ctx.Windows().CreateWindow({});
+  WindowHandle win = GetWindows()->CreateWindow({});
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
@@ -511,8 +422,8 @@ TEST_CASE("Null backend: destroy window enqueues WindowClosed event",
       },
       &received);
 
-  ctx.Windows().DestroyWindow(win);
-  ctx.PumpEvents();
+  GetWindows()->DestroyWindow(win);
+  PumpEvents();
   (void)gecko::DispatchEvents();
 
   REQUIRE(received == 1);
@@ -540,12 +451,65 @@ TEST_CASE("Resolve: Auto resolves to concrete backend", "[platform][config]")
   REQUIRE(resolved.Backend != DisplayBackendKind::Auto);
 }
 
-TEST_CASE("PlatformContext stores resolved config", "[platform][context]")
+TEST_CASE("PlatformModule stores resolved config", "[platform][context]")
 {
   TestServiceScope scope;
 
-  PlatformConfig cfg = {};
+  REQUIRE(scope.platformMod.Config().Backend == DisplayBackendKind::Null);
+}
+
+// --- Caller-owned backend injection ---------------------------------
+//
+// PlatformModule::Backends takes raw pointers (caller-owned). When a
+// pointer is non-null the module must publish *that* exact instance as
+// the service, instead of constructing its own default. Verifies the
+// "user owns the memory" rule documented in MODULE_API_SHAPING.md.
+
+TEST_CASE("PlatformModule publishes injected backends",
+          "[platform][context][injection]")
+{
+  PlatformConfig cfg;
   cfg.Backend = DisplayBackendKind::Null;
-  auto ctx = PlatformContext(cfg);
-  REQUIRE(ctx.Config().Backend == DisplayBackendKind::Null);
+
+  // Caller-owned backends. Held in Unique<> here purely so the test
+  // doesn't have to know the concrete null types — but the *module*
+  // sees raw pointers and never takes ownership.
+  ::gecko::Unique<IWindowsBackend> windows = IWindowsBackend::Create(cfg);
+  ::gecko::Unique<IMonitorsBackend> monitors = IMonitorsBackend::Create(cfg);
+  REQUIRE(windows);
+  REQUIRE(monitors);
+
+  IWindowsBackend* windowsRaw = windows.get();
+  IMonitorsBackend* monitorsRaw = monitors.get();
+
+  SystemAllocator alloc;
+  NullJobSystem jobs;
+  NullProfiler profiler;
+  NullLogger logger;
+  runtime::EventBus events;
+  runtime::CoreServicesModule runtimeMod {jobs, profiler, logger, events};
+
+  PlatformModule platformMod {cfg, PlatformModule::Backends {
+                                       .Windows = windowsRaw,
+                                       .Monitors = monitorsRaw,
+                                   }};
+
+  REQUIRE(SetAllocator(&alloc));
+  auto engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
+  REQUIRE(engine.has_value());
+
+  // Injected pointers must be the ones published as services.
+  REQUIRE(GetWindows() == windowsRaw);
+  REQUIRE(GetMonitors() == monitorsRaw);
+  // Input was left null, so the module should have constructed a
+  // default — accessor must still be non-null and not equal to either
+  // injected pointer.
+  REQUIRE(GetInput() != nullptr);
+
+  engine.reset();
+  ResetAllocator();
+
+  // Caller still owns the backends after Shutdown.
+  REQUIRE(windows);
+  REQUIRE(monitors);
 }

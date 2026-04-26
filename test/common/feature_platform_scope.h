@@ -1,20 +1,21 @@
 #pragma once
 
+#include "gecko/core/engine.h"
+#include "gecko/core/services.h"
 #include "gecko/platform/platform_config.h"
-#include "gecko/platform/platform_context.h"
-#include "test_service_scope.h"
+#include "gecko/platform/platform_module.h"
+#include "gecko/runtime/event_bus.h"
+#include "gecko/runtime/runtime_module.h"
 
+#include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
+#include <optional>
 
 namespace gecko::test {
 
-/// Returns true if a live display server is available for the current
-/// platform.  Feature tests that require a real backend should skip
-/// when this returns false.
 inline bool HasLiveDisplay() noexcept
 {
 #if defined(GECKO_PLATFORM_WINDOWS)
-  // Win32 always has a display available when running interactively.
   return true;
 #elif defined(GECKO_PLATFORM_LINUX)
   const char* wayland = ::std::getenv("WAYLAND_DISPLAY");
@@ -35,27 +36,45 @@ inline bool HasLiveDisplay() noexcept
 /// Usage:
 ///   TEST_CASE("...", "[feature][platform]") {
 ///     FeaturePlatformScope scope;
-///     scope.Ctx.PumpEvents();
-///     ...
+///     gecko::platform::PumpEvents();
+///     auto* win = gecko::platform::GetWindows();
 ///   }
 struct FeaturePlatformScope
 {
-  TestServiceScope Services;
-  platform::PlatformContext Ctx;
+  SystemAllocator Alloc;
+  NullJobSystem Jobs;
+  NullProfiler Profiler;
+  NullLogger Logger;
+  runtime::EventBus Events;
+  runtime::CoreServicesModule Runtime;
+  platform::PlatformModule Platform;
+  ::std::optional<::gecko::Engine> EngineHandle;
 
-  FeaturePlatformScope() : Ctx(MakeConfig())
+  static platform::PlatformConfig MakeAutoConfig() noexcept
+  {
+    platform::PlatformConfig cfg;
+    cfg.Backend = platform::DisplayBackendKind::Auto;
+    return cfg;
+  }
+
+  FeaturePlatformScope()
+      : Runtime(Jobs, Profiler, Logger, Events), Platform(MakeAutoConfig())
   {
     if (!HasLiveDisplay())
       SKIP("No live display server available");
+    REQUIRE(SetAllocator(&Alloc));
+    EngineHandle = ::gecko::Engine::Create({&Runtime, &Platform});
+    REQUIRE(EngineHandle.has_value());
   }
 
-private:
-  static platform::PlatformConfig MakeConfig() noexcept
+  ~FeaturePlatformScope()
   {
-    platform::PlatformConfig cfg {};
-    cfg.Backend = platform::DisplayBackendKind::Auto;
-    return platform::Resolve(cfg);
+    EngineHandle.reset();
+    ResetAllocator();
   }
+
+  FeaturePlatformScope(const FeaturePlatformScope&) = delete;
+  FeaturePlatformScope& operator=(const FeaturePlatformScope&) = delete;
 };
 
 }  // namespace gecko::test

@@ -111,7 +111,7 @@ MouseButton WmButtonToMouseButton(::UINT msg) noexcept
   }
 }
 
-constexpr wchar_t kWndClassName[] = L"GeckoWindowClass";
+constexpr wchar_t WndClassName[] = L"GeckoWindowClass";
 
 }  // namespace
 
@@ -132,7 +132,7 @@ Win32WindowsBackend::Win32WindowsBackend() noexcept
   wc.lpfnWndProc = WndProc;
   wc.hInstance = ::GetModuleHandleW(nullptr);
   wc.hCursor = ::LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
-  wc.lpszClassName = kWndClassName;
+  wc.lpszClassName = WndClassName;
   m_WndClass = ::RegisterClassExW(&wc);
 
   GECKO_INFO(labels::General, "Win32WindowsBackend: initialized");
@@ -148,7 +148,7 @@ Win32WindowsBackend::~Win32WindowsBackend() noexcept
   m_Windows.clear();
 
   if (m_WndClass)
-    ::UnregisterClassW(kWndClassName, ::GetModuleHandleW(nullptr));
+    ::UnregisterClassW(WndClassName, ::GetModuleHandleW(nullptr));
 
   if (s_Instance == this)
     s_Instance = nullptr;
@@ -235,7 +235,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), titleLen);
 
   ::HWND hwnd =
-      ::CreateWindowExW(exStyle, kWndClassName, wTitle.data(), style,
+      ::CreateWindowExW(exStyle, WndClassName, wTitle.data(), style,
                         CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,
                         nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
 
@@ -868,13 +868,42 @@ void Win32WindowsBackend::PumpEvents(
   case WM_CHAR: {
     if (!entry)
       break;
-    // Skip control characters
-    if (wParam < 32 && wParam != '\t' && wParam != '\n' && wParam != '\r')
+    const ::gecko::u32 unit = static_cast<::gecko::u32>(wParam);
+
+    // Combine UTF-16 surrogate pairs into a single codepoint.
+    ::gecko::u32 codepoint = 0;
+    if (unit >= 0xD800 && unit <= 0xDBFF)
+    {
+      // High surrogate — wait for the low surrogate in the next WM_CHAR.
+      entry->PendingHighSurrogate = static_cast<::gecko::u16>(unit);
+      break;
+    }
+    if (unit >= 0xDC00 && unit <= 0xDFFF)
+    {
+      // Low surrogate — combine with stored high surrogate.
+      if (entry->PendingHighSurrogate == 0)
+        break;  // unpaired, drop
+      codepoint = 0x10000 +
+                  ((::gecko::u32(entry->PendingHighSurrogate) - 0xD800) << 10) +
+                  (unit - 0xDC00);
+      entry->PendingHighSurrogate = 0;
+    }
+    else
+    {
+      entry->PendingHighSurrogate = 0;
+      codepoint = unit;
+    }
+
+    // Skip control characters except tab/CR/LF.
+    if (codepoint < 32 && codepoint != '\t' && codepoint != '\n' &&
+        codepoint != '\r')
+      break;
+    if (codepoint == 127)
       break;
 
     StagedEvent ev;
     ev.Code = events::WindowChar;
-    ev.Data.Char = {wh, NowNsSafe(), static_cast<u32>(wParam)};
+    ev.Data.Char = {wh, NowNsSafe(), codepoint};
     ev.PayloadSize = static_cast<u32>(sizeof(events::WindowCharPayload));
     self->m_Staged.push_back(ev);
     break;
@@ -886,10 +915,39 @@ void Win32WindowsBackend::PumpEvents(
     const i32 x = GET_X_LPARAM(lParam);
     const i32 y = GET_Y_LPARAM(lParam);
 
+    if (!entry->MouseInside)
+    {
+      entry->MouseInside = true;
+      ::TRACKMOUSEEVENT tme {};
+      tme.cbSize = sizeof(tme);
+      tme.dwFlags = TME_LEAVE;
+      tme.hwndTrack = hwnd;
+      ::TrackMouseEvent(&tme);
+
+      StagedEvent enterEv;
+      enterEv.Code = events::WindowMouseEntered;
+      enterEv.Data.MouseEntered = {wh, NowNsSafe()};
+      enterEv.PayloadSize =
+          static_cast<u32>(sizeof(events::WindowMouseEnteredPayload));
+      self->m_Staged.push_back(enterEv);
+    }
+
     StagedEvent ev;
     ev.Code = events::WindowMouseMove;
     ev.Data.MouseMove = {wh, NowNsSafe(), x, y};
     ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseMovePayload));
+    self->m_Staged.push_back(ev);
+    break;
+  }
+
+  case WM_MOUSELEAVE: {
+    if (!entry)
+      break;
+    entry->MouseInside = false;
+    StagedEvent ev;
+    ev.Code = events::WindowMouseExited;
+    ev.Data.MouseExited = {wh, NowNsSafe()};
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseExitedPayload));
     self->m_Staged.push_back(ev);
     break;
   }
@@ -1011,17 +1069,17 @@ void Win32WindowsBackend::PumpEvents(
     // Windows enters a modal loop during drag/resize that blocks our
     // PumpEvents.  Start a fast timer so we can keep flushing staged
     // events (resize, move, etc.) while the modal loop is running.
-    ::SetTimer(hwnd, kModalTimerId, kModalTimerIntervalMs, nullptr);
+    ::SetTimer(hwnd, ModalTimerId, ModalTimerIntervalMs, nullptr);
     break;
   }
 
   case WM_EXITSIZEMOVE: {
-    ::KillTimer(hwnd, kModalTimerId);
+    ::KillTimer(hwnd, ModalTimerId);
     break;
   }
 
   case WM_TIMER: {
-    if (wParam == kModalTimerId)
+    if (wParam == ModalTimerId)
     {
       self->FlushStagedEvents();
       if (self->m_ModalFrameCallback)

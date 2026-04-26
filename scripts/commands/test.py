@@ -42,6 +42,12 @@ def register(subparsers) -> None:
         action="store_true",
         help="Only build tests, don't run them",
     )
+    parser.add_argument(
+        "--visible",
+        action="store_true",
+        help="Also run hidden [.visible] tests that flash real windows on screen "
+             "(implies --feature unless --all is given)",
+    )
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -69,7 +75,9 @@ def _run(args) -> int:
     # Decide which targets to build & run
     if args.all:
         targets = UNIT_TARGETS + FEATURE_TARGETS
-    elif args.feature:
+    elif args.feature or args.visible:
+        # --visible without --all implies feature scope (only feature tests have
+        # [.visible]-tagged cases).
         targets = list(FEATURE_TARGETS)
     else:
         # Default: unit only
@@ -130,6 +138,15 @@ def _run(args) -> int:
     exe_suffix = ".exe" if _is_windows() else ""
     overall_result = 0
 
+    # When --visible is set, append the Catch2 tag filter that opts in to the
+    # hidden [.visible] cases. Catch2 hides any tag starting with '.' from the
+    # default run; passing the tag explicitly enables them. We pass it to every
+    # selected target — non-feature targets simply have no matching cases and
+    # exit cleanly with --allow-running-no-tests.
+    extra_args = []
+    if args.visible:
+        extra_args = ["[.visible]", "--allow-running-no-tests"]
+
     # On Windows network shares, SmartScreen blocks unsigned executables in
     # non-interactive mode. Copy to a local temp dir so they run without prompts.
     # On local drives this is skipped — executables run directly.
@@ -153,7 +170,7 @@ def _run(args) -> int:
                 local_exe = Path(tmpdir) / test_executable.name
                 shutil.copy2(test_executable, local_exe)
                 print(f"\n--- {test_target} ---")
-                test_result = subprocess.run([str(local_exe)], check=False)
+                test_result = subprocess.run([str(local_exe), *extra_args], check=False)
                 if test_result.returncode != 0:
                     print(f"  {test_target} exited with code {test_result.returncode}")
                     overall_result = test_result.returncode
@@ -164,7 +181,7 @@ def _run(args) -> int:
                 print(f"  Warning: {test_executable} not found, skipping")
                 continue
             print(f"\n--- {test_target} ---")
-            test_result = subprocess.run([str(test_executable)], check=False)
+            test_result = subprocess.run([str(test_executable), *extra_args], check=False)
             if test_result.returncode != 0:
                 overall_result = test_result.returncode
 

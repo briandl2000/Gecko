@@ -8,7 +8,6 @@
 #include <gecko/core/types.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
-#include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
@@ -196,7 +195,9 @@ static int AppMain(int argc, char** argv)
 
   runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler, ringLogger,
                                             eventBus);
-  platform::PlatformModule platformModule;
+  platform::PlatformConfig platformCfg;
+  platformCfg.Backend = cfg.backend;
+  platform::PlatformModule platformModule(platformCfg);
 
   // 3) Boot the engine. Modules are started in topological order based
   // on each module's Requires() / Publishes() declarations.
@@ -245,18 +246,14 @@ static int AppMain(int argc, char** argv)
   }
   else
   {
-    PlatformConfig platformCfg {};
-    platformCfg.Backend = cfg.backend;
-
-    PlatformContext ctx = PlatformContext(platformCfg);
-
     WindowDesc windowDesc {};
     windowDesc.Title = cfg.title;
     windowDesc.Size = {1280, 720};
     windowDesc.Visible = true;
     windowDesc.Resizable = true;
 
-    WindowHandle window = ctx.Windows().CreateWindow(windowDesc);
+    WindowHandle window =
+        ::gecko::platform::GetWindows()->CreateWindow(windowDesc);
     if (!window.IsValid())
     {
       GECKO_ERROR(app::app_skeleton::labels::Main, "Failed to create window");
@@ -273,11 +270,11 @@ static int AppMain(int argc, char** argv)
         },
         &running);
 
-    while (running && ctx.Windows().IsWindowAlive(window))
+    while (running && ::gecko::platform::GetWindows()->IsWindowAlive(window))
     {
       GECKO_SCOPE_NAMED(app::app_skeleton::labels::Main, "Frame");
 
-      ctx.PumpEvents();
+      ::gecko::platform::PumpEvents();
       (void)gecko::DispatchEvents();
 
       // Your update/render work goes here.
@@ -290,7 +287,7 @@ static int AppMain(int argc, char** argv)
       }
     }
 
-    ctx.Windows().DestroyWindow(window);
+    ::gecko::platform::GetWindows()->DestroyWindow(window);
   }
 
   // Unregister sinks before shutting down services

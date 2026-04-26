@@ -7,7 +7,7 @@ namespace gecko::graphics {
 
 namespace {
 
-constexpr ::gecko::ServiceId kRequired[] = {
+constexpr ::gecko::ServiceId RequiredServices[] = {
     ::gecko::ServiceIdOf<::gecko::ILogger>(),
     ::gecko::ServiceIdOf<::gecko::IProfiler>(),
     ::gecko::ServiceIdOf<::gecko::IJobSystem>(),
@@ -23,7 +23,7 @@ constexpr ::gecko::Label GraphicsModule::RootLabel() const noexcept
 
 ::std::span<const ::gecko::ServiceId> GraphicsModule::Requires() const noexcept
 {
-  return ::std::span<const ::gecko::ServiceId> {kRequired};
+  return ::std::span<const ::gecko::ServiceId> {RequiredServices};
 }
 
 bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept

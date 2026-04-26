@@ -9,7 +9,6 @@
 #include <gecko/core/services/modules.h>
 #include <gecko/core/version.h>
 #include <gecko/graphics/graphics_device.h>
-#include <gecko/platform/platform_context.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
@@ -135,8 +134,6 @@ int main()
   {
     GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "main");
 
-    PlatformContext ctx(PlatformConfig {});
-
     // ── Two windows ───────────────────────────────────────────────
     WindowSlot slots[2];
     const char* titles[2] = {
@@ -152,7 +149,7 @@ int main()
       wd.Resizable = true;
       wd.Mode = WindowMode::Windowed;
 
-      slots[i].Handle = ctx.Windows().CreateWindow(wd);
+      slots[i].Handle = ::gecko::platform::GetWindows()->CreateWindow(wd);
       if (!slots[i].Handle.IsValid())
       {
         GECKO_ERROR(app::graphics_example::labels::Main,
@@ -173,8 +170,10 @@ int main()
     for (u32 i = 0; i < 2; ++i)
     {
       NativeWindowHandle native =
-          ctx.Windows().GetNativeWindowHandle(slots[i].Handle);
-      Extent2D sz = ctx.Windows().GetClientSize(slots[i].Handle);
+          ::gecko::platform::GetWindows()->GetNativeWindowHandle(
+              slots[i].Handle);
+      Extent2D sz =
+          ::gecko::platform::GetWindows()->GetClientSize(slots[i].Handle);
 
       SwapchainDesc scDesc;
       scDesc.Width = sz.Width;
@@ -192,23 +191,23 @@ int main()
     }
 
     // ── Offscreen render target ───────────────────────────────────
-    constexpr u32 kOffscreenW = 1280;
-    constexpr u32 kOffscreenH = 720;
-    constexpr auto kOffscreenFmt = DataFormat::R8G8B8A8_UNORM;
+    constexpr u32 OffscreenW = 1280;
+    constexpr u32 OffscreenH = 720;
+    constexpr auto OffscreenFmt = DataFormat::R8G8B8A8_UNORM;
 
     RenderTargetDesc rtDesc;
-    rtDesc.Width = kOffscreenW;
-    rtDesc.Height = kOffscreenH;
+    rtDesc.Width = OffscreenW;
+    rtDesc.Height = OffscreenH;
     rtDesc.NumRenderTargets = 1;
-    rtDesc.RenderTargetFormats[0] = kOffscreenFmt;
+    rtDesc.RenderTargetFormats[0] = OffscreenFmt;
     rtDesc.RenderTargetClearValues[0] =
         ClearValue::RenderTarget(0.1F, 0.1F, 0.15F, 1.0F);
 
     RenderTarget offscreenRT = device->CreateRenderTarget(rtDesc);
     if (offscreenRT.IsValid())
       GECKO_INFO(app::graphics_example::labels::Main,
-                 "Offscreen render target created (%ux%u)", kOffscreenW,
-                 kOffscreenH);
+                 "Offscreen render target created (%ux%u)", OffscreenW,
+                 OffscreenH);
     else
       GECKO_WARN(app::graphics_example::labels::Main,
                  "Offscreen render target creation failed");
@@ -219,8 +218,8 @@ int main()
     // to SPIR-V with an Rgba32f format operand (glslc's HLSL front-end
     // ignores [[vk::image_format]]) — match that here.
     TextureDesc plasmaDesc {};
-    plasmaDesc.Width = kOffscreenW;
-    plasmaDesc.Height = kOffscreenH;
+    plasmaDesc.Width = OffscreenW;
+    plasmaDesc.Height = OffscreenH;
     plasmaDesc.Format = DataFormat::R32G32B32A32_FLOAT;
     plasmaDesc.Type = TextureType::Tex2D;
     plasmaDesc.Memory = MemoryType::Dedicated;
@@ -235,8 +234,8 @@ int main()
     }
     if (plasmaTex[0].IsValid() && plasmaTex[1].IsValid())
       GECKO_INFO(app::graphics_example::labels::Main,
-                 "Plasma storage textures created (2x %ux%u)", kOffscreenW,
-                 kOffscreenH);
+                 "Plasma storage textures created (2x %ux%u)", OffscreenW,
+                 OffscreenH);
     else
       GECKO_WARN(app::graphics_example::labels::Main,
                  "Plasma storage texture creation failed");
@@ -276,7 +275,7 @@ int main()
     };
     triPDesc.Layout = triLayout;
     triPDesc.NumRenderTargets = 1;
-    triPDesc.RenderTargetFormats[0] = kOffscreenFmt;
+    triPDesc.RenderTargetFormats[0] = OffscreenFmt;
     triPDesc.Culling = CullMode::None;
     triPDesc.PushConstantBytes = 16;  // float Time + 3 pad
     triPDesc.DebugName = "TrianglePipeline";
@@ -388,10 +387,9 @@ int main()
 
     struct ResizeContext
     {
-      PlatformContext* Ctx {nullptr};
       WindowSlot* Slots {nullptr};
     };
-    ResizeContext rctx {&ctx, slots};
+    ResizeContext rctx {slots};
 
     auto resizeSub = SubscribeEvent(
         events::WindowResized,
@@ -500,8 +498,8 @@ int main()
             f32 pc[4] = {time + tOffset, 0.0F, 0.0F, 0.0F};
             computeCmd[i]->SetConstants(
                 0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
-            const u32 gx = (kOffscreenW + 15) / 16;
-            const u32 gy = (kOffscreenH + 15) / 16;
+            const u32 gx = (OffscreenW + 15) / 16;
+            const u32 gy = (OffscreenH + 15) / 16;
             computeCmd[i]->Dispatch(gx, gy, 1);
             computeCmd[i]->TransitionTextureForRead(plasmaTex[i]);
             computeCmd[i]->End();
@@ -518,9 +516,9 @@ int main()
       // using an indirect draw + time push constant.
       ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
       cmd->BeginRendering(offscreenRT, &rtClear);
-      cmd->SetViewport(0.0F, 0.0F, static_cast<f32>(kOffscreenW),
-                       static_cast<f32>(kOffscreenH));
-      cmd->SetScissor(0, 0, kOffscreenW, kOffscreenH);
+      cmd->SetViewport(0.0F, 0.0F, static_cast<f32>(OffscreenW),
+                       static_cast<f32>(OffscreenH));
+      cmd->SetScissor(0, 0, OffscreenW, OffscreenH);
       cmd->BindPipeline(trianglePipeline);
       cmd->BindVertexBuffer(vertexBuffer);
       {
@@ -615,22 +613,22 @@ int main()
       renderFrame();
     };
 
-    ctx.SetModalFrameCallback(
+    ::gecko::platform::SetModalFrameCallback(
         [](void* ud) { (*static_cast<decltype(&update)>(ud))(); }, &update);
 
     while (running)
     {
-      ctx.PumpEvents();
+      ::gecko::platform::PumpEvents();
       update();
     }
 
-    ctx.SetModalFrameCallback(nullptr, nullptr);
+    ::gecko::platform::SetModalFrameCallback(nullptr, nullptr);
 
     // Destroy in reverse order.
     for (u32 i = 0; i < 2; ++i)
     {
       device->DestroySwapchain(slots[i].SC);
-      ctx.Windows().DestroyWindow(slots[i].Handle);
+      ::gecko::platform::GetWindows()->DestroyWindow(slots[i].Handle);
     }
 
     GECKO_INFO(app::graphics_example::labels::Main, "Shutdown complete");

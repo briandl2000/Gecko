@@ -1,8 +1,8 @@
 #pragma once
 
+#include "gecko/core/ptr.h"
 #include "gecko/core/services/profiler.h"
-
-#include <cstdio>
+#include "gecko/platform/platform_io.h"
 
 namespace gecko::runtime {
 
@@ -18,7 +18,7 @@ public:
   void Write(const ProfEvent& event);
 
 private:
-  std::FILE* m_File {nullptr};
+  ::gecko::Unique<::gecko::platform::FileWriter> m_Writer {};
   bool m_First {true};
   u64 m_Time0Ns {0};
 };

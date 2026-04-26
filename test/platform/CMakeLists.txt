@@ -1,6 +1,11 @@
 add_executable(platform_tests
   test_window_types.cpp
   test_platform_context.cpp
+  test_platform_io.cpp
+  test_threading.cpp
+  test_input.cpp
+  test_clipboard.cpp
+  test_terminal.cpp
 )
 
 target_link_libraries(platform_tests
@@ -26,6 +31,7 @@ endif()
 add_executable(platform_feature_tests
   feature_monitors.cpp
   feature_windows.cpp
+  feature_input.cpp
 )
 
 target_link_libraries(platform_feature_tests

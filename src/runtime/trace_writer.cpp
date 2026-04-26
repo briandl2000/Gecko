@@ -1,13 +1,23 @@
 #include "gecko/runtime/trace_writer.h"
 
-#include <cstdio>
-#if defined(GECKO_PLATFORM_WINDOWS)
-#include <share.h>
-#endif
-
 #include "gecko/core/assert.h"
+#include "gecko/platform/platform_io.h"
+#include "private/file_writer_format.h"
 
 namespace gecko::runtime {
+
+namespace {
+
+using ::gecko::runtime::detail::WriteFmt;
+
+inline void WriteSep(::gecko::platform::FileWriter* w, bool& first) noexcept
+{
+  if (!first)
+    w->WriteString(",");
+  first = false;
+}
+
+}  // namespace
 
 TraceWriter::TraceWriter() = default;
 
@@ -21,14 +31,11 @@ bool TraceWriter::Open(const char* path)
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
   Close();
-#if defined(GECKO_PLATFORM_WINDOWS)
-  m_File = _fsopen(path, "wb", _SH_DENYNO);
-#else
-  m_File = std::fopen(path, "wb");
-#endif
-  if (!m_File)
+  m_Writer = ::gecko::platform::OpenWrite(
+      path, ::gecko::platform::WriteMode::Truncate);
+  if (!m_Writer)
     return false;
-  std::fputs("{\"traceEvents\":[", m_File);
+  m_Writer->WriteString("{\"traceEvents\":[");
   m_First = true;
   m_Time0Ns = 0;
   return true;
@@ -36,23 +43,15 @@ bool TraceWriter::Open(const char* path)
 
 void TraceWriter::Close()
 {
-  if (!m_File)
+  if (!m_Writer)
     return;
-  std::fputs("]}\n", m_File);
-  std::fclose(m_File);
-  m_File = nullptr;
-}
-
-static void WriteSep(FILE* file, bool& first)
-{
-  if (!first)
-    std::fputc(',', file);
-  first = false;
+  m_Writer->WriteString("]}\n");
+  m_Writer.reset();
 }
 
 void TraceWriter::Write(const ProfEvent& ev)
 {
-  if (!m_File)
+  if (!m_Writer)
     return;
   if (m_Time0Ns == 0)
     m_Time0Ns = ev.TimestampNs;
@@ -64,32 +63,32 @@ void TraceWriter::Write(const ProfEvent& ev)
   switch (ev.Kind)
   {
   case ProfEventKind::ZoneBegin:
-    WriteSep(m_File, m_First);
-    std::fprintf(m_File,
-                 "{\"name\":\"%s\",\"cat\":\"%s "
-                 "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, label, (unsigned long long)ev.EventLabel.Id, timeUs,
-                 ev.ThreadId);
+    WriteSep(m_Writer.get(), m_First);
+    WriteFmt(m_Writer.get(),
+             "{\"name\":\"%s\",\"cat\":\"%s "
+             "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+             name, label, (unsigned long long)ev.EventLabel.Id, timeUs,
+             ev.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
-    WriteSep(m_File, m_First);
-    std::fprintf(m_File,
-                 "{\"name\":\"%s\",\"cat\":\"%s "
-                 "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, label, (unsigned long long)ev.EventLabel.Id, timeUs,
-                 ev.ThreadId);
+    WriteSep(m_Writer.get(), m_First);
+    WriteFmt(m_Writer.get(),
+             "{\"name\":\"%s\",\"cat\":\"%s "
+             "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+             name, label, (unsigned long long)ev.EventLabel.Id, timeUs,
+             ev.ThreadId);
     break;
   case ProfEventKind::FrameMark:
-    WriteSep(m_File, m_First);
-    std::fprintf(m_File,
-                 "{\"name\":\"%s\",\"cat\":\"frame\",\"ph\":\"i\",\"s\":\"t\","
-                 "\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-                 name, timeUs, ev.ThreadId);
+    WriteSep(m_Writer.get(), m_First);
+    WriteFmt(m_Writer.get(),
+             "{\"name\":\"%s\",\"cat\":\"frame\",\"ph\":\"i\",\"s\":\"t\","
+             "\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
+             name, timeUs, ev.ThreadId);
     break;
   case ProfEventKind::Counter:
-    WriteSep(m_File, m_First);
-    std::fprintf(
-        m_File,
+    WriteSep(m_Writer.get(), m_First);
+    WriteFmt(
+        m_Writer.get(),
         "{\"name\":\"%s\",\"cat\":\"%s "
         "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
         name, label, (unsigned long long)ev.EventLabel.Id, timeUs,

@@ -5,7 +5,7 @@
 #include <gecko/core/services/modules.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
-#include <gecko/platform/platform_context.h>
+#include <gecko/platform/input.h>
 #include <gecko/platform/platform_module.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
@@ -103,6 +103,12 @@ void PrintHelp() noexcept
   GECKO_INFO(app::platform_example::labels::Main, "  Other:");
   GECKO_INFO(app::platform_example::labels::Main, "    [H] Print this help");
   GECKO_INFO(app::platform_example::labels::Main, "    [I] Print window info");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "    [P] Print input snapshot (mouse / keys / focus / hover)");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "    Mouse buttons / scroll / focus / hover are also logged");
+  GECKO_INFO(app::platform_example::labels::Main,
+             "    automatically every frame as they change.");
   GECKO_INFO(app::platform_example::labels::Main, "    [Escape] Quit");
   GECKO_INFO(app::platform_example::labels::Main,
              "═════════════════════════════════════════════════════");
@@ -198,11 +204,6 @@ int main()
     GECKO_FUNC(app::platform_example::labels::Main);
     GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
 
-    PlatformConfig cfg = {};
-    cfg.Backend = DisplayBackendKind::Auto;
-
-    PlatformContext ctx = PlatformContext(cfg);
-
     // ── Create main window — resizable, decorated ──────────────────
     WindowDesc windowDesc;
     windowDesc.Title = "Gecko Platform Example";
@@ -211,7 +212,8 @@ int main()
     windowDesc.Resizable = true;
     windowDesc.Mode = WindowMode::Windowed;
 
-    WindowHandle window = ctx.Windows().CreateWindow(windowDesc);
+    WindowHandle window =
+        ::gecko::platform::GetWindows()->CreateWindow(windowDesc);
     GECKO_INFO(app::platform_example::labels::Main,
                "Creating application window...");
     if (!window.IsValid())
@@ -226,47 +228,49 @@ int main()
 
     // ── Print initial window info ──────────────────────────────────
     {
-      DpiInfo dpi = ctx.Windows().GetDpi(window);
+      DpiInfo dpi = ::gecko::platform::GetWindows()->GetDpi(window);
       GECKO_INFO(app::platform_example::labels::Main,
                  "Window DPI: %u (scale %.2f)", dpi.Dpi,
                  static_cast<double>(dpi.Scale));
 
-      Extent2D size = ctx.Windows().GetClientSize(window);
+      Extent2D size = ::gecko::platform::GetWindows()->GetClientSize(window);
       GECKO_INFO(app::platform_example::labels::Main, "Client size: %ux%u",
                  size.Width, size.Height);
 
-      math::Int2 pos = ctx.Windows().GetPosition(window);
+      math::Int2 pos = ::gecko::platform::GetWindows()->GetPosition(window);
       GECKO_INFO(app::platform_example::labels::Main,
                  "Window position: (%d, %d)", pos.X, pos.Y);
 
-      NativeWindowHandle native = ctx.Windows().GetNativeWindowHandle(window);
+      NativeWindowHandle native =
+          ::gecko::platform::GetWindows()->GetNativeWindowHandle(window);
       GECKO_INFO(app::platform_example::labels::Main,
                  "Native handle: backend=%u, handle=%p",
                  static_cast<unsigned>(native.Backend), native.Handle);
 
       GECKO_INFO(app::platform_example::labels::Main, "Decorated: %s",
-                 BoolStr(ctx.Windows().IsDecorated(window)));
+                 BoolStr(::gecko::platform::GetWindows()->IsDecorated(window)));
       GECKO_INFO(app::platform_example::labels::Main, "Resizable: %s",
-                 BoolStr(ctx.Windows().IsResizable(window)));
+                 BoolStr(::gecko::platform::GetWindows()->IsResizable(window)));
       GECKO_INFO(app::platform_example::labels::Main, "Window mode: %s",
-                 WindowModeToString(ctx.Windows().GetWindowMode(window)));
+                 WindowModeToString(
+                     ::gecko::platform::GetWindows()->GetWindowMode(window)));
       GECKO_INFO(app::platform_example::labels::Main, "Window state: %s",
-                 WindowStateToString(ctx.Windows().GetWindowState(window)));
-      GECKO_INFO(app::platform_example::labels::Main, "Always on top: %s",
-                 BoolStr(ctx.Windows().IsAlwaysOnTop(window)));
+                 WindowStateToString(
+                     ::gecko::platform::GetWindows()->GetWindowState(window)));
+      GECKO_INFO(
+          app::platform_example::labels::Main, "Always on top: %s",
+          BoolStr(::gecko::platform::GetWindows()->IsAlwaysOnTop(window)));
     }
 
     // ── App state for event callbacks ───────────────────────────────
     struct AppState
     {
-      PlatformContext* Ctx;
       WindowHandle MainWindow;
       ::std::vector<WindowHandle> Spawned;
       bool Running {true};
     };
 
     AppState appState;
-    appState.Ctx = &ctx;
     appState.MainWindow = window;
 
     // ── Print keybindings ─────────────────────────────────────────
@@ -296,7 +300,7 @@ int main()
               GECKO_INFO(app::platform_example::labels::Main,
                          "Child window %llu closed",
                          static_cast<unsigned long long>(it->Id));
-              state->Ctx->Windows().DestroyWindow(*it);
+              ::gecko::platform::GetWindows()->DestroyWindow(*it);
               spawned.erase(it);
               break;
             }
@@ -316,7 +320,7 @@ int main()
           if (!payload->Down || payload->Repeat)
             return;
 
-          auto& windows = state->Ctx->Windows();
+          auto& windows = *::gecko::platform::GetWindows();
           const WindowHandle main = state->MainWindow;
 
           switch (payload->Key)
@@ -584,6 +588,46 @@ int main()
             state->Running = false;
             break;
 
+          case KeyCode::P: {
+            // Demonstrate the IInput service: poll current state.
+            auto* input = ::gecko::platform::GetInput();
+            if (!input)
+              break;
+            auto pos = input->GetMousePosition();
+            auto delta = input->GetMouseDelta();
+            const auto focused = input->FocusedWindow();
+            const auto hovered = input->HoveredWindow();
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "── Input snapshot ────────────────────────");
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "  Mouse:    pos=(%d, %d)  delta=(%d, %d)  scrollY=%.2f",
+                       pos.X, pos.Y, delta.X, delta.Y,
+                       static_cast<double>(input->GetMouseScrollY()));
+            GECKO_INFO(
+                app::platform_example::labels::Main,
+                "  Buttons:  L=%s R=%s M=%s",
+                input->IsMouseButtonDown(MouseButton::Left) ? "down" : "up",
+                input->IsMouseButtonDown(MouseButton::Right) ? "down" : "up",
+                input->IsMouseButtonDown(MouseButton::Middle) ? "down" : "up");
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "  Shift held: %s    Ctrl held: %s",
+                       input->IsKeyDown(KeyCode::LeftShift) ||
+                               input->IsKeyDown(KeyCode::RightShift)
+                           ? "yes"
+                           : "no",
+                       input->IsKeyDown(KeyCode::LeftControl) ||
+                               input->IsKeyDown(KeyCode::RightControl)
+                           ? "yes"
+                           : "no");
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "  Focused window: %llu   Hovered window: %llu",
+                       static_cast<unsigned long long>(focused.Id),
+                       static_cast<unsigned long long>(hovered.Id));
+            GECKO_INFO(app::platform_example::labels::Main,
+                       "─────────────────────────────────────────");
+            break;
+          }
+
           default:
             break;
           }
@@ -647,6 +691,84 @@ int main()
         },
         nullptr);
 
+    // ── Per-frame IInput watcher ───────────────────────────────────
+    // Demonstrates polling the IInput service every frame. We log only
+    // edges + state changes so the console doesn't flood with every
+    // mouse-move sample.
+    struct InputWatch
+    {
+      WindowHandle LastFocused {};
+      WindowHandle LastHovered {};
+      bool Initialized {false};
+    } inputWatch;
+
+    auto pollInput = [&]() {
+      auto* input = ::gecko::platform::GetInput();
+      if (!input)
+        return;
+
+      // Mouse button edges (this frame).
+      static constexpr struct
+      {
+        MouseButton Btn;
+        const char* Name;
+      } btns[] = {{MouseButton::Left, "Left"},
+                  {MouseButton::Right, "Right"},
+                  {MouseButton::Middle, "Middle"}};
+      for (const auto& b : btns)
+      {
+        if (input->WasMouseButtonPressed(b.Btn))
+        {
+          auto p = input->GetMousePosition();
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: %s mouse pressed  at (%d, %d)", b.Name, p.X, p.Y);
+        }
+        if (input->WasMouseButtonReleased(b.Btn))
+        {
+          auto p = input->GetMousePosition();
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: %s mouse released at (%d, %d)", b.Name, p.X, p.Y);
+        }
+      }
+
+      // Scroll wheel (accumulated this frame).
+      const float scrollY = input->GetMouseScrollY();
+      if (scrollY != 0.0f)
+      {
+        GECKO_INFO(app::platform_example::labels::Main, "Input: scrollY=%.2f",
+                   static_cast<double>(scrollY));
+      }
+
+      // Focused / hovered window changes.
+      const auto focused = input->FocusedWindow();
+      const auto hovered = input->HoveredWindow();
+      if (!inputWatch.Initialized)
+      {
+        inputWatch.LastFocused = focused;
+        inputWatch.LastHovered = hovered;
+        inputWatch.Initialized = true;
+      }
+      else
+      {
+        if (focused.Id != inputWatch.LastFocused.Id)
+        {
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: focused window %llu → %llu",
+                     static_cast<unsigned long long>(inputWatch.LastFocused.Id),
+                     static_cast<unsigned long long>(focused.Id));
+          inputWatch.LastFocused = focused;
+        }
+        if (hovered.Id != inputWatch.LastHovered.Id)
+        {
+          GECKO_INFO(app::platform_example::labels::Main,
+                     "Input: hovered window %llu → %llu",
+                     static_cast<unsigned long long>(inputWatch.LastHovered.Id),
+                     static_cast<unsigned long long>(hovered.Id));
+          inputWatch.LastHovered = hovered;
+        }
+      }
+    };
+
     // ── Frame callback (shared between normal loop and modal timer) ──
     auto doFrame = [&]() {
       GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "Frame");
@@ -655,22 +777,24 @@ int main()
                           "DispatchEvents");
         (void)gecko::DispatchEvents();
       }
+      pollInput();
       GECKO_PRECISE_SLEEP_NS(16'000'000);
     };
 
     // Register for Win32 modal drag/resize so the app keeps ticking.
-    ctx.SetModalFrameCallback(
+    ::gecko::platform::SetModalFrameCallback(
         [](void* ud) { (*static_cast<decltype(&doFrame)>(ud))(); }, &doFrame);
 
     // ── Main loop (runs until user quits) ──────────────────────────
     GECKO_INFO(app::platform_example::labels::Main, "Entering main loop...");
-    while (appState.Running && ctx.Windows().IsWindowAlive(window))
+    while (appState.Running &&
+           ::gecko::platform::GetWindows()->IsWindowAlive(window))
     {
       GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "MainLoop");
 
       {
         GECKO_SCOPE_NAMED(app::platform_example::labels::Main, "PumpEvents");
-        ctx.PumpEvents();
+        ::gecko::platform::PumpEvents();
       }
 
       doFrame();
@@ -679,19 +803,19 @@ int main()
     // ── Cleanup — destroy all spawned windows, then main ───────────
     for (auto& h : appState.Spawned)
     {
-      if (ctx.Windows().IsWindowAlive(h))
+      if (::gecko::platform::GetWindows()->IsWindowAlive(h))
       {
         GECKO_INFO(app::platform_example::labels::Main,
                    "Destroying spawned window (id=%llu)",
                    static_cast<unsigned long long>(h.Id));
-        ctx.Windows().DestroyWindow(h);
+        ::gecko::platform::GetWindows()->DestroyWindow(h);
       }
     }
     appState.Spawned.clear();
 
     GECKO_INFO(app::platform_example::labels::Main,
                "Destroying main window...");
-    ctx.Windows().DestroyWindow(window);
+    ::gecko::platform::GetWindows()->DestroyWindow(window);
 
     // Unregister sinks before shutting down services
   }

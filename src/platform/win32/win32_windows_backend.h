@@ -89,11 +89,14 @@ private:
     bool Resizable {true};
     bool AlwaysOnTop {false};
     bool Alive {true};
+    bool MouseInside {false};
     ::std::string TitleStorage;
     // Saved style/position for fullscreen restoration.
     ::DWORD SavedStyle {0};
     ::DWORD SavedExStyle {0};
     ::RECT SavedRect {};
+    // High surrogate held for the next WM_CHAR (UTF-16 → codepoint).
+    ::gecko::u16 PendingHighSurrogate {0};
   };
 
   struct StagedEvent
@@ -113,6 +116,8 @@ private:
       events::WindowFocusChangedPayload FocusChanged;
       events::WindowMovedPayload Moved;
       events::WindowStateChangedPayload StateChanged;
+      events::WindowMouseEnteredPayload MouseEntered;
+      events::WindowMouseExitedPayload MouseExited;
       PayloadUnion() noexcept : Closed {}
       {}
     } Data;
@@ -132,8 +137,8 @@ private:
   void ApplyDecorations(::HWND hwnd, bool decorated, bool resizable) noexcept;
   ::DWORD MakeStyle(const WindowDesc& desc) const noexcept;
 
-  static constexpr UINT_PTR kModalTimerId {1};
-  static constexpr ::UINT kModalTimerIntervalMs {16};
+  static constexpr UINT_PTR ModalTimerId {1};
+  static constexpr ::UINT ModalTimerIntervalMs {16};
 
   u64 m_NextId {0};
   ::ATOM m_WndClass {0};
