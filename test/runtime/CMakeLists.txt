@@ -4,6 +4,7 @@ add_executable(runtime_tests
   test_thread_pool_job_system.cpp
   test_event_bus.cpp
   test_module_registry.cpp
+  test_ring_profiler.cpp
 )
 
 target_link_libraries(runtime_tests
