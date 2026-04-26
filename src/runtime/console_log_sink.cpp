@@ -62,14 +62,15 @@ void ConsoleLogSink::Write(const LogMessage& message) noexcept
     payload =
         ::std::string_view(stackBuf.data(), static_cast<::std::size_t>(needed));
   }
-  else
+  else if (needed > 0)
   {
-    heap.resize(needed > 0 ? static_cast<::std::size_t>(needed) : 0);
-    if (!heap.empty())
-    {
-      ::std::snprintf(heap.data(), heap.size() + 1, "[%s][%s] %s",
-                      LevelName(message.Level), label, text);
-    }
+    // Reserve room for the trailing NUL that snprintf writes; the
+    // payload string_view excludes it.
+    const ::std::size_t len = static_cast<::std::size_t>(needed);
+    heap.resize(len + 1);
+    ::std::snprintf(heap.data(), heap.size(), "[%s][%s] %s",
+                    LevelName(message.Level), label, text);
+    heap.resize(len);
     payload = heap;
   }
 

@@ -6,6 +6,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <string_view>
+#include <vector>
 
 namespace gecko::runtime {
 
@@ -14,17 +15,31 @@ namespace {
 inline void WriteFmt(::gecko::platform::FileWriter& w, const char* fmt,
                      ...) noexcept
 {
-  char buf[1024];
+  char stack[1024];
   va_list ap;
   va_start(ap, fmt);
-  int n = std::vsnprintf(buf, sizeof(buf), fmt, ap);
+  va_list ap2;
+  va_copy(ap2, ap);
+  int n = std::vsnprintf(stack, sizeof(stack), fmt, ap);
   va_end(ap);
-  if (n <= 0)
+  if (n < 0)
+  {
+    va_end(ap2);
     return;
-  ::std::size_t len = (n >= static_cast<int>(sizeof(buf)))
-                          ? sizeof(buf) - 1
-                          : static_cast<::std::size_t>(n);
-  w.WriteString(::std::string_view {buf, len});
+  }
+  if (static_cast<::std::size_t>(n) < sizeof(stack))
+  {
+    va_end(ap2);
+    w.WriteString(::std::string_view {stack, static_cast<::std::size_t>(n)});
+    return;
+  }
+  ::std::vector<char> heap(static_cast<::std::size_t>(n) + 1);
+  int n2 = std::vsnprintf(heap.data(), heap.size(), fmt, ap2);
+  va_end(ap2);
+  if (n2 < 0)
+    return;
+  w.WriteString(
+      ::std::string_view {heap.data(), static_cast<::std::size_t>(n2)});
 }
 
 }  // namespace

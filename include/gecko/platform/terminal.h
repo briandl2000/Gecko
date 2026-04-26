@@ -43,9 +43,9 @@ enum class TermStream : ::gecko::u8
 // On Win32, the console code page is forced to CP_UTF8 once on first
 // use so that multi-byte UTF-8 input is rendered correctly. Console
 // virtual-terminal mode is enabled where supported so the same ANSI
-// escape sequences work cross-platform; on older Windows hosts where
-// VT mode cannot be enabled, the color attributes are applied via
-// SetConsoleTextAttribute as a fallback.
+// escape sequences work cross-platform. Gecko targets Windows 10+,
+// which has VT support; on hosts where VT cannot be enabled, color
+// codes may appear as raw escape sequences.
 //
 // When the target stream is not a TTY (e.g. redirected to a file or
 // piped), color is suppressed entirely so logs and tools never get

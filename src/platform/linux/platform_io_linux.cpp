@@ -343,19 +343,11 @@ bool CreateDir(PathView path, bool recursive) noexcept
   {
     if (i == p.size() || p[i] == '/')
     {
-      char saved = (i < p.size()) ? p[i] : '\0';
-      p[i] = '\0';
-      if (p[0] != '\0')
-      {
-        if (::mkdir(p.c_str(), 0755) != 0 && errno != EEXIST)
-        {
-          if (i < p.size())
-            p[i] = saved;
-          return false;
-        }
-      }
-      if (i < p.size())
-        p[i] = saved;
+      ::std::string sub(p, 0, i);
+      if (sub.empty() || sub == "/")
+        continue;
+      if (::mkdir(sub.c_str(), 0755) != 0 && errno != EEXIST)
+        return false;
     }
   }
   return true;

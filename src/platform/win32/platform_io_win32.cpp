@@ -393,20 +393,15 @@ bool CreateDir(PathView path, bool recursive) noexcept
   {
     if (i == w.size() || w[i] == L'\\')
     {
-      wchar_t saved = (i < w.size()) ? w[i] : L'\0';
-      w[i] = L'\0';
-      if (w[0] != L'\0' && !(w.size() >= 2 && i == 2 && w[1] == L':'))
-      {
-        if (!::CreateDirectoryW(w.c_str(), nullptr) &&
-            ::GetLastError() != ERROR_ALREADY_EXISTS)
-        {
-          if (i < w.size())
-            w[i] = saved;
-          return false;
-        }
-      }
-      if (i < w.size())
-        w[i] = saved;
+      // Skip the drive-letter prefix (e.g. "C:") — CreateDirectoryW would fail.
+      if (i == 2 && w.size() >= 2 && w[1] == L':')
+        continue;
+      ::std::wstring sub(w, 0, i);
+      if (sub.empty())
+        continue;
+      if (!::CreateDirectoryW(sub.c_str(), nullptr) &&
+          ::GetLastError() != ERROR_ALREADY_EXISTS)
+        return false;
     }
   }
   return true;
