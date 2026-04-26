@@ -94,7 +94,7 @@ public:
 // ── Convenience free functions ────────────────────────────────────
 //
 // All forward to GetInput(); return defaults when no input service is
-// installed (NullInput is the fallback during boot).
+// installed (i.e. before PlatformModule::Startup or after Shutdown).
 
 [[nodiscard]] GECKO_API bool IsKeyDown(KeyCode key) noexcept;
 [[nodiscard]] GECKO_API bool WasKeyPressed(KeyCode key) noexcept;
@@ -106,7 +106,10 @@ public:
     MouseButton button) noexcept;
 
 [[nodiscard]] GECKO_API MousePosition GetMousePosition() noexcept;
+[[nodiscard]] GECKO_API MousePosition
+GetMousePosition(WindowHandle window) noexcept;
 [[nodiscard]] GECKO_API MousePosition GetMouseDelta() noexcept;
+[[nodiscard]] GECKO_API float GetMouseScrollX() noexcept;
 [[nodiscard]] GECKO_API float GetMouseScrollY() noexcept;
 
 [[nodiscard]] GECKO_API WindowHandle FocusedWindow() noexcept;

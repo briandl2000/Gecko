@@ -489,10 +489,10 @@ TEST_CASE("PlatformModule publishes injected backends",
   runtime::EventBus events;
   runtime::CoreServicesModule runtimeMod {jobs, profiler, logger, events};
 
-  PlatformModule platformMod {cfg,
-                              PlatformModule::Backends {.Windows = windowsRaw,
-                                                        .Monitors = monitorsRaw,
-                                                        .Input = nullptr}};
+  PlatformModule platformMod {cfg, PlatformModule::Backends {
+                                       .Windows = windowsRaw,
+                                       .Monitors = monitorsRaw,
+                                   }};
 
   REQUIRE(SetAllocator(&alloc));
   auto engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});

@@ -2,45 +2,13 @@
 
 #include "gecko/core/assert.h"
 #include "gecko/platform/platform_io.h"
-
-#include <cstdarg>
-#include <cstdio>
-#include <string_view>
-#include <vector>
+#include "private/file_writer_format.h"
 
 namespace gecko::runtime {
 
 namespace {
 
-inline void WriteFmt(::gecko::platform::FileWriter& w, const char* fmt,
-                     ...) noexcept
-{
-  char stack[1024];
-  va_list ap;
-  va_start(ap, fmt);
-  va_list ap2;
-  va_copy(ap2, ap);
-  int n = std::vsnprintf(stack, sizeof(stack), fmt, ap);
-  va_end(ap);
-  if (n < 0)
-  {
-    va_end(ap2);
-    return;
-  }
-  if (static_cast<::std::size_t>(n) < sizeof(stack))
-  {
-    va_end(ap2);
-    w.WriteString(::std::string_view {stack, static_cast<::std::size_t>(n)});
-    return;
-  }
-  ::std::vector<char> heap(static_cast<::std::size_t>(n) + 1);
-  int n2 = std::vsnprintf(heap.data(), heap.size(), fmt, ap2);
-  va_end(ap2);
-  if (n2 < 0)
-    return;
-  w.WriteString(
-      ::std::string_view {heap.data(), static_cast<::std::size_t>(n2)});
-}
+using ::gecko::runtime::detail::WriteFmt;
 
 }  // namespace
 
@@ -119,21 +87,21 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent& event) noexcept
   switch (event.Kind)
   {
   case ProfEventKind::ZoneBegin:
-    WriteFmt(*m_Writer,
+    WriteFmt(m_Writer.get(),
              "  {\"name\":\"%s\",\"cat\":\"%s "
              "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
              name, label, (unsigned long long)event.EventLabel.Id, timeUs,
              event.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
-    WriteFmt(*m_Writer,
+    WriteFmt(m_Writer.get(),
              "  {\"name\":\"%s\",\"cat\":\"%s "
              "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
              name, label, (unsigned long long)event.EventLabel.Id, timeUs,
              event.ThreadId);
     break;
   case ProfEventKind::FrameMark:
-    WriteFmt(*m_Writer,
+    WriteFmt(m_Writer.get(),
              "  "
              "{\"name\":\"%s\",\"cat\":\"frame\",\"ph\":\"i\",\"s\":\"t\","
              "\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
@@ -141,7 +109,7 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent& event) noexcept
     break;
   case ProfEventKind::Counter:
     WriteFmt(
-        *m_Writer,
+        m_Writer.get(),
         "  {\"name\":\"%s\",\"cat\":\"%s "
         "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
         name, label, (unsigned long long)event.EventLabel.Id, timeUs,

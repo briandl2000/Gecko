@@ -47,7 +47,7 @@ PlatformModule::PlatformModule(const PlatformConfig& config) noexcept
 PlatformModule::PlatformModule(const PlatformConfig& config,
                                Backends backends) noexcept
     : m_Config(Resolve(config)), m_Windows(backends.Windows),
-      m_Monitors(backends.Monitors), m_Input(backends.Input)
+      m_Monitors(backends.Monitors)
 {}
 
 PlatformModule::~PlatformModule() noexcept = default;
@@ -93,12 +93,8 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
   m_Monitors->EnumerateMonitors();
 
   // Input service: subscribes to window events on the bus.
-  if (!m_Input)
-  {
-    m_OwnedInput = ::gecko::CreateUnique<WindowEventInput>();
-    m_Input = m_OwnedInput.get();
-  }
-  if (!m_Input)
+  m_OwnedInput = ::gecko::CreateUnique<WindowEventInput>();
+  if (!m_OwnedInput)
   {
     GECKO_ERROR(labels::Platform, "Failed to create input service");
     return false;
@@ -115,7 +111,7 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
     (void)modules.UnpublishService<IWindowsBackend>();
     return false;
   }
-  if (!modules.PublishService<IInput>(m_Input))
+  if (!modules.PublishService<IInput>(m_OwnedInput.get()))
   {
     GECKO_ERROR(labels::Platform, "PublishService<IInput> failed");
     (void)modules.UnpublishService<IMonitorsBackend>();
@@ -125,7 +121,7 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
 
   g_Windows = m_Windows;
   g_Monitors = m_Monitors;
-  g_Input = m_Input;
+  g_Input = m_OwnedInput.get();
   g_Emitter = &m_Emitter;
 
   return true;
@@ -144,7 +140,6 @@ void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
   (void)modules.UnpublishService<IMonitorsBackend>();
   (void)modules.UnpublishService<IWindowsBackend>();
 
-  m_Input = nullptr;
   m_Monitors = nullptr;
   m_Windows = nullptr;
   m_OwnedInput.reset();
