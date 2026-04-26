@@ -1,7 +1,9 @@
 #include "gecko/core/engine.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services.h"
+#include "private/labels.h"
 #include "private/module_registry.h"
 
 namespace gecko {
@@ -9,6 +11,7 @@ namespace gecko {
 ::std::optional<Engine> Engine::Create(
     ::std::initializer_list<IModule*> modules) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(::gecko::core::labels::Modules, "Engine::Create");
   Engine engine;
   engine.m_registry = ::std::unique_ptr<IModuleRegistry>(
       new (::std::nothrow)::gecko::core::detail::ModuleRegistry());

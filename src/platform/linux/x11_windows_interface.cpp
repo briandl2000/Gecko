@@ -221,6 +221,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   int eventCount = 0;
   while (::XPending(m_Display) > 0)
   {
+    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General, "X11::HandleEvent");
     ::XEvent event;
     ::XNextEvent(m_Display, &event);
     eventCount++;

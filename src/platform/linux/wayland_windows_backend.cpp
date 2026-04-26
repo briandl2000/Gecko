@@ -1170,19 +1170,26 @@ void WaylandWindowsBackend::PumpEvents(
     return;
 
   // Non-blocking dispatch: prepare + read (if ready) + dispatch.
-  ::wl_display_flush(m_Display);
-  if (::wl_display_prepare_read(m_Display) == 0)
   {
-    // Poll with zero timeout (non-blocking).
-    struct pollfd pfd {};
-    pfd.fd = ::wl_display_get_fd(m_Display);
-    pfd.events = POLLIN;
-    if (::poll(&pfd, 1, 0) > 0)
-      ::wl_display_read_events(m_Display);
-    else
-      ::wl_display_cancel_read(m_Display);
+    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General, "wl_display_flush+read");
+    ::wl_display_flush(m_Display);
+    if (::wl_display_prepare_read(m_Display) == 0)
+    {
+      // Poll with zero timeout (non-blocking).
+      struct pollfd pfd {};
+      pfd.fd = ::wl_display_get_fd(m_Display);
+      pfd.events = POLLIN;
+      if (::poll(&pfd, 1, 0) > 0)
+        ::wl_display_read_events(m_Display);
+      else
+        ::wl_display_cancel_read(m_Display);
+    }
   }
-  ::wl_display_dispatch_pending(m_Display);
+  {
+    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General,
+                                    "wl_display_dispatch_pending");
+    ::wl_display_dispatch_pending(m_Display);
+  }
 
   // Process configure events.
   for (auto& [id, ws] : m_Windows)
