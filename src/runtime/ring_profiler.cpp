@@ -153,6 +153,19 @@ void RingProfiler::RemoveSink(IProfilerSink* sink) noexcept
   if (!sink)
     return;
 
+  // Wait for any in-flight consumer job to finish: TryPop is SPSC and the
+  // synchronous Flush() below would race against the worker, sometimes
+  // dropping ZoneEnd events (causing trace viewers to show "[incomplete]"
+  // zones).
+  JobHandle jobToWait;
+  {
+    std::lock_guard<std::mutex> lock(m_JobMu);
+    jobToWait = m_ConsumerJob;
+    m_ConsumerJob = JobHandle {};
+  }
+  if (jobToWait.IsValid())
+    WaitForJob(jobToWait);
+
   // Flush all pending work first to ensure no in-flight references
   Flush();
 

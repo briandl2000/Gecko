@@ -107,6 +107,8 @@ int main()
     return 1;
   }
 
+  ::gecko::GetProfiler()->SetMinLevel(::gecko::ProfLevel::Detailed);
+
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
 

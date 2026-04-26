@@ -152,7 +152,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   instanceCreateInfo.enabledLayerCount = static_cast<u32>(layers.size());
   instanceCreateInfo.ppEnabledLayerNames = layers.data();
 
-  if (vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance) != VK_SUCCESS)
+  if ([&]() noexcept {
+        GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateInstance");
+        return vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance) !=
+               VK_SUCCESS;
+      }())
   {
     GECKO_ERROR(labels::Vulkan,
                 "VulkanDevice: vkCreateInstance failed "
@@ -192,7 +196,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   // ── Physical device ───────────────────────────────────────────
 
   u32 physicalDeviceCount = 0;
-  vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, nullptr);
+  {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkEnumeratePhysicalDevices");
+    vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, nullptr);
+  }
   if (physicalDeviceCount == 0)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: no Vulkan physical devices");
@@ -303,8 +310,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   deviceCreateInfo.enabledExtensionCount = static_cast<u32>(deviceExts.size());
   deviceCreateInfo.ppEnabledExtensionNames = deviceExts.data();
 
-  if (vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_Device) !=
-      VK_SUCCESS)
+  if ([&]() noexcept {
+        GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateDevice");
+        return vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr,
+                              &m_Device);
+      }() != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateDevice failed");
     return;
@@ -334,7 +344,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   allocatorCreateInfo.device = m_Device;
   allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
   allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-  VULKAN_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator));
+  {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vmaCreateAllocator");
+    VULKAN_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator));
+  }
 
   // ── Descriptor pool ───────────────────────────────────────────
   // Example-grade: a single large pool, never reset. Sufficient for the
