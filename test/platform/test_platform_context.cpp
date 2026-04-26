@@ -1,5 +1,6 @@
 #include "gecko/core/engine.h"
 #include "gecko/core/services.h"
+#include "gecko/platform/input.h"
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/platform_module.h"
 #include "gecko/runtime/event_bus.h"
@@ -455,4 +456,60 @@ TEST_CASE("PlatformModule stores resolved config", "[platform][context]")
   TestServiceScope scope;
 
   REQUIRE(scope.platformMod.Config().Backend == DisplayBackendKind::Null);
+}
+
+// --- Caller-owned backend injection ---------------------------------
+//
+// PlatformModule::Backends takes raw pointers (caller-owned). When a
+// pointer is non-null the module must publish *that* exact instance as
+// the service, instead of constructing its own default. Verifies the
+// "user owns the memory" rule documented in MODULE_API_SHAPING.md.
+
+TEST_CASE("PlatformModule publishes injected backends",
+          "[platform][context][injection]")
+{
+  PlatformConfig cfg;
+  cfg.Backend = DisplayBackendKind::Null;
+
+  // Caller-owned backends. Held in Unique<> here purely so the test
+  // doesn't have to know the concrete null types — but the *module*
+  // sees raw pointers and never takes ownership.
+  ::gecko::Unique<IWindowsBackend> windows = IWindowsBackend::Create(cfg);
+  ::gecko::Unique<IMonitorsBackend> monitors = IMonitorsBackend::Create(cfg);
+  REQUIRE(windows);
+  REQUIRE(monitors);
+
+  IWindowsBackend* windowsRaw = windows.get();
+  IMonitorsBackend* monitorsRaw = monitors.get();
+
+  SystemAllocator alloc;
+  NullJobSystem jobs;
+  NullProfiler profiler;
+  NullLogger logger;
+  runtime::EventBus events;
+  runtime::CoreServicesModule runtimeMod {jobs, profiler, logger, events};
+
+  PlatformModule platformMod {
+      cfg, PlatformModule::Backends {.Windows = windowsRaw,
+                                     .Monitors = monitorsRaw,
+                                     .Input = nullptr}};
+
+  REQUIRE(SetAllocator(&alloc));
+  auto engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
+  REQUIRE(engine.has_value());
+
+  // Injected pointers must be the ones published as services.
+  REQUIRE(GetWindows() == windowsRaw);
+  REQUIRE(GetMonitors() == monitorsRaw);
+  // Input was left null, so the module should have constructed a
+  // default — accessor must still be non-null and not equal to either
+  // injected pointer.
+  REQUIRE(GetInput() != nullptr);
+
+  engine.reset();
+  ResetAllocator();
+
+  // Caller still owns the backends after Shutdown.
+  REQUIRE(windows);
+  REQUIRE(monitors);
 }

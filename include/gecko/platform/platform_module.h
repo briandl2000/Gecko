@@ -35,7 +35,23 @@ inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
 class PlatformModule final : public ::gecko::IModule
 {
 public:
+  // Optional injection point for tests / specialised hosts. The caller
+  // owns each non-null backend and must keep it alive for the lifetime
+  // of the PlatformModule (same ownership rule as CoreServicesModule's
+  // service references). Any backend left null is created and owned
+  // internally by the module from the resolved PlatformConfig during
+  // Startup(). Production code passes nothing and gets the
+  // OS-appropriate defaults.
+  struct Backends
+  {
+    IWindowsBackend* Windows = nullptr;
+    IMonitorsBackend* Monitors = nullptr;
+    IInput* Input = nullptr;
+  };
+
   GECKO_API explicit PlatformModule(const PlatformConfig& config = {}) noexcept;
+  GECKO_API PlatformModule(const PlatformConfig& config,
+                           Backends backends) noexcept;
   GECKO_API ~PlatformModule() noexcept override;
 
   [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
@@ -65,9 +81,18 @@ public:
 private:
   PlatformConfig m_Config;
   ::gecko::EventEmitter m_Emitter {};
-  ::gecko::Unique<IWindowsBackend> m_Windows;
-  ::gecko::Unique<IMonitorsBackend> m_Monitors;
-  ::gecko::Unique<IInput> m_Input;
+
+  // Externally-owned (injected) backends. Null unless the user passed
+  // them via the Backends ctor.
+  IWindowsBackend* m_Windows = nullptr;
+  IMonitorsBackend* m_Monitors = nullptr;
+  IInput* m_Input = nullptr;
+
+  // Internally-owned fallback defaults, populated during Startup() only
+  // for backends the user did not inject.
+  ::gecko::Unique<IWindowsBackend> m_OwnedWindows;
+  ::gecko::Unique<IMonitorsBackend> m_OwnedMonitors;
+  ::gecko::Unique<IInput> m_OwnedInput;
 };
 
 // ── Service accessors ────────────────────────────────────────────────

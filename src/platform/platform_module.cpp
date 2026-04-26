@@ -45,6 +45,12 @@ PlatformModule::PlatformModule(const PlatformConfig& config) noexcept
     : m_Config(Resolve(config))
 {}
 
+PlatformModule::PlatformModule(const PlatformConfig& config,
+                               Backends backends) noexcept
+    : m_Config(Resolve(config)), m_Windows(backends.Windows),
+      m_Monitors(backends.Monitors), m_Input(backends.Input)
+{}
+
 PlatformModule::~PlatformModule() noexcept = default;
 
 ::std::span<const ::gecko::ServiceId> PlatformModule::Requires() const noexcept
@@ -70,8 +76,16 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
 #endif
 
   m_Emitter = ::gecko::CreateEmitterForModule(labels::Platform);
-  m_Windows = IWindowsBackend::Create(m_Config);
-  m_Monitors = IMonitorsBackend::Create(m_Config);
+  if (!m_Windows)
+  {
+    m_OwnedWindows = IWindowsBackend::Create(m_Config);
+    m_Windows = m_OwnedWindows.get();
+  }
+  if (!m_Monitors)
+  {
+    m_OwnedMonitors = IMonitorsBackend::Create(m_Config);
+    m_Monitors = m_OwnedMonitors.get();
+  }
   if (!m_Windows || !m_Monitors)
   {
     GECKO_ERROR(labels::Platform, "Failed to create platform backends");
@@ -80,25 +94,29 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
   m_Monitors->EnumerateMonitors();
 
   // Input service: subscribes to window events on the bus.
-  m_Input = ::gecko::CreateUnique<WindowEventInput>();
+  if (!m_Input)
+  {
+    m_OwnedInput = ::gecko::CreateUnique<WindowEventInput>();
+    m_Input = m_OwnedInput.get();
+  }
   if (!m_Input)
   {
     GECKO_ERROR(labels::Platform, "Failed to create input service");
     return false;
   }
 
-  if (!modules.PublishService<IWindowsBackend>(m_Windows.get()))
+  if (!modules.PublishService<IWindowsBackend>(m_Windows))
   {
     GECKO_ERROR(labels::Platform, "PublishService<IWindowsBackend> failed");
     return false;
   }
-  if (!modules.PublishService<IMonitorsBackend>(m_Monitors.get()))
+  if (!modules.PublishService<IMonitorsBackend>(m_Monitors))
   {
     GECKO_ERROR(labels::Platform, "PublishService<IMonitorsBackend> failed");
     (void)modules.UnpublishService<IWindowsBackend>();
     return false;
   }
-  if (!modules.PublishService<IInput>(m_Input.get()))
+  if (!modules.PublishService<IInput>(m_Input))
   {
     GECKO_ERROR(labels::Platform, "PublishService<IInput> failed");
     (void)modules.UnpublishService<IMonitorsBackend>();
@@ -106,9 +124,9 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
     return false;
   }
 
-  g_Windows = m_Windows.get();
-  g_Monitors = m_Monitors.get();
-  g_Input = m_Input.get();
+  g_Windows = m_Windows;
+  g_Monitors = m_Monitors;
+  g_Input = m_Input;
   g_Emitter = &m_Emitter;
 
   return true;
@@ -127,9 +145,12 @@ void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
   (void)modules.UnpublishService<IMonitorsBackend>();
   (void)modules.UnpublishService<IWindowsBackend>();
 
-  m_Input.reset();
-  m_Monitors.reset();
-  m_Windows.reset();
+  m_Input = nullptr;
+  m_Monitors = nullptr;
+  m_Windows = nullptr;
+  m_OwnedInput.reset();
+  m_OwnedMonitors.reset();
+  m_OwnedWindows.reset();
   m_Emitter = {};
 
 #if defined(GECKO_PLATFORM_WINDOWS)
