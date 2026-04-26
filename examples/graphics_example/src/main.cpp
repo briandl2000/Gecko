@@ -89,7 +89,11 @@ int main()
   if (!SetAllocator(&trackingAlloc))
     return 1;
 
-  runtime::RingProfiler ringProfiler(1 << 16);
+  // 1<<20 slots: with profiler at Detailed level the graphics example can
+  // emit ~30k events/sec; a 64k ring overflows in ~2s, dropping subsequent
+  // events (including the AppRun ZoneEnd, showing as '[incomplete]' in
+  // Perfetto). 1M is plenty.
+  runtime::RingProfiler ringProfiler(1 << 20);
   runtime::ImmediateLogger ringLogger;
   ringLogger.SetThreadSafe(true);
   runtime::EventBus eventBus;

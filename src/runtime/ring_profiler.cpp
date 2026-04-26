@@ -217,7 +217,7 @@ void RingProfiler::ProcessProfEvents() noexcept
   }
 
   ProfEvent event {};
-  const int maxBatchSize = 128;  // Process events in batches for efficiency
+  const int maxBatchSize = 4096;  // Process events in batches for efficiency
 
   for (int batch = 0; batch < maxBatchSize; ++batch)
   {
@@ -278,8 +278,8 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   u64 now = NowNs();
   u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
 
-  // Don't schedule too frequently (at most every 100µs)
-  if (now - lastTime < 100000)  // 100 microseconds
+  // Don't schedule too frequently (at most every 10µs)
+  if (now - lastTime < 10000)  // 10 microseconds
     return;
 
   // Try to claim the scheduling slot atomically (still no mutex)
