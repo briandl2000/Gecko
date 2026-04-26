@@ -1,6 +1,5 @@
 #pragma once
 
-#include "gecko/core/api.h"
 #include "gecko/platform/input.h"
 
 #include <array>
@@ -23,7 +22,7 @@ namespace gecko::platform {
 // Equivalent to NewFrame() being called *before* the next test step:
 // EndFrame() advances the frame and rolls current → previous so the
 // next round of mutations becomes the new "current" frame.
-class GECKO_API MockInput final : public IInput
+class MockInput final : public IInput
 {
 public:
   static constexpr ::gecko::usize KeyCount = 256;

@@ -163,10 +163,9 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
     auto it = IterateDir(scratch.Path.string());
     REQUIRE(it.Ok());
     int found = 0;
-    DirEntry entry;
-    while (it.Next(entry))
+    while (auto entry = it.Next())
     {
-      if (entry.Name == "a.txt" || entry.Name == "b.txt")
+      if (entry->Name == "a.txt" || entry->Name == "b.txt")
         ++found;
     }
     REQUIRE(found == 2);

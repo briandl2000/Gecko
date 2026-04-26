@@ -11,7 +11,7 @@ namespace gecko::runtime {
 
 namespace {
 
-inline void WriteFmt(::gecko::platform::FileWriter& w, const char* fmt,
+inline void WriteFmt(::gecko::platform::FileWriter* w, const char* fmt,
                      ...) noexcept
 {
   char buf[1024];
@@ -24,7 +24,7 @@ inline void WriteFmt(::gecko::platform::FileWriter& w, const char* fmt,
   ::std::size_t len = (n >= static_cast<int>(sizeof(buf)))
                           ? sizeof(buf) - 1
                           : static_cast<::std::size_t>(n);
-  w.WriteString(::std::string_view {buf, len});
+  w->WriteString(::std::string_view {buf, len});
 }
 
 }  // namespace
@@ -89,7 +89,7 @@ void CrashSafeTraceProfilerSink::WriteEvent(const ProfEvent& event) noexcept
   m_Writer->Seek(-2, /*fromEnd=*/true);
 
   WriteSeparator();
-  WriteJsonEventTo(*m_Writer, event, m_Time0Ns);
+  WriteJsonEventTo(m_Writer.get(), event, m_Time0Ns);
   m_Writer->WriteString("]}");
 }
 
@@ -112,7 +112,7 @@ void CrashSafeTraceProfilerSink::Flush() noexcept
 }
 
 void CrashSafeTraceProfilerSink::WriteJsonEventTo(
-    ::gecko::platform::FileWriter& w, const ProfEvent& event,
+    ::gecko::platform::FileWriter* w, const ProfEvent& event,
     u64 time0Ns) noexcept
 {
   const double timeUs = (double)(event.TimestampNs - time0Ns) / 1000.0;

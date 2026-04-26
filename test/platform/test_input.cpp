@@ -311,7 +311,7 @@ TEST_CASE("Input: PumpEvents auto-calls NewFrame on the input service",
 
 // ── MockInput ────────────────────────────────────────────────────────
 
-#include "gecko/platform/mock_input.h"
+#include "mock_input.h"
 
 TEST_CASE("MockInput: keys + edges", "[platform][input][mock]")
 {

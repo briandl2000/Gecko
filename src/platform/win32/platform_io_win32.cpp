@@ -453,7 +453,7 @@ DirIter IterateDir(PathView path) noexcept
     return {};
   }
 
-  auto next = [](void* handle, DirEntry& out) noexcept -> bool {
+  auto next = [](void* handle, DirEntry* out) noexcept -> bool {
     auto* st = static_cast<State*>(handle);
     for (;;)
     {
@@ -473,13 +473,13 @@ DirIter IterateDir(PathView path) noexcept
         ++len;
       try
       {
-        out.Name = FromWide(st->Data.cFileName, len);
+        out->Name = FromWide(st->Data.cFileName, len);
       }
       catch (...)
       {
         return false;
       }
-      out.IsDirectory =
+      out->IsDirectory =
           (st->Data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
       return true;
     }

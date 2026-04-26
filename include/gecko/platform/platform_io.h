@@ -79,7 +79,10 @@ public:
   {
     return m_Ok;
   }
-  [[nodiscard]] ::std::span<const ::std::byte> Data() const noexcept;
+  [[nodiscard]] ::std::span<const ::std::byte> Data() const noexcept
+  {
+    return {m_Bytes.data(), m_Bytes.size()};
+  }
   [[nodiscard]] ::std::size_t Size() const noexcept
   {
     return m_Bytes.size();
@@ -114,7 +117,10 @@ public:
   {
     return Ok();
   }
-  [[nodiscard]] ::std::span<const ::std::byte> Data() const noexcept;
+  [[nodiscard]] ::std::span<const ::std::byte> Data() const noexcept
+  {
+    return {m_Data, m_Size};
+  }
   [[nodiscard]] ::std::size_t Size() const noexcept
   {
     return m_Size;
@@ -132,7 +138,7 @@ private:
 class GECKO_API DirIter
 {
 public:
-  using NextFn = bool (*)(void* handle, DirEntry& out) noexcept;
+  using NextFn = bool (*)(void* handle, DirEntry* out) noexcept;
   using CloseFn = void (*)(void* handle) noexcept;
 
   DirIter() noexcept = default;
@@ -153,7 +159,7 @@ public:
     return Ok();
   }
 
-  [[nodiscard]] bool Next(DirEntry& out) noexcept;
+  [[nodiscard]] ::std::optional<DirEntry> Next() noexcept;
   void Close() noexcept;
 
 private:

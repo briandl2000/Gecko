@@ -102,11 +102,6 @@ ReadResult& ReadResult::operator=(ReadResult&& other) noexcept
 
 ReadResult::~ReadResult() noexcept = default;
 
-::std::span<const ::std::byte> ReadResult::Data() const noexcept
-{
-  return {m_Bytes.data(), m_Bytes.size()};
-}
-
 ::std::vector<::std::byte> ReadResult::Take() noexcept
 {
   m_Ok = false;
@@ -162,11 +157,6 @@ void MappedFile::Reset() noexcept
   m_Deleter = nullptr;
 }
 
-::std::span<const ::std::byte> MappedFile::Data() const noexcept
-{
-  return {m_Data, m_Size};
-}
-
 // ── DirIter ─────────────────────────────────────────────────────────
 
 DirIter::DirIter(void* handle, NextFn nextFn, CloseFn closeFn) noexcept
@@ -201,11 +191,14 @@ DirIter::~DirIter() noexcept
   Close();
 }
 
-bool DirIter::Next(DirEntry& out) noexcept
+::std::optional<DirEntry> DirIter::Next() noexcept
 {
   if (!m_Handle || !m_Next)
-    return false;
-  return m_Next(m_Handle, out);
+    return ::std::nullopt;
+  DirEntry entry;
+  if (!m_Next(m_Handle, &entry))
+    return ::std::nullopt;
+  return entry;
 }
 
 void DirIter::Close() noexcept

@@ -56,7 +56,7 @@ void UnmapLinux(void* opaque) noexcept
   delete h;
 }
 
-bool DirIterNext(void* handle, DirEntry& out) noexcept
+bool DirIterNext(void* handle, DirEntry* out) noexcept
 {
   auto* d = static_cast<DIR*>(handle);
   while (true)
@@ -70,13 +70,13 @@ bool DirIterNext(void* handle, DirEntry& out) noexcept
       continue;
     try
     {
-      out.Name = e->d_name;
+      out->Name = e->d_name;
     }
     catch (...)
     {
       return false;
     }
-    out.IsDirectory = (e->d_type == DT_DIR);
+    out->IsDirectory = (e->d_type == DT_DIR);
     return true;
   }
 }

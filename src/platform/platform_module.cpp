@@ -2,7 +2,6 @@
 
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
-#include "private/null_input.h"
 #include "private/window_event_input.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
