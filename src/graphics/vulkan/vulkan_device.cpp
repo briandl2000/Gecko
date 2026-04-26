@@ -91,6 +91,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   // ── Enumerate available layers / extensions (for graceful fallback) ──
   ::std::vector<VkExtensionProperties> availableExts;
   {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan,
+                           "vkEnumerateInstanceExtensionProperties");
     u32 n = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &n, nullptr);
     availableExts.resize(n);
@@ -115,6 +117,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   ::std::vector<VkLayerProperties> availableLayers;
   {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan,
+                           "vkEnumerateInstanceLayerProperties");
     u32 n = 0;
     vkEnumerateInstanceLayerProperties(&n, nullptr);
     availableLayers.resize(n);
@@ -273,7 +277,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   VkPhysicalDeviceFeatures2 supported2 {};
   supported2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   supported2.pNext = &supported12;
-  vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supported2);
+  {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkGetPhysicalDeviceFeatures2");
+    vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supported2);
+  }
 
   if (supported13.dynamicRendering != VK_TRUE ||
       supported13.synchronization2 != VK_TRUE)
@@ -329,8 +336,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   cmdPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
-  VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr,
-                                   &m_GraphicsCommandPool));
+  {
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateCommandPool");
+    VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr,
+                                     &m_GraphicsCommandPool));
+  }
 
   // ── VMA allocator ─────────────────────────────────────────────
 
@@ -365,6 +375,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     descPoolCreateInfo.maxSets = 4096;
     descPoolCreateInfo.poolSizeCount = 1;
     descPoolCreateInfo.pPoolSizes = poolSizes;
+    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateDescriptorPool");
     VULKAN_CHECK(vkCreateDescriptorPool(m_Device, &descPoolCreateInfo, nullptr,
                                         &m_DescriptorPool));
   }
