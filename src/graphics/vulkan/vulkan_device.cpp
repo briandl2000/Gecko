@@ -18,6 +18,7 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
 #include "private/labels.h"
@@ -829,6 +830,8 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 
 FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_MARK(labels::Vulkan, "VulkanDevice::BeginFrame");
+
   // Reclaim completed command lists from previous submits before doing
   // anything else this frame.
   ReapPending();
@@ -895,6 +898,8 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 
 void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_MARK(labels::Vulkan, "VulkanDevice::Present");
+
   if (frames.empty())
     return;
 
@@ -972,6 +977,9 @@ Unique<ICommandList> VulkanDevice::CreateComputeCommandList() noexcept
 void VulkanDevice::ExecuteGraphicsCommandList(
     Unique<ICommandList> commandList) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_MARK(labels::Vulkan,
+                              "VulkanDevice::ExecuteGraphicsCommandList");
+
   auto* cl = static_cast<VulkanCommandList*>(commandList.get());
   if (cl == nullptr || !cl->IsValid())
     return;

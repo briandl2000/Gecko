@@ -1,6 +1,7 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_command_list.h"
 
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "private/labels.h"
 #include "vulkan_device.h"
@@ -56,6 +57,8 @@ VulkanCommandList::~VulkanCommandList()
 
 void VulkanCommandList::Begin() noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanCommandList::Begin");
+
   vkResetCommandBuffer(m_CmdBuffer, 0);
   if (m_DescPool != VK_NULL_HANDLE)
     vkResetDescriptorPool(m_Device->Device(), m_DescPool, 0);
@@ -74,6 +77,8 @@ void VulkanCommandList::Begin() noexcept
 
 void VulkanCommandList::End() noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanCommandList::End");
+
   // Transition any active swapchain images still in color-attachment layout
   // to PRESENT. The most recent BeginRendering on a swapchain image left it
   // in COLOR_ATTACHMENT_OPTIMAL after EndRendering.

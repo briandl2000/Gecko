@@ -1,6 +1,7 @@
 ﻿#include "gecko/runtime/thread_pool_job_system.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/profiler.h"
 #include "private/labels.h"
@@ -76,8 +77,9 @@ void ThreadPoolJobSystem::Shutdown() noexcept
 JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
                                       Label label) noexcept
 {
-  // NOTE: Cannot use profiling/logging - JobSystem is Level 1, comes before
-  // Profiler (Level 2) and Logger (Level 3)
+  // Profiler/logger may not exist yet at very early startup; the macros
+  // route through GetProfiler()/GetLogger() which fall back to Null impls.
+  GECKO_PROF_SCOPE_NAMED(labels::JobSystem, "JobSystem::Submit");
 
   if (!m_Initialized || !job)
   {
@@ -102,7 +104,7 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
                                       u32 dependencyCount, JobPriority priority,
                                       Label label) noexcept
 {
-  // NOTE: Cannot use profiling/logging - dependency order violation
+  GECKO_PROF_SCOPE_NAMED(labels::JobSystem, "JobSystem::Submit(deps)");
 
   if (!m_Initialized || !job)
   {
