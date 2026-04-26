@@ -535,21 +535,14 @@ int main()
 
   // Profiler v2: AsyncTraceProfilerSink streams to a Chrome-trace JSON
   // through a dedicated worker thread. It drains and fsyncs on shutdown.
-  // Opt-in via GECKO_TRACE=<path> (or GECKO_TRACE=1 for default file).
-  const char* tracePathEnv = ::std::getenv("GECKO_TRACE");
-  const char* tracePath = nullptr;
-  if (tracePathEnv && tracePathEnv[0] != '\0' && tracePathEnv[0] != '0')
-    tracePath = (tracePathEnv[0] == '1' && tracePathEnv[1] == '\0')
-                    ? "gecko_trace.json"
-                    : tracePathEnv;
-  runtime::AsyncTraceProfilerSink traceSink(tracePath);
+  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
 
-  if (tracePath && !traceSink.IsOpen())
+  if (!traceSink.IsOpen())
   {
     GECKO_WARN(app::core_example::labels::Main,
                "Failed to open trace profiler sink\n");
   }
-  else if (traceSink.IsOpen())
+  else
   {
     if (auto* profiler = GetProfiler())
       traceSink.RegisterWith(profiler);
@@ -867,7 +860,8 @@ int main()
   // Unregister sinks before shutting down services
   consoleSink.Unregister();
   fileSink.Unregister();
-  traceSink.Unregister();
+  // traceSink: let RAII unregister so any final ZoneEnd events still land
+  // in the trace before the writer closes.
 
   // Engine RAII destructor handles UninstallServices when scope ends
   engine.reset();

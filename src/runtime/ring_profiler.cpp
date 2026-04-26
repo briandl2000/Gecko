@@ -118,6 +118,13 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
 
 bool RingProfiler::TryPop(ProfEvent& event) noexcept
 {
+  // Guard against being called after Shutdown() (e.g. trace-sink destructors
+  // running after engine.reset() — they Unregister, which calls Flush, which
+  // calls TryPop). Shutdown swaps the backing storage out, so without this
+  // we'd indexing into an empty vector.
+  if (m_Ring.empty())
+    return false;
+
   u64 pos = m_Tail.load(std::memory_order_relaxed);
   Slot& slot = m_Ring[pos & m_Mask];
   u64 sequence = slot.Sequence.load(std::memory_order_acquire);

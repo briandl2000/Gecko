@@ -117,36 +117,27 @@ int main()
     logger->SetLevel(LogLevel::Info);
   }
 
-  // Profile trace is opt-in: set GECKO_TRACE=<path> (or GECKO_TRACE=1 for the
-  // default file) to capture a Chrome-trace JSON. Off by default to avoid
-  // background I/O during normal runs.
-  const char* tracePathEnv = ::std::getenv("GECKO_TRACE");
-  const char* tracePath = nullptr;
-  if (tracePathEnv && tracePathEnv[0] != '\0' && tracePathEnv[0] != '0')
-    tracePath = (tracePathEnv[0] == '1' && tracePathEnv[1] == '\0')
-                    ? "gecko_trace.json"
-                    : tracePathEnv;
-  runtime::AsyncTraceProfilerSink traceSink(tracePath);
+  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
 
   // Name the main thread so trace viewers show "main" instead of a raw TID.
   ::gecko::SetThreadProfilerName("main");
 
-  GECKO_FUNC(app::graphics_example::labels::Main);
+  GECKO_PUSH_LABEL(app::graphics_example::labels::Main);
   GECKO_INFO(app::graphics_example::labels::Main, gecko::VersionFullString());
 
-  if (tracePath && !traceSink.IsOpen())
+  if (!traceSink.IsOpen())
   {
     GECKO_WARN(app::graphics_example::labels::Main,
                "Failed to open trace profiler sink\n");
   }
-  else if (traceSink.IsOpen())
+  else
   {
     if (auto* profiler = GetProfiler())
       traceSink.RegisterWith(profiler);
   }
 
   {
-    GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "main");
+    GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "AppRun");
 
     // ── Two windows ───────────────────────────────────────────────
     WindowSlot slots[2];
@@ -692,7 +683,12 @@ int main()
 
   consoleSink.Unregister();
   fileSink.Unregister();
-  traceSink.Unregister();
+  // NOTE: do NOT explicitly Unregister traceSink here. The outer GECKO_FUNC
+  // scope object is destroyed at function exit AFTER this line runs but
+  // BEFORE traceSink (since traceSink was declared earlier). Unregistering
+  // here would detach the sink before GECKO_FUNC's ZoneEnd fires, leaving
+  // the main scope visibly "[incomplete]" in trace viewers. RAII does the
+  // right thing: traceSink dtor unregisters, drains, then closes.
 
   engine.reset();
   ResetAllocator();

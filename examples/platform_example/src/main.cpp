@@ -178,24 +178,17 @@ int main()
     return 1;
   }
   // Profiler v2: stream Chrome-trace events asynchronously through a
-  // dedicated worker thread; drains + fsyncs on shutdown. Opt-in via
-  // GECKO_TRACE=<path> (or GECKO_TRACE=1 for the default file).
-  const char* tracePathEnv = ::std::getenv("GECKO_TRACE");
-  const char* tracePath = nullptr;
-  if (tracePathEnv && tracePathEnv[0] != '\0' && tracePathEnv[0] != '0')
-    tracePath = (tracePathEnv[0] == '1' && tracePathEnv[1] == '\0')
-                    ? "gecko_trace.json"
-                    : tracePathEnv;
-  runtime::AsyncTraceProfilerSink traceSink(tracePath);
+  // dedicated worker thread; drains + fsyncs on shutdown.
+  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
 
   ::gecko::SetThreadProfilerName("main");
 
-  if (tracePath && !traceSink.IsOpen())
+  if (!traceSink.IsOpen())
   {
     GECKO_WARN(app::platform_example::labels::Main,
                "Failed to open trace profiler sink\n");
   }
-  else if (traceSink.IsOpen())
+  else
   {
     if (auto* profiler = GetProfiler())
       traceSink.RegisterWith(profiler);
@@ -836,7 +829,8 @@ int main()
   }
   consoleSink.Unregister();
   fileSink.Unregister();
-  traceSink.Unregister();
+  // traceSink: let RAII unregister so any final ZoneEnd events still land
+  // in the trace before the writer closes.
 
   engine.reset();
   ResetAllocator();

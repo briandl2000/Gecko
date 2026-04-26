@@ -293,7 +293,8 @@ static int AppMain(int argc, char** argv)
   // Unregister sinks before shutting down services
   consoleSink.Unregister();
   fileSink.Unregister();
-  traceSink.Unregister();
+  // traceSink: let RAII unregister so any final ZoneEnd events still land
+  // in the trace before the writer closes.
 
   // 5) Shutdown: ~Engine() runs UninstallServices when `engine` goes out
   // of scope. Allocator is infrastructure, reset it explicitly.
