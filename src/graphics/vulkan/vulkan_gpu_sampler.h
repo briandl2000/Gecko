@@ -60,6 +60,7 @@ private:
     std::vector<ZoneRecord> Zones {};
     u32 NextQuery {0};
     bool Pending {false};  // submitted, awaiting resolve
+    u64 CpuFrameStartNs {0};  // CPU NowNs sampled at BeginFrame
   };
 
   void ResolveSlot(FrameSlot& slot) noexcept;

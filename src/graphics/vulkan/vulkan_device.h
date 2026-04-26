@@ -112,6 +112,10 @@ public:
   {
     return m_HasDebugUtils;
   }
+  [[nodiscard]] f32 TimestampPeriodNs() const noexcept
+  {
+    return m_TimestampPeriodNs;
+  }
 
   /// Apply a VK_EXT_debug_utils object name if validation is enabled.
   void SetObjectName(VkObjectType type, u64 handle,

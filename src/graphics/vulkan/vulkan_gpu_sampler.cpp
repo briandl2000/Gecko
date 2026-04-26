@@ -59,6 +59,14 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   slot.NextQuery = 0;
   m_StackDepth = 0;
 
+  // Sample the CPU clock now so we can rebase the GPU timeline against
+  // it when ResolveSlot runs. This makes GPU events appear in the same
+  // monotonic time domain as CPU events in the trace.
+  if (auto* p = ::gecko::GetProfiler(); p != nullptr)
+    slot.CpuFrameStartNs = p->NowNs();
+  else
+    slot.CpuFrameStartNs = 0;
+
   const u32 timestampsPerFrame = 1U + 2U * m_Desc.MaxZonesPerFrame;
   cmd.ResetTimestamps(slot.Pool, 0, timestampsPerFrame);
   cmd.WriteTimestamp(slot.Pool, slot.NextQuery++);
@@ -149,6 +157,19 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
   if (p == nullptr)
     return;
 
+  // Convert raw GPU ticks → nanoseconds, then rebase to CPU frame start.
+  // This places GPU zones inside the wall-clock window of the frame in
+  // which they were submitted (good enough for visualisation; for true
+  // CPU↔GPU calibration we'd need vkGetCalibratedTimestampsEXT).
+  const f64 period = static_cast<f64>(m_Device->TimestampPeriodNs());
+  const u64 gpuFrameStart = ts[0];
+  const u64 cpuFrameStart = slot.CpuFrameStartNs;
+  auto rebase = [&](u64 tick) noexcept -> u64
+  {
+    const f64 deltaNs = static_cast<f64>(tick - gpuFrameStart) * period;
+    return cpuFrameStart + static_cast<u64>(deltaNs);
+  };
+
   for (const ZoneRecord& rec : slot.Zones)
   {
     if (rec.EndQuery == 0)  // never closed
@@ -156,8 +177,8 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
     if (rec.BeginQuery >= got || rec.EndQuery >= got)
       continue;
 
-    const u64 beginNs = ts[rec.BeginQuery];
-    const u64 endNs = ts[rec.EndQuery];
+    const u64 beginNs = rebase(ts[rec.BeginQuery]);
+    const u64 endNs = rebase(ts[rec.EndQuery]);
 
     ::gecko::ProfEvent ev {};
     ev.TimestampNs = beginNs;
