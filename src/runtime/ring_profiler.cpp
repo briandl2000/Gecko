@@ -8,6 +8,7 @@
 #include "private/labels.h"
 
 #include <algorithm>
+#include <cstring>
 #include <vector>
 
 namespace gecko::runtime {
@@ -75,6 +76,18 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   // Guard against emitting before Init (m_Ring is empty)
   if (m_Ring.empty())
     return;
+
+  // Aggregator update for Always-level zones; FrameMark resets it.
+  if (event.Kind == ProfEventKind::FrameMark)
+  {
+    ResetAggregator();
+  }
+  else if (event.Level == ProfLevel::Always &&
+           (event.Kind == ProfEventKind::ZoneBegin ||
+            event.Kind == ProfEventKind::ZoneEnd))
+  {
+    UpdateAggregator(event);
+  }
 
   u64 pos = m_Head.fetch_add(1, std::memory_order_acq_rel);
   Slot& slot = m_Ring[pos & m_Mask];
@@ -313,6 +326,19 @@ bool RingProfiler::Init() noexcept
     }
   }
 
+  if (m_Aggregator.empty())
+  {
+    GECKO_PUSH_LABEL(m_ProfilerLabel);
+    m_Aggregator = std::vector<AggSlot>(c_AggregatorCapacity);
+  }
+
+  if (m_CategoryNames.empty())
+  {
+    GECKO_PUSH_LABEL(m_ProfilerLabel);
+    m_CategoryNames.reserve(c_CategoryCapacity);
+    m_CategoryNames.push_back("default");  // category id 0
+  }
+
   return true;
 }
 
@@ -335,10 +361,151 @@ void RingProfiler::Shutdown() noexcept
   }
 
   decltype(m_Ring)().swap(m_Ring);
+  decltype(m_Aggregator)().swap(m_Aggregator);
+  {
+    std::lock_guard<std::mutex> lk(m_CategoryMu);
+    decltype(m_CategoryNames)().swap(m_CategoryNames);
+  }
 
   {
     std::lock_guard<std::mutex> lk(m_SinkMu);
     decltype(m_Sinks)().swap(m_Sinks);
+  }
+}
+
+ScopeStats RingProfiler::GetStats(u32 nameHash) const noexcept
+{
+  if (m_Aggregator.empty() || nameHash == 0)
+    return {};
+
+  const size_t cap = m_Aggregator.size();
+  size_t idx = nameHash & (cap - 1);
+  for (size_t probe = 0; probe < cap; ++probe)
+  {
+    const AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    u32 key = slot.NameHash.load(std::memory_order_acquire);
+    if (key == 0)
+      return {};
+    if (key == nameHash)
+    {
+      ScopeStats s {};
+      s.LastNs = slot.LastNs.load(std::memory_order_relaxed);
+      s.MinNs = slot.MinNs.load(std::memory_order_relaxed);
+      s.MaxNs = slot.MaxNs.load(std::memory_order_relaxed);
+      s.Count = slot.Count.load(std::memory_order_relaxed);
+      return s;
+    }
+  }
+  return {};
+}
+
+u8 RingProfiler::RegisterCategory(const char* name) noexcept
+{
+  if (!name)
+    return 0;
+
+  std::lock_guard<std::mutex> lk(m_CategoryMu);
+  for (size_t i = 0; i < m_CategoryNames.size(); ++i)
+  {
+    const char* existing = m_CategoryNames[i];
+    if (existing && std::strcmp(existing, name) == 0)
+      return static_cast<u8>(i);
+  }
+  if (m_CategoryNames.size() >= c_CategoryCapacity)
+    return c_ProfInvalidCategory;
+  u8 id = static_cast<u8>(m_CategoryNames.size());
+  m_CategoryNames.push_back(name);
+  return id;
+}
+
+void RingProfiler::SetCategoryEnabled(u8 id, bool on) noexcept
+{
+  if (id >= c_CategoryCapacity)
+    return;
+  u64 bit = u64 {1} << id;
+  if (on)
+    m_CategoryMask.fetch_or(bit, std::memory_order_relaxed);
+  else
+    m_CategoryMask.fetch_and(~bit, std::memory_order_relaxed);
+}
+
+bool RingProfiler::IsCategoryEnabled(u8 id) const noexcept
+{
+  if (id >= c_CategoryCapacity)
+    return false;
+  return (m_CategoryMask.load(std::memory_order_relaxed) & (u64 {1} << id)) !=
+         0;
+}
+
+ProfilerDiagnostics RingProfiler::GetDiagnostics() const noexcept
+{
+  ProfilerDiagnostics d {};
+  d.DroppedEvents = m_DroppedEvents.load(std::memory_order_relaxed);
+  d.ReentrantDrops = m_ReentrantDrops.load(std::memory_order_relaxed);
+  d.AggregatorOverflow = m_AggregatorOverflow.load(std::memory_order_relaxed);
+  return d;
+}
+
+void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
+{
+  if (m_Aggregator.empty() || ev.NameHash == 0)
+    return;
+
+  const size_t cap = m_Aggregator.size();
+  size_t idx = ev.NameHash & (cap - 1);
+  for (size_t probe = 0; probe < cap; ++probe)
+  {
+    AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    u32 expected = slot.NameHash.load(std::memory_order_acquire);
+    if (expected == 0)
+    {
+      // Try to claim the slot.
+      if (slot.NameHash.compare_exchange_strong(expected, ev.NameHash,
+                                                std::memory_order_acq_rel,
+                                                std::memory_order_acquire))
+        expected = ev.NameHash;
+      else if (expected != ev.NameHash)
+        continue;
+    }
+    if (expected == ev.NameHash)
+    {
+      if (ev.Kind == ProfEventKind::ZoneBegin)
+      {
+        slot.OpenBeginNs.store(ev.TimestampNs, std::memory_order_relaxed);
+      }
+      else if (ev.Kind == ProfEventKind::ZoneEnd)
+      {
+        u64 begin = slot.OpenBeginNs.load(std::memory_order_relaxed);
+        if (begin != 0 && ev.TimestampNs >= begin)
+        {
+          u64 dur = ev.TimestampNs - begin;
+          slot.LastNs.store(dur, std::memory_order_relaxed);
+          u64 prevMin = slot.MinNs.load(std::memory_order_relaxed);
+          if (dur < prevMin)
+            slot.MinNs.store(dur, std::memory_order_relaxed);
+          u64 prevMax = slot.MaxNs.load(std::memory_order_relaxed);
+          if (dur > prevMax)
+            slot.MaxNs.store(dur, std::memory_order_relaxed);
+          slot.Count.fetch_add(1, std::memory_order_relaxed);
+          slot.OpenBeginNs.store(0, std::memory_order_relaxed);
+        }
+      }
+      return;
+    }
+  }
+  m_AggregatorOverflow.fetch_add(1, std::memory_order_relaxed);
+}
+
+void RingProfiler::ResetAggregator() noexcept
+{
+  for (auto& slot : m_Aggregator)
+  {
+    slot.NameHash.store(0, std::memory_order_relaxed);
+    slot.LastNs.store(0, std::memory_order_relaxed);
+    slot.MinNs.store(~u64 {0}, std::memory_order_relaxed);
+    slot.MaxNs.store(0, std::memory_order_relaxed);
+    slot.Count.store(0, std::memory_order_relaxed);
+    slot.OpenBeginNs.store(0, std::memory_order_relaxed);
   }
 }
 

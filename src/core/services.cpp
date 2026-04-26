@@ -108,6 +108,20 @@ IProfiler* GetProfiler() noexcept
   return &s_NullProfiler;
 }
 
+namespace {
+thread_local const char* tls_ThreadProfilerName = nullptr;
+}
+
+void SetThreadProfilerName(const char* name) noexcept
+{
+  tls_ThreadProfilerName = name;
+}
+
+const char* GetThreadProfilerName() noexcept
+{
+  return tls_ThreadProfilerName;
+}
+
 ILogger* GetLogger() noexcept
 {
   if (auto* m = g_Modules.load(std::memory_order_acquire))
