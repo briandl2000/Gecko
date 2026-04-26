@@ -50,6 +50,11 @@ private:
   std::atomic<bool> m_Run {true};
   std::thread m_Worker {};
 
+  // Serialises every write to m_Writer (worker drain, Flush(), destructor).
+  // Without this, concurrent DrainAndWrite calls from the worker and the
+  // main thread produced double-comma corruption in the JSON.
+  std::mutex m_WriteMu {};
+
   // Already-emitted thread_name metadata (TID -> done). Worker-only.
   std::vector<u32> m_NamedThreads {};
 

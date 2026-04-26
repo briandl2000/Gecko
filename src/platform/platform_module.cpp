@@ -171,6 +171,7 @@ IInput* GetInput() noexcept
 
 void PumpEvents() noexcept
 {
+  GECKO_PROF_SCOPE_NAMED(labels::Platform, "platform::PumpEvents");
   if (!g_Windows || !g_Monitors || !g_Emitter)
     return;
   // Roll input edges + clear scroll BEFORE pumping so the events

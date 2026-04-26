@@ -251,6 +251,8 @@ void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
 void VulkanCommandList::BeginRendering(const RenderTarget& color,
                                        const ClearValue* clear) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BeginRendering");
   if (!color.Data)
     return;
   auto* rtd = static_cast<VulkanRTData*>(color.Data.get());
@@ -305,6 +307,8 @@ void VulkanCommandList::BeginRendering(
     ::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
     ::std::span<const ClearValue> clears) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::BeginRendering(MRT)");
   if (colors.empty() && depth == nullptr)
     return;
 
@@ -361,6 +365,8 @@ void VulkanCommandList::BeginRendering(
 
 void VulkanCommandList::EndRendering() noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::EndRendering");
   vkCmdEndRendering(m_CmdBuffer);
 
   if (m_ActiveSwapchain != nullptr)
@@ -734,6 +740,8 @@ void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
 
 void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 {
+  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::Vulkan,
+                                  "VulkanCommandList::Dispatch");
   vkCmdDispatch(m_CmdBuffer, x, y, z);
 }
 

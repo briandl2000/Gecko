@@ -21,6 +21,7 @@
 
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -529,16 +530,26 @@ int main()
 
   GECKO_INFO(app::core_example::labels::Main, gecko::VersionFullString());
 
+  // Name the main thread for trace viewers.
+  ::gecko::SetThreadProfilerName("main");
+
   // Profiler v2: AsyncTraceProfilerSink streams to a Chrome-trace JSON
   // through a dedicated worker thread. It drains and fsyncs on shutdown.
-  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
+  // Opt-in via GECKO_TRACE=<path> (or GECKO_TRACE=1 for default file).
+  const char* tracePathEnv = ::std::getenv("GECKO_TRACE");
+  const char* tracePath = nullptr;
+  if (tracePathEnv && tracePathEnv[0] != '\0' && tracePathEnv[0] != '0')
+    tracePath = (tracePathEnv[0] == '1' && tracePathEnv[1] == '\0')
+                    ? "gecko_trace.json"
+                    : tracePathEnv;
+  runtime::AsyncTraceProfilerSink traceSink(tracePath);
 
-  if (!traceSink.IsOpen())
+  if (tracePath && !traceSink.IsOpen())
   {
     GECKO_WARN(app::core_example::labels::Main,
                "Failed to open trace profiler sink\n");
   }
-  else
+  else if (traceSink.IsOpen())
   {
     if (auto* profiler = GetProfiler())
       traceSink.RegisterWith(profiler);

@@ -31,7 +31,7 @@ bool ThreadPoolJobSystem::Init() noexcept
     for (u32 i = 0; i < workerCount; ++i)
     {
       m_WorkerThreads.emplace_back(&ThreadPoolJobSystem::WorkerThreadFunction,
-                                   this);
+                                   this, i);
     }
 
     m_Initialized = true;
@@ -226,10 +226,25 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept
   }
 }
 
-void ThreadPoolJobSystem::WorkerThreadFunction() noexcept
+void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
 {
   // NOTE: Cannot use profiling/logging - JobSystem is Layer 1, comes before
   // Profiler (Layer 2) and Logger (Layer 3)
+
+  // Profiler thread-name registration is layer-independent (it just stores a
+  // pointer in a process-global table) and lets trace sinks emit
+  // chrome-trace `thread_name` records for these workers.
+  static constexpr const char* kWorkerNames[] = {
+      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",
+      "job-worker-4",  "job-worker-5",  "job-worker-6",  "job-worker-7",
+      "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
+      "job-worker-12", "job-worker-13", "job-worker-14", "job-worker-15",
+  };
+  const char* name =
+      (workerIndex < (sizeof(kWorkerNames) / sizeof(kWorkerNames[0])))
+          ? kWorkerNames[workerIndex]
+          : "job-worker-N";
+  ::gecko::SetThreadProfilerName(name);
 
   while (!m_Shutdown.load(std::memory_order_acquire))
   {

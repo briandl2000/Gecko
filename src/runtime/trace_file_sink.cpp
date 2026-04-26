@@ -30,6 +30,7 @@ TraceFileSink::TraceFileSink(const char* path)
 
 TraceFileSink::~TraceFileSink()
 {
+  Unregister();
   if (m_Writer)
   {
     std::lock_guard<std::mutex> lock(m_Mutex);

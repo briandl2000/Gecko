@@ -21,7 +21,11 @@ constexpr ::std::chrono::milliseconds c_FsyncInterval {100};
 
 AsyncTraceProfilerSink::AsyncTraceProfilerSink(const char* path)
 {
-  GECKO_ASSERT(path && "Trace file path cannot be null");
+  // A null/empty path is the explicit "disabled" mode: the sink object can
+  // still be constructed and registered, but it produces no file and the
+  // worker thread is not spawned. IsOpen() reports false in that case.
+  if (!path || path[0] == '\0')
+    return;
 
   m_Writer = ::gecko::platform::OpenWrite(
       path, ::gecko::platform::WriteMode::Truncate);
@@ -37,13 +41,31 @@ AsyncTraceProfilerSink::AsyncTraceProfilerSink(const char* path)
 
 AsyncTraceProfilerSink::~AsyncTraceProfilerSink()
 {
+  // Unregister BEFORE we tear anything down: the base ~RegisteredSink runs
+  // after this body, so without this the profiler would forward final
+  // events into m_Pending after we already closed the writer and they'd
+  // be silently dropped (the trace looked like the main scope never
+  // finished).
+  Unregister();
+
   m_Run.store(false, ::std::memory_order_release);
   m_Cv.notify_all();
   if (m_Worker.joinable())
     m_Worker.join();
 
+  ::std::lock_guard<::std::mutex> wlk(m_WriteMu);
   if (m_Writer)
   {
+    // Drain anything that arrived after the worker exited.
+    if (!m_Pending.empty())
+    {
+      ::std::vector<ProfEvent> batch;
+      {
+        ::std::lock_guard<::std::mutex> lk(m_Mu);
+        batch.swap(m_Pending);
+      }
+      DrainAndWrite(batch);
+    }
     m_Writer->WriteString("]}");
     m_Writer->Flush();
     m_Writer.reset();
@@ -78,16 +100,14 @@ void AsyncTraceProfilerSink::Flush() noexcept
   if (!m_Writer)
     return;
 
-  // Block until the worker has drained whatever was pending at call time.
-  // We do this by snapshotting the current pending size and waiting for
-  // the worker to consume past it. Simpler: take the lock, swap into a
-  // local batch, write it ourselves (Flush is rare and synchronous by
-  // contract).
+  // Snapshot pending events under the queue mutex, then format under the
+  // writer mutex so we can't interleave bytes with the worker thread.
   ::std::vector<ProfEvent> batch;
   {
     ::std::lock_guard<::std::mutex> lk(m_Mu);
     batch.swap(m_Pending);
   }
+  ::std::lock_guard<::std::mutex> wlk(m_WriteMu);
   DrainAndWrite(batch);
   if (m_Writer)
     m_Writer->Flush();
@@ -109,11 +129,15 @@ void AsyncTraceProfilerSink::WorkerLoop() noexcept
     }
 
     if (!batch.empty())
+    {
+      ::std::lock_guard<::std::mutex> wlk(m_WriteMu);
       DrainAndWrite(batch);
+    }
 
     auto now = ::std::chrono::steady_clock::now();
     if (now - lastFsync >= c_FsyncInterval)
     {
+      ::std::lock_guard<::std::mutex> wlk(m_WriteMu);
       if (m_Writer)
         m_Writer->Flush();
       lastFsync = now;
@@ -126,6 +150,7 @@ void AsyncTraceProfilerSink::WorkerLoop() noexcept
         ::std::lock_guard<::std::mutex> lk(m_Mu);
         batch.swap(m_Pending);
       }
+      ::std::lock_guard<::std::mutex> wlk(m_WriteMu);
       if (!batch.empty())
         DrainAndWrite(batch);
       if (m_Writer)

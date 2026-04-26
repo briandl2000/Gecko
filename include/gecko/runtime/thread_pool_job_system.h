@@ -97,7 +97,7 @@ private:
     }
   };
 
-  void WorkerThreadFunction() noexcept;
+  void WorkerThreadFunction(u32 workerIndex) noexcept;
   std::shared_ptr<Job> GetNextReadyJob() noexcept;
   bool AreJobDependenciesComplete(const std::shared_ptr<Job>& job) noexcept;
   JobHandle GenerateJobHandle() noexcept;

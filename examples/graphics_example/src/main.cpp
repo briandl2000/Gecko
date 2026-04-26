@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
 #include <gecko/core/services.h>
@@ -116,17 +117,29 @@ int main()
     logger->SetLevel(LogLevel::Info);
   }
 
-  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
+  // Profile trace is opt-in: set GECKO_TRACE=<path> (or GECKO_TRACE=1 for the
+  // default file) to capture a Chrome-trace JSON. Off by default to avoid
+  // background I/O during normal runs.
+  const char* tracePathEnv = ::std::getenv("GECKO_TRACE");
+  const char* tracePath = nullptr;
+  if (tracePathEnv && tracePathEnv[0] != '\0' && tracePathEnv[0] != '0')
+    tracePath = (tracePathEnv[0] == '1' && tracePathEnv[1] == '\0')
+                    ? "gecko_trace.json"
+                    : tracePathEnv;
+  runtime::AsyncTraceProfilerSink traceSink(tracePath);
+
+  // Name the main thread so trace viewers show "main" instead of a raw TID.
+  ::gecko::SetThreadProfilerName("main");
 
   GECKO_FUNC(app::graphics_example::labels::Main);
   GECKO_INFO(app::graphics_example::labels::Main, gecko::VersionFullString());
 
-  if (!traceSink.IsOpen())
+  if (tracePath && !traceSink.IsOpen())
   {
     GECKO_WARN(app::graphics_example::labels::Main,
                "Failed to open trace profiler sink\n");
   }
-  else
+  else if (traceSink.IsOpen())
   {
     if (auto* profiler = GetProfiler())
       traceSink.RegisterWith(profiler);
@@ -161,9 +174,15 @@ int main()
     GECKO_INFO(app::graphics_example::labels::Main, "Two windows created");
 
     // ── Graphics device ──────────────────────────────────────────
+    // Vulkan validation layers add 5-30s to startup under gdb. Off by
+    // default; opt in with GECKO_VK_VALIDATION=1.
+    const bool wantValidation = []() {
+      const char* v = ::std::getenv("GECKO_VK_VALIDATION");
+      return v && v[0] != '\0' && v[0] != '0';
+    }();
     auto device = CreateGraphicsDevice(
         GraphicsDeviceDesc {.Backend = GraphicsBackend::Vulkan,
-                            .Debug = true,
+                            .Debug = wantValidation,
                             .AppName = "graphics_example"});
     GECKO_INFO(app::graphics_example::labels::Main, "Graphics device created");
 

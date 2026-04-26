@@ -33,6 +33,7 @@ CrashSafeTraceProfilerSink::CrashSafeTraceProfilerSink(const char* path)
 
 CrashSafeTraceProfilerSink::~CrashSafeTraceProfilerSink()
 {
+  Unregister();
   if (m_Writer)
   {
     EnsureValidJson();

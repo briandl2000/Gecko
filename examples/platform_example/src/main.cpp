@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
 #include <gecko/core/services.h>
@@ -177,15 +178,24 @@ int main()
     return 1;
   }
   // Profiler v2: stream Chrome-trace events asynchronously through a
-  // dedicated worker thread; drains + fsyncs on shutdown.
-  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
+  // dedicated worker thread; drains + fsyncs on shutdown. Opt-in via
+  // GECKO_TRACE=<path> (or GECKO_TRACE=1 for the default file).
+  const char* tracePathEnv = ::std::getenv("GECKO_TRACE");
+  const char* tracePath = nullptr;
+  if (tracePathEnv && tracePathEnv[0] != '\0' && tracePathEnv[0] != '0')
+    tracePath = (tracePathEnv[0] == '1' && tracePathEnv[1] == '\0')
+                    ? "gecko_trace.json"
+                    : tracePathEnv;
+  runtime::AsyncTraceProfilerSink traceSink(tracePath);
 
-  if (!traceSink.IsOpen())
+  ::gecko::SetThreadProfilerName("main");
+
+  if (tracePath && !traceSink.IsOpen())
   {
     GECKO_WARN(app::platform_example::labels::Main,
                "Failed to open trace profiler sink\n");
   }
-  else
+  else if (traceSink.IsOpen())
   {
     if (auto* profiler = GetProfiler())
       traceSink.RegisterWith(profiler);

@@ -5,6 +5,7 @@ add_executable(runtime_tests
   test_event_bus.cpp
   test_module_registry.cpp
   test_ring_profiler.cpp
+  test_async_trace_profiler_sink.cpp
 )
 
 target_link_libraries(runtime_tests
