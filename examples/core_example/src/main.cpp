@@ -9,6 +9,7 @@
 #include "gecko/core/utility/thread.h"
 #include "gecko/core/utility/time.h"
 #include "gecko/core/version.h"
+#include "gecko/runtime/async_trace_profiler_sink.h"
 #include "gecko/runtime/console_log_sink.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/file_log_sink.h"
@@ -16,7 +17,6 @@
 #include "gecko/runtime/ring_profiler.h"
 #include "gecko/runtime/runtime_module.h"
 #include "gecko/runtime/thread_pool_job_system.h"
-#include "gecko/runtime/trace_file_sink.h"
 #include "gecko/runtime/tracking_allocator.h"
 
 #include <atomic>
@@ -529,9 +529,9 @@ int main()
 
   GECKO_INFO(app::core_example::labels::Main, gecko::VersionFullString());
 
-  // Set up trace file sink for profiling data after services are available
-  // Sink auto-unregisters when destroyed
-  runtime::TraceFileSink traceSink("gecko_trace.json");
+  // Profiler v2: AsyncTraceProfilerSink streams to a Chrome-trace JSON
+  // through a dedicated worker thread. It drains and fsyncs on shutdown.
+  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
 
   if (!traceSink.IsOpen())
   {
@@ -818,17 +818,23 @@ int main()
                  "Main thread job processing complete!");
     }
 
-    // Add a frame mark to separate the main work from cleanup
+    // Profiler v2: GECKO_FRAME emits a FrameMark which is also the
+    // signal that resets the Always-level aggregator for the next frame.
+    GECKO_FRAME(app::core_example::labels::Main, "EndOfDemo");
+
+    // Profiler v2: report aggregator stats for an Always-level scope.
+    // Note: PhysicsStep above is Normal-level, so it does NOT show up
+    // in the aggregator. Read the labels.Main MainLoop scope which is
+    // captured by the implicit Always-level frame mark instead.
     if (auto* profiler = GetProfiler())
     {
-      ProfEvent frameEvent {.TimestampNs = profiler->NowNs(),
-                            .Value = 0,
-                            .Name = "EndOfDemo",
-                            .EventLabel = app::core_example::labels::Main,
-                            .ThreadId = ThisThreadId(),
-                            .NameHash = FNV1a("EndOfDemo"),
-                            .Kind = ProfEventKind::FrameMark};
-      profiler->Emit(frameEvent);
+      auto diag = profiler->GetDiagnostics();
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Profiler diagnostics: dropped=%llu reentrant=%llu "
+                 "agg_overflow=%llu",
+                 static_cast<unsigned long long>(diag.DroppedEvents),
+                 static_cast<unsigned long long>(diag.ReentrantDrops),
+                 static_cast<unsigned long long>(diag.AggregatorOverflow));
     }
   }
 
