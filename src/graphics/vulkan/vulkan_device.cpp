@@ -23,6 +23,7 @@
 #include "gecko/core/services/memory.h"
 #include "private/labels.h"
 #include "vulkan_command_list.h"
+#include "vulkan_gpu_sampler.h"
 #include "vulkan_surface.h"
 #include "vulkan_util.h"
 
@@ -2042,6 +2043,21 @@ u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
     out[i] = static_cast<u64>(static_cast<f64>(ticks[i]) *
                               static_cast<f64>(periodNs));
   return count;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// GPU profiler
+// ─────────────────────────────────────────────────────────────────────────
+
+::gecko::Unique<IGpuSampler> VulkanDevice::CreateGpuSampler(
+    const GpuSamplerDesc& desc) noexcept
+{
+  if (!m_Valid)
+    return nullptr;
+  auto sampler = ::gecko::CreateUnique<VulkanGpuSampler>(*this, desc);
+  if (sampler == nullptr || !sampler->IsValid())
+    return nullptr;
+  return sampler;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

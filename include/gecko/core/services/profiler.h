@@ -130,6 +130,13 @@ GECKO_API const char* GetThreadProfilerName() noexcept;
 // thread_name metadata.
 GECKO_API const char* LookupThreadProfilerName(u32 threadId) noexcept;
 
+// Register a profiler-side name for a synthetic / virtual thread id. Unlike
+// SetThreadProfilerName this does NOT touch TLS — use it for non-OS-thread
+// rows in the trace (e.g. GPU queues, async I/O lanes). Pass nullptr to
+// remove a previously registered name.
+GECKO_API void RegisterThreadProfilerName(u32 threadId,
+                                          const char* name) noexcept;
+
 struct ProfScope
 {
   Label ScopeLabel {};                  // 16 bytes

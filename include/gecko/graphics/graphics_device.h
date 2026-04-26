@@ -4,6 +4,7 @@
 #include "gecko/core/ptr.h"
 #include "gecko/core/types.h"
 #include "gecko/graphics/command_list.h"
+#include "gecko/graphics/gpu_profiler.h"
 #include "gecko/graphics/graphics_types.h"
 #include "gecko/platform/window.h"
 
@@ -161,6 +162,15 @@ public:
   /// failure or if results are not yet available on the implementation).
   GECKO_API virtual u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery,
                                        ::std::span<u64> out) noexcept = 0;
+
+  // ── GPU profiler ───────────────────────────────────────────────
+
+  /// Create a GPU sampler. Returns nullptr on backends that have no
+  /// timestamp queries (NullDevice).
+  [[nodiscard("Discarding the returned IGpuSampler immediately releases the "
+              "GPU resources backing it")]]
+  GECKO_API virtual ::gecko::Unique<IGpuSampler> CreateGpuSampler(
+      const GpuSamplerDesc& desc) noexcept = 0;
 
   // ── Data upload ───────────────────────────────────────────────
 

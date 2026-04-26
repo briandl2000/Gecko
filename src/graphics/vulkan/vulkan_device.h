@@ -60,6 +60,9 @@ public:
   u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery,
                      ::std::span<u64> out) noexcept override;
 
+  ::gecko::Unique<IGpuSampler> CreateGpuSampler(
+      const GpuSamplerDesc& desc) noexcept override;
+
   // ── Data upload ────────────────────────────────────────────────
 
   void UploadTextureData(Texture& texture,

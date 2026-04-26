@@ -142,6 +142,15 @@ const char* LookupThreadProfilerName(u32 threadId) noexcept
   return (it != g_ThreadNameMap.end()) ? it->second : nullptr;
 }
 
+void RegisterThreadProfilerName(u32 threadId, const char* name) noexcept
+{
+  std::lock_guard<std::mutex> lk(g_ThreadNameMu);
+  if (name == nullptr)
+    g_ThreadNameMap.erase(threadId);
+  else
+    g_ThreadNameMap[threadId] = name;
+}
+
 ILogger* GetLogger() noexcept
 {
   if (auto* m = g_Modules.load(std::memory_order_acquire))
