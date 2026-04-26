@@ -15,7 +15,42 @@ namespace {
 using ::gecko::runtime::detail::WriteChromeTraceEvent;
 using ::gecko::runtime::detail::WriteChromeTraceThreadName;
 
-constexpr ::std::chrono::milliseconds c_FsyncInterval {100};
+constexpr ::std::chrono::milliseconds c_FsyncInterval {1000};
+constexpr ::std::chrono::milliseconds c_DrainTickInterval {25};
+
+// In-memory FileWriter that just appends to a std::string. Used by
+// DrainAndWrite to coalesce a whole event batch into one WriteFile call,
+// which is critical when the trace file lives on a network share (each
+// individual WriteFile becomes an SMB round-trip).
+class StringBufferWriter final : public ::gecko::platform::FileWriter
+{
+public:
+  ::std::string& Buffer() noexcept
+  {
+    return m_Buf;
+  }
+
+  bool Write(::std::span<const ::std::byte> data) noexcept override
+  {
+    m_Buf.append(reinterpret_cast<const char*>(data.data()), data.size());
+    return true;
+  }
+  bool Flush() noexcept override
+  {
+    return true;
+  }
+  ::gecko::u64 Seek(::gecko::i64, bool) noexcept override
+  {
+    return static_cast<::gecko::u64>(-1);
+  }
+  ::gecko::u64 Tell() noexcept override
+  {
+    return static_cast<::gecko::u64>(m_Buf.size());
+  }
+
+private:
+  ::std::string m_Buf;
+};
 
 }  // namespace
 
@@ -122,7 +157,7 @@ void AsyncTraceProfilerSink::WorkerLoop() noexcept
   {
     {
       ::std::unique_lock<::std::mutex> lk(m_Mu);
-      m_Cv.wait_for(lk, c_FsyncInterval, [this]() {
+      m_Cv.wait_for(lk, c_DrainTickInterval, [this]() {
         return !m_Run.load(::std::memory_order_acquire) || !m_Pending.empty();
       });
       batch.swap(m_Pending);
@@ -169,19 +204,38 @@ void AsyncTraceProfilerSink::DrainAndWrite(
     return;
   }
 
+  // Accumulate the entire batch into one in-memory string, then issue
+  // a single WriteFile call to the real writer. This collapses what
+  // would otherwise be ~2N WriteFile/SMB round-trips into 1.
+  StringBufferWriter buf;
   for (const auto& ev : batch)
   {
     if (m_Time0Ns == 0)
       m_Time0Ns = ev.TimestampNs;
 
-    EmitThreadNameOnce(ev.ThreadId, LookupThreadProfilerName(ev.ThreadId));
+    if (const char* tname = LookupThreadProfilerName(ev.ThreadId);
+        tname != nullptr)
+    {
+      if (::std::find(m_NamedThreads.begin(), m_NamedThreads.end(),
+                      ev.ThreadId) == m_NamedThreads.end())
+      {
+        m_NamedThreads.push_back(ev.ThreadId);
+        if (!m_First)
+          buf.Buffer().push_back(',');
+        m_First = false;
+        WriteChromeTraceThreadName(&buf, ev.ThreadId, tname);
+      }
+    }
 
     if (!m_First)
-      m_Writer->WriteString(",");
+      buf.Buffer().push_back(',');
     m_First = false;
-
-    WriteChromeTraceEvent(m_Writer.get(), ev, m_Time0Ns);
+    WriteChromeTraceEvent(&buf, ev, m_Time0Ns);
   }
+
+  if (!buf.Buffer().empty())
+    m_Writer->WriteString(buf.Buffer());
+
   batch.clear();
 }
 
