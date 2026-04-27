@@ -400,3 +400,195 @@ Three side-by-side `CommandList` ranges per frame is the expected shape
 when an app submits multiple cmd buffers — they're physically distinct
 GPU executions on the queue. You opt out of any of them by simply not
 attaching the sampler to that cmd list.
+
+## Workflow — using the profiler day-to-day
+
+This section is the practical "how do I actually use this" guide. It
+covers three roles:
+
+1. **Engine dev** — adding instrumentation to a new module / feature.
+2. **App dev** — turning the profiler on, picking a level, capturing a
+   trace.
+3. **Trace reader** — opening the result and finding bottlenecks.
+
+### 1. Engine-side: what to add and where
+
+When you write a new subsystem, add zones at three layers:
+
+**Always layer** (visible in release):
+
+- One zone per public entry point that *drives* a frame or queue.
+  Examples: `IGraphicsDevice::Present`, `IJobSystem::WaitAll`,
+  `EventBus::Dispatch`, the module's `Update`/`Tick`/`Render`.
+- Anything that can block or sleep — wait edges, vkQueueSubmit,
+  vkQueuePresentKHR, fence waits, mutex acquires you suspect can stall.
+- Frame markers and present points.
+
+```cpp
+GECKO_PROFILE_ALWAYS(labels::Renderer);   // outer entry point
+```
+
+**Normal layer** (default in dev profiling sessions):
+
+- Entry points of internal helpers — pass record functions, resource
+  uploads, asset loaders, scene queries.
+- Anywhere you'd want a default "where did the 8 ms go?" answer.
+
+```cpp
+GECKO_PROFILE_NORMAL_NAMED(labels::Renderer, "BuildCullList");
+```
+
+**Detailed layer** (kept in source, off by default):
+
+- Per-element loops (per-draw, per-particle, per-token, per-entity).
+- Tight inner functions that make the trace 10× larger when enabled.
+- Stuff useful when chasing one specific stall, not for routine viewing.
+
+```cpp
+GECKO_PROFILE(labels::Renderer);          // implicit Detailed
+```
+
+**GPU**: in any code path that records draws/dispatches, accept an
+optional `IGpuSampler*` and call `cmd->AttachGpuSampler(sampler, label)`
+once per command list. Wrap pass-level ranges in `GECKO_GPU_SCOPE_NORMAL`;
+individual draws/dispatches get auto-zoned.
+
+**Hard rules**:
+
+- Never zone in code that runs *during* a profiler emission (logger
+  formatters called from a profile sink, etc.) — risks reentrancy.
+- Never call `GECKO_PROFILE*` inside the allocator's `Allocate`/`Free`.
+  Zones allocate a stack slot only, but anything you put in the body
+  (including `printf`-into-name) does. Pre-format names.
+- Stable string literals only for `name`. `const char*` is captured
+  by pointer, not copied. A `std::string::c_str()` whose owner dies is a
+  trace-corrupting use-after-free.
+
+**Counters**: emit a counter (level always survives the filter) for
+anything you want plotted as a line on the trace:
+
+```cpp
+GECKO_COUNTER(labels::Mem, "alloc_live", liveBytes);
+GECKO_COUNTER(labels::Renderer, "draws", drawCount);
+```
+
+Counters are cheap, batched, and show up as `chrome://tracing` line
+charts above the thread rows.
+
+### 2. App-side: how to actually use it
+
+#### Just want timings in the HUD
+
+The profiler is always installed. If you want the HUD strip
+(`F4`-style stats dump, draws, alloc_live, etc.) just register a
+`WatchScope` in your app boot:
+
+```cpp
+auto* profiler = GetProfiler();
+profiler->WatchScope("frame");          // rolling avg over last N samples
+profiler->WatchScope("renderFrame");
+profiler->WatchScope("Present");
+```
+
+Then in your HUD pull `profiler->GetStats("frame")` and format
+`LastNs`, `AvgNs`, `MinNs`, `MaxNs`.
+
+Default min level is set by build config (`Detailed` in debug,
+`Normal` in release). Override per app:
+
+```cpp
+profiler->SetMinLevel(ProfLevel::Normal);   // tighten the firehose
+```
+
+#### Want to capture a trace JSON
+
+Install an `AsyncTraceProfilerSink` *before* the work you want to
+capture and let it go out of scope (or call its destructor) *after*.
+
+```cpp
+runtime::AsyncTraceProfilerSink trace("frame123.json");
+trace.SetMinLevel(ProfLevel::Detailed);   // or Normal for smaller files
+if (trace.IsOpen())
+{
+    if (auto* p = GetProfiler())
+    {
+        trace.RegisterWith(p);
+        p->SetTraceEnabled(true);          // off by default — tracing is opt-in
+    }
+}
+
+// ... run your scenario ...
+
+// trace dtor unregisters, drains the worker thread, fsyncs the file.
+```
+
+`core_example` does this unconditionally at Detailed level (debug *and*
+release) so it's the canonical "always emit a full trace" reference.
+Other examples keep tracing off by default — turn it on only for
+captures.
+
+#### Want to capture exactly one frame
+
+Wrap a single-frame scope with `SetTraceEnabled(true)` /
+`SetTraceEnabled(false)` around the frame loop iteration of interest.
+The sink keeps streaming; the profiler just stops handing it events.
+
+### 3. Reading the captured data
+
+The output is Chrome-trace JSON. Three viewers, all free:
+
+- **Perfetto UI** (recommended) — <https://ui.perfetto.dev>. Drag the
+  `.json` onto the page. Modern, supports counters, search, flame charts,
+  thread filtering, link-sharing.
+- **chrome://tracing** in any Chromium browser. Older but works
+  offline.
+- **`speedscope`** for a flame-graph view of one thread —
+  `npx speedscope frame123.json`.
+
+#### What to look for, in order
+
+1. **Find the `frame` zone on the main thread.** That's your wall-clock
+   budget. If it's longer than your target (e.g. 16.6 ms for 60 Hz)
+   you're missing frame.
+2. **Compare main-thread frame to the `GPU.Graphics` row.** Are they
+   the same length, or is one much shorter?
+   - Main longer → CPU-bound. Look for big zones on the main thread.
+   - GPU longer → GPU-bound. Look at the GPU `CommandList` ranges and
+     drill into `TrianglePass`/`BlitPass`/whatever.
+   - Both shorter than `frame` → you're vsync-bound or sleeping. Check
+     for an `Always`-level wait zone.
+3. **Look at the `vkQueueSubmit` zone vs the GPU `CommandList` it
+   produced.** They should be nearly back-to-back for the *first* cmd
+   list of the frame. Later cmd lists' GPU ranges may legitimately
+   start *before* their CPU submit (the queue picks up pre-recorded
+   work as soon as the previous cmd finishes). See
+   [Aligning the GPU timeline with CPU events](#aligning-the-gpu-timeline-with-cpu-events).
+4. **Counters strip at the top.** `draws`, `alloc_live`, anything else
+   you've published. Spikes here often correlate with frame-time spikes
+   directly below.
+5. **Worker-thread rows.** Long flat sections = idle. Short scattered
+   zones = a stall on the main thread waiting for the worker. Use the
+   `JobSystem::Wait*` Always zones on main as a cross-reference.
+
+#### Trace size budgeting
+
+Rough numbers from `examples/graphics_example` at 1 kHz frame rate:
+
+| Setting                               | Bytes / minute |
+|---------------------------------------|----------------|
+| `Always`-only                         | ~5 MB          |
+| `Normal`                              | ~50 MB         |
+| `Detailed`                            | ~500 MB        |
+
+Use `Detailed` for short captures (seconds, not minutes). Perfetto
+starts to chug above ~1 GB; Chromium tracing chokes earlier.
+
+### Summary cheat-sheet
+
+| Goal | Action |
+|---|---|
+| Ship release builds with always-on telemetry | Use `GECKO_PROFILE_ALWAYS`/`GECKO_SCOPE_ALWAYS`; default profiler level. |
+| Profile during dev | Default level (Normal in release / Detailed in debug). |
+| One-shot deep trace | `AsyncTraceProfilerSink` + `SetTraceEnabled(true)` around the scenario. |
+| HUD numbers | `WatchScope` + `GetStats`; counters via `GECKO_COUNTER`. |
+| Reading | Perfetto UI; cross-check `frame` vs `GPU.Graphics`; check counters strip. |
