@@ -175,7 +175,7 @@ int main()
   }
 
   {
-    GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "AppRun");
+    GECKO_SCOPE_ALWAYS_NAMED(app::graphics_example::labels::Main, "AppRun");
 
     // ── Two windows ───────────────────────────────────────────────
     WindowSlot slots[2];
@@ -643,6 +643,10 @@ int main()
           if (!computeCmd[i])
             continue;
           computeCmd[i]->Begin();
+          // Auto-zone every Dispatch on this compute command list too.
+          if (gpuSampler)
+            computeCmd[i]->AttachGpuSampler(
+                gpuSampler.get(), app::graphics_example::labels::Main);
           computeCmd[i]->BindPipeline(plasmaPipeline);
           computeCmd[i]->BindRWTexture(0, plasmaTex[i]);
           f32 pc[4] = {time + tOffset, 0.0F, 0.0F, 0.0F};

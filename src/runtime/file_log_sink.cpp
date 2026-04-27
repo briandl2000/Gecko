@@ -1,7 +1,10 @@
 #include "gecko/runtime/file_log_sink.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/scope.h"
 #include "gecko/platform/platform_io.h"
+
+#include "private/labels.h"
 
 #include <cstdio>
 
@@ -21,6 +24,8 @@ void FileLogSink::Write(const LogMessage& message) noexcept
   if (!m_Writer)
     return;
 
+  GECKO_PROFILE_NAMED(labels::Logger, "FileLogSink::Write");
+
   GECKO_ASSERT(message.Text && "Log message text cannot be null");
 
   const char* label =
@@ -36,6 +41,9 @@ void FileLogSink::Write(const LogMessage& message) noexcept
                           ? sizeof(buf) - 1
                           : static_cast<::std::size_t>(n);
   m_Writer->WriteString(::std::string_view {buf, len});
-  m_Writer->Flush();
+  {
+    GECKO_PROFILE_NAMED(labels::Logger, "FileLogSink::Flush");
+    m_Writer->Flush();
+  }
 }
 }  // namespace gecko::runtime

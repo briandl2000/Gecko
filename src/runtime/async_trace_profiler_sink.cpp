@@ -1,9 +1,11 @@
 #include "gecko/runtime/async_trace_profiler_sink.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/scope.h"
 #include "gecko/platform/platform_io.h"
 #include "private/chrome_trace_format.h"
 #include "private/file_writer_format.h"
+#include "private/labels.h"
 
 #include <algorithm>
 #include <chrono>
@@ -165,6 +167,7 @@ void AsyncTraceProfilerSink::WorkerLoop() noexcept
 
     if (!batch.empty())
     {
+      GECKO_PROFILE_NAMED(labels::Profiler, "TraceSink::DrainAndWrite");
       ::std::lock_guard<::std::mutex> wlk(m_WriteMu);
       DrainAndWrite(batch);
     }
@@ -172,6 +175,7 @@ void AsyncTraceProfilerSink::WorkerLoop() noexcept
     auto now = ::std::chrono::steady_clock::now();
     if (now - lastFsync >= c_FsyncInterval)
     {
+      GECKO_PROFILE_NAMED(labels::Profiler, "TraceSink::Fsync");
       ::std::lock_guard<::std::mutex> wlk(m_WriteMu);
       if (m_Writer)
         m_Writer->Flush();

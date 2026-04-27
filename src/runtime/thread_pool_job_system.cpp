@@ -142,6 +142,7 @@ void ThreadPoolJobSystem::Wait(JobHandle handle) noexcept
   if (!handle.IsValid())
     return;
 
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Wait");
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handle]() {
     auto it = m_ActiveJobs.find(handle.Id);
@@ -155,6 +156,7 @@ void ThreadPoolJobSystem::WaitAll(const JobHandle* handles, u32 count) noexcept
   if (!handles || count == 0)
     return;
 
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::WaitAll");
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handles, count]() {
     for (u32 i = 0; i < count; ++i)
@@ -252,6 +254,7 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
     if (!job)
     {
       // No jobs available, wait for notification
+      GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::WorkerIdle");
       std::unique_lock<std::mutex> lock(m_Mutex);
       m_JobAvailable.wait_for(lock, std::chrono::milliseconds(100), [this]() {
         return m_Shutdown.load(std::memory_order_acquire) ||

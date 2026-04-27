@@ -860,7 +860,7 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 
 FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 {
-  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan, "VulkanDevice::BeginFrame");
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::BeginFrame");
 
   // Reclaim completed command lists from previous submits before doing
   // anything else this frame.
