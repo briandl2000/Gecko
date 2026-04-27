@@ -976,7 +976,9 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
 
   VkResult presentResult;
   {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "Present::QueueLock");
     ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueuePresentKHR");
     presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
   }
   if (presentResult == VK_ERROR_OUT_OF_DATE_KHR ||
@@ -1074,8 +1076,13 @@ void VulkanDevice::ExecuteGraphicsCommandList(
     primaryFence = trackerFence;
 
   {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "ExecuteGraphics::QueueLock");
     ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
-    VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
+    {
+      GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueueSubmit");
+      VULKAN_CHECK(
+          vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
+    }
 
     for (u32 i = 1; i < touched.Count; ++i)
     {
@@ -1094,7 +1101,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(
       empty.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
       VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &empty, trackerFence));
     }
-  }
+  }  // queue lock released
 
   // Defer destruction until trackerFence signals (reaped by BeginFrame).
   {

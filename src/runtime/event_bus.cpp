@@ -230,8 +230,10 @@ void EventBus::NotifySubscribers(EventCode code, const EventMeta& meta,
                                  EventView payload,
                                  SubscriptionDelivery deliveryFilter)
 {
+  GECKO_PROFILE_NAMED(runtime::labels::General, "EventBus::NotifySubscribers");
   std::vector<Subscriber> subscribers;
   {
+    GECKO_PROFILE_NAMED(runtime::labels::General, "Notify::CopySubs");
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
     if (!m_Subscribers)
       return;
@@ -248,6 +250,7 @@ void EventBus::NotifySubscribers(EventCode code, const EventMeta& meta,
       continue;
     if (sub.callback)
     {
+      GECKO_PROFILE_NAMED(runtime::labels::General, "Notify::Callback");
       sub.callback(sub.user, meta, payload);
     }
   }

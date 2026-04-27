@@ -755,11 +755,14 @@ int main()
         auto blit = prof->GetStats("BlitPass", ::gecko::ProfSource::GPU);
         f64 fps =
             (frame.AvgNs > 0) ? 1.0e9 / static_cast<f64>(frame.AvgNs) : 0.0;
+        u64 live = trackingAlloc.TotalLiveBytes();
         GECKO_INFO(app::graphics_example::labels::Main,
                    "HUD frame=%.2fms (%.1f fps)  cpu_render=%.2fms  "
-                   "gpu_tri=%.3fms  gpu_blit=%.3fms  frames=%llu",
+                   "gpu_tri=%.3fms  gpu_blit=%.3fms  draws=%u  "
+                   "alloc_live=%llu KB  frames=%llu",
                    frame.AvgNs / 1.0e6, fps, rend.AvgNs / 1.0e6,
-                   tri.AvgNs / 1.0e6, blit.AvgNs / 1.0e6,
+                   tri.AvgNs / 1.0e6, blit.AvgNs / 1.0e6, drawCalls,
+                   (unsigned long long)(live / 1024),
                    (unsigned long long)frameIndex);
       }
       ++frameIndex;
