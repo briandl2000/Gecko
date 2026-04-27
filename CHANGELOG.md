@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Shader build helper** — `gecko_add_shaders(TARGET NAMESPACE HEADER SHADERS [SOURCE_DIR])` CMake function compiles HLSL → SPIR-V via `glslc` and emits a single header that exposes each blob as `inline constexpr unsigned char` arrays via C++26 `#embed`. Stage is inferred from the filename (`.vert.hlsl`, `.frag.hlsl`, `.comp.hlsl`, etc.); variable names default to the capitalized basename with explicit `=Name` overrides. Auto-included for downstream `find_package(Gecko)` consumers. `examples/graphics_example` migrated to it (130-line CMakeLists → 30 lines, byte-identical generated header). See `docs/shader_pipeline.md`.
 - **Platform IO** — `gecko::platform` namespace functions: `Exists`, `Stat`, `Read`, `Map`, `Write`, `AtomicWrite`, `OpenWrite`, `CreateDir`, `Remove`, `IterateDir`, plus well-known paths (`ExePath`, `WorkingDir`, `UserDataDir`). Move-only `ReadResult`, `MappedFile`, `DirIter`, and `FileWriter` handles. Linux + Win32 backends.
 - **Platform threading** — namespace functions for thread naming, sleep, yield, and hardware concurrency (Linux + Win32).
 - **Platform input** — `IInput` service with key/mouse state, press/release edges, scroll, mouse position, focused/hovered window, and UTF-8 typed text. Auto `NewFrame()` on event-bus drain. `MockInput` test fake under `test/common/`.

@@ -1,5 +1,11 @@
 include(FetchContent)
 
+# gecko_add_shaders() lives with the Graphics module — anything that uses
+# Graphics is the only thing that needs to embed SPIR-V blobs. The function
+# is global once defined, so any CMakeLists processed after src/graphics can
+# call it (examples, downstream apps via find_package(Gecko), etc.).
+include(GeckoShaders)
+
 # Vulkan SDK is a prerequisite for the Vulkan backend (see docs/build.md).
 # find_package(Vulkan) works for both system/package-manager installs and the
 # LunarG SDK (which sets $VULKAN_SDK).
