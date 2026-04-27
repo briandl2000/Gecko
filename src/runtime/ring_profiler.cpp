@@ -9,6 +9,7 @@
 #include "private/labels.h"
 
 #include <algorithm>
+#include <array>
 #include <vector>
 
 namespace gecko::runtime {
@@ -17,20 +18,30 @@ namespace gecko::runtime {
 // (e.g., if profiler internally calls a logged/profiled function)
 thread_local bool g_InsideProfiler = false;
 
-// Per-thread open-scope stack used by UpdateAggregator to pair ZoneBegin
-// / ZoneEnd events without sharing OpenBeginNs across threads. Kept at
-// namespace scope (rather than function-local) to dodge MinGW's
-// historically buggy lazy-init of function-static thread_locals with
-// non-trivial destructors. Frames carry the owning RingProfiler* so
-// multiple instances (e.g. across test cases) don't corrupt each other.
+// Per-thread open-scope stack used by UpdateAggregator to pair
+// ZoneBegin / ZoneEnd events without sharing state across threads.
+// Implemented as a fixed-size array + count so the type is trivially
+// destructible: avoids MinGW's historically buggy code path for
+// `thread_local` containers with non-trivial destructors (which on the
+// MSYS2 UCRT64 CI runner aborted runtime_tests.exe before Catch2 could
+// even print its banner). Depth 64 is far above any realistic
+// PROF_SCOPE nesting; overflow is silently dropped (we never produced
+// useful data past that depth anyway).
 struct OpenScopeFrame
 {
-  void* Owner;  // typed as void* to avoid pulling RingProfiler into TU header
+  void* Owner;  // void* avoids pulling RingProfiler ptr type into the TU init
   u32 NameHash;
   u8 Source;
   u64 BeginTs;
 };
-thread_local ::std::vector<OpenScopeFrame> g_OpenScopeStack;
+constexpr ::std::size_t MaxOpenScopeDepth = 64;
+struct OpenScopeStack
+{
+  ::std::array<OpenScopeFrame, MaxOpenScopeDepth> Frames {};
+  ::std::size_t Count = 0;
+};
+static_assert(::std::is_trivially_destructible_v<OpenScopeStack>);
+thread_local OpenScopeStack g_OpenScopeStack {};
 
 u64 RingProfiler::MonotonicNowNs() noexcept
 {
@@ -439,6 +450,25 @@ void RingProfiler::Shutdown() noexcept
   // Flush all pending events before shutdown
   Flush();
 
+  // Drop any open-scope frames this profiler pushed onto the calling
+  // thread's TLS stack. The stack is process-lifetime and shared across
+  // tests/instances; without this, dangling frames owned by `this` would
+  // bleed into the next RingProfiler created on this thread (and could
+  // even match new frames if the allocator reuses our address).
+  {
+    ::std::size_t dst = 0;
+    for (::std::size_t src = 0; src < g_OpenScopeStack.Count; ++src)
+    {
+      if (g_OpenScopeStack.Frames[src].Owner != this)
+      {
+        if (dst != src)
+          g_OpenScopeStack.Frames[dst] = g_OpenScopeStack.Frames[src];
+        ++dst;
+      }
+    }
+    g_OpenScopeStack.Count = dst;
+  }
+
   JobHandle jobToWait;
   {
     std::lock_guard<std::mutex> lock(m_JobMu);
@@ -779,21 +809,27 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
   // thread interleaves scopes we walk the stack to find the match.
   if (ev.Kind == ProfEventKind::ZoneBegin)
   {
-    g_OpenScopeStack.push_back({this, ev.NameHash, srcKey, ev.TimestampNs});
+    if (g_OpenScopeStack.Count < MaxOpenScopeDepth) [[likely]]
+    {
+      g_OpenScopeStack.Frames[g_OpenScopeStack.Count++] = {
+          this, ev.NameHash, srcKey, ev.TimestampNs};
+    }
     return;
   }
 
   // ZoneEnd: locate matching open frame on the TLS stack.
   u64 beginTs = 0;
   bool matched = false;
-  for (size_t i = g_OpenScopeStack.size(); i > 0; --i)
+  for (::std::size_t i = g_OpenScopeStack.Count; i > 0; --i)
   {
-    const OpenScopeFrame& f = g_OpenScopeStack[i - 1];
+    const OpenScopeFrame& f = g_OpenScopeStack.Frames[i - 1];
     if (f.Owner == this && f.NameHash == ev.NameHash && f.Source == srcKey)
     {
       beginTs = f.BeginTs;
-      g_OpenScopeStack.erase(g_OpenScopeStack.begin() +
-                             static_cast<::std::ptrdiff_t>(i - 1));
+      // Compact: shift any frames above the match down by one.
+      for (::std::size_t j = i - 1; j + 1 < g_OpenScopeStack.Count; ++j)
+        g_OpenScopeStack.Frames[j] = g_OpenScopeStack.Frames[j + 1];
+      --g_OpenScopeStack.Count;
       matched = true;
       break;
     }
@@ -822,9 +858,21 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
       else if (expected != ev.NameHash)
         continue;
     }
-    if (expected == ev.NameHash &&
-        slot.Source.load(std::memory_order_relaxed) == srcKey)
+    if (expected == ev.NameHash)
     {
+      // Source publish race: the claimer hasn't stored Source yet. If
+      // we observe 0, try to publish our srcKey ourselves; this resolves
+      // the gap atomically without losing events.
+      u8 cur = slot.Source.load(std::memory_order_relaxed);
+      if (cur == 0)
+      {
+        u8 zero = 0;
+        slot.Source.compare_exchange_strong(zero, srcKey,
+                                            std::memory_order_relaxed);
+        cur = slot.Source.load(std::memory_order_relaxed);
+      }
+      if (cur != srcKey)
+        continue;
       slot.LastNs.store(dur, std::memory_order_relaxed);
       u64 prevMin = slot.MinNs.load(std::memory_order_relaxed);
       while (dur < prevMin && !slot.MinNs.compare_exchange_weak(
