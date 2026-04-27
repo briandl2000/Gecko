@@ -754,9 +754,12 @@ int main()
         {
           if (!frames[i].Valid)
             continue;
-          const Texture& src = (i == 1 && havePlasma)   ? plasmaTex[1]
-                               : (i == 0 && havePlasma) ? plasmaTex[0]
-                                                        : triSampled;
+          // Window 0 shows the triangle offscreen RT, window 1 shows
+          // one of the plasma compute outputs. The second plasma
+          // (plasmaTex[1]) is dispatched purely to exercise the
+          // multi-cmd-list profiling path.
+          const Texture& src =
+              (i == 1 && havePlasma) ? plasmaTex[0] : triSampled;
           ClearValue scClear = ClearValue::RenderTarget(0.0F, 0.0F, 0.0F, 1.0F);
           cmd->BeginRendering(frames[i].BackBuffer, &scClear);
           cmd->SetViewport(0.0F, 0.0F,
