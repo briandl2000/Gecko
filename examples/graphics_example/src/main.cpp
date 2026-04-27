@@ -171,6 +171,20 @@ int main()
     {
       traceSink.RegisterWith(profiler);
       profiler->SetTraceEnabled(true);
+      // Keep the profiler itself at Detailed (so HUD / WatchScope stats stay
+      // fully accurate) but tell the Chrome-trace sink to drop Detailed
+      // events so the JSON file stays small. Tweak via env var below.
+      ::gecko::ProfLevel traceLevel = ::gecko::ProfLevel::Normal;
+      if (const char* env = ::std::getenv("GECKO_TRACE_LEVEL"))
+      {
+        if (env[0] == 'a' || env[0] == 'A')
+          traceLevel = ::gecko::ProfLevel::Always;
+        else if (env[0] == 'd' || env[0] == 'D')
+          traceLevel = ::gecko::ProfLevel::Detailed;
+        else
+          traceLevel = ::gecko::ProfLevel::Normal;
+      }
+      traceSink.SetMinLevel(traceLevel);
     }
   }
 

@@ -113,6 +113,14 @@ void AsyncTraceProfilerSink::Write(const ProfEvent& event) noexcept
 {
   if (!m_Writer)
     return;
+  // Always allow Counter / Mark events through regardless of min-level —
+  // these are typically per-frame summaries the user explicitly opted into.
+  if (event.Kind == ProfEventKind::ZoneBegin ||
+      event.Kind == ProfEventKind::ZoneEnd)
+  {
+    if (event.Level > m_MinLevel.load(::std::memory_order_relaxed))
+      return;
+  }
   {
     ::std::lock_guard<::std::mutex> lk(m_Mu);
     m_Pending.push_back(event);
@@ -125,9 +133,19 @@ void AsyncTraceProfilerSink::WriteBatch(const ProfEvent* events,
 {
   if (!m_Writer || !events || count == 0)
     return;
+  const ProfLevel minLevel = m_MinLevel.load(::std::memory_order_relaxed);
   {
     ::std::lock_guard<::std::mutex> lk(m_Mu);
-    m_Pending.insert(m_Pending.end(), events, events + count);
+    m_Pending.reserve(m_Pending.size() + count);
+    for (::std::size_t i = 0; i < count; ++i)
+    {
+      const ProfEvent& e = events[i];
+      const bool isZone = (e.Kind == ProfEventKind::ZoneBegin ||
+                           e.Kind == ProfEventKind::ZoneEnd);
+      if (isZone && e.Level > minLevel)
+        continue;
+      m_Pending.push_back(e);
+    }
   }
   m_Cv.notify_one();
 }

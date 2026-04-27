@@ -35,6 +35,19 @@ public:
     return m_Writer != nullptr;
   }
 
+  // Drop any event whose Level is more verbose than `level` before queueing
+  // for the worker. Stats / aggregates inside IProfiler are unaffected —
+  // this only thins the Chrome-trace JSON. Default: Detailed (no filtering).
+  void SetMinLevel(ProfLevel level) noexcept
+  {
+    m_MinLevel.store(level, ::std::memory_order_relaxed);
+  }
+
+  ProfLevel GetMinLevel() const noexcept
+  {
+    return m_MinLevel.load(::std::memory_order_relaxed);
+  }
+
   void Write(const ProfEvent& event) noexcept override;
   void WriteBatch(const ProfEvent* events, std::size_t count) noexcept override;
   void Flush() noexcept override;
@@ -49,6 +62,7 @@ private:
   std::vector<ProfEvent> m_Pending {};
   std::atomic<bool> m_Run {true};
   std::thread m_Worker {};
+  std::atomic<ProfLevel> m_MinLevel {ProfLevel::Detailed};
 
   // Serialises every write to m_Writer (worker drain, Flush(), destructor).
   // Without this, concurrent DrainAndWrite calls from the worker and the
