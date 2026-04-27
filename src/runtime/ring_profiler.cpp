@@ -821,17 +821,10 @@ void RingProfiler::ResetAggregator() noexcept
     slot.Count.store(0, std::memory_order_relaxed);
     slot.OpenBeginNs.store(0, std::memory_order_relaxed);
   }
-  // Reset watcher rings too.
-  std::lock_guard<std::mutex> lk(m_WatchMu);
-  for (auto& wptr : m_Watch)
-  {
-    if (!wptr)
-      continue;
-    WatchEntry& w = *wptr;
-    std::lock_guard<std::mutex> wlk(w.Mu);
-    w.Head.store(0, std::memory_order_relaxed);
-    w.Filled.store(0, std::memory_order_relaxed);
-  }
+  // Watcher rings are intentionally NOT cleared here. They model a rolling
+  // window of "the last N samples" and should not be wiped by the 1 s
+  // auto-reset timer - otherwise HUD readers that rely on AvgNs see 0 ms
+  // every reset boundary until the ring re-fills.
 }
 
 }  // namespace gecko::runtime
