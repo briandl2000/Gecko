@@ -17,6 +17,21 @@ namespace gecko::runtime {
 // (e.g., if profiler internally calls a logged/profiled function)
 thread_local bool g_InsideProfiler = false;
 
+// Per-thread open-scope stack used by UpdateAggregator to pair ZoneBegin
+// / ZoneEnd events without sharing OpenBeginNs across threads. Kept at
+// namespace scope (rather than function-local) to dodge MinGW's
+// historically buggy lazy-init of function-static thread_locals with
+// non-trivial destructors. Frames carry the owning RingProfiler* so
+// multiple instances (e.g. across test cases) don't corrupt each other.
+struct OpenScopeFrame
+{
+  void* Owner;  // typed as void* to avoid pulling RingProfiler into TU header
+  u32 NameHash;
+  u8 Source;
+  u64 BeginTs;
+};
+thread_local ::std::vector<OpenScopeFrame> g_OpenScopeStack;
+
 u64 RingProfiler::MonotonicNowNs() noexcept
 {
   return MonotonicTimeNs();
@@ -756,37 +771,29 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(ev.Source) + 1);
 
-  // Per-thread open-scope stack. Begin pushes; End pops the matching frame
-  // and computes duration. Frames carry the owning RingProfiler* so test
+  // Per-thread open-scope stack lives at namespace scope (see
+  // OpenScopeFrame above). Begin pushes; End pops the matching frame and
+  // computes duration. Frames carry the owning RingProfiler* so test
   // shutdowns / multiple instances don't corrupt each other's stacks.
-  // Well-nested PROF_SCOPE usage hits the fast `back() == match` path; if
-  // a thread interleaves scopes, we walk the stack to find the match.
-  struct OpenScope
-  {
-    RingProfiler* Owner;
-    u32 NameHash;
-    u8 Source;
-    u64 BeginTs;
-  };
-  static thread_local ::std::vector<OpenScope> tls_OpenScopes;
-
+  // Well-nested PROF_SCOPE usage hits the fast back-of-stack match; if a
+  // thread interleaves scopes we walk the stack to find the match.
   if (ev.Kind == ProfEventKind::ZoneBegin)
   {
-    tls_OpenScopes.push_back({this, ev.NameHash, srcKey, ev.TimestampNs});
+    g_OpenScopeStack.push_back({this, ev.NameHash, srcKey, ev.TimestampNs});
     return;
   }
 
   // ZoneEnd: locate matching open frame on the TLS stack.
   u64 beginTs = 0;
   bool matched = false;
-  for (size_t i = tls_OpenScopes.size(); i > 0; --i)
+  for (size_t i = g_OpenScopeStack.size(); i > 0; --i)
   {
-    const OpenScope& f = tls_OpenScopes[i - 1];
+    const OpenScopeFrame& f = g_OpenScopeStack[i - 1];
     if (f.Owner == this && f.NameHash == ev.NameHash && f.Source == srcKey)
     {
       beginTs = f.BeginTs;
-      tls_OpenScopes.erase(tls_OpenScopes.begin() +
-                           static_cast<::std::ptrdiff_t>(i - 1));
+      g_OpenScopeStack.erase(g_OpenScopeStack.begin() +
+                             static_cast<::std::ptrdiff_t>(i - 1));
       matched = true;
       break;
     }
