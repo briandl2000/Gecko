@@ -74,7 +74,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 
 VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::Ctor");
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::Ctor");
 
   // ── Instance ──────────────────────────────────────────────────
 
@@ -91,8 +91,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   // ── Enumerate available layers / extensions (for graceful fallback) ──
   ::std::vector<VkExtensionProperties> availableExts;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan,
-                           "vkEnumerateInstanceExtensionProperties");
+    GECKO_PROFILE_NAMED(labels::Vulkan,
+                        "vkEnumerateInstanceExtensionProperties");
     u32 n = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &n, nullptr);
     availableExts.resize(n);
@@ -117,8 +117,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   ::std::vector<VkLayerProperties> availableLayers;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan,
-                           "vkEnumerateInstanceLayerProperties");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkEnumerateInstanceLayerProperties");
     u32 n = 0;
     vkEnumerateInstanceLayerProperties(&n, nullptr);
     availableLayers.resize(n);
@@ -157,7 +156,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   instanceCreateInfo.ppEnabledLayerNames = layers.data();
 
   if ([&]() noexcept {
-        GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateInstance");
+        GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateInstance");
         return vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance) !=
                VK_SUCCESS;
       }())
@@ -201,7 +200,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   u32 physicalDeviceCount = 0;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkEnumeratePhysicalDevices");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkEnumeratePhysicalDevices");
     vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, nullptr);
   }
   if (physicalDeviceCount == 0)
@@ -278,7 +277,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   supported2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   supported2.pNext = &supported12;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkGetPhysicalDeviceFeatures2");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkGetPhysicalDeviceFeatures2");
     vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supported2);
   }
 
@@ -318,7 +317,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   deviceCreateInfo.ppEnabledExtensionNames = deviceExts.data();
 
   if ([&]() noexcept {
-        GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateDevice");
+        GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateDevice");
         return vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr,
                               &m_Device);
       }() != VK_SUCCESS)
@@ -337,7 +336,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   cmdPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateCommandPool");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateCommandPool");
     VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr,
                                      &m_GraphicsCommandPool));
   }
@@ -355,7 +354,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
   allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vmaCreateAllocator");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vmaCreateAllocator");
     VULKAN_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator));
   }
 
@@ -375,7 +374,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     descPoolCreateInfo.maxSets = 4096;
     descPoolCreateInfo.poolSizeCount = 1;
     descPoolCreateInfo.pPoolSizes = poolSizes;
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkCreateDescriptorPool");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateDescriptorPool");
     VULKAN_CHECK(vkCreateDescriptorPool(m_Device, &descPoolCreateInfo, nullptr,
                                         &m_DescriptorPool));
   }
@@ -764,7 +763,7 @@ Swapchain VulkanDevice::CreateSwapchain(
     const ::gecko::platform::NativeWindowHandle& native,
     const SwapchainDesc& desc) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::CreateSwapchain");
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateSwapchain");
 
   if (!m_Valid)
     return Swapchain {};
@@ -828,7 +827,7 @@ void VulkanDevice::DestroySwapchain(Swapchain& swapchain) noexcept
 
 void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::ResizeSwapchain");
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::ResizeSwapchain");
 
   if (!swapchain.Data)
     return;
@@ -861,7 +860,7 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 
 FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED_MARK(labels::Vulkan, "VulkanDevice::BeginFrame");
+  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan, "VulkanDevice::BeginFrame");
 
   // Reclaim completed command lists from previous submits before doing
   // anything else this frame.
@@ -876,14 +875,14 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 
   const u32 frame = data->FrameIndex;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkWaitForFences");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkWaitForFences");
     vkWaitForFences(m_Device, 1, &data->InFlight[frame], VK_TRUE, UINT64_MAX);
   }
 
   u32 imageIndex = 0;
   VkResult ar = VK_SUCCESS;
   {
-    GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "vkAcquireNextImageKHR");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkAcquireNextImageKHR");
     ar = vkAcquireNextImageKHR(m_Device, data->Swapchain, UINT64_MAX,
                                data->ImageAvailable[frame], VK_NULL_HANDLE,
                                &imageIndex);
@@ -936,7 +935,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 
 void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED_MARK(labels::Vulkan, "VulkanDevice::Present");
+  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan, "VulkanDevice::Present");
 
   if (frames.empty())
     return;
@@ -1015,8 +1014,8 @@ Unique<ICommandList> VulkanDevice::CreateComputeCommandList() noexcept
 void VulkanDevice::ExecuteGraphicsCommandList(
     Unique<ICommandList> commandList) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED_MARK(labels::Vulkan,
-                              "VulkanDevice::ExecuteGraphicsCommandList");
+  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan,
+                             "VulkanDevice::ExecuteGraphicsCommandList");
 
   auto* cl = static_cast<VulkanCommandList*>(commandList.get());
   if (cl == nullptr || !cl->IsValid())
@@ -1525,8 +1524,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
 GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
     const GraphicsPipelineDesc& desc) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::Vulkan,
-                         "VulkanDevice::CreateGraphicsPipeline");
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateGraphicsPipeline");
 
   if (!desc.IsValid() || !m_Valid)
     return GraphicsPipeline {};
@@ -1807,7 +1805,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
 ComputePipeline VulkanDevice::CreateComputePipeline(
     const ComputePipelineDesc& desc) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::Vulkan, "VulkanDevice::CreateComputePipeline");
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateComputePipeline");
 
   if (!desc.IsValid() || !m_Valid)
     return ComputePipeline {};

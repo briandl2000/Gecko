@@ -205,7 +205,7 @@ int main()
     logger->SetLevel(LogLevel::Info);
   }
   {
-    GECKO_FUNC(app::platform_example::labels::Main);
+    GECKO_SCOPE(app::platform_example::labels::Main);
     GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
 
     // ── Create main window — resizable, decorated ──────────────────

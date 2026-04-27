@@ -56,7 +56,7 @@ X11MonitorsBackend::~X11MonitorsBackend() noexcept
 
 void X11MonitorsBackend::EnumerateMonitors() noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   m_Monitors.clear();
 

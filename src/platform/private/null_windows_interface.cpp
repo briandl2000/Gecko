@@ -11,7 +11,7 @@ namespace gecko::platform {
 
 WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   const u64 id = ++m_NextId;
 
@@ -39,7 +39,7 @@ WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 
 void NullWindowsBackend::DestroyWindow(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
   if (!window.IsValid())
     return;
 
@@ -67,7 +67,7 @@ bool NullWindowsBackend::IsWindowAlive(WindowHandle window) const noexcept
 
 bool NullWindowsBackend::RequestClose(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
   if (!window.IsValid() || !IsWindowAlive(window))
     return false;
 

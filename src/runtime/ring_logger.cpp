@@ -325,7 +325,7 @@ bool RingLogger::HasPendingEntries() const noexcept
 
 void RingLogger::Flush() noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::Logger, "RingLogger::Flush");
+  GECKO_PROFILE_NAMED(labels::Logger, "RingLogger::Flush");
 
   // Copy sinks vector once to avoid holding lock during I/O
   std::vector<ILogSink*> sinks;

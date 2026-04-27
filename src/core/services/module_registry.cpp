@@ -171,7 +171,7 @@ void ModuleRegistry::Shutdown() noexcept
 ::gecko::ModuleRegistration ModuleRegistry::RegisterStatic(
     ::gecko::IModule& module) noexcept
 {
-  GECKO_FUNC(::gecko::core::labels::Modules);
+  GECKO_SCOPE(::gecko::core::labels::Modules);
 
   if (!m_impl)
   {

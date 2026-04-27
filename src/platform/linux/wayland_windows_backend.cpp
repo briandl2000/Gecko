@@ -517,7 +517,7 @@ void WaylandWindowsBackend::OnToplevelClose(WaylandWindowState* ws) noexcept
 WindowHandle WaylandWindowsBackend::CreateWindow(
     const WindowDesc& desc) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   if (!m_Display || !m_Compositor || !m_WmBase)
     return {};
@@ -648,7 +648,7 @@ WindowHandle WaylandWindowsBackend::CreateWindow(
 
 void WaylandWindowsBackend::DestroyWindow(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   if (!window.IsValid())
     return;
@@ -691,7 +691,7 @@ bool WaylandWindowsBackend::IsWindowAlive(WindowHandle window) const noexcept
 
 bool WaylandWindowsBackend::RequestClose(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   if (!IsWindowAlive(window))
     return false;
@@ -1158,7 +1158,7 @@ void WaylandWindowsBackend::AttachBlankBuffer(WaylandWindowState& ws) noexcept
 void WaylandWindowsBackend::PumpEvents(
     const gecko::EventEmitter& emitter) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   // Flush deferred events first.
   for (const auto& ev : m_Staged)
@@ -1171,7 +1171,7 @@ void WaylandWindowsBackend::PumpEvents(
 
   // Non-blocking dispatch: prepare + read (if ready) + dispatch.
   {
-    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General, "wl_display_flush+read");
+    GECKO_PROFILE_NAMED(labels::General, "wl_display_flush+read");
     ::wl_display_flush(m_Display);
     if (::wl_display_prepare_read(m_Display) == 0)
     {
@@ -1186,8 +1186,7 @@ void WaylandWindowsBackend::PumpEvents(
     }
   }
   {
-    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General,
-                                    "wl_display_dispatch_pending");
+    GECKO_PROFILE_NAMED(labels::General, "wl_display_dispatch_pending");
     ::wl_display_dispatch_pending(m_Display);
   }
 

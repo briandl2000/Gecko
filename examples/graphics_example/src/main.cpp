@@ -795,10 +795,10 @@ int main()
 
   consoleSink.Unregister();
   fileSink.Unregister();
-  // NOTE: do NOT explicitly Unregister traceSink here. The outer GECKO_FUNC
+  // NOTE: do NOT explicitly Unregister traceSink here. The outer GECKO_SCOPE
   // scope object is destroyed at function exit AFTER this line runs but
   // BEFORE traceSink (since traceSink was declared earlier). Unregistering
-  // here would detach the sink before GECKO_FUNC's ZoneEnd fires, leaving
+  // here would detach the sink before GECKO_SCOPE's ZoneEnd fires, leaving
   // the main scope visibly "[incomplete]" in trace viewers. RAII does the
   // right thing: traceSink dtor unregisters, drains, then closes.
 

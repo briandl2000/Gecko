@@ -142,7 +142,7 @@ WaylandMonitorsBackend::~WaylandMonitorsBackend() noexcept
 
 void WaylandMonitorsBackend::EnumerateMonitors() noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   if (!m_Display)
     return;

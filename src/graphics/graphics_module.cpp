@@ -28,13 +28,13 @@ constexpr ::gecko::Label GraphicsModule::RootLabel() const noexcept
 
 bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
-  GECKO_FUNC(labels::Graphics);
+  GECKO_SCOPE(labels::Graphics);
   return true;
 }
 
 void GraphicsModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
-  GECKO_FUNC(labels::Graphics);
+  GECKO_SCOPE(labels::Graphics);
 }
 
 }  // namespace gecko::graphics

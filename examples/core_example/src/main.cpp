@@ -90,7 +90,7 @@ struct TestEventPayload
 // Worker function that simulates some computation
 void WorkerTask(int workerId, int numParticles)
 {
-  GECKO_FUNC(app::core_example::labels::Worker);
+  GECKO_SCOPE(app::core_example::labels::Worker);
 
   GECKO_INFO(app::core_example::labels::Worker,
              "Worker %d: Starting simulation with %d particles", workerId,
@@ -183,7 +183,7 @@ void WorkerTask(int workerId, int numParticles)
 // Function to perform some memory stress testing
 void MemoryStressTest()
 {
-  GECKO_FUNC(app::core_example::labels::Memory);
+  GECKO_SCOPE(app::core_example::labels::Memory);
 
   GECKO_INFO(app::core_example::labels::Memory, "Starting memory stress test");
 
@@ -303,7 +303,7 @@ void MemoryStressTest()
 
 void PrintMemoryStats(const runtime::TrackingAllocator& tracker)
 {
-  GECKO_FUNC(app::core_example::labels::Main);
+  GECKO_SCOPE(app::core_example::labels::Main);
 
   GECKO_INFO(app::core_example::labels::Main, "=== Memory Statistics ===");
   GECKO_INFO(app::core_example::labels::Main, "Total Live Bytes: %llu",
@@ -409,7 +409,7 @@ static void OnTestEventQueued(void* user, const EventMeta& meta,
 
 static void EventSystemTest()
 {
-  GECKO_FUNC(app::core_example::labels::Main);
+  GECKO_SCOPE(app::core_example::labels::Main);
 
   GECKO_INFO(app::core_example::labels::Main, "Setting up event system demo");
 
@@ -564,7 +564,7 @@ int main()
       "Log level is set to Info - Debug and Trace messages are filtered out");
 
   {
-    GECKO_FUNC(app::core_example::labels::Main);
+    GECKO_SCOPE(app::core_example::labels::Main);
 
     GECKO_INFO(app::core_example::labels::Main,
                "Starting comprehensive memory and profiling demo");

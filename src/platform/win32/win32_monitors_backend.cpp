@@ -23,7 +23,7 @@ Win32MonitorsBackend::Win32MonitorsBackend() noexcept
 
 void Win32MonitorsBackend::EnumerateMonitors() noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
   m_Monitors.clear();
   ::EnumDisplayMonitors(nullptr, nullptr, EnumProc,
                         reinterpret_cast<::LPARAM>(this));

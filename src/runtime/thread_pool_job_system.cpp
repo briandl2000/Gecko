@@ -79,7 +79,7 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
 {
   // Profiler/logger may not exist yet at very early startup; the macros
   // route through GetProfiler()/GetLogger() which fall back to Null impls.
-  GECKO_PROF_SCOPE_NAMED(labels::JobSystem, "JobSystem::Submit");
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit");
 
   if (!m_Initialized || !job)
   {
@@ -104,7 +104,7 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
                                       u32 dependencyCount, JobPriority priority,
                                       Label label) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::JobSystem, "JobSystem::Submit(deps)");
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit(deps)");
 
   if (!m_Initialized || !job)
   {
@@ -262,7 +262,7 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
 
     try
     {
-      GECKO_PROF_SCOPE_NAMED_DETAILED(labels::JobSystem, "JobSystem::Run");
+      GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Run");
       job->Function();
       job->Completed.store(true, std::memory_order_release);
     }

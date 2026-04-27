@@ -209,7 +209,7 @@ void Win32WindowsBackend::ApplyDecorations(::HWND hwnd, bool decorated,
 
 WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   const ::DWORD style = MakeStyle(desc);
   const ::DWORD exStyle = WS_EX_APPWINDOW;
@@ -285,7 +285,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 
 void Win32WindowsBackend::DestroyWindow(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
   auto* entry = FindEntry(window);
   if (!entry)
     return;
@@ -312,7 +312,7 @@ bool Win32WindowsBackend::IsWindowAlive(WindowHandle window) const noexcept
 
 bool Win32WindowsBackend::RequestClose(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
   auto* entry = FindEntry(window);
   if (!entry || !entry->Alive)
     return false;
@@ -741,14 +741,13 @@ CursorMode Win32WindowsBackend::GetCursorMode(
 void Win32WindowsBackend::PumpEvents(
     const gecko::EventEmitter& emitter) noexcept
 {
-  GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General,
-                                  "Win32WindowsBackend::PumpEvents");
+  GECKO_PROFILE_NAMED(labels::General, "Win32WindowsBackend::PumpEvents");
   m_CurrentEmitter = &emitter;
 
   ::MSG msg;
   while (::PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE))
   {
-    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General, "DispatchMessage");
+    GECKO_PROFILE_NAMED(labels::General, "DispatchMessage");
     ::TranslateMessage(&msg);
     ::DispatchMessageW(&msg);
   }

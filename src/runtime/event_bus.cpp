@@ -21,7 +21,7 @@ EventBus::~EventBus()
 
 bool EventBus::Init() noexcept
 {
-  GECKO_FUNC(runtime::labels::General);
+  GECKO_SCOPE(runtime::labels::General);
   m_CapabilitySecret = RandomU64();
 
   // Allocate containers now that allocator service is installed
@@ -38,7 +38,7 @@ bool EventBus::Init() noexcept
 
 void EventBus::Shutdown() noexcept
 {
-  GECKO_FUNC(runtime::labels::General);
+  GECKO_SCOPE(runtime::labels::General);
 
   {
     std::lock_guard<std::mutex> lock(m_SubscribersMutex);
@@ -81,7 +81,7 @@ void EventBus::UnregisterModule(u64 moduleId) noexcept
 EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user,
                                       SubscriptionOptions options) noexcept
 {
-  GECKO_FUNC(runtime::labels::General);
+  GECKO_SCOPE(runtime::labels::General);
   GECKO_ASSERT(fn && "Callback cannot be null");
 
   u64 id = m_NextSubscriptionId.fetch_add(1, std::memory_order_relaxed);
@@ -172,7 +172,7 @@ void EventBus::Send(const EventEmitter& emitter, EventCode code,
 
 std::size_t EventBus::Dispatch(std::size_t maxCount) noexcept
 {
-  GECKO_FUNC(runtime::labels::General);
+  GECKO_SCOPE(runtime::labels::General);
 
   std::vector<QueuedEvent> events;
 
@@ -198,8 +198,7 @@ std::size_t EventBus::Dispatch(std::size_t maxCount) noexcept
 
   for (const auto& qEvent : events)
   {
-    GECKO_PROF_SCOPE_NAMED_DETAILED(runtime::labels::General,
-                                    "Dispatch::Notify");
+    GECKO_PROFILE_NAMED(runtime::labels::General, "Dispatch::Notify");
     EventView view {qEvent.payloadStorage, qEvent.payloadSize};
     NotifySubscribers(qEvent.meta.code, qEvent.meta, view,
                       SubscriptionDelivery::Queued);

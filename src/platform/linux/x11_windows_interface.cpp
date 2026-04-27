@@ -75,7 +75,7 @@ X11WindowsBackend::~X11WindowsBackend() noexcept
 
 WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   if (!m_Display)
     return {};
@@ -160,7 +160,7 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
 
 void X11WindowsBackend::DestroyWindow(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   if (!window.IsValid())
     return;
@@ -194,7 +194,7 @@ bool X11WindowsBackend::IsWindowAlive(WindowHandle window) const noexcept
 
 bool X11WindowsBackend::RequestClose(WindowHandle window) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   if (!IsWindowAlive(window))
     return false;
@@ -207,7 +207,7 @@ bool X11WindowsBackend::RequestClose(WindowHandle window) noexcept
 
 void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 {
-  GECKO_FUNC(labels::General);
+  GECKO_SCOPE(labels::General);
 
   // Flush deferred events from RequestClose / DestroyWindow first.
   for (const auto& ev : m_Staged)
@@ -221,7 +221,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   int eventCount = 0;
   while (::XPending(m_Display) > 0)
   {
-    GECKO_PROF_SCOPE_NAMED_DETAILED(labels::General, "X11::HandleEvent");
+    GECKO_PROFILE_NAMED(labels::General, "X11::HandleEvent");
     ::XEvent event;
     ::XNextEvent(m_Display, &event);
     eventCount++;

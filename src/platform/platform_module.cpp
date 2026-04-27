@@ -64,7 +64,7 @@ PlatformModule::~PlatformModule() noexcept = default;
 
 bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
 {
-  GECKO_FUNC(labels::Platform);
+  GECKO_SCOPE(labels::Platform);
 
 #if defined(GECKO_PLATFORM_WINDOWS)
   // Request 1ms timer resolution so SleepNanoseconds is accurate.
@@ -129,7 +129,7 @@ bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept
 
 void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
 {
-  GECKO_FUNC(labels::Platform);
+  GECKO_SCOPE(labels::Platform);
 
   g_Emitter = nullptr;
   g_Input = nullptr;
@@ -171,7 +171,7 @@ IInput* GetInput() noexcept
 
 void PumpEvents() noexcept
 {
-  GECKO_PROF_SCOPE_NAMED(labels::Platform, "platform::PumpEvents");
+  GECKO_PROFILE_NAMED(labels::Platform, "platform::PumpEvents");
   if (!g_Windows || !g_Monitors || !g_Emitter)
     return;
   // Roll input edges + clear scroll BEFORE pumping so the events

@@ -225,79 +225,77 @@ struct ProfScope
 #define GECKO_PROF_CONCAT_(x, y) x##y
 #define GECKO_PROF_CONCAT(x, y) GECKO_PROF_CONCAT_(x, y)
 
-#if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_NORMAL
-#define GECKO_PROF_SCOPE(label)                                             \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
-  {                                                                         \
-    (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Normal \
-  }
-#define GECKO_PROF_SCOPE_NAMED(label, name)                                \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                 \
-  {                                                                        \
-    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal \
-  }
-#define GECKO_PROF_FUNC(label) GECKO_PROF_SCOPE(label)
-#else
-#define GECKO_PROF_SCOPE(label) (void)0
-#define GECKO_PROF_SCOPE_NAMED(label, name) (void)0
-#define GECKO_PROF_FUNC(label) (void)0
-#endif
+// ============================================================================
+// Profiler-only scope macros. These do NOT push a memory label.
+// Consumers should usually prefer the combined macros in <gecko/core/scope.h>
+// (`GECKO_SCOPE`, `GECKO_SCOPE_NAMED`, ...) which push a label AND start a
+// profiler scope. The macros below are provided for engine-internal sites
+// that explicitly want a profiler scope without affecting the label stack.
+//
+//   GECKO_PROFILE                -> Detailed, name = __func__
+//   GECKO_PROFILE_NAMED          -> Detailed, custom name literal
+//   GECKO_PROFILE_CAT            -> Detailed + category
+//   GECKO_PROFILE_NORMAL[_NAMED|_CAT]
+//   GECKO_PROFILE_ALWAYS[_NAMED|_CAT]
+// ============================================================================
 
 #if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_DETAILED
-#define GECKO_PROF_SCOPE_DETAILED(label)                                      \
+#define GECKO_PROFILE(label)                                                  \
   ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                    \
   {                                                                           \
     (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Detailed \
   }
-#define GECKO_PROF_SCOPE_NAMED_DETAILED(label, name)                         \
+#define GECKO_PROFILE_NAMED(label, name)                                     \
   ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                   \
   {                                                                          \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Detailed \
   }
-#define GECKO_PROF_FUNC_DETAILED(label) GECKO_PROF_SCOPE_DETAILED(label)
-#else
-#define GECKO_PROF_SCOPE_DETAILED(label) (void)0
-#define GECKO_PROF_SCOPE_NAMED_DETAILED(label, name) (void)0
-#define GECKO_PROF_FUNC_DETAILED(label) (void)0
-#endif
-
-#define GECKO_PROF_SCOPE_MARK(label)                                        \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
-  {                                                                         \
-    (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Always \
-  }
-#define GECKO_PROF_SCOPE_NAMED_MARK(label, name)                           \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                 \
-  {                                                                        \
-    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Always \
-  }
-#define GECKO_PROF_FUNC_MARK(label) GECKO_PROF_SCOPE_MARK(label)
-
-// Category-tagged variants. `cat` is a u8 returned from
-// IProfiler::RegisterCategory(); category 0 is the always-enabled default.
-#if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_NORMAL
-#define GECKO_PROF_SCOPE_NAMED_CAT(label, name, cat)                        \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
-  {                                                                         \
-    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal, \
-        (::gecko::u8)(cat)                                                  \
-  }
-#else
-#define GECKO_PROF_SCOPE_NAMED_CAT(label, name, cat) (void)0
-#endif
-
-#if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_DETAILED
-#define GECKO_PROF_SCOPE_NAMED_CAT_DETAILED(label, name, cat)                 \
+#define GECKO_PROFILE_CAT(label, name, cat)                                   \
   ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                    \
   {                                                                           \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Detailed, \
         (::gecko::u8)(cat)                                                    \
   }
 #else
-#define GECKO_PROF_SCOPE_NAMED_CAT_DETAILED(label, name, cat) (void)0
+#define GECKO_PROFILE(label) (void)0
+#define GECKO_PROFILE_NAMED(label, name) (void)0
+#define GECKO_PROFILE_CAT(label, name, cat) (void)0
 #endif
 
-#define GECKO_PROF_SCOPE_NAMED_CAT_MARK(label, name, cat)                   \
+#if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_NORMAL
+#define GECKO_PROFILE_NORMAL(label)                                         \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
+  {                                                                         \
+    (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Normal \
+  }
+#define GECKO_PROFILE_NORMAL_NAMED(label, name)                            \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                 \
+  {                                                                        \
+    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal \
+  }
+#define GECKO_PROFILE_NORMAL_CAT(label, name, cat)                          \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
+  {                                                                         \
+    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal, \
+        (::gecko::u8)(cat)                                                  \
+  }
+#else
+#define GECKO_PROFILE_NORMAL(label) (void)0
+#define GECKO_PROFILE_NORMAL_NAMED(label, name) (void)0
+#define GECKO_PROFILE_NORMAL_CAT(label, name, cat) (void)0
+#endif
+
+#define GECKO_PROFILE_ALWAYS(label)                                         \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
+  {                                                                         \
+    (label), ::gecko::FNV1a(__func__), __func__, ::gecko::ProfLevel::Always \
+  }
+#define GECKO_PROFILE_ALWAYS_NAMED(label, name)                            \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                 \
+  {                                                                        \
+    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Always \
+  }
+#define GECKO_PROFILE_ALWAYS_CAT(label, name, cat)                          \
   ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
   {                                                                         \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Always, \
@@ -337,18 +335,15 @@ struct ProfScope
 
 #else  // !GECKO_PROFILING
 
-#define GECKO_PROF_SCOPE(label) (void)0
-#define GECKO_PROF_SCOPE_NAMED(label, name) (void)0
-#define GECKO_PROF_FUNC(label) (void)0
-#define GECKO_PROF_SCOPE_DETAILED(label) (void)0
-#define GECKO_PROF_SCOPE_NAMED_DETAILED(label, name) (void)0
-#define GECKO_PROF_FUNC_DETAILED(label) (void)0
-#define GECKO_PROF_SCOPE_MARK(label) (void)0
-#define GECKO_PROF_SCOPE_NAMED_MARK(label, name) (void)0
-#define GECKO_PROF_FUNC_MARK(label) (void)0
-#define GECKO_PROF_SCOPE_NAMED_CAT(label, name, cat) (void)0
-#define GECKO_PROF_SCOPE_NAMED_CAT_DETAILED(label, name, cat) (void)0
-#define GECKO_PROF_SCOPE_NAMED_CAT_MARK(label, name, cat) (void)0
+#define GECKO_PROFILE(label) (void)0
+#define GECKO_PROFILE_NAMED(label, name) (void)0
+#define GECKO_PROFILE_CAT(label, name, cat) (void)0
+#define GECKO_PROFILE_NORMAL(label) (void)0
+#define GECKO_PROFILE_NORMAL_NAMED(label, name) (void)0
+#define GECKO_PROFILE_NORMAL_CAT(label, name, cat) (void)0
+#define GECKO_PROFILE_ALWAYS(label) (void)0
+#define GECKO_PROFILE_ALWAYS_NAMED(label, name) (void)0
+#define GECKO_PROFILE_ALWAYS_CAT(label, name, cat) (void)0
 #define GECKO_COUNTER(label, name, val) (void)0
 #define GECKO_FRAME(label, name) (void)0
 
