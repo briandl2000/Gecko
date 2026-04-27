@@ -135,15 +135,11 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
     slot.ProfileEvent = event;  // copy event
     slot.Sequence.store(pos + 1, std::memory_order_release);
 
-    // Try to schedule async processing
-    // Use reentrancy guard to prevent infinite recursion with single-threaded
-    // job systems
-    if (!g_InsideProfiler)
-    {
-      g_InsideProfiler = true;
-      TryScheduleConsumerJob();
-      g_InsideProfiler = false;
-    }
+    // Try to schedule async processing. The reentrancy guard lives inside
+    // TryScheduleConsumerJob() itself - around the Submit() call - so that
+    // if Submit inline-runs ProcessProfEvents (e.g. NullJobSystem), the
+    // re-entered Emit's call here is detected and skipped.
+    TryScheduleConsumerJob();
   }
   else
   {
@@ -309,8 +305,9 @@ void RingProfiler::ProcessProfEvents() noexcept
 void RingProfiler::TryScheduleConsumerJob() noexcept
 {
   // Reentrancy guard: With single-threaded job systems (like NullJobSystem),
-  // Submit() runs the job immediately inline, which could cause infinite
-  // recursion
+  // Submit() runs the job inline on this thread, which calls
+  // ProcessProfEvents -> Sink::Write -> may Emit -> here again. Bail on the
+  // recursive entry so we don't infinitely re-submit.
   if (g_InsideProfiler)
     return;
 
@@ -348,8 +345,13 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   auto* jobSystem = GetJobSystem();
   if (!jobSystem)
   {
-    // No job system available, process immediately on current thread
+    // No job system available, process immediately on current thread.
+    // Set the reentrancy flag so any Emits issued from sinks during
+    // ProcessProfEvents see g_InsideProfiler == true and skip their own
+    // re-scheduling attempt.
+    g_InsideProfiler = true;
     ProcessProfEvents();
+    g_InsideProfiler = false;
     return;
   }
 
@@ -358,8 +360,12 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
     // Check m_Run again while holding the lock to prevent shutdown race
     if (!m_Run.load(std::memory_order_acquire))
       return;
+    // Same reasoning as above: NullJobSystem inline-runs Submit, so set the
+    // guard around the Submit call as well.
+    g_InsideProfiler = true;
     m_ConsumerJob = jobSystem->Submit([this]() { ProcessProfEvents(); },
                                       JobPriority::Low, m_ProfilerLabel);
+    g_InsideProfiler = false;
   }
 }
 

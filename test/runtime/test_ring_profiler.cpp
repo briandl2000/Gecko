@@ -63,23 +63,47 @@ TEST_CASE("RingProfiler basic init/shutdown", "[runtime][profiler]")
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler FIFO ordering via TryPop", "[runtime][profiler]")
+namespace {
+struct RecordingSink : ::gecko::IProfilerSink
+{
+  ::std::vector<ProfEvent> Events;
+  void Write(const ProfEvent& ev) noexcept override
+  {
+    Events.push_back(ev);
+  }
+  void WriteBatch(::std::span<const ProfEvent> events) noexcept override
+  {
+    Events.insert(Events.end(), events.begin(), events.end());
+  }
+  void Flush() noexcept override
+  {}
+};
+}  // namespace
+
+TEST_CASE("RingProfiler delivers events to sinks in FIFO order",
+          "[runtime][profiler]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
 
+  RecordingSink sink;
+  prof.AddSink(&sink);
+
   for (u64 i = 0; i < 10; ++i)
     prof.Emit(MakeZoneBegin(0xAAAA, i + 1));
 
-  ProfEvent ev {};
+  // Flush drains anything still queued (rate-limiter may have parked some
+  // events between the auto-drain on the first Emit and the next one).
+  prof.Flush();
+
+  REQUIRE(sink.Events.size() == 10);
   for (u64 i = 0; i < 10; ++i)
   {
-    REQUIRE(prof.TryPop(ev));
-    REQUIRE(ev.TimestampNs == i + 1);
-    REQUIRE(ev.NameHash == 0xAAAAu);
+    REQUIRE(sink.Events[i].TimestampNs == i + 1);
+    REQUIRE(sink.Events[i].NameHash == 0xAAAAu);
   }
-  REQUIRE_FALSE(prof.TryPop(ev));
 
+  prof.RemoveSink(&sink);
   prof.Shutdown();
 }
 
@@ -214,4 +238,57 @@ TEST_CASE("RingProfiler diagnostics counters non-decreasing",
   REQUIRE(d1.DroppedEvents >= d0.DroppedEvents);
 
   prof.Shutdown();
+}
+
+namespace {
+
+struct CountingSink : ::gecko::IProfilerSink
+{
+  ::std::atomic<u32> Received {0};
+  void Write(const ProfEvent&) noexcept override
+  {
+    Received.fetch_add(1, ::std::memory_order_relaxed);
+  }
+  void WriteBatch(::std::span<const ProfEvent> events) noexcept override
+  {
+    Received.fetch_add(static_cast<u32>(events.size()),
+                       ::std::memory_order_relaxed);
+  }
+  void Flush() noexcept override
+  {}
+};
+
+}  // namespace
+
+TEST_CASE("RingProfiler delivers events to sinks without explicit Flush",
+          "[runtime][profiler][sink]")
+{
+  // Regression guard: if the consumer-job scheduling path from Emit() ever
+  // breaks (e.g. reentrancy guard mis-ordering), this test catches it.
+  // Without a real job system installed, GetJobSystem() returns nullptr in
+  // RingProfiler::TryScheduleConsumerJob() which then runs ProcessProfEvents
+  // inline on the emitting thread - so by the time Emit() returns we expect
+  // the event to already be in the sink, with no Flush needed.
+  RingProfiler prof(64);
+  REQUIRE(prof.Init());
+
+  CountingSink sink;
+  prof.AddSink(&sink);
+
+  constexpr u32 c_NumEvents = 10;
+  for (u32 i = 0; i < c_NumEvents; ++i)
+    prof.Emit(MakeZoneBegin(0x1, i + 1));
+
+  // No prof.Flush() here on purpose. We want to see what arrives via the
+  // automatic consumer-job path alone.
+  u32 receivedBeforeShutdown = sink.Received.load(::std::memory_order_relaxed);
+
+  // Shutdown will Flush internally, draining everything still in the ring.
+  prof.RemoveSink(&sink);
+  prof.Shutdown();
+
+  // What we really care about: did *any* events make it to the sink before
+  // the explicit Flush in RemoveSink/Shutdown? If 0, the consumer path is
+  // dead and events only ever flow at shutdown.
+  REQUIRE(receivedBeforeShutdown > 0u);
 }
