@@ -111,10 +111,13 @@ private:
   std::atomic<u64> m_LastStatsResetNs {0};
 
   // Aggregator: 1024-entry open-addressing table keyed by name-hash + source.
-  // Updated on ZoneEnd for *every* level (cheap: single CAS). Reset by
-  // ResetStats() / auto-timer / FrameMark (FrameMark behavior is opt-in
-  // via SetStatsResetIntervalMs(0) — by default a timer drives it).
-  // Reads via GetStats() are relaxed snapshots (not transactional).
+  // Updated on ZoneEnd for *every* level (cheap: single CAS). Cleared by
+  // ResetStats() (manual) and by an auto-timer (see SetStatsResetIntervalMs;
+  // default 1 s). FrameMark is a passive marker and does NOT reset stats.
+  // ScopeStats::LastNs and the per-WatchScope rolling rings persist across
+  // resets so HUD readers never see 0 ms in the gap between reset and the
+  // next ZoneEnd; only Min/Max/Count are windowed. Reads via GetStats() are
+  // relaxed snapshots (not transactional).
   static constexpr size_t c_AggregatorCapacity = 1024;
   struct AggSlot
   {

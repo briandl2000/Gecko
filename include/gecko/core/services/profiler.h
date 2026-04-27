@@ -71,10 +71,14 @@ struct IProfilerSink : public RegisteredSink<IProfilerSink, IProfiler>
 };
 
 // Per-scope aggregator snapshot. Updated on ZoneEnd for *every* level
-// (cheap: one CAS per zone-end). Stats reset on a configurable timer
-// (default 1 s) or via IProfiler::ResetStats(). AvgNs is non-zero only for
-// scopes registered via WatchScope() — those get a fixed-window rolling
-// average over the last N samples.
+// (cheap: one CAS per zone-end). The windowed counters (MinNs, MaxNs,
+// Count) reset on a configurable timer (default 1 s) or via
+// IProfiler::ResetStats(). LastNs and the per-WatchScope rolling ring are
+// intentionally NOT cleared by the auto-reset - they represent "the most
+// recent observation" and "the last N actual samples" respectively, so
+// HUD readers never see 0 ms in the gap between reset and the next
+// ZoneEnd. AvgNs is non-zero only for scopes registered via WatchScope() -
+// those get a fixed-window rolling average over the last N samples.
 struct ScopeStats
 {
   u64 LastNs {0};

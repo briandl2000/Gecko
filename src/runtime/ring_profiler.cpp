@@ -71,11 +71,11 @@ bool RingProfiler::IsLevelEnabled(ProfLevel level) const noexcept
 
 void RingProfiler::Emit(const ProfEvent& event) noexcept
 {
-  if (!m_Run.load(std::memory_order_relaxed))
+  if (!m_Run.load(std::memory_order_relaxed)) [[unlikely]]
     return;
 
   // Guard against emitting before Init (m_Ring is empty)
-  if (m_Ring.empty())
+  if (m_Ring.empty()) [[unlikely]]
     return;
 
   // Auto-reset stats on a timer (independent of FrameMark).
@@ -107,9 +107,9 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
     UpdateAggregator(event);
   }
 
-  // Detailed sample-rate gate. Drop most events at sink-emit time without
-  // touching the aggregator (already done above) so HUD queries stay
-  // accurate while trace volume drops.
+  // Detailed sample-rate gate. Drop most Detailed events here (before they
+  // enter the ring) without touching the aggregator (already updated
+  // above) so HUD queries stay accurate while trace volume drops.
   if (event.Level == ProfLevel::Detailed &&
       (event.Kind == ProfEventKind::ZoneBegin ||
        event.Kind == ProfEventKind::ZoneEnd))
@@ -130,7 +130,7 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
 
   u64 sequence = slot.Sequence.load(std::memory_order_acquire);
   i64 diff = (i64)sequence - (i64)pos;
-  if (diff == 0)
+  if (diff == 0) [[likely]]
   {
     slot.ProfileEvent = event;  // copy event
     slot.Sequence.store(pos + 1, std::memory_order_release);
@@ -449,7 +449,7 @@ ScopeStats RingProfiler::GetStats(u32 nameHash,
     return {};
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  const size_t cap = m_Aggregator.size();
+  constexpr size_t cap = c_AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
@@ -578,7 +578,7 @@ void RingProfiler::WatchScope(u32 nameHash, u32 windowSize,
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  const size_t cap = m_Aggregator.size();
+  constexpr size_t cap = c_AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
@@ -630,7 +630,7 @@ void RingProfiler::UnwatchScope(u32 nameHash, ProfSource source) noexcept
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  const size_t cap = m_Aggregator.size();
+  constexpr size_t cap = c_AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
@@ -730,11 +730,13 @@ ProfilerDiagnostics RingProfiler::GetDiagnostics() const noexcept
 
 void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
 {
-  if (m_Aggregator.empty() || ev.NameHash == 0)
+  if (m_Aggregator.empty() || ev.NameHash == 0) [[unlikely]]
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(ev.Source) + 1);
-  const size_t cap = m_Aggregator.size();
+  // Capacity is fixed at construction; use the constexpr so the compiler
+  // can fold the (cap-1) mask into a constant.
+  constexpr size_t cap = c_AggregatorCapacity;
   size_t idx = ev.NameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
