@@ -15,5 +15,6 @@ write_basic_package_version_file(
 install(FILES 
   ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
+  ${CMAKE_SOURCE_DIR}/cmake/GeckoShaders.cmake
   DESTINATION lib/cmake/${PROJECT_NAME})
 
