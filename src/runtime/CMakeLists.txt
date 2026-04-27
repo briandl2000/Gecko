@@ -4,6 +4,7 @@ set_target_properties(Runtime PROPERTIES OUTPUT_NAME "GeckoRuntime")
 
 target_sources(Runtime
   PRIVATE
+    async_trace_profiler_sink.cpp
     console_log_sink.cpp
     crash_safe_trace_profiler_sink.cpp
     event_bus.cpp

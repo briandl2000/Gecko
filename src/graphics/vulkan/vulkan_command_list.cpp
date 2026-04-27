@@ -1,7 +1,9 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_command_list.h"
 
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
+#include "gecko/graphics/gpu_profiler.h"
 #include "private/labels.h"
 #include "vulkan_device.h"
 #include "vulkan_util.h"
@@ -56,6 +58,8 @@ VulkanCommandList::~VulkanCommandList()
 
 void VulkanCommandList::Begin() noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Begin");
+
   vkResetCommandBuffer(m_CmdBuffer, 0);
   if (m_DescPool != VK_NULL_HANDLE)
     vkResetDescriptorPool(m_Device->Device(), m_DescPool, 0);
@@ -74,6 +78,17 @@ void VulkanCommandList::Begin() noexcept
 
 void VulkanCommandList::End() noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::End");
+
+  // Close the auto "CommandList" GPU zone opened by AttachGpuSampler.
+  // Must run before vkEndCommandBuffer so its end-timestamp lands in
+  // the buffer.
+  if (m_AutoCmdListZoneOpen && m_AutoSampler)
+  {
+    m_AutoSampler->EndZone(*this);
+    m_AutoCmdListZoneOpen = false;
+  }
+
   // Transition any active swapchain images still in color-attachment layout
   // to PRESENT. The most recent BeginRendering on a swapchain image left it
   // in COLOR_ATTACHMENT_OPTIMAL after EndRendering.
@@ -246,6 +261,7 @@ void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
 void VulkanCommandList::BeginRendering(const RenderTarget& color,
                                        const ClearValue* clear) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BeginRendering");
   if (!color.Data)
     return;
   auto* rtd = static_cast<VulkanRTData*>(color.Data.get());
@@ -300,6 +316,7 @@ void VulkanCommandList::BeginRendering(
     ::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
     ::std::span<const ClearValue> clears) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BeginRendering(MRT)");
   if (colors.empty() && depth == nullptr)
     return;
 
@@ -356,6 +373,7 @@ void VulkanCommandList::BeginRendering(
 
 void VulkanCommandList::EndRendering() noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::EndRendering");
   vkCmdEndRendering(m_CmdBuffer);
 
   if (m_ActiveSwapchain != nullptr)
@@ -385,6 +403,7 @@ void VulkanCommandList::EndRendering() noexcept
 void VulkanCommandList::SetViewport(f32 x, f32 y, f32 write, f32 h, f32 minD,
                                     f32 maxD) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::SetViewport");
   VkViewport viewport {};
   viewport.x = x;
   viewport.y =
@@ -398,6 +417,7 @@ void VulkanCommandList::SetViewport(f32 x, f32 y, f32 write, f32 h, f32 minD,
 
 void VulkanCommandList::SetScissor(i32 x, i32 y, u32 write, u32 h) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::SetScissor");
   VkRect2D rect {};
   rect.offset = {x, y};
   rect.extent = {write, h};
@@ -434,6 +454,7 @@ VkDescriptorSet EnsureCurrentDescSet(VulkanCommandList* self, VkDevice device,
 
 void VulkanCommandList::BindPipeline(const GraphicsPipeline& pipeline) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindPipeline(gfx)");
   if (!pipeline.Data)
     return;
   auto* pd = static_cast<VulkanPipelineData*>(pipeline.Data.get());
@@ -444,6 +465,7 @@ void VulkanCommandList::BindPipeline(const GraphicsPipeline& pipeline) noexcept
 
 void VulkanCommandList::BindPipeline(const ComputePipeline& pipeline) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindPipeline(cs)");
   if (!pipeline.Data)
     return;
   auto* pd = static_cast<VulkanPipelineData*>(pipeline.Data.get());
@@ -455,6 +477,7 @@ void VulkanCommandList::BindPipeline(const ComputePipeline& pipeline) noexcept
 void VulkanCommandList::BindVertexBuffer(const Buffer& buffer,
                                          u32 slot) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindVertexBuffer");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
@@ -464,6 +487,7 @@ void VulkanCommandList::BindVertexBuffer(const Buffer& buffer,
 
 void VulkanCommandList::BindIndexBuffer(const Buffer& buffer) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindIndexBuffer");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
@@ -473,6 +497,7 @@ void VulkanCommandList::BindIndexBuffer(const Buffer& buffer) noexcept
 void VulkanCommandList::BindConstantBuffer(u32 slot,
                                            const Buffer& buffer) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindConstantBuffer");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !buffer.Data)
     return;
@@ -509,6 +534,7 @@ void VulkanCommandList::BindConstantBuffer(u32 slot,
 
 void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindTexture");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE)
     return;
@@ -551,6 +577,7 @@ void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
 
 void VulkanCommandList::BindRWTexture(u32 slot, const Texture& texture) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindRWTexture");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !texture.Data)
     return;
@@ -594,6 +621,7 @@ void VulkanCommandList::BindRWTexture(u32 slot, const Texture& texture) noexcept
 
 void VulkanCommandList::BindSampler(u32 slot, const Sampler& sampler) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindSampler");
   if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !sampler.Data)
     return;
@@ -681,6 +709,7 @@ void VulkanCommandList::BindRWStructuredBuffer(u32 slot,
 void VulkanCommandList::SetConstants(
     u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::SetConstants");
   if (m_CurrentPipeline == nullptr ||
       m_CurrentPipeline->PushConstantBytes == 0 || bytes.empty())
     return;
@@ -697,53 +726,91 @@ void VulkanCommandList::SetConstants(
 void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
                              u32 firstVertex, u32 firstInstance) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Draw");
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex,
             firstInstance);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
                                     u32 firstIndex, i32 vertexOffset,
                                     u32 firstInstance) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndexed");
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex,
                    vertexOffset, firstInstance);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
                                      u32 drawCount, u32 stride) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
                                             u32 drawCount, u32 stride) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndexedIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndexedIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Dispatch");
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDispatch(m_CmdBuffer, x, y, z);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
                                          u64 offset) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DispatchIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDispatchIndirect(m_CmdBuffer, bd->Buffer, offset);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::TransitionTextureForRead(
     const Texture& texture) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan,
+                      "VulkanCommandList::TransitionTextureForRead");
   if (!texture.Data)
     return;
   auto* td = static_cast<VulkanTextureData*>(texture.Data.get());
@@ -760,6 +827,7 @@ void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,
                                    const Buffer& src, u64 srcOffset,
                                    u64 size) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::CopyBuffer");
   if (!dst.Data || !src.Data || size == 0)
     return;
   auto* dd = static_cast<VulkanBufferData*>(dst.Data.get());
@@ -775,6 +843,7 @@ void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
                                             u32 slice, const Buffer& src,
                                             u64 srcOffset) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::CopyBufferToTexture");
   if (!dst.Data || !src.Data)
     return;
   auto* td = static_cast<VulkanTextureData*>(dst.Data.get());
@@ -803,6 +872,7 @@ void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
                                             const Texture& src, u32 mip,
                                             u32 slice) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::CopyTextureToBuffer");
   if (!dst.Data || !src.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(dst.Data.get());
@@ -845,6 +915,22 @@ void VulkanCommandList::WriteTimestamp(const QueryPool& pool,
   auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
   vkCmdWriteTimestamp(m_CmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                       qd->QueryPool, index);
+}
+
+void VulkanCommandList::AttachGpuSampler(IGpuSampler* sampler,
+                                         ::gecko::Label autoZoneLabel) noexcept
+{
+  m_AutoSampler = sampler;
+  m_AutoZoneLabel = autoZoneLabel;
+  // Open an Always-level "CommandList" GPU zone covering the whole
+  // command-buffer execution, closed in End(). This is the canonical
+  // GPU-time-per-cmd-list bracket the user gets for free.
+  if (sampler && !m_AutoCmdListZoneOpen)
+  {
+    sampler->BeginZone(*this, autoZoneLabel, "CommandList",
+                       ::gecko::ProfLevel::Always);
+    m_AutoCmdListZoneOpen = true;
+  }
 }
 
 }  // namespace gecko::graphics

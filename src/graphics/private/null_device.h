@@ -91,6 +91,12 @@ public:
   {}
   void WriteTimestamp(const QueryPool&, u32) noexcept override
   {}
+  void AttachGpuSampler(IGpuSampler*, ::gecko::Label) noexcept override
+  {}
+  IGpuSampler* GetAttachedGpuSampler() const noexcept override
+  {
+    return nullptr;
+  }
 };
 
 class NullDevice final : public GraphicsDevice
@@ -129,6 +135,12 @@ public:
       const ComputePipelineDesc&) noexcept override;
   QueryPool CreateTimestampQueryPool(const QueryPoolDesc&) noexcept override;
   u32 ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept override;
+
+  ::gecko::Unique<IGpuSampler> CreateGpuSampler(
+      const GpuSamplerDesc&) noexcept override
+  {
+    return nullptr;
+  }
 
   void UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32,
                          u32) noexcept override;

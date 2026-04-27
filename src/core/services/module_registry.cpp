@@ -4,6 +4,7 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services.h"
 #include "gecko/core/services/log.h"
+#include "gecko/core/utility/hash.h"
 #include "private/labels.h"
 
 #include <unordered_map>
@@ -59,6 +60,10 @@ struct ModuleRegistry::Impl
       return true;
     }
     GECKO_ASSERT(rec.Module != nullptr);
+    const char* name = rec.Root.Name ? rec.Root.Name : "Module::Startup";
+    ::gecko::ProfScope _scope_module_startup(::gecko::core::labels::Modules,
+                                             ::gecko::FNV1a(name), name,
+                                             ::gecko::ProfLevel::Normal);
     if (!rec.Module->Startup(self))
     {
       return false;
@@ -166,7 +171,7 @@ void ModuleRegistry::Shutdown() noexcept
 ::gecko::ModuleRegistration ModuleRegistry::RegisterStatic(
     ::gecko::IModule& module) noexcept
 {
-  GECKO_FUNC(::gecko::core::labels::Modules);
+  GECKO_SCOPE(::gecko::core::labels::Modules);
 
   if (!m_impl)
   {

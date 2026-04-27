@@ -60,6 +60,9 @@ public:
   u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery,
                      ::std::span<u64> out) noexcept override;
 
+  ::gecko::Unique<IGpuSampler> CreateGpuSampler(
+      const GpuSamplerDesc& desc) noexcept override;
+
   // ── Data upload ────────────────────────────────────────────────
 
   void UploadTextureData(Texture& texture,
@@ -109,10 +112,23 @@ public:
   {
     return m_HasDebugUtils;
   }
+  [[nodiscard]] f32 TimestampPeriodNs() const noexcept
+  {
+    return m_TimestampPeriodNs;
+  }
 
   /// Apply a VK_EXT_debug_utils object name if validation is enabled.
   void SetObjectName(VkObjectType type, u64 handle,
                      const char* name) const noexcept;
+
+  /// Reset a range of timestamp queries in `pool` from the host. Uses
+  /// VK_EXT_host_query_reset (Vulkan 1.2 core) when available, otherwise
+  /// falls back to a one-time vkCmdResetQueryPool submit. Used by
+  /// VulkanGpuSampler so it doesn't need to embed a reset on a specific
+  /// command list (would race with cmds submitted later in GPU-execution
+  /// order than they were recorded).
+  void HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
+                          u32 count) noexcept;
 
 private:
   // ── Helpers ───────────────────────────────────────────────────

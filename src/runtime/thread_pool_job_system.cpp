@@ -1,6 +1,7 @@
 ﻿#include "gecko/runtime/thread_pool_job_system.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/profiler.h"
 #include "private/labels.h"
@@ -30,7 +31,7 @@ bool ThreadPoolJobSystem::Init() noexcept
     for (u32 i = 0; i < workerCount; ++i)
     {
       m_WorkerThreads.emplace_back(&ThreadPoolJobSystem::WorkerThreadFunction,
-                                   this);
+                                   this, i);
     }
 
     m_Initialized = true;
@@ -76,8 +77,9 @@ void ThreadPoolJobSystem::Shutdown() noexcept
 JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
                                       Label label) noexcept
 {
-  // NOTE: Cannot use profiling/logging - JobSystem is Level 1, comes before
-  // Profiler (Level 2) and Logger (Level 3)
+  // Profiler/logger may not exist yet at very early startup; the macros
+  // route through GetProfiler()/GetLogger() which fall back to Null impls.
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit");
 
   if (!m_Initialized || !job)
   {
@@ -102,7 +104,7 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
                                       u32 dependencyCount, JobPriority priority,
                                       Label label) noexcept
 {
-  // NOTE: Cannot use profiling/logging - dependency order violation
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit(deps)");
 
   if (!m_Initialized || !job)
   {
@@ -140,6 +142,7 @@ void ThreadPoolJobSystem::Wait(JobHandle handle) noexcept
   if (!handle.IsValid())
     return;
 
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Wait");
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handle]() {
     auto it = m_ActiveJobs.find(handle.Id);
@@ -153,6 +156,7 @@ void ThreadPoolJobSystem::WaitAll(const JobHandle* handles, u32 count) noexcept
   if (!handles || count == 0)
     return;
 
+  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::WaitAll");
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handles, count]() {
     for (u32 i = 0; i < count; ++i)
@@ -224,10 +228,25 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept
   }
 }
 
-void ThreadPoolJobSystem::WorkerThreadFunction() noexcept
+void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
 {
   // NOTE: Cannot use profiling/logging - JobSystem is Layer 1, comes before
   // Profiler (Layer 2) and Logger (Layer 3)
+
+  // Profiler thread-name registration is layer-independent (it just stores a
+  // pointer in a process-global table) and lets trace sinks emit
+  // chrome-trace `thread_name` records for these workers.
+  static constexpr const char* WorkerNames[] = {
+      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",
+      "job-worker-4",  "job-worker-5",  "job-worker-6",  "job-worker-7",
+      "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
+      "job-worker-12", "job-worker-13", "job-worker-14", "job-worker-15",
+  };
+  const char* name =
+      (workerIndex < (sizeof(WorkerNames) / sizeof(WorkerNames[0])))
+          ? WorkerNames[workerIndex]
+          : "job-worker-N";
+  ::gecko::SetThreadProfilerName(name);
 
   while (!m_Shutdown.load(std::memory_order_acquire))
   {
@@ -235,6 +254,7 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept
     if (!job)
     {
       // No jobs available, wait for notification
+      GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::WorkerIdle");
       std::unique_lock<std::mutex> lock(m_Mutex);
       m_JobAvailable.wait_for(lock, std::chrono::milliseconds(100), [this]() {
         return m_Shutdown.load(std::memory_order_acquire) ||
@@ -245,8 +265,7 @@ void ThreadPoolJobSystem::WorkerThreadFunction() noexcept
 
     try
     {
-      // Don't profile individual jobs in worker thread - too much overhead
-      // during init
+      GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Run");
       job->Function();
       job->Completed.store(true, std::memory_order_release);
     }

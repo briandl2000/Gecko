@@ -10,7 +10,7 @@ namespace gecko {
 
 void EventSubscription::Reset()
 {
-  GECKO_FUNC(core::labels::Events);
+  GECKO_SCOPE(core::labels::Events);
 
   if (m_Bus && m_Id != 0)
   {
@@ -25,7 +25,7 @@ void EventSubscription::Reset()
 
 EventEmitter CreateEmitterForModule(Label moduleLabel, u64 sender)
 {
-  GECKO_FUNC(core::labels::Events);
+  GECKO_SCOPE(core::labels::Events);
 
   if (!moduleLabel.IsValid())
   {

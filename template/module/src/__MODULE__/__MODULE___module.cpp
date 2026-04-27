@@ -13,14 +13,14 @@ constexpr ::gecko::Label __MODULE_CAMEL__Module::RootLabel() const noexcept
 
 bool __MODULE_CAMEL__Module::Startup(::gecko::IModuleRegistry& modules) noexcept
 {
-  GECKO_FUNC(labels::__MODULE_CAMEL__);
+  GECKO_SCOPE(labels::__MODULE_CAMEL__);
   return true;
 }
 
 void __MODULE_CAMEL__Module::Shutdown(
     ::gecko::IModuleRegistry& modules) noexcept
 {
-  GECKO_FUNC(labels::__MODULE_CAMEL__);
+  GECKO_SCOPE(labels::__MODULE_CAMEL__);
 }
 
 }  // namespace gecko::__MODULE__

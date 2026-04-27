@@ -30,6 +30,7 @@ TraceFileSink::TraceFileSink(const char* path)
 
 TraceFileSink::~TraceFileSink()
 {
+  Unregister();
   if (m_Writer)
   {
     std::lock_guard<std::mutex> lock(m_Mutex);
@@ -55,13 +56,13 @@ void TraceFileSink::Write(const ProfEvent& event) noexcept
     FlushBufferedEvents();
 }
 
-void TraceFileSink::WriteBatch(const ProfEvent* events, size_t count) noexcept
+void TraceFileSink::WriteBatch(::std::span<const ProfEvent> events) noexcept
 {
-  if (!m_Writer || !events)
+  if (!m_Writer)
     return;
 
-  for (size_t i = 0; i < count; ++i)
-    Write(events[i]);
+  for (const ProfEvent& e : events)
+    Write(e);
 }
 
 void TraceFileSink::Flush() noexcept

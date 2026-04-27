@@ -18,10 +18,13 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
+#include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 #include "vulkan_command_list.h"
+#include "vulkan_gpu_sampler.h"
 #include "vulkan_surface.h"
 #include "vulkan_util.h"
 
@@ -72,6 +75,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
 
 VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::Ctor");
+
   // ── Instance ──────────────────────────────────────────────────
 
   VkApplicationInfo appInfo {};
@@ -87,6 +92,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   // ── Enumerate available layers / extensions (for graceful fallback) ──
   ::std::vector<VkExtensionProperties> availableExts;
   {
+    GECKO_PROFILE_NAMED(labels::Vulkan,
+                        "vkEnumerateInstanceExtensionProperties");
     u32 n = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &n, nullptr);
     availableExts.resize(n);
@@ -111,6 +118,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   ::std::vector<VkLayerProperties> availableLayers;
   {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkEnumerateInstanceLayerProperties");
     u32 n = 0;
     vkEnumerateInstanceLayerProperties(&n, nullptr);
     availableLayers.resize(n);
@@ -148,7 +156,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   instanceCreateInfo.enabledLayerCount = static_cast<u32>(layers.size());
   instanceCreateInfo.ppEnabledLayerNames = layers.data();
 
-  if (vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance) != VK_SUCCESS)
+  if ([&]() noexcept {
+        GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateInstance");
+        return vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance) !=
+               VK_SUCCESS;
+      }())
   {
     GECKO_ERROR(labels::Vulkan,
                 "VulkanDevice: vkCreateInstance failed "
@@ -188,7 +200,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   // ── Physical device ───────────────────────────────────────────
 
   u32 physicalDeviceCount = 0;
-  vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, nullptr);
+  {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkEnumeratePhysicalDevices");
+    vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, nullptr);
+  }
   if (physicalDeviceCount == 0)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: no Vulkan physical devices");
@@ -262,7 +277,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   VkPhysicalDeviceFeatures2 supported2 {};
   supported2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   supported2.pNext = &supported12;
-  vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supported2);
+  {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkGetPhysicalDeviceFeatures2");
+    vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supported2);
+  }
 
   if (supported13.dynamicRendering != VK_TRUE ||
       supported13.synchronization2 != VK_TRUE)
@@ -299,8 +317,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   deviceCreateInfo.enabledExtensionCount = static_cast<u32>(deviceExts.size());
   deviceCreateInfo.ppEnabledExtensionNames = deviceExts.data();
 
-  if (vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_Device) !=
-      VK_SUCCESS)
+  if ([&]() noexcept {
+        GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateDevice");
+        return vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr,
+                              &m_Device);
+      }() != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateDevice failed");
     return;
@@ -315,8 +336,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
   cmdPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
-  VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr,
-                                   &m_GraphicsCommandPool));
+  {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateCommandPool");
+    VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr,
+                                     &m_GraphicsCommandPool));
+  }
 
   // ── VMA allocator ─────────────────────────────────────────────
 
@@ -330,7 +354,10 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   allocatorCreateInfo.device = m_Device;
   allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
   allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-  VULKAN_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator));
+  {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vmaCreateAllocator");
+    VULKAN_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator));
+  }
 
   // ── Descriptor pool ───────────────────────────────────────────
   // Example-grade: a single large pool, never reset. Sufficient for the
@@ -348,6 +375,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     descPoolCreateInfo.maxSets = 4096;
     descPoolCreateInfo.poolSizeCount = 1;
     descPoolCreateInfo.pPoolSizes = poolSizes;
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateDescriptorPool");
     VULKAN_CHECK(vkCreateDescriptorPool(m_Device, &descPoolCreateInfo, nullptr,
                                         &m_DescriptorPool));
   }
@@ -736,6 +764,8 @@ Swapchain VulkanDevice::CreateSwapchain(
     const ::gecko::platform::NativeWindowHandle& native,
     const SwapchainDesc& desc) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateSwapchain");
+
   if (!m_Valid)
     return Swapchain {};
 
@@ -798,6 +828,8 @@ void VulkanDevice::DestroySwapchain(Swapchain& swapchain) noexcept
 
 void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::ResizeSwapchain");
+
   if (!swapchain.Data)
     return;
   auto* data = static_cast<VulkanSwapchainData*>(swapchain.Data.get());
@@ -829,6 +861,8 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
 
 FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::BeginFrame");
+
   // Reclaim completed command lists from previous submits before doing
   // anything else this frame.
   ReapPending();
@@ -841,12 +875,19 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
     return ctx;
 
   const u32 frame = data->FrameIndex;
-  vkWaitForFences(m_Device, 1, &data->InFlight[frame], VK_TRUE, UINT64_MAX);
+  {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkWaitForFences");
+    vkWaitForFences(m_Device, 1, &data->InFlight[frame], VK_TRUE, UINT64_MAX);
+  }
 
   u32 imageIndex = 0;
-  VkResult ar = vkAcquireNextImageKHR(m_Device, data->Swapchain, UINT64_MAX,
-                                      data->ImageAvailable[frame],
-                                      VK_NULL_HANDLE, &imageIndex);
+  VkResult ar = VK_SUCCESS;
+  {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkAcquireNextImageKHR");
+    ar = vkAcquireNextImageKHR(m_Device, data->Swapchain, UINT64_MAX,
+                               data->ImageAvailable[frame], VK_NULL_HANDLE,
+                               &imageIndex);
+  }
   if (ar == VK_ERROR_OUT_OF_DATE_KHR)
   {
     ResizeSwapchain(swapchain);
@@ -895,6 +936,8 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
 
 void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
 {
+  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan, "VulkanDevice::Present");
+
   if (frames.empty())
     return;
 
@@ -934,7 +977,9 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
 
   VkResult presentResult;
   {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "Present::QueueLock");
     ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueuePresentKHR");
     presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
   }
   if (presentResult == VK_ERROR_OUT_OF_DATE_KHR ||
@@ -972,6 +1017,9 @@ Unique<ICommandList> VulkanDevice::CreateComputeCommandList() noexcept
 void VulkanDevice::ExecuteGraphicsCommandList(
     Unique<ICommandList> commandList) noexcept
 {
+  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan,
+                             "VulkanDevice::ExecuteGraphicsCommandList");
+
   auto* cl = static_cast<VulkanCommandList*>(commandList.get());
   if (cl == nullptr || !cl->IsValid())
     return;
@@ -1029,8 +1077,22 @@ void VulkanDevice::ExecuteGraphicsCommandList(
     primaryFence = trackerFence;
 
   {
+    GECKO_PROFILE_NAMED(labels::Vulkan, "ExecuteGraphics::QueueLock");
     ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
-    VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
+    {
+      GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueueSubmit");
+      // Notify any attached GPU sampler that the cmd list is about to
+      // be submitted. The sampler uses the first such CPU timestamp
+      // per frame as its rebase anchor so GPU zones line up with the
+      // vkQueueSubmit call on the CPU timeline.
+      if (auto* sampler = cl->GetAttachedGpuSampler(); sampler != nullptr)
+      {
+        if (auto* p = ::gecko::GetProfiler(); p != nullptr)
+          sampler->OnSubmit(p->NowNs());
+      }
+      VULKAN_CHECK(
+          vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
+    }
 
     for (u32 i = 1; i < touched.Count; ++i)
     {
@@ -1049,7 +1111,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(
       empty.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
       VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &empty, trackerFence));
     }
-  }
+  }  // queue lock released
 
   // Defer destruction until trackerFence signals (reaped by BeginFrame).
   {
@@ -1479,6 +1541,8 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
 GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
     const GraphicsPipelineDesc& desc) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateGraphicsPipeline");
+
   if (!desc.IsValid() || !m_Valid)
     return GraphicsPipeline {};
 
@@ -1758,6 +1822,8 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
 ComputePipeline VulkanDevice::CreateComputePipeline(
     const ComputePipelineDesc& desc) noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateComputePipeline");
+
   if (!desc.IsValid() || !m_Valid)
     return ComputePipeline {};
 
@@ -2034,6 +2100,51 @@ u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
     out[i] = static_cast<u64>(static_cast<f64>(ticks[i]) *
                               static_cast<f64>(periodNs));
   return count;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// GPU profiler
+// ─────────────────────────────────────────────────────────────────────────
+
+void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
+                                      u32 count) noexcept
+{
+  if (!pool.IsValid() || count == 0)
+    return;
+  auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
+  if (firstQuery >= qd->Count)
+    return;
+  const u32 c = ::std::min(count, qd->Count - firstQuery);
+  if (m_HasHostQueryReset)
+  {
+    vkResetQueryPool(m_Device, qd->QueryPool, firstQuery, c);
+  }
+  else
+  {
+    struct Ctx
+    {
+      VkQueryPool Pool;
+      u32 First;
+      u32 Count;
+    } cc {qd->QueryPool, firstQuery, c};
+    OneTimeSubmit(
+        [](VkCommandBuffer cb, void* x) {
+          auto* r = static_cast<Ctx*>(x);
+          vkCmdResetQueryPool(cb, r->Pool, r->First, r->Count);
+        },
+        &cc);
+  }
+}
+
+::gecko::Unique<IGpuSampler> VulkanDevice::CreateGpuSampler(
+    const GpuSamplerDesc& desc) noexcept
+{
+  if (!m_Valid)
+    return nullptr;
+  auto sampler = ::gecko::CreateUnique<VulkanGpuSampler>(*this, desc);
+  if (sampler == nullptr || !sampler->IsValid())
+    return nullptr;
+  return sampler;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

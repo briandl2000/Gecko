@@ -9,6 +9,7 @@
 #include "gecko/core/utility/thread.h"
 #include "gecko/core/utility/time.h"
 #include "gecko/core/version.h"
+#include "gecko/runtime/async_trace_profiler_sink.h"
 #include "gecko/runtime/console_log_sink.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/file_log_sink.h"
@@ -16,11 +17,11 @@
 #include "gecko/runtime/ring_profiler.h"
 #include "gecko/runtime/runtime_module.h"
 #include "gecko/runtime/thread_pool_job_system.h"
-#include "gecko/runtime/trace_file_sink.h"
 #include "gecko/runtime/tracking_allocator.h"
 
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -89,7 +90,7 @@ struct TestEventPayload
 // Worker function that simulates some computation
 void WorkerTask(int workerId, int numParticles)
 {
-  GECKO_FUNC(app::core_example::labels::Worker);
+  GECKO_SCOPE(app::core_example::labels::Worker);
 
   GECKO_INFO(app::core_example::labels::Worker,
              "Worker %d: Starting simulation with %d particles", workerId,
@@ -182,7 +183,7 @@ void WorkerTask(int workerId, int numParticles)
 // Function to perform some memory stress testing
 void MemoryStressTest()
 {
-  GECKO_FUNC(app::core_example::labels::Memory);
+  GECKO_SCOPE(app::core_example::labels::Memory);
 
   GECKO_INFO(app::core_example::labels::Memory, "Starting memory stress test");
 
@@ -302,7 +303,7 @@ void MemoryStressTest()
 
 void PrintMemoryStats(const runtime::TrackingAllocator& tracker)
 {
-  GECKO_FUNC(app::core_example::labels::Main);
+  GECKO_SCOPE(app::core_example::labels::Main);
 
   GECKO_INFO(app::core_example::labels::Main, "=== Memory Statistics ===");
   GECKO_INFO(app::core_example::labels::Main, "Total Live Bytes: %llu",
@@ -408,7 +409,7 @@ static void OnTestEventQueued(void* user, const EventMeta& meta,
 
 static void EventSystemTest()
 {
-  GECKO_FUNC(app::core_example::labels::Main);
+  GECKO_SCOPE(app::core_example::labels::Main);
 
   GECKO_INFO(app::core_example::labels::Main, "Setting up event system demo");
 
@@ -529,9 +530,19 @@ int main()
 
   GECKO_INFO(app::core_example::labels::Main, gecko::VersionFullString());
 
-  // Set up trace file sink for profiling data after services are available
-  // Sink auto-unregisters when destroyed
-  runtime::TraceFileSink traceSink("gecko_trace.json");
+  // Name the main thread for trace viewers.
+  ::gecko::SetThreadProfilerName("main");
+
+  // Profiler v2: AsyncTraceProfilerSink streams to a Chrome-trace JSON
+  // through a dedicated worker thread. It drains and fsyncs on shutdown.
+  // core_example deliberately forces Detailed level on both the profiler
+  // and the trace sink (in debug AND release) so users can inspect every
+  // emitted event in Perfetto and verify the profiler features.
+  if (auto* profiler = GetProfiler())
+    profiler->SetMinLevel(::gecko::ProfLevel::Detailed);
+
+  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
+  traceSink.SetMinLevel(::gecko::ProfLevel::Detailed);
 
   if (!traceSink.IsOpen())
   {
@@ -541,7 +552,10 @@ int main()
   else
   {
     if (auto* profiler = GetProfiler())
+    {
       traceSink.RegisterWith(profiler);
+      profiler->SetTraceEnabled(true);
+    }
   }
 
   // Now logging works with all sinks configured!
@@ -560,7 +574,7 @@ int main()
       "Log level is set to Info - Debug and Trace messages are filtered out");
 
   {
-    GECKO_FUNC(app::core_example::labels::Main);
+    GECKO_SCOPE(app::core_example::labels::Main);
 
     GECKO_INFO(app::core_example::labels::Main,
                "Starting comprehensive memory and profiling demo");
@@ -818,17 +832,23 @@ int main()
                  "Main thread job processing complete!");
     }
 
-    // Add a frame mark to separate the main work from cleanup
+    // Profiler v2: GECKO_FRAME emits a FrameMark which is also the
+    // signal that resets the Always-level aggregator for the next frame.
+    GECKO_FRAME(app::core_example::labels::Main, "EndOfDemo");
+
+    // Profiler v2: report aggregator stats for an Always-level scope.
+    // Note: PhysicsStep above is Normal-level, so it does NOT show up
+    // in the aggregator. Read the labels.Main MainLoop scope which is
+    // captured by the implicit Always-level frame mark instead.
     if (auto* profiler = GetProfiler())
     {
-      ProfEvent frameEvent {.TimestampNs = profiler->NowNs(),
-                            .Value = 0,
-                            .Name = "EndOfDemo",
-                            .EventLabel = app::core_example::labels::Main,
-                            .ThreadId = ThisThreadId(),
-                            .NameHash = FNV1a("EndOfDemo"),
-                            .Kind = ProfEventKind::FrameMark};
-      profiler->Emit(frameEvent);
+      auto diag = profiler->GetDiagnostics();
+      GECKO_INFO(app::core_example::labels::Main,
+                 "Profiler diagnostics: dropped=%llu reentrant=%llu "
+                 "agg_overflow=%llu",
+                 static_cast<unsigned long long>(diag.DroppedEvents),
+                 static_cast<unsigned long long>(diag.ReentrantDrops),
+                 static_cast<unsigned long long>(diag.AggregatorOverflow));
     }
   }
 
@@ -850,7 +870,8 @@ int main()
   // Unregister sinks before shutting down services
   consoleSink.Unregister();
   fileSink.Unregister();
-  traceSink.Unregister();
+  // traceSink: let RAII unregister so any final ZoneEnd events still land
+  // in the trace before the writer closes.
 
   // Engine RAII destructor handles UninstallServices when scope ends
   engine.reset();

@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
 #include <gecko/core/services.h>
@@ -14,7 +15,6 @@
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
-#include <gecko/runtime/trace_file_sink.h>
 #include <gecko/runtime/tracking_allocator.h>
 #include <vector>
 
@@ -176,19 +176,8 @@ int main()
     ResetAllocator();
     return 1;
   }
-  // Set up trace file sink for profiling data after services are available
-  runtime::TraceFileSink traceSink("gecko_trace.json");
 
-  if (!traceSink.IsOpen())
-  {
-    GECKO_WARN(app::platform_example::labels::Main,
-               "Failed to open trace profiler sink\n");
-  }
-  else
-  {
-    if (auto* profiler = GetProfiler())
-      traceSink.RegisterWith(profiler);
-  }
+  ::gecko::SetThreadProfilerName("main");
 
   // Now configure logging sinks - they auto-unregister when destroyed
   runtime::ConsoleLogSink consoleSink;
@@ -201,7 +190,7 @@ int main()
     logger->SetLevel(LogLevel::Info);
   }
   {
-    GECKO_FUNC(app::platform_example::labels::Main);
+    GECKO_SCOPE(app::platform_example::labels::Main);
     GECKO_INFO(app::platform_example::labels::Main, gecko::VersionFullString());
 
     // ── Create main window — resizable, decorated ──────────────────
@@ -798,6 +787,10 @@ int main()
       }
 
       doFrame();
+
+      // Profiler v2: mark the end of a frame. This both shows up as a
+      // FrameMark in the trace and resets the Always-level aggregator.
+      GECKO_FRAME(app::platform_example::labels::Main, "Frame");
     }
 
     // ── Cleanup — destroy all spawned windows, then main ───────────
@@ -821,7 +814,8 @@ int main()
   }
   consoleSink.Unregister();
   fileSink.Unregister();
-  traceSink.Unregister();
+  // traceSink: let RAII unregister so any final ZoneEnd events still land
+  // in the trace before the writer closes.
 
   engine.reset();
   ResetAllocator();

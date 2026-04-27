@@ -167,15 +167,11 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
 
   entry.Sequence.store(position + 1, std::memory_order_release);
 
-  // Try to schedule processing, but don't wait if job system is busy
-  // Use reentrancy guard to prevent infinite recursion with single-threaded job
-  // systems
-  if (!g_InsideRingLogger)
-  {
-    g_InsideRingLogger = true;
-    TryScheduleConsumerJob();
-    g_InsideRingLogger = false;
-  }
+  // Try to schedule processing. The reentrancy guard lives inside
+  // TryScheduleConsumerJob() itself - around the Submit() call - so if
+  // Submit inline-runs ProcessLogEntries (e.g. NullJobSystem), the
+  // re-entered Log call's scheduling attempt is detected and skipped.
+  TryScheduleConsumerJob();
 }
 
 void RingLogger::ProcessLogEntries() noexcept
@@ -265,17 +261,18 @@ void RingLogger::TryScheduleConsumerJob() noexcept
   if (!m_Run.load(std::memory_order_acquire))
     return;
 
-  // Rate-limit scheduling to avoid job spam (check BEFORE mutex)
-  static std::atomic<u64> lastScheduleTime {0};
+  // Rate-limit scheduling to avoid job spam (check BEFORE mutex). Per-
+  // instance: a function-local static would couple unrelated RingLogger
+  // instances together.
   u64 now = NowNs();
-  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
+  u64 lastTime = m_LastScheduleNs.load(std::memory_order_relaxed);
 
   // Don't schedule too frequently (at most every 100µs)
   if (now - lastTime < 100000)  // 100 microseconds
     return;
 
   // Try to claim the scheduling slot atomically (still no mutex)
-  if (!lastScheduleTime.compare_exchange_weak(lastTime, now,
+  if (!m_LastScheduleNs.compare_exchange_weak(lastTime, now,
                                               std::memory_order_relaxed))
     return;
 
@@ -295,8 +292,11 @@ void RingLogger::TryScheduleConsumerJob() noexcept
   auto* jobSystem = GetJobSystem();
   if (!jobSystem)
   {
-    // No job system available, process immediately on current thread
+    // No job system available, process immediately on current thread.
+    // Guard against re-entry from sinks that may log during processing.
+    g_InsideRingLogger = true;
     ProcessLogEntries();
+    g_InsideRingLogger = false;
     return;
   }
 
@@ -305,8 +305,12 @@ void RingLogger::TryScheduleConsumerJob() noexcept
     // Check m_Run again while holding the lock to prevent shutdown race
     if (!m_Run.load(std::memory_order_acquire))
       return;
+    // Same reasoning: NullJobSystem inline-runs Submit, so set the guard
+    // around the Submit call too.
+    g_InsideRingLogger = true;
     m_ConsumerJob = jobSystem->Submit([this]() { ProcessLogEntries(); },
                                       JobPriority::Normal, m_LoggerLabel);
+    g_InsideRingLogger = false;
   }
 }
 
@@ -325,6 +329,8 @@ bool RingLogger::HasPendingEntries() const noexcept
 
 void RingLogger::Flush() noexcept
 {
+  GECKO_PROFILE_NAMED(labels::Logger, "RingLogger::Flush");
+
   // Copy sinks vector once to avoid holding lock during I/O
   std::vector<ILogSink*> sinks;
   {

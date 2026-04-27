@@ -59,6 +59,7 @@ if(Vulkan_FOUND)
   target_sources(Graphics PRIVATE
     vulkan/vulkan_device.cpp
     vulkan/vulkan_command_list.cpp
+    vulkan/vulkan_gpu_sampler.cpp
     vulkan/vulkan_surface.cpp
   )
   target_compile_definitions(Graphics PRIVATE GECKO_GRAPHICS_VULKAN)

@@ -5,14 +5,18 @@
 #include <cstdarg>
 #include <cstdio>
 #include <string_view>
-#include <vector>
 
 namespace gecko::runtime::detail {
 
-// printf into a FileWriter without truncation. The common path uses a
-// thread-local stack-sized buffer; rare overflows fall back to a
-// thread-local growable heap buffer so profile/log hot paths do not
-// allocate per call.
+// printf into a FileWriter without truncation up to a fixed stack-sized
+// buffer. Records longer than the buffer are silently dropped.
+//
+// We deliberately avoid `thread_local` non-trivial destructors here:
+// MinGW (Win32 GCC) crashes inside libstdc++ during thread / process
+// teardown when a `thread_local std::vector<char>` is freed after some
+// CRT state has already been torn down (the failure surfaces as a SIGSEGV
+// inside `__new_allocator<char>::deallocate`). A 4 KiB stack-only buffer
+// covers every chrome-trace and log-record format string we emit.
 //
 // `w` may be null (no-op). Format errors silently drop the record so
 // the caller never has to check a return.
@@ -22,38 +26,24 @@ inline void WriteFmt(::gecko::platform::FileWriter* w, const char* fmt,
   if (!w)
     return;
 
-  static constexpr ::std::size_t StackSize = 1024;
-  thread_local char stack[StackSize];
-  thread_local ::std::vector<char> heap;
+  static constexpr ::std::size_t StackSize = 4096;
+  char stack[StackSize];
 
   ::va_list ap;
   ::va_start(ap, fmt);
-  ::va_list ap2;
-  ::va_copy(ap2, ap);
   int n = ::std::vsnprintf(stack, StackSize, fmt, ap);
   ::va_end(ap);
   if (n < 0)
-  {
-    ::va_end(ap2);
     return;
-  }
 
-  if (static_cast<::std::size_t>(n) < StackSize)
-  {
-    ::va_end(ap2);
-    w->WriteString(::std::string_view {stack, static_cast<::std::size_t>(n)});
-    return;
-  }
+  // Cap at StackSize-1 if vsnprintf indicates the formatted string was
+  // truncated. We accept the truncation rather than allocating because
+  // none of the engine's format strings should ever exceed StackSize.
+  ::std::size_t len = static_cast<::std::size_t>(n);
+  if (len >= StackSize)
+    len = StackSize - 1;
 
-  const ::std::size_t needed = static_cast<::std::size_t>(n) + 1;
-  if (heap.size() < needed)
-    heap.resize(needed);
-  int n2 = ::std::vsnprintf(heap.data(), heap.size(), fmt, ap2);
-  ::va_end(ap2);
-  if (n2 < 0)
-    return;
-  w->WriteString(
-      ::std::string_view {heap.data(), static_cast<::std::size_t>(n2)});
+  w->WriteString(::std::string_view {stack, len});
 }
 
 }  // namespace gecko::runtime::detail
