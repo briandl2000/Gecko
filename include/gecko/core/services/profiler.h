@@ -194,7 +194,9 @@ GECKO_API const char* LookupThreadProfilerName(u32 threadId) noexcept;
 GECKO_API void RegisterThreadProfilerName(u32 threadId,
                                           const char* name) noexcept;
 
-struct ProfScope
+struct [[nodiscard(
+    "ProfScope is a RAII guard - name the variable, e.g. via GECKO_PROFILE")]]
+ProfScope
 {
   Label ScopeLabel {};                  // 16 bytes
   u64 Time0 {0};                        // 8 bytes

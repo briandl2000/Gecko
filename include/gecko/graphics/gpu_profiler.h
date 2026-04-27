@@ -86,7 +86,8 @@ protected:
 
 // ── RAII helper ──────────────────────────────────────────────────────────
 
-class GpuProfScope
+class [[nodiscard("GpuProfScope is a RAII guard - name the variable, e.g. via "
+                  "GECKO_GPU_PROF_SCOPE")]] GpuProfScope
 {
 public:
   GpuProfScope(IGpuSampler& sampler, ICommandList& cmd, ::gecko::Label label,
@@ -117,7 +118,9 @@ private:
 
 // Picks up the IGpuSampler from the command list (set via AttachGpuSampler).
 // Silently no-ops if the cmd has no attached sampler.
-class GpuAutoProfScope
+class [[nodiscard(
+    "GpuAutoProfScope is a RAII guard - name the variable, e.g. via "
+    "GECKO_GPU_SCOPE_*")]] GpuAutoProfScope
 {
 public:
   GpuAutoProfScope(ICommandList& cmd, ::gecko::Label label, const char* name,
