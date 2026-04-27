@@ -435,7 +435,13 @@ int main()
     GpuSamplerDesc samplerDesc {};
     samplerDesc.MaxZonesPerFrame = 64;
     samplerDesc.FramesInFlight = 3;
-    samplerDesc.GpuThreadName = "GPU";
+    // Name reflects the underlying Vulkan queue. Gecko currently has
+    // only one queue (graphics, which also services compute and
+    // present), so all GPU zones land on this single Perfetto track.
+    // When a dedicated compute / copy queue lands, create a second
+    // IGpuSampler with GpuThreadName = "GPU.Compute" / "GPU.Copy"
+    // and AttachGpuSampler it to those queue's command lists.
+    samplerDesc.GpuThreadName = "GPU.Graphics";
     Unique<IGpuSampler> gpuSampler = device->CreateGpuSampler(samplerDesc);
     if (gpuSampler)
       GECKO_INFO(app::graphics_example::labels::Main,

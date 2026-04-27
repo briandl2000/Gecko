@@ -47,25 +47,45 @@ The plain (no-name) form uses the function symbol as the zone name.
 
 ### GPU scopes
 
-The graphics module exposes `IGpuSampler`. Each `BeginZone` / `EndZone`
-records a pair of timestamps on the queue; results are resolved one
-frame later and emitted as `ProfEvent`s with `Source::GPU` on a
-synthetic thread row named `"GPU"`.
+The graphics module exposes `IGpuSampler`. A sampler owns one VkQueryPool
+ring (one slot per frame in flight) and emits matched begin/end
+`ProfEvent`s on a synthetic thread row whose name comes from
+`GpuSamplerDesc::GpuThreadName`. Use one sampler **per Vulkan queue**.
+Gecko currently has only one queue (graphics — also services compute and
+present), so most apps create exactly one sampler with
+`GpuThreadName = "GPU.Graphics"`. When a dedicated compute or copy queue
+is added later, create a second sampler (`"GPU.Compute"` /
+`"GPU.Copy"`); each shows up as its own thread track in Perfetto.
 
-Wire a sampler to a command list once per frame:
+Per-frame setup:
 
 ```cpp
-sampler->BeginFrame(*cmd);
+GpuSamplerDesc desc {};
+desc.MaxZonesPerFrame = 64;     // 2 timestamps per zone
+desc.FramesInFlight   = 3;
+desc.GpuThreadName    = "GPU.Graphics";
+auto sampler = device->CreateGpuSampler(desc);
+
+// every frame:
+sampler->BeginFrame(*cmd);              // rotates ring + resolves N-frames-old slot
 cmd->AttachGpuSampler(sampler.get(), labels::Renderer);
-// ... record draws / dispatches ...
-sampler->EndFrame(*cmd);
+// ... record draws / dispatches / GECKO_GPU_SCOPE_* zones ...
+sampler->EndFrame(*cmd);                // no-op (kept for API symmetry)
+cmd->End();
+device->ExecuteGraphicsCommandList(::std::move(cmd));
 ```
 
-`AttachGpuSampler` does two things:
+`AttachGpuSampler` does **three** things:
 
-1. Enables **automatic** GPU zones around every `Draw*` and `Dispatch*`
-   on this command list, tagged at level `Detailed`.
-2. Lets the `GECKO_GPU_SCOPE_*` macros find the sampler implicitly.
+1. Opens an **`Always`-level `"CommandList"` zone** that wraps the entire
+   command-buffer execution. Closed in `cmd->End()`. This gives every
+   submitted cmd list a free GPU-time-per-cmd-buffer bracket — no
+   manual setup. Opt out by simply not attaching a sampler.
+2. Enables automatic GPU zones around every `Draw*` and `Dispatch*` on
+   this command list, tagged at level `Detailed`. They show up nested
+   inside any manual zones you've opened.
+3. Lets the ergonomic `GECKO_GPU_SCOPE_*` macros find the sampler
+   implicitly via `cmd.GetAttachedGpuSampler()`.
 
 Manual zones for higher-level groups (passes, post-process, GBuffer):
 
@@ -78,14 +98,50 @@ Manual zones for higher-level groups (passes, post-process, GBuffer):
 
 Constraints:
 
-- Up to `GpuSamplerDesc::MaxZonesPerFrame` zones per frame (default 64).
-  Each zone consumes 2 timestamps.
-- Nesting up to 32 deep.
-- A zone's timestamps are only visible to the profiler one frame later
-  (after the GPU fence signals). No CPU stall.
-- The current sampler is bound to the **graphics queue's** frame fence
-  — don't attach it to compute command lists submitted on a separate
-  queue (timestamps will never resolve and you will hang).
+- Up to `GpuSamplerDesc::MaxZonesPerFrame` zones per frame across **all
+  cmd lists that share the sampler** (default 64). Each zone consumes 2
+  timestamps. The auto `"CommandList"` zone counts toward this budget,
+  as do auto Draw/Dispatch zones.
+- Nesting up to 32 deep across the whole frame's cmd-list graph.
+- A zone's timestamps are visible to the profiler `FramesInFlight - 1`
+  frames later (after the GPU has signalled). No CPU stall.
+
+#### Multi-command-list and multi-queue
+
+A single sampler is safe to attach to **any number of command lists in
+the same frame**, as long as they all submit to the same queue.
+Examples submit a graphics cmd plus two compute cmds (currently all on
+the graphics queue) — each gets its own `"CommandList"` Always zone
+nested with whatever passes you record on that cmd. Three free `Always`
+ranges show up side-by-side on the GPU track per frame.
+
+When Gecko gains an actual async-compute queue, attach a *separate*
+sampler to compute cmds: per-queue VkQueryPool rings can't share state,
+and Perfetto draws each sampler's `GpuThreadName` as its own row, which
+is what you want anyway.
+
+#### How GPU-frame timing works (under the hood)
+
+`IGpuSampler` keeps `FramesInFlight` query-pool slots in a ring.
+
+- `BeginFrame` advances the ring index and, if the slot we wrap into is
+  pending, calls `ResolveSlot` (read all timestamps + emit events +
+  host-reset the pool via `VK_EXT_host_query_reset` /
+  Vulkan 1.2 core).
+- `BeginZone` / `EndZone` write timestamps into the *current* slot at
+  recording time. Cmd lists submitted out of recording order (e.g. a
+  compute cmd recorded after a graphics cmd's `BeginFrame` but
+  submitted before it) interleave their timestamp writes; the resolver
+  uses `min(valid ts)` from the slot as the frame anchor so a negative
+  delta cannot underflow `u64`.
+- `EndFrame` is a no-op kept for API symmetry. Rotation happens in
+  `BeginFrame` so any `EndZone` calls fired **after** `EndFrame` (e.g.
+  the auto `"CommandList"` zone closed by `cmd->End()`) still target
+  the correct slot.
+- The pool is reset from the host inside `ResolveSlot`, **not** from a
+  cmd-buffer-recorded `vkCmdResetQueryPool`. Embedding the reset on a
+  recorded cmd list races with cmd lists submitted later in record
+  order but earlier in GPU-execution order.
 
 ### Frame markers and counters
 
@@ -250,7 +306,35 @@ Compiles to nothing in release where `GECKO_PROF_MAX_LEVEL == Normal`.
 | Graphics | `VulkanDevice::BeginFrame` | Normal |
 | Graphics | `VulkanCommandList::Begin` / `End` | Normal |
 | Graphics | `VulkanCommandList::BeginRendering` / `EndRendering` | Detailed |
+| Graphics | GPU auto `"CommandList"` zone (per `AttachGpuSampler`) | Always |
 | Graphics | Auto GPU zones around `Draw*` / `Dispatch*` | Detailed |
 
 When you add new code, follow the table: entry points and sleep/wait
 edges as `Always` or `Normal`; deep inner work as `Detailed`.
+
+## What the GPU thread looks like in Perfetto
+
+A frame from `examples/graphics_example` (one graphics cmd list, two
+compute cmd lists, all on the single graphics queue) renders on the
+`GPU.Graphics` thread row as:
+
+```
+[CommandList ─────────────────────────────────────]   ← compute cmd 0, Always
+   [PlasmaPass]                                       ← Normal
+      [Dispatch]                                      ← auto Detailed
+
+[CommandList ─────────────────────────────────────]   ← compute cmd 1, Always
+   [PlasmaPass]
+      [Dispatch]
+
+[CommandList ─────────────────────────────────────]   ← graphics cmd, Always
+   [TrianglePass]                                     ← Normal
+      [DrawIndirect]                                  ← auto Detailed
+   [BlitPass]                                         ← Normal
+      [Draw]   [Draw]                                 ← auto Detailed (per blit)
+```
+
+Three side-by-side `CommandList` ranges per frame is the expected shape
+when an app submits multiple cmd buffers — they're physically distinct
+GPU executions on the queue. You opt out of any of them by simply not
+attaching the sampler to that cmd list.
