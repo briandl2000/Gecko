@@ -719,7 +719,7 @@ void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Draw");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw");
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw", ::gecko::ProfLevel::Detailed);
   vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex,
             firstInstance);
   if (m_AutoSampler)
@@ -732,7 +732,7 @@ void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndexed");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed");
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed", ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex,
                    vertexOffset, firstInstance);
   if (m_AutoSampler)
@@ -747,7 +747,7 @@ void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect");
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect", ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -761,7 +761,7 @@ void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect");
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect", ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndexedIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -771,7 +771,7 @@ void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Dispatch");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch");
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch", ::gecko::ProfLevel::Detailed);
   vkCmdDispatch(m_CmdBuffer, x, y, z);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -785,7 +785,7 @@ void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect");
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect", ::gecko::ProfLevel::Detailed);
   vkCmdDispatchIndirect(m_CmdBuffer, bd->Buffer, offset);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);

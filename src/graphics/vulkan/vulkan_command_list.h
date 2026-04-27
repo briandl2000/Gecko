@@ -94,6 +94,11 @@ public:
   void AttachGpuSampler(IGpuSampler* sampler,
                         ::gecko::Label autoZoneLabel) noexcept override;
 
+  IGpuSampler* GetAttachedGpuSampler() const noexcept override
+  {
+    return m_AutoSampler;
+  }
+
   // ── Accessors used by VulkanDevice::Execute ───────────────────
 
   [[nodiscard]] VkCommandBuffer CommandBuffer() const noexcept

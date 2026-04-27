@@ -97,7 +97,8 @@ void VulkanGpuSampler::EndFrame(ICommandList& cmd) noexcept
 }
 
 void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label,
-                                 const char* name) noexcept
+                                 const char* name,
+                                 ::gecko::ProfLevel level) noexcept
 {
   if (!m_Valid)
     return;
@@ -117,6 +118,7 @@ void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label,
   rec.NameHash = ::gecko::FNV1a(name);
   rec.BeginQuery = slot.NextQuery++;
   rec.EndQuery = 0;
+  rec.Level = level;
 
   cmd.WriteTimestamp(slot.Pool, rec.BeginQuery);
 
@@ -187,6 +189,7 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
     ev.NameHash = rec.NameHash;
     ev.Kind = ::gecko::ProfEventKind::ZoneBegin;
     ev.Source = ::gecko::ProfSource::GPU;
+    ev.Level = rec.Level;
     p->Emit(ev);
 
     ev.TimestampNs = endNs;

@@ -93,6 +93,10 @@ public:
   {}
   void AttachGpuSampler(IGpuSampler*, ::gecko::Label) noexcept override
   {}
+  IGpuSampler* GetAttachedGpuSampler() const noexcept override
+  {
+    return nullptr;
+  }
 };
 
 class NullDevice final : public GraphicsDevice

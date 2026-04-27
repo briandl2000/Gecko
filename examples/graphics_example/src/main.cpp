@@ -692,17 +692,14 @@ int main()
       if (haveTimestamps)
         cmd->WriteTimestamp(timestampPool, 0);
       {
-        // GPU-side profiler zone.
-        IGpuSampler* s = gpuSampler.get();
-        if (s)
-          s->BeginZone(*cmd, app::graphics_example::labels::Main,
-                       "TrianglePass");
+        // GPU-side profiler zone (Normal level so it survives default
+        // trace filtering even when Detailed is dropped).
+        GECKO_GPU_SCOPE_NORMAL_NAMED(*cmd, app::graphics_example::labels::Main,
+                                     "TrianglePass");
         if (indirectBuffer.IsValid())
           cmd->DrawIndirect(indirectBuffer, 0, 1, 16);
         else
           cmd->Draw(3);
-        if (s)
-          s->EndZone(*cmd);
       }
       if (haveTimestamps)
         cmd->WriteTimestamp(timestampPool, 1);
@@ -724,9 +721,8 @@ int main()
       if (haveTimestamps)
         cmd->WriteTimestamp(timestampPool, 2);
       {
-        IGpuSampler* s = gpuSampler.get();
-        if (s)
-          s->BeginZone(*cmd, app::graphics_example::labels::Main, "BlitPass");
+        GECKO_GPU_SCOPE_NORMAL_NAMED(*cmd, app::graphics_example::labels::Main,
+                                     "BlitPass");
         for (u32 i = 0; i < 2; ++i)
         {
           if (!frames[i].Valid)
@@ -749,8 +745,6 @@ int main()
           cmd->Draw(3);
           cmd->EndRendering();
         }
-        if (s)
-          s->EndZone(*cmd);
       }
       if (haveTimestamps)
         cmd->WriteTimestamp(timestampPool, 3);

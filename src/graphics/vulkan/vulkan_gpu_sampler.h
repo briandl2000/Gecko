@@ -33,8 +33,8 @@ public:
 
   void BeginFrame(ICommandList& cmd) noexcept override;
   void EndFrame(ICommandList& cmd) noexcept override;
-  void BeginZone(ICommandList& cmd, ::gecko::Label label,
-                 const char* name) noexcept override;
+  void BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name,
+                 ::gecko::ProfLevel level) noexcept override;
   void EndZone(ICommandList& cmd) noexcept override;
 
   [[nodiscard]] bool IsValid() const noexcept
@@ -52,6 +52,7 @@ private:
     u32 NameHash {0};
     u32 BeginQuery {0};
     u32 EndQuery {0};
+    ::gecko::ProfLevel Level {::gecko::ProfLevel::Normal};
   };
 
   struct FrameSlot

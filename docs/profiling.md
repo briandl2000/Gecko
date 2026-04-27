@@ -17,7 +17,10 @@ All macros below are zero-cost (`(void)0`) in non-`GECKO_PROFILING` builds.
 | `GECKO_PROF_SCOPE_NAMED_CAT(label, name, cat)` | Categorised CPU scope. | Normal |
 | `GECKO_FRAME(label, name)` | Frame boundary. Resets aggregator stats. | Always |
 | `GECKO_COUNTER(label, name, val)` | Numeric counter sample. | Normal |
-| `GECKO_GPU_PROF_SCOPE(sampler, cmd, label, name)` | GPU timestamp pair. | — |
+| `GECKO_GPU_PROF_SCOPE(sampler, cmd, label, name)` | GPU timestamp pair (explicit sampler). | Normal |
+| `GECKO_GPU_SCOPE_NAMED(cmd, label, name)` | GPU zone, sampler picked up from cmd via `AttachGpuSampler`. | Detailed |
+| `GECKO_GPU_SCOPE_NORMAL_NAMED(cmd, label, name)` | Same, Normal level. | Normal |
+| `GECKO_GPU_SCOPE_ALWAYS_NAMED(cmd, label, name)` | Same, Always level. | Always |
 
 ## Levels
 

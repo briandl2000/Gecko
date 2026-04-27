@@ -58,8 +58,9 @@ public:
 
   // Open a GPU zone. Pairs with EndZone. Nesting is supported up to a
   // backend-defined depth limit (currently 32).
-  GECKO_API virtual void BeginZone(ICommandList& cmd, ::gecko::Label label,
-                                   const char* name) noexcept = 0;
+  GECKO_API virtual void BeginZone(
+      ICommandList& cmd, ::gecko::Label label, const char* name,
+      ::gecko::ProfLevel level = ::gecko::ProfLevel::Normal) noexcept = 0;
 
   GECKO_API virtual void EndZone(ICommandList& cmd) noexcept = 0;
 
@@ -75,10 +76,11 @@ class GpuProfScope
 {
 public:
   GpuProfScope(IGpuSampler& sampler, ICommandList& cmd, ::gecko::Label label,
-               const char* name) noexcept
+               const char* name,
+               ::gecko::ProfLevel level = ::gecko::ProfLevel::Normal) noexcept
       : m_Sampler(&sampler), m_Cmd(&cmd)
   {
-    sampler.BeginZone(cmd, label, name);
+    sampler.BeginZone(cmd, label, name, level);
   }
 
   ~GpuProfScope() noexcept
@@ -93,6 +95,35 @@ public:
 
   GpuProfScope(GpuProfScope&&) = delete;
   GpuProfScope& operator=(GpuProfScope&&) = delete;
+
+private:
+  IGpuSampler* m_Sampler {nullptr};
+  ICommandList* m_Cmd {nullptr};
+};
+
+// Picks up the IGpuSampler from the command list (set via AttachGpuSampler).
+// Silently no-ops if the cmd has no attached sampler.
+class GpuAutoProfScope
+{
+public:
+  GpuAutoProfScope(ICommandList& cmd, ::gecko::Label label, const char* name,
+                   ::gecko::ProfLevel level) noexcept
+      : m_Sampler(cmd.GetAttachedGpuSampler()), m_Cmd(&cmd)
+  {
+    if (m_Sampler)
+      m_Sampler->BeginZone(cmd, label, name, level);
+  }
+
+  ~GpuAutoProfScope() noexcept
+  {
+    if (m_Sampler && m_Cmd)
+      m_Sampler->EndZone(*m_Cmd);
+  }
+
+  GpuAutoProfScope(const GpuAutoProfScope&) = delete;
+  GpuAutoProfScope& operator=(const GpuAutoProfScope&) = delete;
+  GpuAutoProfScope(GpuAutoProfScope&&) = delete;
+  GpuAutoProfScope& operator=(GpuAutoProfScope&&) = delete;
 
 private:
   IGpuSampler* m_Sampler {nullptr};
@@ -115,8 +146,42 @@ private:
     (sampler_ref), (cmd_ref), (label), name                           \
   }
 
+// ── Ergonomic GPU scope macros (mirror CPU GECKO_SCOPE_*) ─────────
+//
+// Sampler is picked up from the command list via AttachGpuSampler; pass
+// the cmd, a Label, and a literal name. Compiles out at GECKO_PROFILING=0.
+//
+// Levels:
+//   _NAMED         -> Detailed (default for renderer fine-grain zones)
+//   _NORMAL_NAMED  -> Normal
+//   _ALWAYS_NAMED  -> Always
+
+#define GECKO_GPU_SCOPE_NAMED(cmd_ref, label, name)                       \
+  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, \
+                                                            __LINE__)     \
+  {                                                                       \
+    (cmd_ref), (label), name, ::gecko::ProfLevel::Detailed                \
+  }
+
+#define GECKO_GPU_SCOPE_NORMAL_NAMED(cmd_ref, label, name)                \
+  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, \
+                                                            __LINE__)     \
+  {                                                                       \
+    (cmd_ref), (label), name, ::gecko::ProfLevel::Normal                  \
+  }
+
+#define GECKO_GPU_SCOPE_ALWAYS_NAMED(cmd_ref, label, name)                \
+  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, \
+                                                            __LINE__)     \
+  {                                                                       \
+    (cmd_ref), (label), name, ::gecko::ProfLevel::Always                  \
+  }
+
 #else
 
 #define GECKO_GPU_PROF_SCOPE(sampler_ref, cmd_ref, label, name) (void)0
+#define GECKO_GPU_SCOPE_NAMED(cmd_ref, label, name) (void)0
+#define GECKO_GPU_SCOPE_NORMAL_NAMED(cmd_ref, label, name) (void)0
+#define GECKO_GPU_SCOPE_ALWAYS_NAMED(cmd_ref, label, name) (void)0
 
 #endif

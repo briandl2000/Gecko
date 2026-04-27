@@ -167,6 +167,11 @@ public:
   GECKO_API virtual void AttachGpuSampler(
       IGpuSampler* sampler, ::gecko::Label autoZoneLabel) noexcept = 0;
 
+  // Sampler currently attached to this command list (or nullptr). Used
+  // by GECKO_GPU_SCOPE_* macros so callers don't have to re-thread the
+  // sampler reference everywhere.
+  GECKO_API virtual IGpuSampler* GetAttachedGpuSampler() const noexcept = 0;
+
 protected:
   ICommandList() = default;
 };
