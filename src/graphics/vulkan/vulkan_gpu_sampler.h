@@ -44,7 +44,7 @@ public:
   }
 
 private:
-  static constexpr u32 c_MaxNestingDepth = 32;
+  static constexpr u32 MaxNestingDepth = 32;
 
   struct ZoneRecord
   {
@@ -74,7 +74,7 @@ private:
   u32 m_Current {0};
 
   // Open-zone stack, holds indices into the current FrameSlot's Zones.
-  u32 m_OpenStack[c_MaxNestingDepth] {};
+  u32 m_OpenStack[MaxNestingDepth] {};
   u32 m_StackDepth {0};
 
   bool m_Valid {false};

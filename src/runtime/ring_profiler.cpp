@@ -403,13 +403,13 @@ bool RingProfiler::Init() noexcept
   if (m_Aggregator.empty())
   {
     GECKO_PUSH_LABEL(m_ProfilerLabel);
-    m_Aggregator = std::vector<AggSlot>(c_AggregatorCapacity);
+    m_Aggregator = std::vector<AggSlot>(AggregatorCapacity);
   }
 
   if (m_CategoryNames.empty())
   {
     GECKO_PUSH_LABEL(m_ProfilerLabel);
-    m_CategoryNames.reserve(c_CategoryCapacity);
+    m_CategoryNames.reserve(CategoryCapacity);
     m_CategoryNames.push_back("default");  // category id 0
   }
 
@@ -458,7 +458,7 @@ ScopeStats RingProfiler::GetStats(u32 nameHash,
     return {};
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  constexpr size_t cap = c_AggregatorCapacity;
+  constexpr size_t cap = AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
@@ -512,8 +512,8 @@ u8 RingProfiler::RegisterCategory(const char* name) noexcept
     if (existing && std::strcmp(existing, name) == 0)
       return static_cast<u8>(i);
   }
-  if (m_CategoryNames.size() >= c_CategoryCapacity)
-    return c_ProfInvalidCategory;
+  if (m_CategoryNames.size() >= CategoryCapacity)
+    return ProfInvalidCategory;
   u8 id = static_cast<u8>(m_CategoryNames.size());
   m_CategoryNames.push_back(name);
   return id;
@@ -521,7 +521,7 @@ u8 RingProfiler::RegisterCategory(const char* name) noexcept
 
 void RingProfiler::SetCategoryEnabled(u8 id, bool on) noexcept
 {
-  if (id >= c_CategoryCapacity)
+  if (id >= CategoryCapacity)
     return;
   u64 bit = u64 {1} << id;
   if (on)
@@ -532,7 +532,7 @@ void RingProfiler::SetCategoryEnabled(u8 id, bool on) noexcept
 
 bool RingProfiler::IsCategoryEnabled(u8 id) const noexcept
 {
-  if (id >= c_CategoryCapacity)
+  if (id >= CategoryCapacity)
     return false;
   return (m_CategoryMask.load(std::memory_order_relaxed) & (u64 {1} << id)) !=
          0;
@@ -541,7 +541,7 @@ bool RingProfiler::IsCategoryEnabled(u8 id) const noexcept
 u8 RingProfiler::FindCategory(const char* name) const noexcept
 {
   if (!name)
-    return c_ProfInvalidCategory;
+    return ProfInvalidCategory;
   std::lock_guard<std::mutex> lk(m_CategoryMu);
   for (size_t i = 0; i < m_CategoryNames.size(); ++i)
   {
@@ -549,7 +549,7 @@ u8 RingProfiler::FindCategory(const char* name) const noexcept
     if (existing && std::strcmp(existing, name) == 0)
       return static_cast<u8>(i);
   }
-  return c_ProfInvalidCategory;
+  return ProfInvalidCategory;
 }
 
 const char* RingProfiler::GetCategoryName(u8 id) const noexcept
@@ -587,7 +587,7 @@ void RingProfiler::WatchScope(u32 nameHash, u32 windowSize,
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  constexpr size_t cap = c_AggregatorCapacity;
+  constexpr size_t cap = AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
@@ -639,7 +639,7 @@ void RingProfiler::UnwatchScope(u32 nameHash, ProfSource source) noexcept
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  constexpr size_t cap = c_AggregatorCapacity;
+  constexpr size_t cap = AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
@@ -745,7 +745,7 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
   const u8 srcKey = static_cast<u8>(static_cast<u8>(ev.Source) + 1);
   // Capacity is fixed at construction; use the constexpr so the compiler
   // can fold the (cap-1) mask into a constant.
-  constexpr size_t cap = c_AggregatorCapacity;
+  constexpr size_t cap = AggregatorCapacity;
   size_t idx = ev.NameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {

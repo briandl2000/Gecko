@@ -116,7 +116,7 @@ void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label,
 
   if (slot.Zones.size() >= m_Desc.MaxZonesPerFrame)
     return;
-  if (m_StackDepth >= c_MaxNestingDepth)
+  if (m_StackDepth >= MaxNestingDepth)
     return;
   if (slot.NextQuery + 2U > 2U * m_Desc.MaxZonesPerFrame)
     return;

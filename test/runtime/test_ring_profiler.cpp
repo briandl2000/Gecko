@@ -205,7 +205,7 @@ TEST_CASE("RingProfiler categories: register, enable, disable",
 
   u8 cat = prof.RegisterCategory("net");
   REQUIRE(cat != 0);
-  REQUIRE(cat != c_ProfInvalidCategory);
+  REQUIRE(cat != ProfInvalidCategory);
   REQUIRE(prof.IsCategoryEnabled(cat));
 
   // Same name -> same id.
@@ -275,8 +275,8 @@ TEST_CASE("RingProfiler delivers events to sinks without explicit Flush",
   CountingSink sink;
   prof.AddSink(&sink);
 
-  constexpr u32 c_NumEvents = 10;
-  for (u32 i = 0; i < c_NumEvents; ++i)
+  constexpr u32 NumEvents = 10;
+  for (u32 i = 0; i < NumEvents; ++i)
     prof.Emit(MakeZoneBegin(0x1, i + 1));
 
   // No prof.Flush() here on purpose. We want to see what arrives via the

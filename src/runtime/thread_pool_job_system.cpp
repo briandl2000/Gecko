@@ -236,15 +236,15 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
   // Profiler thread-name registration is layer-independent (it just stores a
   // pointer in a process-global table) and lets trace sinks emit
   // chrome-trace `thread_name` records for these workers.
-  static constexpr const char* kWorkerNames[] = {
+  static constexpr const char* WorkerNames[] = {
       "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",
       "job-worker-4",  "job-worker-5",  "job-worker-6",  "job-worker-7",
       "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
       "job-worker-12", "job-worker-13", "job-worker-14", "job-worker-15",
   };
   const char* name =
-      (workerIndex < (sizeof(kWorkerNames) / sizeof(kWorkerNames[0])))
-          ? kWorkerNames[workerIndex]
+      (workerIndex < (sizeof(WorkerNames) / sizeof(WorkerNames[0])))
+          ? WorkerNames[workerIndex]
           : "job-worker-N";
   ::gecko::SetThreadProfilerName(name);
 

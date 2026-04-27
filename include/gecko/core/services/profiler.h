@@ -95,8 +95,8 @@ struct ProfilerDiagnostics
   u64 AggregatorOverflow {0};
 };
 
-constexpr u8 c_ProfMaxCategories = 64;
-constexpr u8 c_ProfInvalidCategory = 0xFF;
+constexpr u8 ProfMaxCategories = 64;
+constexpr u8 ProfInvalidCategory = 0xFF;
 
 struct IProfilerStream;  // forward decl for DumpStats
 
@@ -169,7 +169,7 @@ struct IProfiler
 
   // Categories. RegisterCategory returns a stable id (1..63) for the given
   // name; subsequent calls with the same name return the same id. Returns
-  // c_ProfInvalidCategory on overflow.
+  // ProfInvalidCategory on overflow.
   virtual u8 RegisterCategory(const char* name) noexcept = 0;
   virtual void SetCategoryEnabled(u8 id, bool on) noexcept = 0;
   virtual bool IsCategoryEnabled(u8 id) const noexcept = 0;
@@ -472,7 +472,7 @@ struct NullProfiler final : IProfiler
   }
   u8 FindCategory(const char*) const noexcept override
   {
-    return c_ProfInvalidCategory;
+    return ProfInvalidCategory;
   }
   const char* GetCategoryName(u8) const noexcept override
   {

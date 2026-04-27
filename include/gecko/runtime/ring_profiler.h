@@ -124,7 +124,7 @@ private:
   // resets so HUD readers never see 0 ms in the gap between reset and the
   // next ZoneEnd; only Min/Max/Count are windowed. Reads via GetStats() are
   // relaxed snapshots (not transactional).
-  static constexpr size_t c_AggregatorCapacity = 1024;
+  static constexpr size_t AggregatorCapacity = 1024;
   struct AggSlot
   {
     std::atomic<u32> NameHash {0};
@@ -158,7 +158,7 @@ private:
 
   // Category state: 64 named slots, each with a name and an enabled bit
   // packed into m_CategoryMask.
-  static constexpr u8 c_CategoryCapacity = c_ProfMaxCategories;
+  static constexpr u8 CategoryCapacity = ProfMaxCategories;
   std::atomic<u64> m_CategoryMask {~u64 {0}};  // all enabled by default
   mutable std::mutex m_CategoryMu {};
   std::vector<const char*> m_CategoryNames {};
