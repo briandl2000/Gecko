@@ -143,6 +143,68 @@ is what you want anyway.
   recorded cmd list races with cmd lists submitted later in record
   order but earlier in GPU-execution order.
 
+#### Aligning the GPU timeline with CPU events
+
+GPU timestamps come from a different clock than CPU `Profiler::NowNs()`.
+The sampler rebases them so GPU events sit on the same monotonic
+timeline as CPU events. The anchor is the first per-frame
+`IGpuSampler::OnSubmit(cpuNowNs)` call — fired by `VulkanDevice` right
+before each `vkQueueSubmit`. Concretely:
+
+```text
+gpuFrameStart = min(valid GPU ts in slot)            (ns from GPU clock)
+cpuAnchor     = first OnSubmit(cpuNowNs) for slot    (ns from CPU clock)
+emitTs(gpuTs) = cpuAnchor + (gpuTs - gpuFrameStart)
+```
+
+Result: **the first cmd list of a frame's `CommandList` GPU zone lines
+up with its `vkQueueSubmit` to within ~1 µs.** Subsequent cmd lists
+within the same frame can drift by tens of µs.
+
+##### Why later cmd lists' GPU zones can appear *before* their CPU submit
+
+This is real GPU pipelining, not a bug. A small worked example:
+
+```text
+CPU thread :  [record cmd0][submit0][record cmd1][submit1][record cmd2][submit2]
+                    ^ 0us       ^ 280us               ^ 560us
+
+GPU queue  :       [exec cmd0][exec cmd1][exec cmd2]
+                    ^ 0.5us    ^ ~250us   ^ ~500us
+```
+
+`vkQueueSubmit` is fully asynchronous: it just enqueues. The GPU starts
+executing cmd 0 immediately, and when it finishes, the queue picks up
+cmd 1 *right away* — the driver/GPU does not wait for the CPU to call
+`vkQueueSubmit` again, because cmd 1 was already enqueued. If the GPU
+finishes cmd 0 faster than the CPU records and submits cmd 1, **the
+GPU starts executing cmd 1 before the CPU's `vkQueueSubmit(cmd1)` call
+completes.** In Perfetto this looks like the GPU zone for cmd 1 starts
+~70 µs to the *left* of its CPU submit. That's an accurate picture of
+the hardware.
+
+We deliberately **do not** clamp GPU zones to start ≥ their own submit:
+doing so would hide the GPU-pipelining advantage you're trying to
+measure.
+
+##### When the alignment really is wrong
+
+- **Long runs**: CPU and GPU clocks drift relative to each other (a
+  few ppm typically). The first cmd list per frame is re-anchored
+  every frame so error never accumulates across frames; within a
+  frame it's bounded by frame time × ppm and is normally < 1 µs.
+- **No submits**: if no `OnSubmit` arrives before `ResolveSlot`, the
+  sampler falls back to the CPU time sampled in `BeginFrame`. This
+  only matters in degenerate cases (recorded zones never submitted).
+- **Multi-queue (future)**: each queue has its own GPU clock domain;
+  use one `IGpuSampler` per queue (with distinct `GpuThreadName` like
+  `"GPU.Compute"`) so each gets its own anchor.
+
+If you ever need sub-microsecond CPU↔GPU clock conversion across a
+whole frame's worth of cmd lists, `VK_EXT_calibrated_timestamps` is the
+hammer to reach for. Gecko does not use it today; the single-anchor
+model above is sufficient for visualizing pass-level GPU work.
+
 ### Frame markers and counters
 
 ```cpp
