@@ -111,7 +111,15 @@ int main()
     return 1;
   }
 
+#if defined(GECKO_DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
+  // Debug: full picture, every Vulkan op + blind-spot zone visible.
   ::gecko::GetProfiler()->SetMinLevel(::gecko::ProfLevel::Detailed);
+#else
+  // Release: keep only the high-level picture (Always = frame, GPU passes,
+  // Present, ExecuteGraphicsCommandList) plus Normal scopes. Detailed
+  // per-vk-op scopes are dropped from the trace sink.
+  ::gecko::GetProfiler()->SetMinLevel(::gecko::ProfLevel::Normal);
+#endif
 
   // Watch the scopes whose rolling-average we'll display in the HUD.
   // (Other scopes still get Last/Min/Max/Count for free; only Avg is
@@ -528,7 +536,8 @@ int main()
     u64 frameIndex = 0;
 
     auto renderFrame = [&]() {
-      GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "renderFrame");
+      GECKO_SCOPE_ALWAYS_NAMED(app::graphics_example::labels::Main,
+                               "renderFrame");
       // Coalesce pending resizes into a single swapchain rebuild per window.
       for (u32 i = 0; i < 2; ++i)
       {
@@ -769,7 +778,7 @@ int main()
     };
 
     auto update = [&]() {
-      GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "frame");
+      GECKO_SCOPE_ALWAYS_NAMED(app::graphics_example::labels::Main, "frame");
       (void)DispatchEvents();
       renderFrame();
       GECKO_FRAME(app::graphics_example::labels::Main, "Frame");
