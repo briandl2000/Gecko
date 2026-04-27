@@ -2,7 +2,10 @@
 #include "gecko/core/utility/hash.h"
 #include "gecko/runtime/ring_profiler.h"
 
+#include <atomic>
 #include <catch2/catch_test_macros.hpp>
+#include <string>
+#include <thread>
 #include <vector>
 
 using namespace gecko;
@@ -291,4 +294,164 @@ TEST_CASE("RingProfiler delivers events to sinks without explicit Flush",
   // the explicit Flush in RemoveSink/Shutdown? If 0, the consumer path is
   // dead and events only ever flow at shutdown.
   REQUIRE(receivedBeforeShutdown > 0u);
+}
+
+TEST_CASE("RingProfiler RegisterCategory rejects null name",
+          "[runtime][profiler][categories]")
+{
+  RingProfiler prof(64);
+  REQUIRE(prof.Init());
+  REQUIRE(prof.RegisterCategory(nullptr) == ProfInvalidCategory);
+  prof.Shutdown();
+}
+
+TEST_CASE("RingProfiler RegisterCategory copies the name buffer",
+          "[runtime][profiler][categories]")
+{
+  RingProfiler prof(64);
+  REQUIRE(prof.Init());
+
+  // Pass a non-static buffer that we then mutate. If the implementation
+  // stored the raw pointer, GetCategoryName would either crash or return
+  // garbage. With owned-string storage it must still match the original.
+  ::std::string scratch = "transient_category";
+  u8 cat = prof.RegisterCategory(scratch.c_str());
+  REQUIRE(cat != 0);
+  REQUIRE(cat != ProfInvalidCategory);
+
+  scratch = "MUTATED_AFTER_REGISTRATION";  // clobber the source buffer
+  REQUIRE(::std::string(prof.GetCategoryName(cat)) == "transient_category");
+
+  // Re-registration with the same logical name still returns the same id,
+  // even though the new buffer is a different pointer.
+  ::std::string again = "transient_category";
+  REQUIRE(prof.RegisterCategory(again.c_str()) == cat);
+
+  prof.Shutdown();
+}
+
+TEST_CASE("RingProfiler aggregator pairs across threads correctly",
+          "[runtime][profiler][aggregator][threads]")
+{
+  // Regression guard for the OpenBeginNs cross-thread bug. Before the
+  // TLS-stack fix, the same NameHash on multiple threads shared a single
+  // OpenBeginNs slot, so each thread's ZoneBegin clobbered the previous
+  // thread's pending start time and produced wildly incorrect durations
+  // (or silently dropped Count increments).
+  RingProfiler prof(1024);
+  REQUIRE(prof.Init());
+  prof.SetStatsResetIntervalMs(0);
+
+  const u32 hash = ::gecko::FNV1a("CrossThread");
+  constexpr u32 NumThreads = 8;
+  constexpr u32 IterPerThread = 50;
+
+  ::std::atomic<bool> go {false};
+  ::std::vector<::std::thread> ts;
+  for (u32 t = 0; t < NumThreads; ++t)
+  {
+    ts.emplace_back([&, t]() {
+      while (!go.load(::std::memory_order_acquire))
+      {
+        // spin briefly until release
+      }
+      // Each thread emits IterPerThread complete Begin/End pairs at
+      // monotonically increasing timestamps within the thread.
+      u64 ts0 = 1'000'000ULL * (t + 1);
+      for (u32 i = 0; i < IterPerThread; ++i)
+      {
+        u64 begin = ts0 + i * 1000;
+        u64 end = begin + 100 + (i % 5);  // small varying duration
+        ProfEvent eb = MakeZoneBegin(hash, begin, ProfLevel::Always);
+        ProfEvent ee = MakeZoneEnd(hash, end, ProfLevel::Always);
+        eb.ThreadId = t + 1;
+        ee.ThreadId = t + 1;
+        prof.Emit(eb);
+        prof.Emit(ee);
+      }
+    });
+  }
+  go.store(true, ::std::memory_order_release);
+  for (auto& th : ts)
+    th.join();
+
+  ScopeStats s = prof.GetStats(hash);
+  REQUIRE(s.Count == NumThreads * IterPerThread);
+  REQUIRE(s.MinNs >= 100u);
+  REQUIRE(s.MaxNs <= 200u);  // 100 + (i%5) is at most 104
+
+  prof.Shutdown();
+}
+
+TEST_CASE("RingProfiler aggregator handles nested same-name scopes",
+          "[runtime][profiler][aggregator]")
+{
+  // Nested ZoneBegin with the same hash on one thread used to corrupt
+  // OpenBeginNs (inner Begin overwrote the outer's start). With the TLS
+  // open-scope stack, each Begin/End matches LIFO and both durations are
+  // recorded.
+  RingProfiler prof(64);
+  REQUIRE(prof.Init());
+  prof.SetStatsResetIntervalMs(0);
+
+  const u32 hash = ::gecko::FNV1a("Recursive");
+
+  // Outer scope spans [100, 1000] -> dur 900
+  // Inner scope spans [200,  300] -> dur 100
+  prof.Emit(MakeZoneBegin(hash, 100, ProfLevel::Always));
+  prof.Emit(MakeZoneBegin(hash, 200, ProfLevel::Always));
+  prof.Emit(MakeZoneEnd(hash, 300, ProfLevel::Always));
+  prof.Emit(MakeZoneEnd(hash, 1000, ProfLevel::Always));
+
+  ScopeStats s = prof.GetStats(hash);
+  REQUIRE(s.Count == 2u);
+  REQUIRE(s.MinNs == 100u);
+  REQUIRE(s.MaxNs == 900u);
+
+  prof.Shutdown();
+}
+
+TEST_CASE("RingProfiler aggregator ignores orphan ZoneEnd",
+          "[runtime][profiler][aggregator]")
+{
+  // A ZoneEnd with no matching open Begin must not bump Count or pollute
+  // Min/Max. (Could happen if a ZoneBegin was filtered by category gating
+  // before it reached UpdateAggregator while the End slipped through, or
+  // if user code emits raw events.)
+  RingProfiler prof(64);
+  REQUIRE(prof.Init());
+  prof.SetStatsResetIntervalMs(0);
+
+  const u32 hash = ::gecko::FNV1a("Orphan");
+  prof.Emit(MakeZoneEnd(hash, 1000, ProfLevel::Always));
+
+  ScopeStats s = prof.GetStats(hash);
+  REQUIRE(s.Count == 0u);
+
+  prof.Shutdown();
+}
+
+TEST_CASE("RingProfiler aggregator: orphan ZoneBegin does not produce a sample",
+          "[runtime][profiler][aggregator]")
+{
+  // Begin without matching End leaves the open-scope stack non-empty for
+  // this thread but contributes no Count and no Min/Max update.
+  RingProfiler prof(64);
+  REQUIRE(prof.Init());
+  prof.SetStatsResetIntervalMs(0);
+
+  const u32 hash = ::gecko::FNV1a("OnlyBegin");
+  prof.Emit(MakeZoneBegin(hash, 1000, ProfLevel::Always));
+
+  ScopeStats s = prof.GetStats(hash);
+  REQUIRE(s.Count == 0u);
+
+  // A subsequent matching End closes the dangling Begin and produces one
+  // sample, confirming the open-scope frame survived correctly.
+  prof.Emit(MakeZoneEnd(hash, 1500, ProfLevel::Always));
+  s = prof.GetStats(hash);
+  REQUIRE(s.Count == 1u);
+  REQUIRE(s.LastNs == 500u);
+
+  prof.Shutdown();
 }

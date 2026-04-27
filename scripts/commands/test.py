@@ -22,7 +22,7 @@ def _is_cross_compile() -> bool:
 UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests", "graphics_tests"]
 
 # Feature test targets (need live display / real backends)
-FEATURE_TARGETS = ["platform_feature_tests"]
+FEATURE_TARGETS = ["platform_feature_tests", "runtime_feature_tests"]
 
 
 def register(subparsers) -> None:
