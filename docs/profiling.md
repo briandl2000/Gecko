@@ -477,6 +477,51 @@ charts above the thread rows.
 
 ### 2. App-side: how to actually use it
 
+#### Instrumenting your own app code
+
+The profiler macros are public API — your gameplay / tools / app code
+should use them too, with the same level discipline as the engine:
+
+```cpp
+void Game::Tick(f32 dt)
+{
+    GECKO_PROFILE_ALWAYS(labels::Game);          // visible in release
+
+    {
+        GECKO_PROFILE_NORMAL_NAMED(labels::Game, "AI");
+        m_AI.Update(dt);
+    }
+    {
+        GECKO_PROFILE_NORMAL_NAMED(labels::Game, "Physics");
+        m_Physics.Step(dt);
+        GECKO_COUNTER(labels::Game, "rigid_bodies", m_Physics.BodyCount());
+    }
+    {
+        GECKO_PROFILE_NORMAL_NAMED(labels::Game, "Render");
+        for (auto& e : m_Entities)
+        {
+            GECKO_PROFILE(labels::Game);          // implicit Detailed per entity
+            e.Render(m_Cmd);
+        }
+    }
+}
+```
+
+Quick rules for app code:
+
+- **One `_ALWAYS`** at each top-level entry point you call from the
+  frame loop (`Tick`, `Update`, `Render`, `Save`).
+- **`_NORMAL_NAMED`** for sub-systems / passes / loaders.
+- **Implicit Detailed** for per-entity / per-particle inner work.
+- Use **`GECKO_COUNTER`** for anything you'd want as a graph: entity
+  count, AI agents, queued downloads, draw calls, memory by category.
+- Define your app's labels once (e.g. `app::game::labels::AI`) and reuse
+  them — Labels are the trace's category column in Perfetto.
+
+You don't need to install or boot anything; if the engine is up, the
+profiler is up, and your zones flow through the same ring + sinks as the
+engine's.
+
 #### Just want timings in the HUD
 
 The profiler is always installed. If you want the HUD strip
