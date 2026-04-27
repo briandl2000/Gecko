@@ -114,6 +114,11 @@ TEST_CASE("RingProfiler overflow drops events", "[runtime][profiler]")
 {
   RingProfiler prof(8);  // tiny ring
   REQUIRE(prof.Init());
+  // Disable auto-draining so the ring really fills. Otherwise on slower
+  // hosts (e.g. aarch64) each Emit takes long enough that the 10us
+  // schedule gate fires every iteration, draining inline before the next
+  // emit can land - and DroppedEvents stays at zero.
+  prof.SetAutoScheduleEnabled(false);
 
   // Without consuming, push more than capacity.
   for (u64 i = 0; i < 64; ++i)

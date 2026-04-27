@@ -67,6 +67,14 @@ public:
   // Flushes all pending events to sinks
   void Flush() noexcept;
 
+  // When false, Emit() will not auto-schedule the consumer drain - callers
+  // must invoke Flush() explicitly (or rely on Shutdown's drain) to deliver
+  // events. Default: true. Useful for tests that want a deterministic ring
+  // state and for clients that prefer explicit-flush semantics over the
+  // background-drain scheduling heuristic.
+  void SetAutoScheduleEnabled(bool enabled) noexcept;
+  bool IsAutoScheduleEnabled() const noexcept;
+
 private:
   struct Slot
   {
@@ -100,6 +108,7 @@ private:
   // schedule attempts that happen within the rate window of the previous
   // instance's last attempt.
   std::atomic<u64> m_LastScheduleNs {0};
+  std::atomic<bool> m_AutoSchedule {true};
   Label m_ProfilerLabel {};
   std::atomic<ProfLevel> m_MinLevel {ProfLevel::Detailed};
   std::atomic<u64> m_DroppedEvents {0};

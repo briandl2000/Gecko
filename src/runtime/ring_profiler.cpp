@@ -314,6 +314,10 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   if (!m_Run.load(std::memory_order_acquire))
     return;
 
+  // Test/explicit-flush hook: caller has opted out of auto-draining.
+  if (!m_AutoSchedule.load(std::memory_order_relaxed))
+    return;
+
   // Rate-limit scheduling to avoid job spam (check BEFORE mutex). Per-
   // instance timestamp - a function-local static would couple unrelated
   // RingProfiler instances together (this bit us in Release CI where two
@@ -669,6 +673,16 @@ void RingProfiler::SetStatsResetIntervalMs(u32 ms) noexcept
 u32 RingProfiler::GetStatsResetIntervalMs() const noexcept
 {
   return m_StatsResetIntervalMs.load(std::memory_order_relaxed);
+}
+
+void RingProfiler::SetAutoScheduleEnabled(bool enabled) noexcept
+{
+  m_AutoSchedule.store(enabled, std::memory_order_relaxed);
+}
+
+bool RingProfiler::IsAutoScheduleEnabled() const noexcept
+{
+  return m_AutoSchedule.load(std::memory_order_relaxed);
 }
 
 void RingProfiler::ForEachScope(ForEachScopeFn fn, void* user) const noexcept
