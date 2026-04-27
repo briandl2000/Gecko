@@ -72,10 +72,12 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   slot.Zones.clear();
   slot.NextQuery = 0;
   m_StackDepth = 0;
+  slot.SubmitCpuNs = 0;
 
-  // Sample the CPU clock now so we can rebase the GPU timeline against
-  // it when ResolveSlot runs. This makes GPU events appear in the same
-  // monotonic time domain as CPU events in the trace.
+  // Sample the CPU clock now as a fallback rebase anchor. This is used
+  // only if no OnSubmit() arrives before ResolveSlot runs (e.g. cmd
+  // lists were never submitted). When OnSubmit fires we prefer that
+  // timestamp, since it lines up with the actual vkQueueSubmit call.
   if (auto* p = ::gecko::GetProfiler(); p != nullptr)
     slot.CpuFrameStartNs = p->NowNs();
   else
@@ -148,6 +150,20 @@ void VulkanGpuSampler::EndZone(ICommandList& cmd) noexcept
   cmd.WriteTimestamp(slot.Pool, rec.EndQuery);
 }
 
+void VulkanGpuSampler::OnSubmit(u64 cpuNowNs) noexcept
+{
+  if (!m_Valid)
+    return;
+  // Record the CPU timestamp of the first submit covering the slot
+  // currently being recorded. Subsequent submits in the same frame
+  // don't override it — only the first submit's CPU time anchors the
+  // GPU timeline so its earliest GPU timestamp lands on the
+  // vkQueueSubmit call site.
+  FrameSlot& slot = m_Frames[m_Current];
+  if (slot.SubmitCpuNs == 0)
+    slot.SubmitCpuNs = cpuNowNs;
+}
+
 void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
 {
   slot.Pending = false;
@@ -198,9 +214,13 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
     m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
     return;
   }
-  const u64 cpuFrameStart = slot.CpuFrameStartNs;
+  // Prefer the first vkQueueSubmit CPU timestamp as the rebase anchor
+  // (closest to actual GPU work start). Fall back to BeginFrame time
+  // only if OnSubmit was never called (e.g. cmd lists never submitted).
+  const u64 cpuAnchor =
+      slot.SubmitCpuNs != 0 ? slot.SubmitCpuNs : slot.CpuFrameStartNs;
   auto rebase = [&](u64 ns) noexcept -> u64 {
-    return cpuFrameStart + (ns - gpuFrameStart);
+    return cpuAnchor + (ns - gpuFrameStart);
   };
 
   for (const ZoneRecord& rec : slot.Zones)

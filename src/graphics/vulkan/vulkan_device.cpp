@@ -21,6 +21,7 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
+#include "gecko/core/services/profiler.h"
 #include "private/labels.h"
 #include "vulkan_command_list.h"
 #include "vulkan_gpu_sampler.h"
@@ -1080,6 +1081,15 @@ void VulkanDevice::ExecuteGraphicsCommandList(
     ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
     {
       GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueueSubmit");
+      // Notify any attached GPU sampler that the cmd list is about to
+      // be submitted. The sampler uses the first such CPU timestamp
+      // per frame as its rebase anchor so GPU zones line up with the
+      // vkQueueSubmit call on the CPU timeline.
+      if (auto* sampler = cl->GetAttachedGpuSampler(); sampler != nullptr)
+      {
+        if (auto* p = ::gecko::GetProfiler(); p != nullptr)
+          sampler->OnSubmit(p->NowNs());
+      }
       VULKAN_CHECK(
           vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
     }

@@ -64,6 +64,20 @@ public:
 
   GECKO_API virtual void EndZone(ICommandList& cmd) noexcept = 0;
 
+  // Notify the sampler that a command list it instrumented has been
+  // submitted to its queue. Called by the device immediately before the
+  // underlying queue-submit call. The sampler uses the first such CPU
+  // timestamp seen for the current frame as the rebase anchor for that
+  // frame's GPU events, so the resulting GPU zones line up with the
+  // CPU vkQueueSubmit (etc.) calls in the trace.
+  //
+  // Default is a no-op so backends that don't need it (or null
+  // implementations) don't have to override.
+  GECKO_API virtual void OnSubmit(u64 cpuNowNs) noexcept
+  {
+    (void)cpuNowNs;
+  }
+
 protected:
   IGpuSampler() = default;
   IGpuSampler(IGpuSampler&&) noexcept = default;

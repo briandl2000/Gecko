@@ -656,37 +656,44 @@ int main()
       if (haveCompute)
       {
         GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "ComputePass");
-        // Record both compute command lists on the main render thread
-        // (no job-system fan-out) so the profiler trace shows them on
-        // the main row instead of scattering across job workers.
+        // Two compute cmd lists per frame to exercise the multi-cmd-list
+        // GPU profiling path. Cmd list 0 actually runs the plasma
+        // dispatch into plasmaTex[0]; cmd list 1 only performs the
+        // SHADER_READ layout transition for it. Both get an attached
+        // sampler so the trace shows two distinct compute "CommandList"
+        // zones on the GPU thread row.
         for (u32 i = 0; i < 2; ++i)
         {
-          const f32 tOffset = (i == 0) ? 0.0F : 3.14159F;
           computeCmd[i] = device->CreateComputeCommandList();
           if (!computeCmd[i])
             continue;
           computeCmd[i]->Begin();
-          // Attach the same sampler to each compute cmd list so its
-          // 'CommandList' Always GPU zone wraps the dispatch and any
-          // manual GPU zones recorded below are emitted on the GPU
-          // thread row.
           if (gpuSampler)
             computeCmd[i]->AttachGpuSampler(
                 gpuSampler.get(), app::graphics_example::labels::Main);
-          computeCmd[i]->BindPipeline(plasmaPipeline);
-          computeCmd[i]->BindRWTexture(0, plasmaTex[i]);
-          f32 pc[4] = {time + tOffset, 0.0F, 0.0F, 0.0F};
-          computeCmd[i]->SetConstants(
-              0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
-          const u32 gx = (OffscreenW + 15) / 16;
-          const u32 gy = (OffscreenH + 15) / 16;
+          if (i == 0)
           {
-            GECKO_GPU_SCOPE_NORMAL_NAMED(*computeCmd[i],
-                                         app::graphics_example::labels::Main,
-                                         "PlasmaPass");
-            computeCmd[i]->Dispatch(gx, gy, 1);
+            computeCmd[i]->BindPipeline(plasmaPipeline);
+            computeCmd[i]->BindRWTexture(0, plasmaTex[0]);
+            f32 pc[4] = {time, 0.0F, 0.0F, 0.0F};
+            computeCmd[i]->SetConstants(
+                0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
+            const u32 gx = (OffscreenW + 15) / 16;
+            const u32 gy = (OffscreenH + 15) / 16;
+            {
+              GECKO_GPU_SCOPE_NORMAL_NAMED(*computeCmd[i],
+                                           app::graphics_example::labels::Main,
+                                           "PlasmaPass");
+              computeCmd[i]->Dispatch(gx, gy, 1);
+            }
           }
-          computeCmd[i]->TransitionTextureForRead(plasmaTex[i]);
+          else
+          {
+            // Barrier-only cmd list: transition plasmaTex[0] from
+            // GENERAL (compute write) to SHADER_READ_ONLY for sampling
+            // in the blit pass.
+            computeCmd[i]->TransitionTextureForRead(plasmaTex[0]);
+          }
           computeCmd[i]->End();
         }
         // Submit from the main thread, in deterministic order.

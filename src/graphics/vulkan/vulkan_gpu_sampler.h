@@ -36,6 +36,7 @@ public:
   void BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name,
                  ::gecko::ProfLevel level) noexcept override;
   void EndZone(ICommandList& cmd) noexcept override;
+  void OnSubmit(u64 cpuNowNs) noexcept override;
 
   [[nodiscard]] bool IsValid() const noexcept
   {
@@ -62,6 +63,7 @@ private:
     u32 NextQuery {0};
     bool Pending {false};     // submitted, awaiting resolve
     u64 CpuFrameStartNs {0};  // CPU NowNs sampled at BeginFrame
+    u64 SubmitCpuNs {0};      // CPU NowNs at first vkQueueSubmit for slot
   };
 
   void ResolveSlot(FrameSlot& slot) noexcept;
