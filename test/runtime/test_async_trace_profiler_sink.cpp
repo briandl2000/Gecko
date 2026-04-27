@@ -170,3 +170,56 @@ TEST_CASE("AsyncTraceProfilerSink emits thread_name metadata",
   ::std::filesystem::remove(path);
   RegisterThreadProfilerName(7777, nullptr);
 }
+
+TEST_CASE("AsyncTraceProfilerSink::SetMinLevel filters out lower-level zones",
+          "[runtime][profiler][trace]")
+{
+  const auto path = MakeTempPath("minlevel");
+
+  {
+    runtime::AsyncTraceProfilerSink sink(path.c_str());
+    REQUIRE(sink.IsOpen());
+    sink.SetMinLevel(ProfLevel::Normal);
+
+    auto emitZone = [&](const char* name, ProfLevel level) {
+      ProfEvent begin {};
+      begin.Kind = ProfEventKind::ZoneBegin;
+      begin.Name = name;
+      begin.EventLabel = MakeLabel("test.minlevel");
+      begin.ThreadId = 1;
+      begin.TimestampNs = 100;
+      begin.Level = level;
+      sink.Write(begin);
+
+      ProfEvent end = begin;
+      end.Kind = ProfEventKind::ZoneEnd;
+      end.TimestampNs = 200;
+      sink.Write(end);
+    };
+
+    emitZone("AlwaysZone", ProfLevel::Always);
+    emitZone("NormalZone", ProfLevel::Normal);
+    emitZone("DetailedZone", ProfLevel::Detailed);
+
+    // Counter events bypass the level filter.
+    ProfEvent counter {};
+    counter.Kind = ProfEventKind::Counter;
+    counter.Name = "DetailedCounter";
+    counter.EventLabel = MakeLabel("test.minlevel");
+    counter.ThreadId = 1;
+    counter.TimestampNs = 300;
+    counter.Level = ProfLevel::Detailed;
+    counter.Value = 42;
+    sink.Write(counter);
+  }
+
+  const auto contents = SlurpFile(path);
+  REQUIRE(contents.find("AlwaysZone") != ::std::string::npos);
+  REQUIRE(contents.find("NormalZone") != ::std::string::npos);
+  // Detailed zones must be dropped because the sink cap is Normal.
+  REQUIRE(contents.find("DetailedZone") == ::std::string::npos);
+  // Counter must survive the level filter.
+  REQUIRE(contents.find("DetailedCounter") != ::std::string::npos);
+
+  ::std::filesystem::remove(path);
+}
