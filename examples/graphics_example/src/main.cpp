@@ -12,7 +12,6 @@
 #include <gecko/graphics/gpu_profiler.h>
 #include <gecko/graphics/graphics_device.h>
 #include <gecko/platform/platform_module.h>
-#include <gecko/runtime/async_trace_profiler_sink.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
@@ -112,13 +111,9 @@ int main()
   }
 
 #if defined(GECKO_DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
-  // Debug: full picture, every Vulkan op + blind-spot zone visible.
-  ::gecko::GetProfiler()->SetMinLevel(::gecko::ProfLevel::Detailed);
-#else
-  // Release: keep only the high-level picture (Always = frame, GPU passes,
-  // Present, ExecuteGraphicsCommandList) plus Normal scopes. Detailed
-  // per-vk-op scopes are dropped from the trace sink.
   ::gecko::GetProfiler()->SetMinLevel(::gecko::ProfLevel::Normal);
+#else
+  ::gecko::GetProfiler()->SetMinLevel(::gecko::ProfLevel::Always);
 #endif
 
   // Watch the scopes whose rolling-average we'll display in the HUD.
@@ -135,13 +130,6 @@ int main()
     prof->SetStatsResetIntervalMs(500);
   }
 
-  // Register a category for the demo "terrain" compute job so it can be
-  // toggled independently of the rest of the renderer (F4 dumps stats by
-  // category).
-  u8 catTerrain = 0;
-  if (auto* prof = ::gecko::GetProfiler())
-    catTerrain = prof->RegisterCategory("terrain");
-
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
 
@@ -152,43 +140,11 @@ int main()
     logger->SetLevel(LogLevel::Info);
   }
 
-  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
-
   // Name the main thread so trace viewers show "main" instead of a raw TID.
   ::gecko::SetThreadProfilerName("main");
 
   GECKO_PUSH_LABEL(app::graphics_example::labels::Main);
   GECKO_INFO(app::graphics_example::labels::Main, gecko::VersionFullString());
-
-  if (!traceSink.IsOpen())
-  {
-    GECKO_WARN(app::graphics_example::labels::Main,
-               "Failed to open trace profiler sink\n");
-  }
-  else
-  {
-    if (auto* profiler = GetProfiler())
-    {
-      traceSink.RegisterWith(profiler);
-      profiler->SetTraceEnabled(true);
-      // Default the trace sink's level to match the profiler's min level —
-      // i.e. Detailed in debug builds (everything in the JSON), Normal in
-      // release. The trace sink filter is a *cap* on what reaches the file;
-      // it never lifts events the profiler itself has filtered out.
-      // Override with GECKO_TRACE_LEVEL=always|normal|detailed.
-      ::gecko::ProfLevel traceLevel = profiler->GetMinLevel();
-      if (const char* env = ::std::getenv("GECKO_TRACE_LEVEL"))
-      {
-        if (env[0] == 'a' || env[0] == 'A')
-          traceLevel = ::gecko::ProfLevel::Always;
-        else if (env[0] == 'd' || env[0] == 'D')
-          traceLevel = ::gecko::ProfLevel::Detailed;
-        else
-          traceLevel = ::gecko::ProfLevel::Normal;
-      }
-      traceSink.SetMinLevel(traceLevel);
-    }
-  }
 
   {
     GECKO_SCOPE_ALWAYS_NAMED(app::graphics_example::labels::Main, "AppRun");
@@ -461,18 +417,6 @@ int main()
     // ── Event subscriptions ───────────────────────────────────────
     bool running = true;
 
-    // Optional: exit cleanly after N frames so automated runs (and
-    // headless CI) get a properly terminated trace file. Set
-    // GECKO_EXAMPLE_MAX_FRAMES to a positive integer.
-    const u64 maxFrames = []() -> u64 {
-      const char* v = ::std::getenv("GECKO_EXAMPLE_MAX_FRAMES");
-      if (!v || !v[0])
-        return 0;
-      char* e = nullptr;
-      auto n = ::std::strtoull(v, &e, 10);
-      return n;
-    }();
-
     auto closeSub = SubscribeEvent(
         events::WindowCloseRequested,
         [](void* user, const EventMeta&, EventView view) {
@@ -518,43 +462,6 @@ int main()
           {
           case KeyCode::Escape:
             *static_cast<bool*>(user) = false;
-            break;
-          case KeyCode::F1:
-            if (prof)
-            {
-              bool on = !prof->IsTraceEnabled();
-              prof->SetTraceEnabled(on);
-              GECKO_INFO(app::graphics_example::labels::Main,
-                         "[F1] trace file output: {}", on ? "ON" : "OFF");
-            }
-            break;
-          case KeyCode::F2:
-            if (prof)
-            {
-              ::gecko::ProfLevel cur = prof->GetMinLevel();
-              ::gecko::ProfLevel next = (cur == ::gecko::ProfLevel::Always)
-                                            ? ::gecko::ProfLevel::Normal
-                                        : (cur == ::gecko::ProfLevel::Normal)
-                                            ? ::gecko::ProfLevel::Detailed
-                                            : ::gecko::ProfLevel::Always;
-              prof->SetMinLevel(next);
-              const char* names[3] = {"Always", "Normal", "Detailed"};
-              GECKO_INFO(app::graphics_example::labels::Main,
-                         "[F2] min profiler level: {}",
-                         names[static_cast<int>(next)]);
-            }
-            break;
-          case KeyCode::F3:
-            // F3 cycles the Detailed sample rate: 1, 8, 64, 0, 1, ...
-            if (prof)
-            {
-              u32 r = prof->GetDetailedSampleRate();
-              u32 next = (r == 1) ? 8u : (r == 8) ? 64u : (r == 64) ? 0u : 1u;
-              prof->SetDetailedSampleRate(next);
-              GECKO_INFO(app::graphics_example::labels::Main,
-                         "[F3] Detailed sample rate: 1/{}",
-                         next == 0 ? 0 : next);
-            }
             break;
           case KeyCode::F4:
             if (prof)
@@ -635,27 +542,10 @@ int main()
       const bool haveCompute = plasmaPipeline.IsValid() &&
                                plasmaTex[0].IsValid() && plasmaTex[1].IsValid();
 
-      // Fake "terrain generation" scope, tagged with the 'terrain' category
-      // so it can be filtered independently. Spends ~50us doing nothing
-      // useful — this is just to demo feature-scoped profiling. Its scope
-      // shows up in the trace under the 'terrain' category and contributes
-      // to GetStats("FakeTerrainGen").
-      {
-        ::gecko::ProfScope _terrain {app::graphics_example::labels::Main,
-                                     ::gecko::FNV1a("FakeTerrainGen"),
-                                     "FakeTerrainGen",
-                                     ::gecko::ProfLevel::Detailed, catTerrain};
-        volatile u64 acc = 0;
-        for (u32 i = 0; i < 5000; ++i)
-          acc += i * frameIndex;
-        (void)acc;
-      }
-
       Unique<ICommandList> computeCmd[2];
 
       if (haveCompute)
       {
-        GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "ComputePass");
         // Two compute cmd lists per frame to exercise the multi-cmd-list
         // GPU profiling path. Cmd list 0 actually runs the plasma
         // dispatch into plasmaTex[0]; cmd list 1 only performs the
@@ -705,8 +595,6 @@ int main()
       // Pass 1: render the spinning-coloured triangle into the offscreen RT
       // using an indirect draw + time push constant.
       {
-        GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
-                                 "TrianglePassRecord");
         ClearValue rtClear =
             ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
         cmd->BeginRendering(offscreenRT, &rtClear);
@@ -723,8 +611,7 @@ int main()
         if (haveTimestamps)
           cmd->WriteTimestamp(timestampPool, 0);
         {
-          // GPU-side profiler zone (Normal level so it survives default
-          // trace filtering even when Detailed is dropped).
+          // GPU-side profiler zone for the triangle pass.
           GECKO_GPU_SCOPE_NORMAL_NAMED(
               *cmd, app::graphics_example::labels::Main, "TrianglePass");
           if (indirectBuffer.IsValid())
@@ -753,8 +640,6 @@ int main()
       if (haveTimestamps)
         cmd->WriteTimestamp(timestampPool, 2);
       {
-        GECKO_SCOPE_NAMED(app::graphics_example::labels::Main,
-                          "BlitPassRecord");
         GECKO_GPU_SCOPE_NORMAL_NAMED(*cmd, app::graphics_example::labels::Main,
                                      "BlitPass");
         for (u32 i = 0; i < 2; ++i)
@@ -857,8 +742,6 @@ int main()
 
     while (running)
     {
-      if (maxFrames && frameIndex >= maxFrames)
-        running = false;
       ::gecko::platform::PumpEvents();
       update();
     }
