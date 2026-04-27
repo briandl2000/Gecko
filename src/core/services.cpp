@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <mutex>
+#include <string>
 #include <unordered_map>
 
 namespace gecko {
@@ -111,20 +112,24 @@ IProfiler* GetProfiler() noexcept
 }
 
 namespace {
-thread_local const char* tls_ThreadProfilerName = nullptr;
+thread_local ::std::string tls_ThreadProfilerName;
 
-// Process-global registry: TID-hash -> profiler name. Written by
+// Process-global registry: TID -> profiler name. Written by
 // SetThreadProfilerName; read by trace sinks emitting chrome-trace
 // `thread_name` metadata. The map only ever holds named threads (small).
+// Names are owned strings so callers may pass non-static buffers.
 std::mutex g_ThreadNameMu;
-std::unordered_map<u32, const char*> g_ThreadNameMap;
+std::unordered_map<u32, ::std::string> g_ThreadNameMap;
 }  // namespace
 
 void SetThreadProfilerName(const char* name) noexcept
 {
-  tls_ThreadProfilerName = name;
   if (!name)
+  {
+    tls_ThreadProfilerName.clear();
     return;
+  }
+  tls_ThreadProfilerName = name;
   u32 tid = ThisThreadId();
   std::lock_guard<std::mutex> lk(g_ThreadNameMu);
   g_ThreadNameMap[tid] = name;
@@ -132,14 +137,15 @@ void SetThreadProfilerName(const char* name) noexcept
 
 const char* GetThreadProfilerName() noexcept
 {
-  return tls_ThreadProfilerName;
+  return tls_ThreadProfilerName.empty() ? nullptr
+                                        : tls_ThreadProfilerName.c_str();
 }
 
 const char* LookupThreadProfilerName(u32 threadId) noexcept
 {
   std::lock_guard<std::mutex> lk(g_ThreadNameMu);
   auto it = g_ThreadNameMap.find(threadId);
-  return (it != g_ThreadNameMap.end()) ? it->second : nullptr;
+  return (it != g_ThreadNameMap.end()) ? it->second.c_str() : nullptr;
 }
 
 void RegisterThreadProfilerName(u32 threadId, const char* name) noexcept

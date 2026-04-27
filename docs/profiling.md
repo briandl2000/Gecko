@@ -232,7 +232,7 @@ GECKO_COUNTER(labels::Memory, "LiveBytes",
 runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
 auto* p = GetProfiler();
 traceSink.RegisterWith(p);
-p->SetTraceEnabled(true);                 // arm the sink
+p->SetTraceEnabled(true);                 // ensure routing is armed (default)
 traceSink.SetMinLevel(p->GetMinLevel());  // optional: cap trace verbosity
 ```
 
@@ -558,7 +558,7 @@ if (trace.IsOpen())
     if (auto* p = GetProfiler())
     {
         trace.RegisterWith(p);
-        p->SetTraceEnabled(true);          // off by default — tracing is opt-in
+        p->SetTraceEnabled(true);          // on by default; call again to re-arm after a pause
     }
 }
 
@@ -569,8 +569,10 @@ if (trace.IsOpen())
 
 `core_example` does this unconditionally at Detailed level (debug *and*
 release) so it's the canonical "always emit a full trace" reference.
-Other examples keep tracing off by default — turn it on only for
-captures.
+Other examples keep tracing routed (the default) but only register a
+sink when they want capture — if you'd rather have routing off until
+you're ready, call `SetTraceEnabled(false)` early and re-enable for the
+section you want to capture.
 
 #### Want to capture exactly one frame
 

@@ -9,7 +9,6 @@
 #include "private/labels.h"
 
 #include <algorithm>
-#include <cstring>
 #include <vector>
 
 namespace gecko::runtime {
@@ -503,19 +502,19 @@ ScopeStats RingProfiler::GetStats(u32 nameHash,
 u8 RingProfiler::RegisterCategory(const char* name) noexcept
 {
   if (!name)
-    return 0;
+    return ProfInvalidCategory;
 
   std::lock_guard<std::mutex> lk(m_CategoryMu);
   for (size_t i = 0; i < m_CategoryNames.size(); ++i)
   {
-    const char* existing = m_CategoryNames[i];
-    if (existing && std::strcmp(existing, name) == 0)
+    if (m_CategoryNames[i] == name)
       return static_cast<u8>(i);
   }
   if (m_CategoryNames.size() >= CategoryCapacity)
     return ProfInvalidCategory;
   u8 id = static_cast<u8>(m_CategoryNames.size());
-  m_CategoryNames.push_back(name);
+  // Copy into owned storage; callers are free to pass temporaries.
+  m_CategoryNames.emplace_back(name);
   return id;
 }
 
@@ -545,8 +544,7 @@ u8 RingProfiler::FindCategory(const char* name) const noexcept
   std::lock_guard<std::mutex> lk(m_CategoryMu);
   for (size_t i = 0; i < m_CategoryNames.size(); ++i)
   {
-    const char* existing = m_CategoryNames[i];
-    if (existing && std::strcmp(existing, name) == 0)
+    if (m_CategoryNames[i] == name)
       return static_cast<u8>(i);
   }
   return ProfInvalidCategory;
@@ -557,7 +555,7 @@ const char* RingProfiler::GetCategoryName(u8 id) const noexcept
   std::lock_guard<std::mutex> lk(m_CategoryMu);
   if (id >= m_CategoryNames.size())
     return nullptr;
-  return m_CategoryNames[id];
+  return m_CategoryNames[id].c_str();
 }
 
 void RingProfiler::SetTraceEnabled(bool enabled) noexcept
@@ -743,8 +741,47 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(ev.Source) + 1);
-  // Capacity is fixed at construction; use the constexpr so the compiler
-  // can fold the (cap-1) mask into a constant.
+
+  // Per-thread open-scope stack. Begin pushes; End pops the matching frame
+  // and computes duration. Frames carry the owning RingProfiler* so test
+  // shutdowns / multiple instances don't corrupt each other's stacks.
+  // Well-nested PROF_SCOPE usage hits the fast `back() == match` path; if
+  // a thread interleaves scopes, we walk the stack to find the match.
+  struct OpenScope
+  {
+    RingProfiler* Owner;
+    u32 NameHash;
+    u8 Source;
+    u64 BeginTs;
+  };
+  static thread_local ::std::vector<OpenScope> tls_OpenScopes;
+
+  if (ev.Kind == ProfEventKind::ZoneBegin)
+  {
+    tls_OpenScopes.push_back({this, ev.NameHash, srcKey, ev.TimestampNs});
+    return;
+  }
+
+  // ZoneEnd: locate matching open frame on the TLS stack.
+  u64 beginTs = 0;
+  bool matched = false;
+  for (size_t i = tls_OpenScopes.size(); i > 0; --i)
+  {
+    const OpenScope& f = tls_OpenScopes[i - 1];
+    if (f.Owner == this && f.NameHash == ev.NameHash && f.Source == srcKey)
+    {
+      beginTs = f.BeginTs;
+      tls_OpenScopes.erase(tls_OpenScopes.begin() +
+                           static_cast<::std::ptrdiff_t>(i - 1));
+      matched = true;
+      break;
+    }
+  }
+  if (!matched || ev.TimestampNs < beginTs) [[unlikely]]
+    return;
+  const u64 dur = ev.TimestampNs - beginTs;
+
+  // Update / claim aggregator slot for this (NameHash, Source).
   constexpr size_t cap = AggregatorCapacity;
   size_t idx = ev.NameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
@@ -753,7 +790,6 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
     u32 expected = slot.NameHash.load(std::memory_order_acquire);
     if (expected == 0)
     {
-      // Try to claim the slot.
       if (slot.NameHash.compare_exchange_strong(expected, ev.NameHash,
                                                 std::memory_order_acq_rel,
                                                 std::memory_order_acquire))
@@ -768,46 +804,35 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
     if (expected == ev.NameHash &&
         slot.Source.load(std::memory_order_relaxed) == srcKey)
     {
-      if (ev.Kind == ProfEventKind::ZoneBegin)
-      {
-        slot.OpenBeginNs.store(ev.TimestampNs, std::memory_order_relaxed);
-      }
-      else if (ev.Kind == ProfEventKind::ZoneEnd)
-      {
-        u64 begin = slot.OpenBeginNs.load(std::memory_order_relaxed);
-        if (begin != 0 && ev.TimestampNs >= begin)
-        {
-          u64 dur = ev.TimestampNs - begin;
-          slot.LastNs.store(dur, std::memory_order_relaxed);
-          u64 prevMin = slot.MinNs.load(std::memory_order_relaxed);
-          if (dur < prevMin)
-            slot.MinNs.store(dur, std::memory_order_relaxed);
-          u64 prevMax = slot.MaxNs.load(std::memory_order_relaxed);
-          if (dur > prevMax)
-            slot.MaxNs.store(dur, std::memory_order_relaxed);
-          slot.Count.fetch_add(1, std::memory_order_relaxed);
-          slot.OpenBeginNs.store(0, std::memory_order_relaxed);
+      slot.LastNs.store(dur, std::memory_order_relaxed);
+      u64 prevMin = slot.MinNs.load(std::memory_order_relaxed);
+      while (dur < prevMin && !slot.MinNs.compare_exchange_weak(
+                                  prevMin, dur, std::memory_order_relaxed))
+      {}
+      u64 prevMax = slot.MaxNs.load(std::memory_order_relaxed);
+      while (dur > prevMax && !slot.MaxNs.compare_exchange_weak(
+                                  prevMax, dur, std::memory_order_relaxed))
+      {}
+      slot.Count.fetch_add(1, std::memory_order_relaxed);
 
-          // Push duration into watcher ring if scope is watched.
-          u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
-          if (wIdx != ~u32 {0})
+      // Push duration into watcher ring if scope is watched.
+      u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
+      if (wIdx != ~u32 {0})
+      {
+        std::lock_guard<std::mutex> lk(m_WatchMu);
+        if (wIdx < m_Watch.size() && m_Watch[wIdx])
+        {
+          WatchEntry& w = *m_Watch[wIdx];
+          std::lock_guard<std::mutex> wlk(w.Mu);
+          if (!w.Samples.empty())
           {
-            std::lock_guard<std::mutex> lk(m_WatchMu);
-            if (wIdx < m_Watch.size() && m_Watch[wIdx])
-            {
-              WatchEntry& w = *m_Watch[wIdx];
-              std::lock_guard<std::mutex> wlk(w.Mu);
-              if (!w.Samples.empty())
-              {
-                u32 cap2 = static_cast<u32>(w.Samples.size());
-                u32 head = w.Head.load(std::memory_order_relaxed);
-                w.Samples[head] = dur;
-                w.Head.store((head + 1) % cap2, std::memory_order_relaxed);
-                u32 filled = w.Filled.load(std::memory_order_relaxed);
-                if (filled < cap2)
-                  w.Filled.store(filled + 1, std::memory_order_relaxed);
-              }
-            }
+            u32 cap2 = static_cast<u32>(w.Samples.size());
+            u32 head = w.Head.load(std::memory_order_relaxed);
+            w.Samples[head] = dur;
+            w.Head.store((head + 1) % cap2, std::memory_order_relaxed);
+            u32 filled = w.Filled.load(std::memory_order_relaxed);
+            if (filled < cap2)
+              w.Filled.store(filled + 1, std::memory_order_relaxed);
           }
         }
       }
@@ -830,7 +855,6 @@ void RingProfiler::ResetAggregator() noexcept
     slot.MinNs.store(~u64 {0}, std::memory_order_relaxed);
     slot.MaxNs.store(0, std::memory_order_relaxed);
     slot.Count.store(0, std::memory_order_relaxed);
-    slot.OpenBeginNs.store(0, std::memory_order_relaxed);
   }
   // Watcher rings are intentionally NOT cleared here. They model a rolling
   // window of "the last N samples" and should not be wiped by the 1 s

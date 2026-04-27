@@ -6,6 +6,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 
 namespace gecko::runtime {
@@ -135,9 +136,6 @@ private:
     std::atomic<u32> Count {0};
     // Watcher index into m_Watch (or ~0u if not watched).
     std::atomic<u32> WatchIdx {~u32 {0}};
-    // Tracks the matching ZoneBegin TimestampNs on this slot's most recent
-    // open zone; used by ZoneEnd to compute duration.
-    std::atomic<u64> OpenBeginNs {0};
     // Tracks the human-readable name of the last event that wrote here
     // (latched on first write). Used by ForEachScope / DumpStats.
     std::atomic<const char*> Name {nullptr};
@@ -157,11 +155,12 @@ private:
   mutable std::mutex m_WatchMu {};
 
   // Category state: 64 named slots, each with a name and an enabled bit
-  // packed into m_CategoryMask.
+  // packed into m_CategoryMask. Names are stored as owned strings so
+  // callers may pass non-static buffers - we copy on registration.
   static constexpr u8 CategoryCapacity = ProfMaxCategories;
   std::atomic<u64> m_CategoryMask {~u64 {0}};  // all enabled by default
   mutable std::mutex m_CategoryMu {};
-  std::vector<const char*> m_CategoryNames {};
+  std::vector<std::string> m_CategoryNames {};
 
   void ProcessProfEvents() noexcept;
   void TryScheduleConsumerJob() noexcept;

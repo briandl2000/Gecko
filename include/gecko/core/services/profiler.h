@@ -169,7 +169,8 @@ struct IProfiler
 
   // Categories. RegisterCategory returns a stable id (1..63) for the given
   // name; subsequent calls with the same name return the same id. Returns
-  // ProfInvalidCategory on overflow.
+  // ProfInvalidCategory on overflow or null name. The implementation copies
+  // the name into owned storage, so callers may pass non-static buffers.
   virtual u8 RegisterCategory(const char* name) noexcept = 0;
   virtual void SetCategoryEnabled(u8 id, bool on) noexcept = 0;
   virtual bool IsCategoryEnabled(u8 id) const noexcept = 0;
