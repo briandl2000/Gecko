@@ -3,6 +3,7 @@
 
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
+#include "gecko/graphics/gpu_profiler.h"
 #include "private/labels.h"
 #include "vulkan_device.h"
 #include "vulkan_util.h"
@@ -717,8 +718,12 @@ void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
                              u32 firstVertex, u32 firstInstance) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Draw");
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw");
   vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex,
             firstInstance);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
@@ -726,8 +731,12 @@ void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
                                     u32 firstInstance) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndexed");
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed");
   vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex,
                    vertexOffset, firstInstance);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
@@ -737,7 +746,11 @@ void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect");
   vkCmdDrawIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
@@ -747,13 +760,21 @@ void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect");
   vkCmdDrawIndexedIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Dispatch");
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch");
   vkCmdDispatch(m_CmdBuffer, x, y, z);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
@@ -763,7 +784,11 @@ void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
+  if (m_AutoSampler)
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect");
   vkCmdDispatchIndirect(m_CmdBuffer, bd->Buffer, offset);
+  if (m_AutoSampler)
+    m_AutoSampler->EndZone(*this);
 }
 
 void VulkanCommandList::TransitionTextureForRead(
@@ -875,6 +900,13 @@ void VulkanCommandList::WriteTimestamp(const QueryPool& pool,
   auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
   vkCmdWriteTimestamp(m_CmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                       qd->QueryPool, index);
+}
+
+void VulkanCommandList::AttachGpuSampler(IGpuSampler* sampler,
+                                         ::gecko::Label autoZoneLabel) noexcept
+{
+  m_AutoSampler = sampler;
+  m_AutoZoneLabel = autoZoneLabel;
 }
 
 }  // namespace gecko::graphics

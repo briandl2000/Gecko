@@ -91,6 +91,9 @@ public:
                        u32 count) noexcept override;
   void WriteTimestamp(const QueryPool& pool, u32 index) noexcept override;
 
+  void AttachGpuSampler(IGpuSampler* sampler,
+                        ::gecko::Label autoZoneLabel) noexcept override;
+
   // ── Accessors used by VulkanDevice::Execute ───────────────────
 
   [[nodiscard]] VkCommandBuffer CommandBuffer() const noexcept
@@ -139,6 +142,11 @@ private:
   // Descriptor set allocated for the currently bound pipeline; shared by
   // all BindTexture / BindConstantBuffer / BindStructuredBuffer calls.
   VkDescriptorSet m_CurrentDescSet {VK_NULL_HANDLE};
+
+  // Optional auto-zone wiring: if non-null, every Draw/Dispatch wraps
+  // the recorded vkCmd* call in BeginZone/EndZone.
+  IGpuSampler* m_AutoSampler {nullptr};
+  ::gecko::Label m_AutoZoneLabel {};
 };
 
 }  // namespace gecko::graphics

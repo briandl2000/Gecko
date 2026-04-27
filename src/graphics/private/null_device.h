@@ -91,6 +91,8 @@ public:
   {}
   void WriteTimestamp(const QueryPool&, u32) noexcept override
   {}
+  void AttachGpuSampler(IGpuSampler*, ::gecko::Label) noexcept override
+  {}
 };
 
 class NullDevice final : public GraphicsDevice

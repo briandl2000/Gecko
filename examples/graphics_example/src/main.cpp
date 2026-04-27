@@ -168,7 +168,10 @@ int main()
   else
   {
     if (auto* profiler = GetProfiler())
+    {
       traceSink.RegisterWith(profiler);
+      profiler->SetTraceEnabled(true);
+    }
   }
 
   {
@@ -436,6 +439,18 @@ int main()
     // ── Event subscriptions ───────────────────────────────────────
     bool running = true;
 
+    // Optional: exit cleanly after N frames so automated runs (and
+    // headless CI) get a properly terminated trace file. Set
+    // GECKO_EXAMPLE_MAX_FRAMES to a positive integer.
+    const u64 maxFrames = []() -> u64 {
+      const char* v = ::std::getenv("GECKO_EXAMPLE_MAX_FRAMES");
+      if (!v || !v[0])
+        return 0;
+      char* e = nullptr;
+      auto n = ::std::strtoull(v, &e, 10);
+      return n;
+    }();
+
     auto closeSub = SubscribeEvent(
         events::WindowCloseRequested,
         [](void* user, const EventMeta&, EventView view) {
@@ -571,7 +586,14 @@ int main()
       cmd->Begin();
 
       if (gpuSampler)
+      {
         gpuSampler->BeginFrame(*cmd);
+        // Auto-wrap every Draw/DrawIndexed/DrawIndirect/Dispatch on this
+        // command list in a GPU zone (nested under our manual TrianglePass /
+        // BlitPass zones). Detailed level only.
+        cmd->AttachGpuSampler(gpuSampler.get(),
+                              app::graphics_example::labels::Main);
+      }
 
       const bool haveTimestamps = timestampPool.IsValid();
       if (haveTimestamps)
@@ -789,6 +811,8 @@ int main()
 
     while (running)
     {
+      if (maxFrames && frameIndex >= maxFrames)
+        running = false;
       ::gecko::platform::PumpEvents();
       update();
     }

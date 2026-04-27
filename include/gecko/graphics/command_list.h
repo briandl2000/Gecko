@@ -1,11 +1,14 @@
 #pragma once
 
 #include "gecko/core/api.h"
+#include "gecko/core/labels.h"
 #include "gecko/graphics/graphics_types.h"
 
 #include <span>
 
 namespace gecko::graphics {
+
+class IGpuSampler;
 
 /// Abstract graphics/compute command list.
 ///
@@ -153,6 +156,16 @@ public:
 
   GECKO_API virtual void WriteTimestamp(const QueryPool& pool,
                                         u32 index) noexcept = 0;
+
+  // ── GPU auto-zones ────────────────────────────────────────────
+  //
+  // Attach an IGpuSampler so every Draw/DrawIndexed/DrawIndirect/
+  // DrawIndexedIndirect/Dispatch/DispatchIndirect call on this command
+  // list is automatically wrapped in a GPU zone at ProfLevel::Detailed.
+  // Pass `nullptr` to disable. Manual BeginZone/EndZone keep working
+  // alongside; auto-zones nest inside any user-opened zone.
+  GECKO_API virtual void AttachGpuSampler(
+      IGpuSampler* sampler, ::gecko::Label autoZoneLabel) noexcept = 0;
 
 protected:
   ICommandList() = default;
