@@ -3,7 +3,6 @@
 #include "gecko/core/assert.h"
 #include "gecko/core/scope.h"
 #include "gecko/platform/platform_io.h"
-
 #include "private/labels.h"
 
 #include <cstdio>

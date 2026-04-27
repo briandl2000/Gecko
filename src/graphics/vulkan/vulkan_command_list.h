@@ -152,6 +152,9 @@ private:
   // the recorded vkCmd* call in BeginZone/EndZone.
   IGpuSampler* m_AutoSampler {nullptr};
   ::gecko::Label m_AutoZoneLabel {};
+  // True between AttachGpuSampler and End() — the always-on
+  // "CommandList" GPU zone covering the whole command-buffer execution.
+  bool m_AutoCmdListZoneOpen {false};
 };
 
 }  // namespace gecko::graphics

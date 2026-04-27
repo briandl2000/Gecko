@@ -80,6 +80,15 @@ void VulkanCommandList::End() noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::End");
 
+  // Close the auto "CommandList" GPU zone opened by AttachGpuSampler.
+  // Must run before vkEndCommandBuffer so its end-timestamp lands in
+  // the buffer.
+  if (m_AutoCmdListZoneOpen && m_AutoSampler)
+  {
+    m_AutoSampler->EndZone(*this);
+    m_AutoCmdListZoneOpen = false;
+  }
+
   // Transition any active swapchain images still in color-attachment layout
   // to PRESENT. The most recent BeginRendering on a swapchain image left it
   // in COLOR_ATTACHMENT_OPTIMAL after EndRendering.
@@ -719,7 +728,8 @@ void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Draw");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw", ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex,
             firstInstance);
   if (m_AutoSampler)
@@ -732,7 +742,8 @@ void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndexed");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed", ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex,
                    vertexOffset, firstInstance);
   if (m_AutoSampler)
@@ -747,7 +758,8 @@ void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect", ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -761,7 +773,8 @@ void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect", ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndexedIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -771,7 +784,8 @@ void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Dispatch");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch", ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDispatch(m_CmdBuffer, x, y, z);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -785,7 +799,8 @@ void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect", ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect",
+                             ::gecko::ProfLevel::Detailed);
   vkCmdDispatchIndirect(m_CmdBuffer, bd->Buffer, offset);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -907,6 +922,15 @@ void VulkanCommandList::AttachGpuSampler(IGpuSampler* sampler,
 {
   m_AutoSampler = sampler;
   m_AutoZoneLabel = autoZoneLabel;
+  // Open an Always-level "CommandList" GPU zone covering the whole
+  // command-buffer execution, closed in End(). This is the canonical
+  // GPU-time-per-cmd-list bracket the user gets for free.
+  if (sampler && !m_AutoCmdListZoneOpen)
+  {
+    sampler->BeginZone(*this, autoZoneLabel, "CommandList",
+                       ::gecko::ProfLevel::Always);
+    m_AutoCmdListZoneOpen = true;
+  }
 }
 
 }  // namespace gecko::graphics

@@ -433,7 +433,7 @@ int main()
     // GECKO_GPU_PROF_SCOPE and emits matched ProfEvents into the
     // global IProfiler with ProfSource::GPU.
     GpuSamplerDesc samplerDesc {};
-    samplerDesc.MaxZonesPerFrame = 16;
+    samplerDesc.MaxZonesPerFrame = 64;
     samplerDesc.FramesInFlight = 3;
     samplerDesc.GpuThreadName = "GPU";
     Unique<IGpuSampler> gpuSampler = device->CreateGpuSampler(samplerDesc);
@@ -649,7 +649,8 @@ int main()
 
       if (haveCompute)
       {
-        GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "ComputePass");
+        GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
+                                 "ComputePass");
         // Record both compute command lists on the main render thread
         // (no job-system fan-out) so the profiler trace shows them on
         // the main row instead of scattering across job workers.
@@ -672,40 +673,49 @@ int main()
           computeCmd[i]->End();
         }
         // Submit from the main thread, in deterministic order.
-        for (u32 i = 0; i < 2; ++i)
-          if (computeCmd[i])
-            device->ExecuteComputeCommandList(::std::move(computeCmd[i]));
+        {
+          GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
+                                   "PlasmaSubmit");
+          for (u32 i = 0; i < 2; ++i)
+            if (computeCmd[i])
+              device->ExecuteComputeCommandList(::std::move(computeCmd[i]));
+        }
       }
 
       // Pass 1: render the spinning-coloured triangle into the offscreen RT
       // using an indirect draw + time push constant.
-      ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
-      cmd->BeginRendering(offscreenRT, &rtClear);
-      cmd->SetViewport(0.0F, 0.0F, static_cast<f32>(OffscreenW),
-                       static_cast<f32>(OffscreenH));
-      cmd->SetScissor(0, 0, OffscreenW, OffscreenH);
-      cmd->BindPipeline(trianglePipeline);
-      cmd->BindVertexBuffer(vertexBuffer);
       {
-        f32 pc[4] = {time, 0.0F, 0.0F, 0.0F};
-        cmd->SetConstants(
-            0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
+        GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
+                                 "TrianglePassRecord");
+        ClearValue rtClear =
+            ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
+        cmd->BeginRendering(offscreenRT, &rtClear);
+        cmd->SetViewport(0.0F, 0.0F, static_cast<f32>(OffscreenW),
+                         static_cast<f32>(OffscreenH));
+        cmd->SetScissor(0, 0, OffscreenW, OffscreenH);
+        cmd->BindPipeline(trianglePipeline);
+        cmd->BindVertexBuffer(vertexBuffer);
+        {
+          f32 pc[4] = {time, 0.0F, 0.0F, 0.0F};
+          cmd->SetConstants(
+              0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
+        }
+        if (haveTimestamps)
+          cmd->WriteTimestamp(timestampPool, 0);
+        {
+          // GPU-side profiler zone (Normal level so it survives default
+          // trace filtering even when Detailed is dropped).
+          GECKO_GPU_SCOPE_NORMAL_NAMED(
+              *cmd, app::graphics_example::labels::Main, "TrianglePass");
+          if (indirectBuffer.IsValid())
+            cmd->DrawIndirect(indirectBuffer, 0, 1, 16);
+          else
+            cmd->Draw(3);
+        }
+        if (haveTimestamps)
+          cmd->WriteTimestamp(timestampPool, 1);
+        cmd->EndRendering();
       }
-      if (haveTimestamps)
-        cmd->WriteTimestamp(timestampPool, 0);
-      {
-        // GPU-side profiler zone (Normal level so it survives default
-        // trace filtering even when Detailed is dropped).
-        GECKO_GPU_SCOPE_NORMAL_NAMED(*cmd, app::graphics_example::labels::Main,
-                                     "TrianglePass");
-        if (indirectBuffer.IsValid())
-          cmd->DrawIndirect(indirectBuffer, 0, 1, 16);
-        else
-          cmd->Draw(3);
-      }
-      if (haveTimestamps)
-        cmd->WriteTimestamp(timestampPool, 1);
-      cmd->EndRendering();
       // After EndRendering the offscreen target is in SHADER_READ_ONLY.
 
       // Pass 2 & 3: fullscreen-quad blit into each swapchain. Window A
@@ -723,6 +733,8 @@ int main()
       if (haveTimestamps)
         cmd->WriteTimestamp(timestampPool, 2);
       {
+        GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
+                                 "BlitPassRecord");
         GECKO_GPU_SCOPE_NORMAL_NAMED(*cmd, app::graphics_example::labels::Main,
                                      "BlitPass");
         for (u32 i = 0; i < 2; ++i)
