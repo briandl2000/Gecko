@@ -93,6 +93,12 @@ private:
   std::atomic<bool> m_Run {true};
   std::mutex m_JobMu {};  // Protects m_ConsumerJob
   JobHandle m_ConsumerJob {};
+  // Per-instance rate-limit timestamp for consumer-job scheduling.
+  // Must NOT be a function-level static: that would couple unrelated
+  // RingProfiler instances (e.g. across test cases) and silently drop
+  // schedule attempts that happen within the rate window of the previous
+  // instance's last attempt.
+  std::atomic<u64> m_LastScheduleNs {0};
   Label m_ProfilerLabel {};
   std::atomic<ProfLevel> m_MinLevel {ProfLevel::Detailed};
   std::atomic<u64> m_DroppedEvents {0};

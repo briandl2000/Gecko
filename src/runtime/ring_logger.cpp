@@ -261,17 +261,18 @@ void RingLogger::TryScheduleConsumerJob() noexcept
   if (!m_Run.load(std::memory_order_acquire))
     return;
 
-  // Rate-limit scheduling to avoid job spam (check BEFORE mutex)
-  static std::atomic<u64> lastScheduleTime {0};
+  // Rate-limit scheduling to avoid job spam (check BEFORE mutex). Per-
+  // instance: a function-local static would couple unrelated RingLogger
+  // instances together.
   u64 now = NowNs();
-  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
+  u64 lastTime = m_LastScheduleNs.load(std::memory_order_relaxed);
 
   // Don't schedule too frequently (at most every 100µs)
   if (now - lastTime < 100000)  // 100 microseconds
     return;
 
   // Try to claim the scheduling slot atomically (still no mutex)
-  if (!lastScheduleTime.compare_exchange_weak(lastTime, now,
+  if (!m_LastScheduleNs.compare_exchange_weak(lastTime, now,
                                               std::memory_order_relaxed))
     return;
 

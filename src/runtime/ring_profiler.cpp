@@ -315,17 +315,20 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   if (!m_Run.load(std::memory_order_acquire))
     return;
 
-  // Rate-limit scheduling to avoid job spam (check BEFORE mutex)
-  static std::atomic<u64> lastScheduleTime {0};
+  // Rate-limit scheduling to avoid job spam (check BEFORE mutex). Per-
+  // instance timestamp - a function-local static would couple unrelated
+  // RingProfiler instances together (this bit us in Release CI where two
+  // back-to-back test cases ran their first Emit() inside the same 10us
+  // window and the second one silently no-op'd).
   u64 now = NowNs();
-  u64 lastTime = lastScheduleTime.load(std::memory_order_relaxed);
+  u64 lastTime = m_LastScheduleNs.load(std::memory_order_relaxed);
 
   // Don't schedule too frequently (at most every 10µs)
   if (now - lastTime < 10000)  // 10 microseconds
     return;
 
   // Try to claim the scheduling slot atomically (still no mutex)
-  if (!lastScheduleTime.compare_exchange_weak(lastTime, now,
+  if (!m_LastScheduleNs.compare_exchange_weak(lastTime, now,
                                               std::memory_order_relaxed))
     return;
 

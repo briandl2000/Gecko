@@ -79,6 +79,11 @@ private:
   JobHandle m_ConsumerJob;
   Label m_LoggerLabel;
 
+  // Per-instance rate-limit timestamp for consumer-job scheduling. See
+  // matching comment in ring_profiler.h for why this is not a function-
+  // local static.
+  std::atomic<u64> m_LastScheduleNs {0};
+
   IProfiler* m_Profiler;
 
   void ProcessLogEntries() noexcept;
