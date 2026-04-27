@@ -8,7 +8,6 @@
 #include <gecko/core/version.h>
 #include <gecko/platform/input.h>
 #include <gecko/platform/platform_module.h>
-#include <gecko/runtime/async_trace_profiler_sink.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
@@ -177,22 +176,8 @@ int main()
     ResetAllocator();
     return 1;
   }
-  // Profiler v2: stream Chrome-trace events asynchronously through a
-  // dedicated worker thread; drains + fsyncs on shutdown.
-  runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
 
   ::gecko::SetThreadProfilerName("main");
-
-  if (!traceSink.IsOpen())
-  {
-    GECKO_WARN(app::platform_example::labels::Main,
-               "Failed to open trace profiler sink\n");
-  }
-  else
-  {
-    if (auto* profiler = GetProfiler())
-      traceSink.RegisterWith(profiler);
-  }
 
   // Now configure logging sinks - they auto-unregister when destroyed
   runtime::ConsoleLogSink consoleSink;

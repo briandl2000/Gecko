@@ -16,7 +16,6 @@
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
-#include <gecko/runtime/trace_file_sink.h>
 #include <gecko/runtime/tracking_allocator.h>
 #include <string_view>
 
@@ -222,20 +221,6 @@ static int AppMain(int argc, char** argv)
 
   GECKO_INFO(app::app_skeleton::labels::Main, gecko::VersionFullString());
 
-  // Trace sink auto-unregisters when destroyed
-  runtime::TraceFileSink traceSink("gecko_trace.json");
-
-  if (traceSink.IsOpen())
-  {
-    if (auto* profiler = GetProfiler())
-      traceSink.RegisterWith(profiler);
-  }
-  else
-  {
-    GECKO_WARN(app::app_skeleton::labels::Main,
-               "Failed to open trace file sink");
-  }
-
   // 4) Run either headless or windowed.
 
   if (!cfg.windowed)
@@ -293,8 +278,6 @@ static int AppMain(int argc, char** argv)
   // Unregister sinks before shutting down services
   consoleSink.Unregister();
   fileSink.Unregister();
-  // traceSink: let RAII unregister so any final ZoneEnd events still land
-  // in the trace before the writer closes.
 
   // 5) Shutdown: ~Engine() runs UninstallServices when `engine` goes out
   // of scope. Allocator is infrastructure, reset it explicitly.
