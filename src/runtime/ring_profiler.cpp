@@ -809,10 +809,13 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
 void RingProfiler::ResetAggregator() noexcept
 {
   // Preserve scope identity (NameHash/Source/Name/WatchIdx) so watched
-  // scopes keep accumulating across resets; only clear the counters.
+  // scopes keep accumulating across resets; only clear the per-window
+  // counters. LastNs is intentionally NOT reset - it represents "the
+  // most recent observation" and a reset that happens between two
+  // zone-ends should not make HUD readers see 0 ms until the next
+  // zone-end fires.
   for (auto& slot : m_Aggregator)
   {
-    slot.LastNs.store(0, std::memory_order_relaxed);
     slot.MinNs.store(~u64 {0}, std::memory_order_relaxed);
     slot.MaxNs.store(0, std::memory_order_relaxed);
     slot.Count.store(0, std::memory_order_relaxed);
