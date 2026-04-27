@@ -633,6 +633,7 @@ int main()
 
       if (haveCompute)
       {
+        GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "ComputePass");
         // Record both compute command lists on the main render thread
         // (no job-system fan-out) so the profiler trace shows them on
         // the main row instead of scattering across job workers.
