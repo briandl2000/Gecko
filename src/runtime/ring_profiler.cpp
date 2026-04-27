@@ -1,6 +1,7 @@
 #include "gecko/runtime/ring_profiler.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/utility/bit.h"
 #include "gecko/core/utility/thread.h"
@@ -77,16 +78,51 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   if (m_Ring.empty())
     return;
 
-  // Aggregator update for Always-level zones; FrameMark resets it.
-  if (event.Kind == ProfEventKind::FrameMark)
+  // Auto-reset stats on a timer (independent of FrameMark).
+  if (u32 interval = m_StatsResetIntervalMs.load(std::memory_order_relaxed);
+      interval > 0)
   {
-    ResetAggregator();
+    u64 nowNs = event.TimestampNs;
+    u64 lastNs = m_LastStatsResetNs.load(std::memory_order_relaxed);
+    if (lastNs == 0)
+    {
+      m_LastStatsResetNs.store(nowNs, std::memory_order_relaxed);
+    }
+    else if (nowNs - lastNs >= u64 {interval} * 1'000'000ULL)
+    {
+      // Try to claim the reset; only one Emit succeeds per interval.
+      if (m_LastStatsResetNs.compare_exchange_strong(lastNs, nowNs,
+                                                     std::memory_order_acq_rel,
+                                                     std::memory_order_relaxed))
+        ResetAggregator();
+    }
   }
-  else if (event.Level == ProfLevel::Always &&
-           (event.Kind == ProfEventKind::ZoneBegin ||
-            event.Kind == ProfEventKind::ZoneEnd))
+
+  // Aggregator update for ALL levels (cheap CAS+store). FrameMark no
+  // longer auto-resets — apps can call ResetStats() manually if they want
+  // per-frame reset semantics.
+  if (event.Kind == ProfEventKind::ZoneBegin ||
+      event.Kind == ProfEventKind::ZoneEnd)
   {
     UpdateAggregator(event);
+  }
+
+  // Detailed sample-rate gate. Drop most events at sink-emit time without
+  // touching the aggregator (already done above) so HUD queries stay
+  // accurate while trace volume drops.
+  if (event.Level == ProfLevel::Detailed &&
+      (event.Kind == ProfEventKind::ZoneBegin ||
+       event.Kind == ProfEventKind::ZoneEnd))
+  {
+    u32 rate = m_DetailedSampleRate.load(std::memory_order_relaxed);
+    if (rate == 0)
+      return;
+    if (rate > 1)
+    {
+      u64 c = m_DetailedCounter.fetch_add(1, std::memory_order_relaxed);
+      if (c % rate != 0)
+        return;
+    }
   }
 
   u64 pos = m_Head.fetch_add(1, std::memory_order_acq_rel);
@@ -185,10 +221,14 @@ void RingProfiler::Flush() noexcept
     sinks = m_Sinks;
   }
 
+  const bool trace = m_TraceEnabled.load(std::memory_order_relaxed);
+
   // Process all pending events synchronously
   ProfEvent event {};
   while (TryPop(event))
   {
+    if (!trace)
+      continue;
     for (auto* sink : sinks)
     {
       if (sink)
@@ -216,6 +256,8 @@ void RingProfiler::ProcessProfEvents() noexcept
     sinks = m_Sinks;
   }
 
+  const bool trace = m_TraceEnabled.load(std::memory_order_relaxed);
+
   ProfEvent event {};
   const int maxBatchSize = 4096;  // Process events in batches for efficiency
 
@@ -223,6 +265,9 @@ void RingProfiler::ProcessProfEvents() noexcept
   {
     if (!TryPop(event))
       break;
+
+    if (!trace)
+      continue;
 
     for (auto* sink : sinks)
     {
@@ -233,9 +278,9 @@ void RingProfiler::ProcessProfEvents() noexcept
     }
   }
 
-  // Report dropped events if any occurred
+  // Report dropped events if any occurred (only when tracing).
   u64 dropped = m_DroppedEvents.exchange(0, std::memory_order_relaxed);
-  if (dropped)
+  if (dropped && trace)
   {
     // Emit a counter event to mark dropped events in the trace
     ProfEvent dropEvent {};
@@ -383,6 +428,10 @@ void RingProfiler::Shutdown() noexcept
   decltype(m_Ring)().swap(m_Ring);
   decltype(m_Aggregator)().swap(m_Aggregator);
   {
+    std::lock_guard<std::mutex> lk(m_WatchMu);
+    decltype(m_Watch)().swap(m_Watch);
+  }
+  {
     std::lock_guard<std::mutex> lk(m_CategoryMu);
     decltype(m_CategoryNames)().swap(m_CategoryNames);
   }
@@ -393,11 +442,13 @@ void RingProfiler::Shutdown() noexcept
   }
 }
 
-ScopeStats RingProfiler::GetStats(u32 nameHash) const noexcept
+ScopeStats RingProfiler::GetStats(u32 nameHash,
+                                  ProfSource source) const noexcept
 {
   if (m_Aggregator.empty() || nameHash == 0)
     return {};
 
+  const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
   const size_t cap = m_Aggregator.size();
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
@@ -406,13 +457,34 @@ ScopeStats RingProfiler::GetStats(u32 nameHash) const noexcept
     u32 key = slot.NameHash.load(std::memory_order_acquire);
     if (key == 0)
       return {};
-    if (key == nameHash)
+    if (key == nameHash &&
+        slot.Source.load(std::memory_order_relaxed) == srcKey)
     {
       ScopeStats s {};
       s.LastNs = slot.LastNs.load(std::memory_order_relaxed);
       s.MinNs = slot.MinNs.load(std::memory_order_relaxed);
       s.MaxNs = slot.MaxNs.load(std::memory_order_relaxed);
       s.Count = slot.Count.load(std::memory_order_relaxed);
+
+      // If watched, compute average over the rolling window.
+      u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
+      if (wIdx != ~u32 {0})
+      {
+        std::lock_guard<std::mutex> lk(m_WatchMu);
+        if (wIdx < m_Watch.size() && m_Watch[wIdx])
+        {
+          WatchEntry& w = *m_Watch[wIdx];
+          std::lock_guard<std::mutex> wlk(w.Mu);
+          u32 filled = w.Filled.load(std::memory_order_relaxed);
+          if (filled > 0)
+          {
+            u64 sum = 0;
+            for (u32 i = 0; i < filled; ++i)
+              sum += w.Samples[i];
+            s.AvgNs = sum / filled;
+          }
+        }
+      }
       return s;
     }
   }
@@ -457,6 +529,196 @@ bool RingProfiler::IsCategoryEnabled(u8 id) const noexcept
          0;
 }
 
+u8 RingProfiler::FindCategory(const char* name) const noexcept
+{
+  if (!name)
+    return c_ProfInvalidCategory;
+  std::lock_guard<std::mutex> lk(m_CategoryMu);
+  for (size_t i = 0; i < m_CategoryNames.size(); ++i)
+  {
+    const char* existing = m_CategoryNames[i];
+    if (existing && std::strcmp(existing, name) == 0)
+      return static_cast<u8>(i);
+  }
+  return c_ProfInvalidCategory;
+}
+
+const char* RingProfiler::GetCategoryName(u8 id) const noexcept
+{
+  std::lock_guard<std::mutex> lk(m_CategoryMu);
+  if (id >= m_CategoryNames.size())
+    return nullptr;
+  return m_CategoryNames[id];
+}
+
+void RingProfiler::SetTraceEnabled(bool enabled) noexcept
+{
+  m_TraceEnabled.store(enabled, std::memory_order_relaxed);
+}
+
+bool RingProfiler::IsTraceEnabled() const noexcept
+{
+  return m_TraceEnabled.load(std::memory_order_relaxed);
+}
+
+void RingProfiler::SetDetailedSampleRate(u32 nthEvent) noexcept
+{
+  m_DetailedSampleRate.store(nthEvent, std::memory_order_relaxed);
+}
+
+u32 RingProfiler::GetDetailedSampleRate() const noexcept
+{
+  return m_DetailedSampleRate.load(std::memory_order_relaxed);
+}
+
+void RingProfiler::WatchScope(u32 nameHash, u32 windowSize,
+                              ProfSource source) noexcept
+{
+  if (m_Aggregator.empty() || nameHash == 0 || windowSize == 0)
+    return;
+
+  const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
+  const size_t cap = m_Aggregator.size();
+  size_t idx = nameHash & (cap - 1);
+  for (size_t probe = 0; probe < cap; ++probe)
+  {
+    AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    u32 expected = slot.NameHash.load(std::memory_order_acquire);
+    if (expected == 0)
+    {
+      // Reserve the slot up-front so subsequent ZoneEnds find it.
+      if (slot.NameHash.compare_exchange_strong(expected, nameHash,
+                                                std::memory_order_acq_rel,
+                                                std::memory_order_acquire))
+      {
+        slot.Source.store(srcKey, std::memory_order_relaxed);
+        expected = nameHash;
+      }
+      else if (expected != nameHash)
+        continue;
+    }
+    if (expected == nameHash)
+    {
+      // (Re)allocate watcher entry.
+      std::lock_guard<std::mutex> lk(m_WatchMu);
+      u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
+      if (wIdx == ~u32 {0} || wIdx >= m_Watch.size() || !m_Watch[wIdx])
+      {
+        auto entry = std::make_unique<WatchEntry>();
+        entry->Samples.assign(windowSize, 0);
+        m_Watch.push_back(std::move(entry));
+        wIdx = static_cast<u32>(m_Watch.size() - 1);
+        slot.WatchIdx.store(wIdx, std::memory_order_relaxed);
+      }
+      else
+      {
+        WatchEntry& w = *m_Watch[wIdx];
+        std::lock_guard<std::mutex> wlk(w.Mu);
+        w.Samples.assign(windowSize, 0);
+        w.Head.store(0, std::memory_order_relaxed);
+        w.Filled.store(0, std::memory_order_relaxed);
+      }
+      slot.Source.store(srcKey, std::memory_order_relaxed);
+      return;
+    }
+  }
+}
+
+void RingProfiler::UnwatchScope(u32 nameHash, ProfSource source) noexcept
+{
+  if (m_Aggregator.empty() || nameHash == 0)
+    return;
+
+  const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
+  const size_t cap = m_Aggregator.size();
+  size_t idx = nameHash & (cap - 1);
+  for (size_t probe = 0; probe < cap; ++probe)
+  {
+    AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    u32 key = slot.NameHash.load(std::memory_order_acquire);
+    if (key == 0)
+      return;
+    if (key == nameHash &&
+        slot.Source.load(std::memory_order_relaxed) == srcKey)
+    {
+      slot.WatchIdx.store(~u32 {0}, std::memory_order_relaxed);
+      return;
+    }
+  }
+}
+
+void RingProfiler::ResetStats() noexcept
+{
+  ResetAggregator();
+  m_LastStatsResetNs.store(MonotonicNowNs(), std::memory_order_relaxed);
+}
+
+void RingProfiler::SetStatsResetIntervalMs(u32 ms) noexcept
+{
+  m_StatsResetIntervalMs.store(ms, std::memory_order_relaxed);
+  m_LastStatsResetNs.store(MonotonicNowNs(), std::memory_order_relaxed);
+}
+
+u32 RingProfiler::GetStatsResetIntervalMs() const noexcept
+{
+  return m_StatsResetIntervalMs.load(std::memory_order_relaxed);
+}
+
+void RingProfiler::ForEachScope(ForEachScopeFn fn, void* user) const noexcept
+{
+  if (!fn || m_Aggregator.empty())
+    return;
+  for (size_t i = 0; i < m_Aggregator.size(); ++i)
+  {
+    const AggSlot& slot = m_Aggregator[i];
+    u32 key = slot.NameHash.load(std::memory_order_acquire);
+    if (key == 0)
+      continue;
+    u8 srcKey = slot.Source.load(std::memory_order_relaxed);
+    if (srcKey == 0)
+      continue;
+    ProfSource source = static_cast<ProfSource>(srcKey - 1);
+    ScopeStats s = GetStats(key, source);
+    const char* name = slot.Name.load(std::memory_order_relaxed);
+    fn(name, key, source, s, user);
+  }
+}
+
+namespace {
+struct DumpCtx
+{
+  Label OutLabel;
+};
+void DumpCallback(const char* name, u32 hash, ProfSource source,
+                  const ScopeStats& s, void* user) noexcept
+{
+  auto* ctx = static_cast<DumpCtx*>(user);
+  const char* tag = (source == ProfSource::GPU) ? "[GPU]" : "[CPU]";
+  GECKO_INFO(ctx->OutLabel,
+             "{} {:<40} count={:>5}  last={:>8.3f}ms  min={:>8.3f}ms  "
+             "max={:>8.3f}ms  avg={:>8.3f}ms  hash={:#x}",
+             tag, name ? name : "(unnamed)", s.Count, s.LastNs / 1.0e6,
+             s.MinNs / 1.0e6, s.MaxNs / 1.0e6, s.AvgNs / 1.0e6, hash);
+}
+}  // namespace
+
+void RingProfiler::DumpStats(Label label) const noexcept
+{
+  GECKO_INFO(
+      label,
+      "----- Profiler stats (interval={}ms, sample-rate=1/{}, trace={}) -----",
+      m_StatsResetIntervalMs.load(std::memory_order_relaxed),
+      m_DetailedSampleRate.load(std::memory_order_relaxed),
+      m_TraceEnabled.load(std::memory_order_relaxed) ? "on" : "off");
+  DumpCtx ctx {label};
+  ForEachScope(&DumpCallback, &ctx);
+  ProfilerDiagnostics d = GetDiagnostics();
+  GECKO_INFO(
+      label,
+      "----- diagnostics: dropped={}, reentrant={}, agg-overflow={} -----",
+      d.DroppedEvents, d.ReentrantDrops, d.AggregatorOverflow);
+}
+
 ProfilerDiagnostics RingProfiler::GetDiagnostics() const noexcept
 {
   ProfilerDiagnostics d {};
@@ -471,6 +733,7 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
   if (m_Aggregator.empty() || ev.NameHash == 0)
     return;
 
+  const u8 srcKey = static_cast<u8>(static_cast<u8>(ev.Source) + 1);
   const size_t cap = m_Aggregator.size();
   size_t idx = ev.NameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
@@ -483,11 +746,16 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
       if (slot.NameHash.compare_exchange_strong(expected, ev.NameHash,
                                                 std::memory_order_acq_rel,
                                                 std::memory_order_acquire))
+      {
+        slot.Source.store(srcKey, std::memory_order_relaxed);
+        slot.Name.store(ev.Name, std::memory_order_relaxed);
         expected = ev.NameHash;
+      }
       else if (expected != ev.NameHash)
         continue;
     }
-    if (expected == ev.NameHash)
+    if (expected == ev.NameHash &&
+        slot.Source.load(std::memory_order_relaxed) == srcKey)
     {
       if (ev.Kind == ProfEventKind::ZoneBegin)
       {
@@ -508,6 +776,28 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
             slot.MaxNs.store(dur, std::memory_order_relaxed);
           slot.Count.fetch_add(1, std::memory_order_relaxed);
           slot.OpenBeginNs.store(0, std::memory_order_relaxed);
+
+          // Push duration into watcher ring if scope is watched.
+          u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
+          if (wIdx != ~u32 {0})
+          {
+            std::lock_guard<std::mutex> lk(m_WatchMu);
+            if (wIdx < m_Watch.size() && m_Watch[wIdx])
+            {
+              WatchEntry& w = *m_Watch[wIdx];
+              std::lock_guard<std::mutex> wlk(w.Mu);
+              if (!w.Samples.empty())
+              {
+                u32 cap2 = static_cast<u32>(w.Samples.size());
+                u32 head = w.Head.load(std::memory_order_relaxed);
+                w.Samples[head] = dur;
+                w.Head.store((head + 1) % cap2, std::memory_order_relaxed);
+                u32 filled = w.Filled.load(std::memory_order_relaxed);
+                if (filled < cap2)
+                  w.Filled.store(filled + 1, std::memory_order_relaxed);
+              }
+            }
+          }
         }
       }
       return;
@@ -521,11 +811,25 @@ void RingProfiler::ResetAggregator() noexcept
   for (auto& slot : m_Aggregator)
   {
     slot.NameHash.store(0, std::memory_order_relaxed);
+    slot.Source.store(0, std::memory_order_relaxed);
     slot.LastNs.store(0, std::memory_order_relaxed);
     slot.MinNs.store(~u64 {0}, std::memory_order_relaxed);
     slot.MaxNs.store(0, std::memory_order_relaxed);
     slot.Count.store(0, std::memory_order_relaxed);
     slot.OpenBeginNs.store(0, std::memory_order_relaxed);
+    slot.WatchIdx.store(~u32 {0}, std::memory_order_relaxed);
+    slot.Name.store(nullptr, std::memory_order_relaxed);
+  }
+  // Reset watcher rings too.
+  std::lock_guard<std::mutex> lk(m_WatchMu);
+  for (auto& wptr : m_Watch)
+  {
+    if (!wptr)
+      continue;
+    WatchEntry& w = *wptr;
+    std::lock_guard<std::mutex> wlk(w.Mu);
+    w.Head.store(0, std::memory_order_relaxed);
+    w.Filled.store(0, std::memory_order_relaxed);
   }
 }
 

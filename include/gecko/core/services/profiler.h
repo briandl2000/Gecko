@@ -69,13 +69,17 @@ struct IProfilerSink : public RegisteredSink<IProfilerSink, IProfiler>
   virtual void Flush() noexcept = 0;
 };
 
-// Per-frame aggregator slot. Updated on ZoneEnd for Always-level scopes only.
-// Reset on FrameMark. Read with GetStats(nameHash) for cheap HUD/telemetry.
+// Per-scope aggregator snapshot. Updated on ZoneEnd for *every* level
+// (cheap: one CAS per zone-end). Stats reset on a configurable timer
+// (default 1 s) or via IProfiler::ResetStats(). AvgNs is non-zero only for
+// scopes registered via WatchScope() — those get a fixed-window rolling
+// average over the last N samples.
 struct ScopeStats
 {
   u64 LastNs {0};
   u64 MinNs {~u64 {0}};
   u64 MaxNs {0};
+  u64 AvgNs {0};  // 0 if scope is not watched
   u32 Count {0};
 };
 
@@ -88,6 +92,8 @@ struct ProfilerDiagnostics
 
 constexpr u8 c_ProfMaxCategories = 64;
 constexpr u8 c_ProfInvalidCategory = 0xFF;
+
+struct IProfilerStream;  // forward decl for DumpStats
 
 struct IProfiler
 {
@@ -102,10 +108,59 @@ struct IProfiler
   virtual bool Init() noexcept = 0;
   virtual void Shutdown() noexcept = 0;
 
-  // Aggregator query. Returns a snapshot of the current frame's stats for
-  // the given name-hash. Returns a default-constructed ScopeStats if the
-  // scope has not been seen this frame.
-  virtual ScopeStats GetStats(u32 nameHash) const noexcept = 0;
+  // Trace output gate. When false, sinks receive nothing (file/network
+  // writes pause), but the in-process aggregator keeps tracking — query
+  // GetStats() to read live timings. Default: true.
+  virtual void SetTraceEnabled(bool enabled) noexcept = 0;
+  virtual bool IsTraceEnabled() const noexcept = 0;
+
+  // Detailed-level sample rate. N=1: every Detailed event emitted (default).
+  // N=K (K>1): emit only every K-th Detailed event per scope. N=0: emit
+  // none. Use to keep trace files manageable when vsync is off / hot loops
+  // dominate. Normal/Always are unaffected.
+  virtual void SetDetailedSampleRate(u32 nthEvent) noexcept = 0;
+  virtual u32 GetDetailedSampleRate() const noexcept = 0;
+
+  // Aggregator query. Returns a snapshot of stats for the given scope.
+  // Returns a default-constructed ScopeStats if unseen since the last reset.
+  // The (const char*) overload hashes once per call — cache the hash
+  // yourself if you query in a hot loop.
+  virtual ScopeStats GetStats(
+      u32 nameHash, ProfSource source = ProfSource::CPU) const noexcept = 0;
+  ScopeStats GetStats(const char* name,
+                      ProfSource source = ProfSource::CPU) const noexcept;
+
+  // Watch a scope for rolling-average tracking. AvgNs in the returned
+  // ScopeStats becomes the mean of the last `windowSize` samples. Calling
+  // again with a different window resizes. Use sparingly — each watched
+  // scope owns a ring of `windowSize * 8` bytes.
+  virtual void WatchScope(u32 nameHash, u32 windowSize = 256,
+                          ProfSource source = ProfSource::CPU) noexcept = 0;
+  void WatchScope(const char* name, u32 windowSize = 256,
+                  ProfSource source = ProfSource::CPU) noexcept;
+  virtual void UnwatchScope(u32 nameHash,
+                            ProfSource source = ProfSource::CPU) noexcept = 0;
+  void UnwatchScope(const char* name,
+                    ProfSource source = ProfSource::CPU) noexcept;
+
+  // Reset all aggregator stats. Called automatically on a configurable
+  // timer (see SetStatsResetIntervalMs). Set interval to 0 to disable
+  // auto-reset (useful for one-shot tools / non-game-loop apps).
+  virtual void ResetStats() noexcept = 0;
+  virtual void SetStatsResetIntervalMs(u32 ms) noexcept = 0;
+  virtual u32 GetStatsResetIntervalMs() const noexcept = 0;
+
+  // Iterate every scope currently in the aggregator. Callback shape:
+  //   void(*)(const char* name, u32 nameHash, ProfSource source,
+  //           const ScopeStats& stats, void* user)
+  using ForEachScopeFn = void (*)(const char* name, u32 nameHash,
+                                  ProfSource source, const ScopeStats& stats,
+                                  void* user);
+  virtual void ForEachScope(ForEachScopeFn fn, void* user) const noexcept = 0;
+
+  // Print a human-readable table of every scope to GECKO_INFO under the
+  // given label. Intended for an F-key debug dump.
+  virtual void DumpStats(Label label) const noexcept = 0;
 
   // Categories. RegisterCategory returns a stable id (1..63) for the given
   // name; subsequent calls with the same name return the same id. Returns
@@ -113,6 +168,8 @@ struct IProfiler
   virtual u8 RegisterCategory(const char* name) noexcept = 0;
   virtual void SetCategoryEnabled(u8 id, bool on) noexcept = 0;
   virtual bool IsCategoryEnabled(u8 id) const noexcept = 0;
+  virtual u8 FindCategory(const char* name) const noexcept = 0;
+  virtual const char* GetCategoryName(u8 id) const noexcept = 0;
 
   virtual ProfilerDiagnostics GetDiagnostics() const noexcept = 0;
 };
@@ -369,10 +426,38 @@ struct NullProfiler final : IProfiler
   }
   void Shutdown() noexcept override
   {}
-  ScopeStats GetStats(u32) const noexcept override
+  void SetTraceEnabled(bool) noexcept override
+  {}
+  bool IsTraceEnabled() const noexcept override
+  {
+    return false;
+  }
+  void SetDetailedSampleRate(u32) noexcept override
+  {}
+  u32 GetDetailedSampleRate() const noexcept override
+  {
+    return 1;
+  }
+  ScopeStats GetStats(u32, ProfSource) const noexcept override
   {
     return {};
   }
+  void WatchScope(u32, u32, ProfSource) noexcept override
+  {}
+  void UnwatchScope(u32, ProfSource) noexcept override
+  {}
+  void ResetStats() noexcept override
+  {}
+  void SetStatsResetIntervalMs(u32) noexcept override
+  {}
+  u32 GetStatsResetIntervalMs() const noexcept override
+  {
+    return 0;
+  }
+  void ForEachScope(ForEachScopeFn, void*) const noexcept override
+  {}
+  void DumpStats(Label) const noexcept override
+  {}
   u8 RegisterCategory(const char*) noexcept override
   {
     return 0;
@@ -383,10 +468,37 @@ struct NullProfiler final : IProfiler
   {
     return true;
   }
+  u8 FindCategory(const char*) const noexcept override
+  {
+    return c_ProfInvalidCategory;
+  }
+  const char* GetCategoryName(u8) const noexcept override
+  {
+    return nullptr;
+  }
   ProfilerDiagnostics GetDiagnostics() const noexcept override
   {
     return {};
   }
 };
+
+// String-overload helpers (inline; hash on the fly).
+inline ScopeStats IProfiler::GetStats(const char* name,
+                                      ProfSource source) const noexcept
+{
+  return GetStats(name ? FNV1a(name) : 0u, source);
+}
+inline void IProfiler::WatchScope(const char* name, u32 windowSize,
+                                  ProfSource source) noexcept
+{
+  if (name)
+    WatchScope(FNV1a(name), windowSize, source);
+}
+inline void IProfiler::UnwatchScope(const char* name,
+                                    ProfSource source) noexcept
+{
+  if (name)
+    UnwatchScope(FNV1a(name), source);
+}
 
 }  // namespace gecko

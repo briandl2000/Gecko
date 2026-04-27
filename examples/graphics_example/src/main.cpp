@@ -197,7 +197,7 @@ int main()
       scDesc.Height = sz.Height;
       scDesc.NumBackBuffers = 2;
       scDesc.Format = DataFormat::R8G8B8A8_UNORM;
-      scDesc.VSync = true;
+      scDesc.VSync = false;
 
       slots[i].SC = device->CreateSwapchain(native, scDesc);
       if (!slots[i].SC.IsValid())

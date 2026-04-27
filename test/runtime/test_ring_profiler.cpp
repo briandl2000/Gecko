@@ -125,29 +125,33 @@ TEST_CASE("RingProfiler aggregator min/max/last/count",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler aggregator only tracks Always level",
+TEST_CASE("RingProfiler aggregator captures every level",
           "[runtime][profiler][aggregator]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
+  prof.SetStatsResetIntervalMs(0);  // disable auto-reset
 
-  const u32 hash = ::gecko::FNV1a("OnlyNormal");
+  const u32 hashN = ::gecko::FNV1a("LevelNormal");
+  const u32 hashD = ::gecko::FNV1a("LevelDetailed");
 
-  // Normal-level zones must NOT update aggregator.
-  prof.Emit(MakeZoneBegin(hash, 100, ProfLevel::Normal));
-  prof.Emit(MakeZoneEnd(hash, 200, ProfLevel::Normal));
+  prof.Emit(MakeZoneBegin(hashN, 100, ProfLevel::Normal));
+  prof.Emit(MakeZoneEnd(hashN, 200, ProfLevel::Normal));
+  prof.Emit(MakeZoneBegin(hashD, 300, ProfLevel::Detailed));
+  prof.Emit(MakeZoneEnd(hashD, 350, ProfLevel::Detailed));
 
-  ScopeStats s = prof.GetStats(hash);
-  REQUIRE(s.Count == 0u);
+  REQUIRE(prof.GetStats(hashN).Count == 1u);
+  REQUIRE(prof.GetStats(hashD).Count == 1u);
 
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler FrameMark resets aggregator",
+TEST_CASE("RingProfiler FrameMark no longer auto-resets aggregator",
           "[runtime][profiler][aggregator]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
+  prof.SetStatsResetIntervalMs(0);
 
   const u32 hash = ::gecko::FNV1a("Bar");
 
@@ -156,7 +160,11 @@ TEST_CASE("RingProfiler FrameMark resets aggregator",
   REQUIRE(prof.GetStats(hash).Count == 1u);
 
   prof.Emit(MakeFrame(2000));
-  // After a FrameMark the slot must be empty for this hash.
+  // FrameMark is now a passive marker — stats survive.
+  REQUIRE(prof.GetStats(hash).Count == 1u);
+
+  // Manual reset clears them.
+  prof.ResetStats();
   REQUIRE(prof.GetStats(hash).Count == 0u);
 
   prof.Shutdown();
