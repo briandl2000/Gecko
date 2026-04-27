@@ -535,7 +535,14 @@ int main()
 
   // Profiler v2: AsyncTraceProfilerSink streams to a Chrome-trace JSON
   // through a dedicated worker thread. It drains and fsyncs on shutdown.
+  // core_example deliberately forces Detailed level on both the profiler
+  // and the trace sink (in debug AND release) so users can inspect every
+  // emitted event in Perfetto and verify the profiler features.
+  if (auto* profiler = GetProfiler())
+    profiler->SetMinLevel(::gecko::ProfLevel::Detailed);
+
   runtime::AsyncTraceProfilerSink traceSink("gecko_trace.json");
+  traceSink.SetMinLevel(::gecko::ProfLevel::Detailed);
 
   if (!traceSink.IsOpen())
   {
@@ -545,7 +552,10 @@ int main()
   else
   {
     if (auto* profiler = GetProfiler())
+    {
       traceSink.RegisterWith(profiler);
+      profiler->SetTraceEnabled(true);
+    }
   }
 
   // Now logging works with all sinks configured!
