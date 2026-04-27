@@ -20,8 +20,8 @@ public:
   }
 
   virtual void Write(const ProfEvent& event) noexcept override;
-  virtual void WriteBatch(const ProfEvent* events,
-                          size_t count) noexcept override;
+  virtual void WriteBatch(
+      ::std::span<const ProfEvent> events) noexcept override;
   virtual void Flush() noexcept override;
 
 private:

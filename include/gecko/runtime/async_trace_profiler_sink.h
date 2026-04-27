@@ -49,7 +49,7 @@ public:
   }
 
   void Write(const ProfEvent& event) noexcept override;
-  void WriteBatch(const ProfEvent* events, std::size_t count) noexcept override;
+  void WriteBatch(::std::span<const ProfEvent> events) noexcept override;
   void Flush() noexcept override;
 
 private:

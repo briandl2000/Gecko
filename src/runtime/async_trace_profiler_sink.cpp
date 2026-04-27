@@ -128,18 +128,17 @@ void AsyncTraceProfilerSink::Write(const ProfEvent& event) noexcept
   m_Cv.notify_one();
 }
 
-void AsyncTraceProfilerSink::WriteBatch(const ProfEvent* events,
-                                        ::std::size_t count) noexcept
+void AsyncTraceProfilerSink::WriteBatch(
+    ::std::span<const ProfEvent> events) noexcept
 {
-  if (!m_Writer || !events || count == 0)
+  if (!m_Writer || events.empty())
     return;
   const ProfLevel minLevel = m_MinLevel.load(::std::memory_order_relaxed);
   {
     ::std::lock_guard<::std::mutex> lk(m_Mu);
-    m_Pending.reserve(m_Pending.size() + count);
-    for (::std::size_t i = 0; i < count; ++i)
+    m_Pending.reserve(m_Pending.size() + events.size());
+    for (const ProfEvent& e : events)
     {
-      const ProfEvent& e = events[i];
       const bool isZone = (e.Kind == ProfEventKind::ZoneBegin ||
                            e.Kind == ProfEventKind::ZoneEnd);
       if (isZone && e.Level > minLevel)

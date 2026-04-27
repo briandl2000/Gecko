@@ -53,16 +53,16 @@ void CrashSafeTraceProfilerSink::Write(const ProfEvent& event) noexcept
     EnsureValidJson();
 }
 
-void CrashSafeTraceProfilerSink::WriteBatch(const ProfEvent* events,
-                                            size_t count) noexcept
+void CrashSafeTraceProfilerSink::WriteBatch(
+    ::std::span<const ProfEvent> events) noexcept
 {
-  if (!m_Writer || !events || count == 0)
+  if (!m_Writer || events.empty())
     return;
 
-  for (size_t i = 0; i < count; ++i)
-    WriteEvent(events[i]);
+  for (const ProfEvent& e : events)
+    WriteEvent(e);
 
-  m_EventCount.fetch_add(count, std::memory_order_relaxed);
+  m_EventCount.fetch_add(events.size(), std::memory_order_relaxed);
   EnsureValidJson();
 }
 

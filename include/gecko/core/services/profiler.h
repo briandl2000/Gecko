@@ -4,6 +4,8 @@
 #include "gecko/core/sink_registration.h"
 #include "gecko/core/types.h"
 
+#include <span>
+
 namespace gecko {
 
 enum class ProfLevel : u8
@@ -64,8 +66,7 @@ struct IProfilerSink : public RegisteredSink<IProfilerSink, IProfiler>
 {
   virtual ~IProfilerSink() = default;
   virtual void Write(const ProfEvent& event) noexcept = 0;
-  virtual void WriteBatch(const ProfEvent* events,
-                          std::size_t count) noexcept = 0;
+  virtual void WriteBatch(::std::span<const ProfEvent> events) noexcept = 0;
   virtual void Flush() noexcept = 0;
 };
 
