@@ -12,8 +12,8 @@ VulkanGpuSampler::VulkanGpuSampler(VulkanDevice& device,
                                    const GpuSamplerDesc& desc) noexcept
     : m_Device(&device), m_Desc(desc)
 {
-  // Each frame needs (1 frame-start) + (2 per zone) timestamps.
-  const u32 timestampsPerFrame = 1U + 2U * m_Desc.MaxZonesPerFrame;
+  // Each frame needs 2 timestamps per zone (begin + end).
+  const u32 timestampsPerFrame = 2U * m_Desc.MaxZonesPerFrame;
   const u32 frames = m_Desc.FramesInFlight == 0 ? 1U : m_Desc.FramesInFlight;
 
   m_Frames.resize(frames);
@@ -51,6 +51,20 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   if (!m_Valid)
     return;
 
+  // Advance the ring; resolve the slot we are about to wrap into (its
+  // GPU work from FramesInFlight frames ago is now assumed signalled).
+  // Doing rotation in BeginFrame (rather than EndFrame) lets EndZone
+  // calls fire after EndFrame — e.g. the graphics command list's
+  // auto 'CommandList' Always zone is closed by cmd->End() which the
+  // app calls after gpuSampler->EndFrame.
+  if (m_Frames[m_Current].Pending)
+  {
+    m_Current = (m_Current + 1U) % static_cast<u32>(m_Frames.size());
+    FrameSlot& resolveSlot = m_Frames[m_Current];
+    if (resolveSlot.Pending)
+      ResolveSlot(resolveSlot);
+  }
+
   FrameSlot& slot = m_Frames[m_Current];
 
   // If this slot is still pending (sampler under-rotated), drop its
@@ -67,9 +81,13 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   else
     slot.CpuFrameStartNs = 0;
 
-  const u32 timestampsPerFrame = 1U + 2U * m_Desc.MaxZonesPerFrame;
-  cmd.ResetTimestamps(slot.Pool, 0, timestampsPerFrame);
-  cmd.WriteTimestamp(slot.Pool, slot.NextQuery++);
+  // No cmd-side ResetTimestamps here — the pool was reset from the host
+  // either at creation (first use) or after ResolveSlot (subsequent
+  // uses). Embedding the reset on `cmd` would race with cmd lists
+  // submitted later in record order but earlier in GPU-execution order
+  // (e.g. compute cmd lists submitted before the graphics cmd that
+  // recorded BeginFrame).
+  (void)cmd;
   slot.Pending = true;
 }
 
@@ -77,23 +95,12 @@ void VulkanGpuSampler::EndFrame(ICommandList& cmd) noexcept
 {
   if (!m_Valid)
     return;
-
-  // Closing any stuck-open zones is unsafe (the timestamps were already
-  // written for them) so we just rotate. EndZone-mismatch is a caller bug.
-  m_StackDepth = 0;
-
-  FrameSlot& slot = m_Frames[m_Current];
-  // Reserve the last timestamp slot for frame end (optional, currently
-  // unused for emission but useful for future per-frame zone).
-  if (slot.NextQuery < (1U + 2U * m_Desc.MaxZonesPerFrame))
-    cmd.WriteTimestamp(slot.Pool, slot.NextQuery++);
-
-  // Advance the ring; resolve the slot we are about to wrap around to.
-  m_Current = (m_Current + 1U) % static_cast<u32>(m_Frames.size());
-
-  FrameSlot& resolveSlot = m_Frames[m_Current];
-  if (resolveSlot.Pending)
-    ResolveSlot(resolveSlot);
+  // Rotation moved to BeginFrame so that EndZone calls firing after
+  // EndFrame (e.g. the graphics cmd's auto 'CommandList' zone closed
+  // by cmd->End()) still target the correct slot. Closing any
+  // stuck-open zones here would be unsafe (timestamps already
+  // written), so EndFrame is now effectively a no-op.
+  (void)cmd;
 }
 
 void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label,
@@ -109,7 +116,7 @@ void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label,
     return;
   if (m_StackDepth >= c_MaxNestingDepth)
     return;
-  if (slot.NextQuery + 2U > (1U + 2U * m_Desc.MaxZonesPerFrame))
+  if (slot.NextQuery + 2U > 2U * m_Desc.MaxZonesPerFrame)
     return;
 
   ZoneRecord rec {};
@@ -145,30 +152,55 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
 {
   slot.Pending = false;
 
-  if (slot.Zones.empty() || slot.NextQuery == 0)
-    return;
+  const u32 poolSize = 2U * m_Desc.MaxZonesPerFrame;
 
-  // Pull all timestamps in one shot.
+  if (slot.Zones.empty() || slot.NextQuery == 0)
+  {
+    m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
+    return;
+  }
+
+  // Pull all timestamps in one shot. ReadTimestamps converts ticks→ns
+  // internally using the device timestamp period.
   std::vector<u64> ts(slot.NextQuery, 0);
   const u32 got = m_Device->ReadTimestamps(
       slot.Pool, 0, std::span<u64>(ts.data(), ts.size()));
   if (got == 0)
+  {
+    m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
     return;
+  }
 
   auto* p = ::gecko::GetProfiler();
   if (p == nullptr)
+  {
+    m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
     return;
+  }
 
-  // Convert raw GPU ticks → nanoseconds, then rebase to CPU frame start.
-  // This places GPU zones inside the wall-clock window of the frame in
-  // which they were submitted (good enough for visualisation; for true
-  // CPU↔GPU calibration we'd need vkGetCalibratedTimestampsEXT).
-  const f64 period = static_cast<f64>(m_Device->TimestampPeriodNs());
-  const u64 gpuFrameStart = ts[0];
+  // Use the smallest valid GPU timestamp as the anchor. Recording order
+  // does not match GPU execution order when cmd lists are submitted out
+  // of recording order (e.g. compute cmds submitted before a graphics
+  // cmd whose BeginFrame call was already recorded), so a fixed anchor
+  // like ts[0] could lead to underflow when computing deltas.
+  u64 gpuFrameStart = ~0ULL;
+  for (const ZoneRecord& rec : slot.Zones)
+  {
+    if (rec.EndQuery == 0)
+      continue;
+    if (rec.BeginQuery >= got || rec.EndQuery >= got)
+      continue;
+    if (ts[rec.BeginQuery] < gpuFrameStart)
+      gpuFrameStart = ts[rec.BeginQuery];
+  }
+  if (gpuFrameStart == ~0ULL)
+  {
+    m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
+    return;
+  }
   const u64 cpuFrameStart = slot.CpuFrameStartNs;
-  auto rebase = [&](u64 tick) noexcept -> u64 {
-    const f64 deltaNs = static_cast<f64>(tick - gpuFrameStart) * period;
-    return cpuFrameStart + static_cast<u64>(deltaNs);
+  auto rebase = [&](u64 ns) noexcept -> u64 {
+    return cpuFrameStart + (ns - gpuFrameStart);
   };
 
   for (const ZoneRecord& rec : slot.Zones)
@@ -199,6 +231,9 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
 
   slot.Zones.clear();
   slot.NextQuery = 0;
+
+  // Host-reset the pool so it's ready for re-use on the next ring wrap.
+  m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
 }
 
 }  // namespace gecko::graphics

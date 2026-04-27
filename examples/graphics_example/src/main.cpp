@@ -649,8 +649,7 @@ int main()
 
       if (haveCompute)
       {
-        GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
-                                 "ComputePass");
+        GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "ComputePass");
         // Record both compute command lists on the main render thread
         // (no job-system fan-out) so the profiler trace shows them on
         // the main row instead of scattering across job workers.
@@ -661,6 +660,13 @@ int main()
           if (!computeCmd[i])
             continue;
           computeCmd[i]->Begin();
+          // Attach the same sampler to each compute cmd list so its
+          // 'CommandList' Always GPU zone wraps the dispatch and any
+          // manual GPU zones recorded below are emitted on the GPU
+          // thread row.
+          if (gpuSampler)
+            computeCmd[i]->AttachGpuSampler(
+                gpuSampler.get(), app::graphics_example::labels::Main);
           computeCmd[i]->BindPipeline(plasmaPipeline);
           computeCmd[i]->BindRWTexture(0, plasmaTex[i]);
           f32 pc[4] = {time + tOffset, 0.0F, 0.0F, 0.0F};
@@ -668,18 +674,19 @@ int main()
               0, {reinterpret_cast<const gecko::byte*>(pc), sizeof(pc)});
           const u32 gx = (OffscreenW + 15) / 16;
           const u32 gy = (OffscreenH + 15) / 16;
-          computeCmd[i]->Dispatch(gx, gy, 1);
+          {
+            GECKO_GPU_SCOPE_NORMAL_NAMED(*computeCmd[i],
+                                         app::graphics_example::labels::Main,
+                                         "PlasmaPass");
+            computeCmd[i]->Dispatch(gx, gy, 1);
+          }
           computeCmd[i]->TransitionTextureForRead(plasmaTex[i]);
           computeCmd[i]->End();
         }
         // Submit from the main thread, in deterministic order.
-        {
-          GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
-                                   "PlasmaSubmit");
-          for (u32 i = 0; i < 2; ++i)
-            if (computeCmd[i])
-              device->ExecuteComputeCommandList(::std::move(computeCmd[i]));
-        }
+        for (u32 i = 0; i < 2; ++i)
+          if (computeCmd[i])
+            device->ExecuteComputeCommandList(::std::move(computeCmd[i]));
       }
 
       // Pass 1: render the spinning-coloured triangle into the offscreen RT
@@ -733,8 +740,8 @@ int main()
       if (haveTimestamps)
         cmd->WriteTimestamp(timestampPool, 2);
       {
-        GECKO_SCOPE_NORMAL_NAMED(app::graphics_example::labels::Main,
-                                 "BlitPassRecord");
+        GECKO_SCOPE_NAMED(app::graphics_example::labels::Main,
+                          "BlitPassRecord");
         GECKO_GPU_SCOPE_NORMAL_NAMED(*cmd, app::graphics_example::labels::Main,
                                      "BlitPass");
         for (u32 i = 0; i < 2; ++i)

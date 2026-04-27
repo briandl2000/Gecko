@@ -2096,6 +2096,36 @@ u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
 // GPU profiler
 // ─────────────────────────────────────────────────────────────────────────
 
+void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
+                                      u32 count) noexcept
+{
+  if (!pool.IsValid() || count == 0)
+    return;
+  auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
+  if (firstQuery >= qd->Count)
+    return;
+  const u32 c = ::std::min(count, qd->Count - firstQuery);
+  if (m_HasHostQueryReset)
+  {
+    vkResetQueryPool(m_Device, qd->QueryPool, firstQuery, c);
+  }
+  else
+  {
+    struct Ctx
+    {
+      VkQueryPool Pool;
+      u32 First;
+      u32 Count;
+    } cc {qd->QueryPool, firstQuery, c};
+    OneTimeSubmit(
+        [](VkCommandBuffer cb, void* x) {
+          auto* r = static_cast<Ctx*>(x);
+          vkCmdResetQueryPool(cb, r->Pool, r->First, r->Count);
+        },
+        &cc);
+  }
+}
+
 ::gecko::Unique<IGpuSampler> VulkanDevice::CreateGpuSampler(
     const GpuSamplerDesc& desc) noexcept
 {
