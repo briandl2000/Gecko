@@ -808,17 +808,15 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
 
 void RingProfiler::ResetAggregator() noexcept
 {
+  // Preserve scope identity (NameHash/Source/Name/WatchIdx) so watched
+  // scopes keep accumulating across resets; only clear the counters.
   for (auto& slot : m_Aggregator)
   {
-    slot.NameHash.store(0, std::memory_order_relaxed);
-    slot.Source.store(0, std::memory_order_relaxed);
     slot.LastNs.store(0, std::memory_order_relaxed);
     slot.MinNs.store(~u64 {0}, std::memory_order_relaxed);
     slot.MaxNs.store(0, std::memory_order_relaxed);
     slot.Count.store(0, std::memory_order_relaxed);
     slot.OpenBeginNs.store(0, std::memory_order_relaxed);
-    slot.WatchIdx.store(~u32 {0}, std::memory_order_relaxed);
-    slot.Name.store(nullptr, std::memory_order_relaxed);
   }
   // Reset watcher rings too.
   std::lock_guard<std::mutex> lk(m_WatchMu);

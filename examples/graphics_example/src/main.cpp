@@ -113,6 +113,27 @@ int main()
 
   ::gecko::GetProfiler()->SetMinLevel(::gecko::ProfLevel::Detailed);
 
+  // Watch the scopes whose rolling-average we'll display in the HUD.
+  // (Other scopes still get Last/Min/Max/Count for free; only Avg is
+  // opt-in because each watched scope owns a small ring buffer.)
+  if (auto* prof = ::gecko::GetProfiler())
+  {
+    prof->WatchScope("frame", 240);
+    prof->WatchScope("renderFrame", 240);
+    prof->WatchScope("TrianglePass", 240, ::gecko::ProfSource::GPU);
+    prof->WatchScope("BlitPass", 240, ::gecko::ProfSource::GPU);
+    prof->WatchScope("PlasmaCompute", 240);
+    // Reset stats every 500 ms so HUD numbers track recent behaviour.
+    prof->SetStatsResetIntervalMs(500);
+  }
+
+  // Register a category for the demo "terrain" compute job so it can be
+  // toggled independently of the rest of the renderer (F4 dumps stats by
+  // category).
+  u8 catTerrain = 0;
+  if (auto* prof = ::gecko::GetProfiler())
+    catTerrain = prof->RegisterCategory("terrain");
+
   runtime::ConsoleLogSink consoleSink;
   runtime::FileLogSink fileSink("log.txt");
 
@@ -445,10 +466,57 @@ int main()
         [](void* user, const EventMeta&, EventView view) {
           const auto* payload =
               reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
-          if (payload->Down && !payload->Repeat &&
-              payload->Key == KeyCode::Escape)
+          if (!payload->Down || payload->Repeat)
+            return;
+          auto* prof = ::gecko::GetProfiler();
+          switch (payload->Key)
           {
+          case KeyCode::Escape:
             *static_cast<bool*>(user) = false;
+            break;
+          case KeyCode::F1:
+            if (prof)
+            {
+              bool on = !prof->IsTraceEnabled();
+              prof->SetTraceEnabled(on);
+              GECKO_INFO(app::graphics_example::labels::Main,
+                         "[F1] trace file output: {}", on ? "ON" : "OFF");
+            }
+            break;
+          case KeyCode::F2:
+            if (prof)
+            {
+              ::gecko::ProfLevel cur = prof->GetMinLevel();
+              ::gecko::ProfLevel next = (cur == ::gecko::ProfLevel::Always)
+                                            ? ::gecko::ProfLevel::Normal
+                                        : (cur == ::gecko::ProfLevel::Normal)
+                                            ? ::gecko::ProfLevel::Detailed
+                                            : ::gecko::ProfLevel::Always;
+              prof->SetMinLevel(next);
+              const char* names[3] = {"Always", "Normal", "Detailed"};
+              GECKO_INFO(app::graphics_example::labels::Main,
+                         "[F2] min profiler level: {}",
+                         names[static_cast<int>(next)]);
+            }
+            break;
+          case KeyCode::F3:
+            // F3 cycles the Detailed sample rate: 1, 8, 64, 0, 1, ...
+            if (prof)
+            {
+              u32 r = prof->GetDetailedSampleRate();
+              u32 next = (r == 1) ? 8u : (r == 8) ? 64u : (r == 64) ? 0u : 1u;
+              prof->SetDetailedSampleRate(next);
+              GECKO_INFO(app::graphics_example::labels::Main,
+                         "[F3] Detailed sample rate: 1/{}",
+                         next == 0 ? 0 : next);
+            }
+            break;
+          case KeyCode::F4:
+            if (prof)
+              prof->DumpStats(app::graphics_example::labels::Main);
+            break;
+          default:
+            break;
           }
         },
         &running);
@@ -460,6 +528,7 @@ int main()
     u64 frameIndex = 0;
 
     auto renderFrame = [&]() {
+      GECKO_SCOPE_NAMED(app::graphics_example::labels::Main, "renderFrame");
       // Coalesce pending resizes into a single swapchain rebuild per window.
       for (u32 i = 0; i < 2; ++i)
       {
@@ -512,6 +581,22 @@ int main()
       // already in SHADER_READ_ONLY when it runs.
       const bool haveCompute = plasmaPipeline.IsValid() &&
                                plasmaTex[0].IsValid() && plasmaTex[1].IsValid();
+
+      // Fake "terrain generation" scope, tagged with the 'terrain' category
+      // so it can be filtered independently. Spends ~50us doing nothing
+      // useful — this is just to demo feature-scoped profiling. Its scope
+      // shows up in the trace under the 'terrain' category and contributes
+      // to GetStats("FakeTerrainGen").
+      {
+        ::gecko::ProfScope _terrain {app::graphics_example::labels::Main,
+                                     ::gecko::FNV1a("FakeTerrainGen"),
+                                     "FakeTerrainGen",
+                                     ::gecko::ProfLevel::Detailed, catTerrain};
+        volatile u64 acc = 0;
+        for (u32 i = 0; i < 5000; ++i)
+          acc += i * frameIndex;
+        (void)acc;
+      }
 
       Unique<ICommandList> computeCmd[2];
 
@@ -641,19 +726,41 @@ int main()
       device->Present(
           ::std::span<const FrameContext> {toPresent, presentCount});
 
-      // Log GPU timings once per ~60 frames (WAIT-blocks until ready).
-      if (haveTimestamps && (frameIndex % 60) == 0 && frameIndex > 0)
+      // Counter: 1 indirect tri draw + 1 blit draw per valid swapchain.
+      u32 drawCalls = 1u;
+      for (u32 i = 0; i < 2; ++i)
+        if (frames[i].Valid)
+          ++drawCalls;
+      GECKO_COUNTER(app::graphics_example::labels::Main, "DrawCalls",
+                    drawCalls);
       {
-        u64 ns[4] {};
-        u32 got = device->ReadTimestamps(timestampPool, 0, ns);
-        if (got == 4)
-        {
-          const f64 triMs = static_cast<f64>(ns[1] - ns[0]) / 1.0e6;
-          const f64 blitMs = static_cast<f64>(ns[3] - ns[2]) / 1.0e6;
-          GECKO_INFO(app::graphics_example::labels::Main,
-                     "GPU: triangle pass = %.3f ms, blit pass = %.3f ms", triMs,
-                     blitMs);
-        }
+        u64 live = trackingAlloc.TotalLiveBytes();
+        GECKO_COUNTER(app::graphics_example::labels::Main, "AllocLiveBytes",
+                      live);
+      }
+      // Log GPU timings once per ~60 frames (WAIT-blocks until ready).
+      // Profiler-driven HUD: print frame + per-pass timings every ~1 s.
+      // CPU values come from WatchScope("frame")/("renderFrame") and the
+      // GPU-side ones from the gpu_profiler events fed into the same
+      // aggregator (keyed on ProfSource::GPU). No QueryPool poll needed.
+      static u64 s_LastHudPrintNs = 0;
+      const u64 nowNs = ::gecko::GetProfiler()->NowNs();
+      if (nowNs - s_LastHudPrintNs > 1'000'000'000ULL)
+      {
+        s_LastHudPrintNs = nowNs;
+        auto* prof = ::gecko::GetProfiler();
+        auto frame = prof->GetStats("frame");
+        auto rend = prof->GetStats("renderFrame");
+        auto tri = prof->GetStats("TrianglePass", ::gecko::ProfSource::GPU);
+        auto blit = prof->GetStats("BlitPass", ::gecko::ProfSource::GPU);
+        f64 fps =
+            (frame.AvgNs > 0) ? 1.0e9 / static_cast<f64>(frame.AvgNs) : 0.0;
+        GECKO_INFO(app::graphics_example::labels::Main,
+                   "HUD frame=%.2fms (%.1f fps)  cpu_render=%.2fms  "
+                   "gpu_tri=%.3fms  gpu_blit=%.3fms  frames=%llu",
+                   frame.AvgNs / 1.0e6, fps, rend.AvgNs / 1.0e6,
+                   tri.AvgNs / 1.0e6, blit.AvgNs / 1.0e6,
+                   (unsigned long long)frameIndex);
       }
       ++frameIndex;
     };
