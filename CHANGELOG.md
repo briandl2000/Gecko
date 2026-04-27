@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `constexpr FormatSizeInBytes(DataFormat)` and `CalculateNumberOfMips(u32, u32)`
   - 31 unit tests covering all descriptor `IsValid()` methods and null device smoke tests
 - **graphics_example** — demonstrates window + swapchain creation, frame loop with resize handling and ESC/close events
+- **Profiler v2** — leveled zones (`Always` / `Normal` / `Detailed`) with runtime cap, sink-side level filtering, watch-scope rolling averages, `SetTraceEnabled`, sample-rate, `DumpStats`, ring-overflow / reentrant-drop diagnostics. `GECKO_GPU_SCOPE_*` macros plus auto GPU zones via `ICommandList::AttachGpuSampler`.
+- **GPU sampler** — `IGpuSampler` interface and `VulkanGpuSampler` impl using per-frame timestamp pools. GPU timestamps are rebased to CPU `vkQueueSubmit` time so Perfetto traces line up under their CPU submit calls.
+- **AsyncTraceProfilerSink** — Chrome-trace JSON writer on a worker thread with batched writes, `SetMinLevel` filter, `thread_name` metadata, drains on dtor.
+- **`docs/profiling.md`** — usage guide, GPU sampler timing model, multi-queue notes, and explanation of why GPU zones can legitimately appear before their CPU submit.
 
 ### Changed
 - `IWindowsBackend` and `IMonitorsBackend` promoted to services; `PlatformModule` now supports caller-owned backend injection.
