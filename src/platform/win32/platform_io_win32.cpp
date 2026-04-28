@@ -9,12 +9,18 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <algorithm>
-#include <fileapi.h>
+// clang-format off: <Windows.h> must be included before any sub-header
+// (e.g. <ShlObj.h>, <fileapi.h>) so that the architecture macros it sets
+// up are visible to winnt.h.
+#include <Windows.h>
+
 #include <ShlObj.h>
+#include <fileapi.h>
+
+#include <algorithm>
 #include <string>
 #include <vector>
-#include <Windows.h>
+// clang-format on
 
 namespace gecko::platform {
 
