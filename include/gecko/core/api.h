@@ -18,3 +18,13 @@
 #else
 #define GECKO_API
 #endif
+
+/// Compiler-agnostic alias for the GCC/Clang `__PRETTY_FUNCTION__`
+/// builtin. On MSVC this expands to `__FUNCSIG__`. Used by templates
+/// that hash a unique per-type string at compile time
+/// (e.g. `ServiceIdOf<T>()`).
+#if defined(_MSC_VER) && !defined(__clang__)
+#define GECKO_PRETTY_FUNCTION __FUNCSIG__
+#else
+#define GECKO_PRETTY_FUNCTION __PRETTY_FUNCTION__
+#endif

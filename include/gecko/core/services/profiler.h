@@ -12,9 +12,8 @@
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/sink_registration.h"
+#include "gecko/core/span.h"
 #include "gecko/core/types.h"
-
-#include <span>
 
 namespace gecko {
 
@@ -88,7 +87,7 @@ struct IProfilerSink : public RegisteredSink<IProfilerSink, IProfiler>
   virtual void Write(const ProfEvent& event) noexcept = 0;
   /// Receive a batch of events. Implementations may forward each entry
   /// to `Write` if they have no batching path.
-  virtual void WriteBatch(::std::span<const ProfEvent> events) noexcept = 0;
+  virtual void WriteBatch(Span<const ProfEvent> events) noexcept = 0;
   /// Block until queued events have been written out.
   virtual void Flush() noexcept = 0;
 };
@@ -244,9 +243,8 @@ ProfScope
   ProfScope(Label label, u32 hash, const char* name, ProfLevel lvl,
             u8 cat = 0) noexcept;
   ~ProfScope() noexcept;
-  ProfScope(const ProfScope&) = delete ("ProfScope is a stack-only RAII guard");
-  ProfScope& operator=(const ProfScope&) =
-      delete ("ProfScope is a stack-only RAII guard");
+  ProfScope(const ProfScope&) = delete;
+  ProfScope& operator=(const ProfScope&) = delete;
 };
 
 }  // namespace gecko

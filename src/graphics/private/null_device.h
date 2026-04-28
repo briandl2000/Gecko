@@ -10,10 +10,8 @@ public:
   NullCommandList() = default;
   ~NullCommandList() override = default;
 
-  NullCommandList(const NullCommandList&) =
-      delete ("NullCommandList is not copyable");
-  NullCommandList& operator=(const NullCommandList&) =
-      delete ("NullCommandList is not copyable");
+  NullCommandList(const NullCommandList&) = delete;
+  NullCommandList& operator=(const NullCommandList&) = delete;
 
   void Begin() noexcept override
   {}
@@ -105,9 +103,8 @@ public:
   NullDevice() = default;
   ~NullDevice() override = default;
 
-  NullDevice(const NullDevice&) = delete ("NullDevice is not copyable");
-  NullDevice& operator=(const NullDevice&) =
-      delete ("NullDevice is not copyable");
+  NullDevice(const NullDevice&) = delete;
+  NullDevice& operator=(const NullDevice&) = delete;
 
   Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle&,
                             const SwapchainDesc&) noexcept override;

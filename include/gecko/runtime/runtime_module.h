@@ -50,7 +50,7 @@ public:
       ::gecko::IModuleRegistry& modules) noexcept override;
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 
-  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Publishes()
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes()
       const noexcept override;
 
 private:

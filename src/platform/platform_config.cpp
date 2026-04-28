@@ -117,14 +117,15 @@ namespace {
 {
 #if defined(GECKO_PLATFORM_WINDOWS)
   return DisplayBackendKind::Win32;
-#elif defined(GECKO_PLATFORM_LINUX)
+#else
+#if defined(GECKO_PLATFORM_LINUX)
   if (IsWaylandAvailable())
     return DisplayBackendKind::Wayland;
   if (IsXlibAvailable())
     return DisplayBackendKind::Xlib;
 #endif
-
   return DisplayBackendKind::Null;
+#endif
 }
 
 }  // namespace

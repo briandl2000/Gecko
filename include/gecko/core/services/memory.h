@@ -195,8 +195,12 @@ GECKO_API void ResetAllocator() noexcept;
 /// @param alignment Required alignment (power of two).
 /// @return Pointer to the new allocation; never null.
 [[nodiscard]]
-inline void* AllocBytes(u64 size,
-                        u32 alignment = alignof(::std::max_align_t)) noexcept
+inline void* AllocBytes(
+    u64 size,
+    u32 alignment =
+        alignof(::std::max_align_t)) noexcept  // abi-ok: alignof() in default
+                                               // arg, evaluated at the call
+                                               // site as a u32 literal
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&

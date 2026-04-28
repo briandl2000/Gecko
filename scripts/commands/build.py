@@ -45,19 +45,20 @@ def _auto_configure() -> int:
     """Auto-configure CMake when the build directory doesn't exist yet."""
     env = os.environ.copy()
 
-    # Gecko uses GCC. When no toolchain file is in play (native builds),
-    # make sure CMake picks up gcc instead of whatever cc/c++ defaults to.
+    # Let CMake auto-detect the compiler. Honour CC/CXX if the caller
+    # already set them (or a toolchain file is in use); otherwise CMake
+    # picks whatever is on PATH (gcc on Linux, MSVC on Windows, the
+    # cross compiler when invoked via gk-pi's toolchain file).
     toolchain = env.get("CMAKE_TOOLCHAIN_FILE")
-    if not toolchain:
-        gcc = shutil.which("gcc")
-        gpp = shutil.which("g++")
-        if not gcc or not gpp:
-            print("ERROR: GCC compiler not found. Gecko requires GCC.")
+    if not toolchain and "CXX" not in env:
+        if not (shutil.which("c++") or shutil.which("g++")
+                or shutil.which("clang++") or shutil.which("cl")):
+            print("ERROR: No C++ compiler found on PATH.")
             if _is_windows():
-                print("  Make sure you're using the MSYS2 UCRT64 shell.")
+                print("  Install Visual Studio Build Tools or use MSYS2.")
+            else:
+                print("  Install build-essential / gcc-c++ / base-devel.")
             return 1
-        env.setdefault("CC", gcc)
-        env.setdefault("CXX", gpp)
 
     cmake_args = [
         "cmake", "-S", _REPO_ROOT, "-B", BUILD_DIR,

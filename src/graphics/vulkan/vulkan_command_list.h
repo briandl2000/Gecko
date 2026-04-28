@@ -29,9 +29,8 @@ public:
   VulkanCommandList(VulkanDevice& device, bool compute) noexcept;
   ~VulkanCommandList() override;
 
-  VulkanCommandList(const VulkanCommandList&) = delete ("not copyable");
-  VulkanCommandList& operator=(const VulkanCommandList&) =
-      delete ("not copyable");
+  VulkanCommandList(const VulkanCommandList&) = delete;
+  VulkanCommandList& operator=(const VulkanCommandList&) = delete;
 
   // -- ICommandList API ------------------------------------------
 

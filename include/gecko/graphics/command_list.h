@@ -36,9 +36,8 @@ class ICommandList
 public:
   virtual ~ICommandList() = default;
 
-  ICommandList(const ICommandList&) = delete ("ICommandList is not copyable");
-  ICommandList& operator=(const ICommandList&) =
-      delete ("ICommandList is not copyable");
+  ICommandList(const ICommandList&) = delete;
+  ICommandList& operator=(const ICommandList&) = delete;
 
   ICommandList(ICommandList&&) noexcept = default;
   ICommandList& operator=(ICommandList&&) noexcept = default;

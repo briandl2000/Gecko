@@ -54,7 +54,7 @@ void CrashSafeTraceProfilerSink::Write(const ProfEvent& event) noexcept
 }
 
 void CrashSafeTraceProfilerSink::WriteBatch(
-    ::std::span<const ProfEvent> events) noexcept
+    ::gecko::Span<const ProfEvent> events) noexcept
 {
   if (!m_Writer || events.empty())
     return;

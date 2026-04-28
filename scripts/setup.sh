@@ -25,21 +25,21 @@ unset _gecko_os
 # Configure CMake if not already done
 if [ ! -d "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" ]; then
     echo "Configuring CMake for $GECKO_PLATFORM_ID..."
-    
-    # Prefer GCC; fall back to any cc/c++ if available
-    if command -v gcc &> /dev/null && command -v g++ &> /dev/null; then
-        echo "Using GCC compiler: $(gcc --version | head -n1)"
-        export CC=gcc
-        export CXX=g++
-    else
-        echo "ERROR: GCC compiler not found!"
-        echo "Install with:"
-        echo "  Ubuntu/Debian: sudo apt-get install gcc g++"
+
+    # Let CMake auto-detect the compiler. Honour CC/CXX if the caller
+    # already exported them; otherwise CMake picks whatever is available
+    # (gcc on Linux, MSVC on Windows, the cross toolchain when invoked
+    # via gk-pi).
+    if [ -z "${CXX:-}" ] && ! command -v c++ &> /dev/null \
+        && ! command -v g++ &> /dev/null && ! command -v clang++ &> /dev/null; then
+        echo "ERROR: No C++ compiler found on PATH."
+        echo "Install one of:"
+        echo "  Ubuntu/Debian: sudo apt-get install build-essential"
         echo "  Fedora:        sudo dnf install gcc gcc-c++"
-        echo "  Arch:          sudo pacman -S gcc"
+        echo "  Arch:          sudo pacman -S base-devel"
         return 1
     fi
-    
+
     cmake -S "$REPO_ROOT" -B "$REPO_ROOT/out/build/$GECKO_PLATFORM_ID" \
         -G "Ninja Multi-Config" \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \

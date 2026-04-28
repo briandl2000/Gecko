@@ -72,6 +72,10 @@ if(Vulkan_FOUND)
   target_link_libraries(Graphics PRIVATE Vulkan::Vulkan)
   target_include_directories(Graphics PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vulkan
+  )
+  # Treat the third-party VulkanMemoryAllocator header as a system include
+  # so its warnings (C4100/C4127/C4189 on MSVC, etc.) don't trip /WX.
+  target_include_directories(Graphics SYSTEM PRIVATE
     ${vulkanmemoryallocator_SOURCE_DIR}/include
   )
 

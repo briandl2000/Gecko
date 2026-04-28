@@ -171,7 +171,7 @@ TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer",
       {
         Count.fetch_add(1, ::std::memory_order_relaxed);
       }
-      void WriteBatch(::std::span<const ProfEvent> evs) noexcept override
+      void WriteBatch(::gecko::Span<const ProfEvent> evs) noexcept override
       {
         Count.fetch_add(static_cast<u32>(evs.size()),
                         ::std::memory_order_relaxed);

@@ -10,15 +10,19 @@ install command for your platform.
 
 | Tool | Min version |
 |------|-------------|
-| GCC  | 15 (C++26) |
+| C++ compiler | any with C++23 support |
 | CMake | 3.22 |
 | Ninja | any |
 | Python | 3.7 |
 
-> **Why GCC only?** Gecko targets C++26 (`-std=c++2c`). As of mid-2026 GCC is
-> the only compiler with broad C++26 support in a stable release. MSVC will
-> be added once it ships C++26 core support — see
-> [MSVC Migration Plan](#msvc-migration-plan).
+Gecko targets **C++23** and lets CMake auto-detect the host compiler.
+Tier-1 verified configurations:
+
+- GCC 13+ on Linux (x86_64).
+- aarch64-linux-gnu-g++ via the docker toolchain in `docker/aarch64-toolchain.cmake` (used by `gk-pi`).
+- MSVC (Visual Studio 2022 17.6+) on Windows.
+
+Clang on Linux should also work but is not gated in CI.
 
 #### Linux (Ubuntu / Debian)
 ```bash
@@ -37,13 +41,16 @@ sudo dnf install gcc g++ ninja-build cmake python3 \
 sudo pacman -S gcc ninja cmake python libx11 libxext libxrandr wayland wayland-protocols
 ```
 
-#### Windows (MSYS2 + MinGW-w64)
-1. Install [MSYS2](https://www.msys2.org/).
-2. Open the **UCRT64** terminal (not MSYS or MINGW64).
-3. `pacman -S mingw-w64-ucrt-x86_64-{gcc,ninja,cmake,gdb,python}`
-4. Verify: `gcc --version` should show 15+.
+#### Windows
 
-All `gk` commands must run from the UCRT64 terminal.
+1. Install Visual Studio 2022 17.6+ with the "Desktop development with C++" workload.
+2. Install CMake, Ninja, and Python 3 (the VS installer can include CMake / Ninja).
+3. Run `gk` from a *Developer PowerShell for VS 2022* so `cl.exe` is on PATH.
+
+Gecko's Windows setup script (`scripts/setup.ps1`) is a thin convenience
+wrapper; you can also drive CMake manually with the presets in
+`CMakePresets.json`. MinGW-w64 also works if you want a Linux-style
+workflow, but MSVC is the supported default.
 
 #### macOS
 ```bash
@@ -65,9 +72,8 @@ missing, CMake prints the exact install command for your platform.
 | Ubuntu / Debian | `sudo apt-get install libvulkan-dev vulkan-validationlayers spirv-tools` |
 | Fedora | `sudo dnf install vulkan-loader-devel vulkan-validation-layers spirv-tools` |
 | Arch | `sudo pacman -S vulkan-devel spirv-tools` |
-| MSYS2 UCRT64 | `pacman -S mingw-w64-ucrt-x86_64-vulkan-devel` |
+| Windows | [LunarG Vulkan SDK](https://vulkan.lunarg.com/) (sets `$VULKAN_SDK`) |
 | macOS | [LunarG SDK for macOS](https://vulkan.lunarg.com/) (bundles MoltenVK) |
-| Windows (non-MSYS2) | [LunarG SDK](https://vulkan.lunarg.com/) |
 
 **Shader compiler:** `glslc` ships with every SDK above. Examples that load
 shaders (e.g. `graphics_example`) compile HLSL → SPIR-V at build time via
@@ -78,12 +84,23 @@ it is installed. Shipping builds don't require it.
 
 ## Setup
 
+**Linux / macOS / MSYS2 (Bash):**
+
 ```bash
-source scripts/setup.sh    # Linux / macOS / MSYS2 UCRT64
+source scripts/setup.sh
 ```
 
-This creates the `gk` shell function, detects GCC, and runs the initial CMake
-configure step. Re-run any time `CMakePresets.json` or prerequisites change.
+**Windows (Developer PowerShell for VS 2022):**
+
+```powershell
+. .\scripts\setup.ps1
+```
+
+The setup script defines the `gk` command and runs the initial CMake
+configure. CMake auto-detects the host C++ compiler; set `CC` / `CXX`
+(or `CMAKE_TOOLCHAIN_FILE`) before sourcing the script if you want to
+pin a specific one. Re-run any time `CMakePresets.json` or prerequisites
+change.
 
 ## `gk` CLI
 
@@ -139,19 +156,27 @@ Set breakpoints, press `F5`, pick a target. The Local target builds via
 
 ## MinGW Runtime DLLs
 
-On Windows the build copies `libgcc_s_seh-1.dll`, `libstdc++-6.dll`, and
-`libwinpthread-1.dll` alongside each executable so nothing depends on MSYS2
-being on `PATH`.
+When building with MinGW-w64 the build copies `libgcc_s_seh-1.dll`,
+`libstdc++-6.dll`, and `libwinpthread-1.dll` alongside each executable
+so nothing depends on the MinGW install being on `PATH`. With MSVC and
+on Linux this step is a no-op.
 
-## MSVC Migration Plan
+## ABI Notes
 
-1. **Now:** GCC 15 on Linux + Windows (MSYS2). Code is written to be
-   MSVC-compatible where practical:
-   - Use `_WIN32` / `GECKO_PLATFORM_WINDOWS`, not `_MSC_VER`
-   - Use `<share.h>`, not `<corecrt_share.h>`
-   - Use CMake `target_link_libraries`, not `#pragma comment(lib, ...)`
-   - Guard GCC-only builtins with `#ifdef` fallbacks
-2. **When MSVC ships C++26:** Add it as an alternate Windows compiler.
+`CoreServices` is built as a shared library so the engine and (future)
+plugins observe a single set of service singletons. Virtual methods on
+`CoreServices` interfaces (`IAllocator`, `IJobSystem`, `IProfiler`,
+`ILogger`, `IEventBus`, `IModule`, `IProfilerSink`, ...) only use
+layout-stable types -- primitives, Gecko PODs, raw pointers, and
+`gecko::Span<T>` (a fixed `{ T*, size_t }` POD in
+[`include/gecko/core/span.h`](../include/gecko/core/span.h)) -- so the
+boundary survives differences in standard-library version between the
+engine binary and a plugin.
+
+Free functions and class methods on the static `Core`, `Platform`,
+`Math`, and `Runtime` libraries may use `std::span`, `std::string`,
+`std::string_view`, etc. freely; each linking binary gets its own copy
+of those static libraries.
 
 ## VS Code Tasks & Debugging
 

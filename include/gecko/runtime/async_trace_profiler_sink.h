@@ -58,7 +58,7 @@ public:
   }
 
   void Write(const ProfEvent& event) noexcept override;
-  void WriteBatch(::std::span<const ProfEvent> events) noexcept override;
+  void WriteBatch(::gecko::Span<const ProfEvent> events) noexcept override;
   void Flush() noexcept override;
 
 private:

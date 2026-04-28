@@ -16,7 +16,13 @@
 namespace gecko {
 
 /// Opaque payload submitted to the job system.
-using JobFunction = ::std::function<void()>;
+///
+/// Implementation note: this is currently `::std::function<void()>`, which
+/// means the job system is **not** ABI-stable across compilers/STLs. It is
+/// safe today because Gecko is one-toolchain-per-process; if cross-toolchain
+/// plugins ever submit jobs, replace with a `(void (*)(void*), void*)` pair
+/// or a small POD closure.
+using JobFunction = ::std::function<void()>;  // abi-ok: see note above
 
 /// Lightweight identifier for a submitted job. Cheap to copy. A value-
 /// initialised handle (`Id == 0`) is the canonical "empty" handle and
@@ -122,9 +128,10 @@ inline JobHandle SubmitJob(JobFunction job,
                            JobPriority priority = JobPriority::Normal,
                            Label label = {}) noexcept
 {
-  if (auto* jobSystem = GetJobSystem())
-    return jobSystem->Submit(::std::move(job), priority, label);
-  return JobHandle {};
+  // abi-ok: inline helper, instantiated per TU; does not cross the boundary.
+  auto* jobSystem = GetJobSystem();
+  return jobSystem ? jobSystem->Submit(::std::move(job), priority, label)
+                   : JobHandle {};
 }
 
 /// Convenience wrapper that submits a job with explicit dependencies.
@@ -133,10 +140,12 @@ inline JobHandle SubmitJob(JobFunction job, const JobHandle* dependencies,
                            JobPriority priority = JobPriority::Normal,
                            Label label = {}) noexcept
 {
-  if (auto* jobSystem = GetJobSystem())
-    return jobSystem->Submit(::std::move(job), dependencies, dependencyCount,
-                             priority, label);
-  return JobHandle {};
+  // abi-ok: inline helper, instantiated per TU; does not cross the boundary.
+  auto* jobSystem = GetJobSystem();
+  if (!jobSystem)
+    return JobHandle {};
+  return jobSystem->Submit(::std::move(job), dependencies, dependencyCount,
+                           priority, label);
 }
 
 /// Block until the supplied handle completes.

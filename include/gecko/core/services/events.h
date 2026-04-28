@@ -117,12 +117,8 @@ class EventSubscription
 {
 public:
   EventSubscription() = default;
-  EventSubscription(const EventSubscription&) = delete (
-      "EventSubscription is move-only; copying would create duplicate "
-      "unsubscribe");
-  EventSubscription& operator=(const EventSubscription&) = delete (
-      "EventSubscription is move-only; copying would create duplicate "
-      "unsubscribe");
+  EventSubscription(const EventSubscription&) = delete;
+  EventSubscription& operator=(const EventSubscription&) = delete;
 
   EventSubscription(EventSubscription&& other) noexcept
       : m_Bus(other.m_Bus), m_Id(other.m_Id)
@@ -211,8 +207,7 @@ public:
   ///
   /// @param maxCount  Maximum number of events to dispatch in this call.
   /// @return Number of events actually dispatched.
-  GECKO_API virtual std::size_t Dispatch(
-      std::size_t maxCount = static_cast<std::size_t>(-1)) = 0;
+  GECKO_API virtual usize Dispatch(usize maxCount = static_cast<usize>(-1)) = 0;
 
   /// Register a module so it may create emitters.
   /// @param moduleId  Stable id (e.g. `Label::Hash`) of the module.
@@ -293,8 +288,7 @@ inline void SendEvent(const EventEmitter& emitter, EventCode code,
 
 /// Drive the bus's queue. @return Number of events dispatched.
 [[nodiscard]]
-GECKO_API inline std::size_t DispatchEvents(
-    std::size_t maxCount = static_cast<std::size_t>(-1))
+GECKO_API inline usize DispatchEvents(usize maxCount = static_cast<usize>(-1))
 {
   if (auto* eventBus = GetEventBus())
     return eventBus->Dispatch(maxCount);
@@ -309,8 +303,7 @@ struct NullEventBus final : IEventBus
       SubscriptionOptions options = {}) noexcept override;
   GECKO_API virtual void Send(const EventEmitter& emitter, EventCode code,
                               EventView payload) noexcept override;
-  GECKO_API virtual std::size_t Dispatch(
-      std::size_t maxCount) noexcept override;
+  GECKO_API virtual usize Dispatch(usize maxCount) noexcept override;
 
   GECKO_API virtual bool RegisterModule(u64 moduleId) noexcept override;
   GECKO_API virtual void UnregisterModule(u64 moduleId) noexcept override;

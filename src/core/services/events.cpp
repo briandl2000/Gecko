@@ -52,7 +52,7 @@ EventSubscription NullEventBus::Subscribe(EventCode, CallbackFn, void*,
 void NullEventBus::Send(const EventEmitter&, EventCode, EventView) noexcept
 {}
 
-std::size_t NullEventBus::Dispatch(std::size_t) noexcept
+usize NullEventBus::Dispatch(usize) noexcept
 {
   return 0;
 }

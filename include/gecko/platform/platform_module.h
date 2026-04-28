@@ -76,10 +76,10 @@ public:
     return labels::Platform;
   }
 
-  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Requires()
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires()
       const noexcept override;
 
-  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Publishes()
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes()
       const noexcept override;
 
   [[nodiscard]] GECKO_API bool Startup(

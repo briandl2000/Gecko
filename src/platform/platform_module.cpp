@@ -52,14 +52,16 @@ PlatformModule::PlatformModule(const PlatformConfig& config,
 
 PlatformModule::~PlatformModule() noexcept = default;
 
-::std::span<const ::gecko::ServiceId> PlatformModule::Requires() const noexcept
+::gecko::Span<const ::gecko::ServiceId> PlatformModule::Requires()
+    const noexcept
 {
-  return ::std::span<const ::gecko::ServiceId> {RequiredServices};
+  return ::gecko::Span<const ::gecko::ServiceId> {RequiredServices};
 }
 
-::std::span<const ::gecko::ServiceId> PlatformModule::Publishes() const noexcept
+::gecko::Span<const ::gecko::ServiceId> PlatformModule::Publishes()
+    const noexcept
 {
-  return ::std::span<const ::gecko::ServiceId> {PublishedServices};
+  return ::gecko::Span<const ::gecko::ServiceId> {PublishedServices};
 }
 
 bool PlatformModule::Startup(::gecko::IModuleRegistry& modules) noexcept

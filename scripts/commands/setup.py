@@ -36,27 +36,26 @@ def _check_tools() -> bool:
             print("  Install with: sudo apt-get install ninja-build")
         ok = False
 
-    if not shutil.which("gcc") or not shutil.which("g++"):
-        print("ERROR: gcc/g++ not found.", file=sys.stderr)
+    # Any C++ compiler will do; CMake picks one up automatically.
+    if not (
+        shutil.which("c++")
+        or shutil.which("g++")
+        or shutil.which("clang++")
+        or shutil.which("cl")
+    ):
+        print("ERROR: no C++ compiler found on PATH.", file=sys.stderr)
         if _is_windows():
-            print("  Use the MSYS2 UCRT64 shell (gcc is installed there)")
+            print("  Install Visual Studio Build Tools or use MSYS2.")
         else:
-            print("  Install with: sudo apt-get install gcc g++")
+            print("  Install with: sudo apt-get install build-essential")
         ok = False
 
     return ok
 
 
 def _setup_env() -> dict[str, str]:
-    """Return environment with correct compiler settings."""
-    env = os.environ.copy()
-
-    if not _is_windows():
-        # On Linux/macOS, ensure GCC is used
-        env.setdefault("CC", "gcc")
-        env.setdefault("CXX", "g++")
-
-    return env
+    """Return environment unchanged; compiler selection is left to CMake."""
+    return os.environ.copy()
 
 
 def _run(args) -> int:

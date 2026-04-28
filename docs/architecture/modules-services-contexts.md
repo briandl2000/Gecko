@@ -205,16 +205,30 @@ the same process, it's a context.
 - **Plugin loader**: Platform-side `ILibraryLoader` service for
   `dlopen`/`LoadLibrary`. Lands when there's an actual plugin.
 - **Plugin ABI rule**: today plugins must be built with the **same
-  compiler, same C++ standard library, and same STL configuration** as
-  the host (one toolchain per process). Reasoning: `IModule` is a
-  virtual C++ interface and we return `std::span<const ServiceId>` from
-  `Publishes()` / `Requires()`. Vtable layout (Itanium vs MSVC ABI),
-  exception model (DWARF vs SEH), and `std::span` field order are all
-  implementation-defined and not stable across toolchains. A future
-  cross-toolchain plugin entry would need a separate C ABI shim
-  (`extern "C" gecko_plugin_register(GeckoPluginV1*)` with POD-only
-  types and function pointers); this is deferred until a plugin loader
-  exists to validate it.
+  compiler and same C++ ABI** as the host (one toolchain per process).
+  Vtable layout (Itanium vs MSVC ABI) and exception model (DWARF vs
+  SEH) are implementation-defined and not stable across toolchains.
+
+  What we *do* control across toolchains is the data shapes that cross
+  the `CoreServices` shared-library boundary. The rule on every virtual
+  in `include/gecko/core/services/*.h`:
+
+  - Allowed parameter / return types: primitives, raw pointers,
+    `const char*`, Gecko PODs, and `gecko::Span<T>`
+    (see [`include/gecko/core/span.h`](../../include/gecko/core/span.h)).
+  - **Forbidden**: any `std::` type whose layout is implementation-defined
+    (`std::string`, `std::string_view`, `std::span`, `std::vector`,
+    `std::function`, ...). Use the Gecko POD equivalent or pass a raw
+    pointer + size.
+  - Free functions in static libraries (`Core` impl, `Runtime` impl,
+    `Platform` impl) may use `std::` types freely -- the rule is
+    boundary-local.
+
+  Verified by [`scripts/lint_abi.py`](../../scripts/lint_abi.py), wired
+  into `gk test` and CI. A future cross-toolchain plugin would also
+  need a separate C ABI shim (`extern "C" gecko_plugin_register(...)`
+  with POD-only types and function pointers); that's deferred until a
+  plugin loader exists to validate it.
 - **Core-as-shared**: Currently `Core` is `STATIC` and `CoreServices`
   is `SHARED`. The split is plugin-compatible: plugins link `Core`
   statically (utilities, no globals) and `CoreServices` dynamically
