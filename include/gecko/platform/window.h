@@ -26,7 +26,9 @@ struct Extent2D
 /// Default-constructed handles compare equal to `InvalidWindowHandle`.
 struct WindowHandle
 {
-  u64 Id {0};  ///< Backend-specific identifier; `0` means invalid.
+  static constexpr u64 InvalidId = 0;  ///< Sentinel value for invalid handles.
+
+  u64 Id {InvalidId};  ///< Backend-specific identifier; `0` means invalid.
 
   WindowHandle() = default;
   explicit WindowHandle(u64 id) noexcept : Id(id)
@@ -35,12 +37,12 @@ struct WindowHandle
   /// `true` when the handle refers to (or once referred to) a window.
   bool IsValid() const noexcept
   {
-    return Id != 0;
+    return Id != InvalidId;
   }
   /// Make the handle invalid (without closing the underlying window).
   void Reset() noexcept
   {
-    Id = 0;
+    Id = InvalidId;
   }
 
   bool operator==(const WindowHandle& other) const noexcept

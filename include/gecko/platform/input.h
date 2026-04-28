@@ -83,10 +83,10 @@ public:
 
   // Window focus / hover --------------------------------------------
   /// The window currently receiving keyboard focus, or
-  /// `InvalidWindowHandle` when none of our windows is focused.
+  /// `WindowHandle::InvalidId` when none of our windows is focused.
   [[nodiscard]] GECKO_API virtual WindowHandle FocusedWindow()
       const noexcept = 0;
-  /// The window the mouse cursor is over. `InvalidWindowHandle` when
+  /// The window the mouse cursor is over. `WindowHandle::InvalidId` when
   /// the cursor is outside all of our windows or has not entered any
   /// since startup.
   [[nodiscard]] GECKO_API virtual WindowHandle HoveredWindow()

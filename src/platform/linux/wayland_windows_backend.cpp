@@ -1272,7 +1272,7 @@ void WaylandWindowsBackend::OnKeyboardEnter(::wl_keyboard* /*kb*/,
   const u64 id = FindWindowBySurface(surface);
   m_FocusedKeyboard = id;
 
-  if (id != 0)
+  if (id != WindowHandle::InvalidId)
   {
     m_Staged.push_back(MakeStagedEvent(
         events::WindowFocusChanged,
@@ -1285,9 +1285,9 @@ void WaylandWindowsBackend::OnKeyboardLeave(::wl_keyboard* /*kb*/,
                                             ::wl_surface* surface) noexcept
 {
   const u64 id = FindWindowBySurface(surface);
-  m_FocusedKeyboard = 0;
+  m_FocusedKeyboard = WindowHandle::InvalidId;
 
-  if (id != 0)
+  if (id != WindowHandle::InvalidId)
   {
     m_Staged.push_back(MakeStagedEvent(
         events::WindowFocusChanged,
@@ -1299,7 +1299,7 @@ void WaylandWindowsBackend::OnKeyboardKey(::wl_keyboard* /*kb*/, u32 /*serial*/,
                                           u32 /*time*/, u32 key,
                                           u32 state) noexcept
 {
-  if (m_FocusedKeyboard == 0)
+  if (m_FocusedKeyboard == WindowHandle::InvalidId)
     return;
 
   const bool down = (state == WL_KEYBOARD_KEY_STATE_PRESSED);
@@ -1370,7 +1370,7 @@ void WaylandWindowsBackend::OnPointerEnter(::wl_pointer* /*pointer*/,
   m_FocusedPointer = FindWindowBySurface(surface);
 
   // Apply cursor for the entered window.
-  if (m_FocusedPointer != 0)
+  if (m_FocusedPointer != WindowHandle::InvalidId)
   {
     auto it = m_Windows.find(m_FocusedPointer);
     if (it != m_Windows.end())
@@ -1387,21 +1387,21 @@ void WaylandWindowsBackend::OnPointerLeave(::wl_pointer* /*pointer*/,
                                            u32 /*serial*/,
                                            ::wl_surface* /*surface*/) noexcept
 {
-  if (m_FocusedPointer != 0)
+  if (m_FocusedPointer != WindowHandle::InvalidId)
   {
     m_Staged.push_back(
         MakeStagedEvent(events::WindowMouseExited,
                         events::WindowMouseExitedPayload {
                             WindowHandle {m_FocusedPointer}, NowNsSafe()}));
   }
-  m_FocusedPointer = 0;
+  m_FocusedPointer = WindowHandle::InvalidId;
 }
 
 void WaylandWindowsBackend::OnPointerMotion(::wl_pointer* /*pointer*/,
                                             u32 /*time*/, wl_fixed_t sx,
                                             wl_fixed_t sy) noexcept
 {
-  if (m_FocusedPointer == 0)
+  if (m_FocusedPointer == WindowHandle::InvalidId)
     return;
 
   m_Staged.push_back(MakeStagedEvent(
@@ -1415,7 +1415,7 @@ void WaylandWindowsBackend::OnPointerButton(::wl_pointer* /*pointer*/,
                                             u32 button, u32 state) noexcept
 {
   m_LastPointerSerial = serial;
-  if (m_FocusedPointer == 0)
+  if (m_FocusedPointer == WindowHandle::InvalidId)
     return;
 
   const bool down = (state == WL_POINTER_BUTTON_STATE_PRESSED);
@@ -1430,7 +1430,7 @@ void WaylandWindowsBackend::OnPointerAxis(::wl_pointer* /*pointer*/,
                                           u32 /*time*/, u32 axis,
                                           wl_fixed_t value) noexcept
 {
-  if (m_FocusedPointer == 0)
+  if (m_FocusedPointer == WindowHandle::InvalidId)
     return;
 
   float dx = 0.0F;
@@ -1456,7 +1456,7 @@ u64 WaylandWindowsBackend::FindWindowBySurface(
 {
   auto it = m_WindowBySurface.find(surface);
   if (it == m_WindowBySurface.end())
-    return 0;
+    return WindowHandle::InvalidId;
   return it->second;
 }
 

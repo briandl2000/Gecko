@@ -10,7 +10,7 @@ TEST_CASE("WindowHandle default is invalid", "[platform][window]")
 {
   WindowHandle h;
   REQUIRE_FALSE(h.IsValid());
-  REQUIRE(h.Id == 0);
+  REQUIRE(h.Id == WindowHandle::InvalidId);
 }
 
 TEST_CASE("WindowHandle explicit construction", "[platform][window]")

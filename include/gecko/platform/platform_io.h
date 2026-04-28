@@ -137,7 +137,6 @@ private:
 };
 
 /// Forward-iterator-style directory enumeration handle. Move-only.
-/// Forward-iterator-style directory enumeration handle. Move-only.
 class GECKO_API DirIter
 {
 public:

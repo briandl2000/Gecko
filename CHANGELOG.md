@@ -39,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: dev build releases no longer include a description
 - Allocator decoupled from `Services`. Use `SetAllocator(IAllocator*)` / `ResetAllocator()` for lifecycle and `Allocator()` (returns reference) for access. `services.Allocator` and `GetAllocator()` removed.
 - **Module-published services** — modules now declare what they `Publishes()` and `Requires()`; `Engine::Create({...})` starts them in topological order. Replaces the `Services` struct, `Install/UninstallServices`, and `GECKO_BOOT`/`GECKO_SHUTDOWN`. `runtime::CoreServicesModule` publishes the four foundational services (`IJobSystem`, `IProfiler`, `ILogger`, `IEventBus`); `Engine` itself owns the registry and lives in the `GeckoCoreServices` shared library.
-- made the code use doxygen style comments in the public api for clarity
+- Made the code use Doxygen-style comments in the public API for clarity.
+- Updated the example projects to use more of an oop style and make it easier to explore.
 
 ### Fixed
 - `CreateDir(recursive=true)` no longer writes one byte past `std::string`/`std::wstring` `size()` when terminating path segments (Linux + Win32).

@@ -1121,7 +1121,7 @@ Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindByHwnd(
     ::HWND hwnd) noexcept
 {
   const u64 id = static_cast<u64>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-  if (id == 0)
+  if (id == WindowHandle::InvalidId)
     return nullptr;
   auto it = m_Windows.find(id);
   return (it != m_Windows.end()) ? &it->second : nullptr;
