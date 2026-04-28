@@ -1,5 +1,9 @@
 #pragma once
 
+/// @file
+/// `IGpuSampler` interface for GPU-side profiling and the RAII zone
+/// helpers used by the `GECKO_GPU_*` macros.
+
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/ptr.h"
@@ -9,35 +13,32 @@
 
 namespace gecko::graphics {
 
-// ── GPU profiler ─────────────────────────────────────────────────────────
+// GPU profiler ------------------------------------------------------
 //
-// Records GPU-side timing for a single render queue. Pair every BeginZone
-// with an EndZone on the same command list; nest as desired. Frames must
-// be bracketed with BeginFrame / EndFrame so the sampler can rotate its
-// timestamp pools and resolve completed frames into IProfiler events.
+// Records GPU-side timing for a single render queue. Pair every
+// `BeginZone` with an `EndZone` on the same command list; nest as
+// desired. Frames must be bracketed with `BeginFrame` / `EndFrame` so
+// the sampler can rotate its timestamp pools and resolve completed
+// frames into `IProfiler` events.
 //
-// Threading: a single IGpuSampler instance is owned by the thread that
-// records the queue's command lists for the frame. Calls into the
-// profiler happen from EndFrame on that same thread.
+// Threading: a single `IGpuSampler` instance is owned by the thread
+// that records the queue's command lists for the frame. Calls into
+// the profiler happen from `EndFrame` on that same thread.
 
+/// Configuration for `IGpuSampler` creation.
 struct GpuSamplerDesc
 {
-  // Worst-case zones per frame (each zone consumes 2 timestamps).
-  u32 MaxZonesPerFrame {64};
-
-  // Number of frames to keep in flight before resolving. Must be >= the
-  // graphics device's MaxFramesInFlight so timestamps are guaranteed
-  // available when we read them.
-  u32 FramesInFlight {3};
-
-  // Synthetic thread id for the GPU rows in the trace. Defaults to a
-  // sentinel that is unlikely to collide with any OS thread id.
-  u32 GpuThreadId {0xFFFF0001u};
-
-  // Name registered via RegisterThreadProfilerName for GpuThreadId.
-  const char* GpuThreadName {"GPU"};
+  u32 MaxZonesPerFrame {
+      64};  ///< Worst-case zones per frame (each zone uses 2 timestamps).
+  u32 FramesInFlight {3};  ///< Frames kept in flight; must be >= the device's
+                           ///< `MaxFramesInFlight`.
+  u32 GpuThreadId {
+      0xFFFF0001u};  ///< Synthetic thread id used for GPU rows in the trace.
+  const char* GpuThreadName {
+      "GPU"};  ///< Display name registered for `GpuThreadId`.
 };
 
+/// Records GPU-side timing zones for a single render queue.
 class IGpuSampler
 {
 public:
@@ -47,32 +48,37 @@ public:
   IGpuSampler& operator=(const IGpuSampler&) =
       delete ("IGpuSampler is non-copyable");
 
-  // Mark the start of a new GPU frame on the given command list. Records
-  // a "frame start" timestamp and rotates the internal pool ring.
+  /// Mark the start of a new GPU frame on `cmd`. Records a frame-start
+  /// timestamp and rotates the internal pool ring.
   GECKO_API virtual void BeginFrame(ICommandList& cmd) noexcept = 0;
 
-  // Mark the end of the current GPU frame. Records a "frame end"
-  // timestamp and resolves a frame from FramesInFlight ago, emitting all
-  // of its zones into IProfiler with ProfSource::GPU.
+  /// Mark the end of the current GPU frame. Records a frame-end
+  /// timestamp and resolves a frame from `FramesInFlight` ago, emitting
+  /// all of its zones into `IProfiler` with `ProfSource::GPU`.
   GECKO_API virtual void EndFrame(ICommandList& cmd) noexcept = 0;
 
-  // Open a GPU zone. Pairs with EndZone. Nesting is supported up to a
-  // backend-defined depth limit (currently 32).
+  /// Open a GPU zone. Pairs with `EndZone`. Nesting is supported up to
+  /// a backend-defined depth limit (currently 32).
+  /// @param cmd    Command list the zone records into.
+  /// @param label  Module label for the zone.
+  /// @param name   Display name (zero-copy literal recommended).
+  /// @param level  Verbosity level filter.
   GECKO_API virtual void BeginZone(
       ICommandList& cmd, ::gecko::Label label, const char* name,
       ::gecko::ProfLevel level = ::gecko::ProfLevel::Normal) noexcept = 0;
 
+  /// Close the zone most recently opened by `BeginZone` on `cmd`.
   GECKO_API virtual void EndZone(ICommandList& cmd) noexcept = 0;
 
-  // Notify the sampler that a command list it instrumented has been
-  // submitted to its queue. Called by the device immediately before the
-  // underlying queue-submit call. The sampler uses the first such CPU
-  // timestamp seen for the current frame as the rebase anchor for that
-  // frame's GPU events, so the resulting GPU zones line up with the
-  // CPU vkQueueSubmit (etc.) calls in the trace.
-  //
-  // Default is a no-op so backends that don't need it (or null
-  // implementations) don't have to override.
+  /// Notify the sampler that a command list it instrumented has been
+  /// submitted to its queue. Called by the device immediately before
+  /// the underlying queue-submit call. The sampler uses the first such
+  /// CPU timestamp seen for the current frame as the rebase anchor for
+  /// that frame's GPU events, so the resulting GPU zones line up with
+  /// the CPU `vkQueueSubmit` (etc.) calls in the trace.
+  ///
+  /// Default is a no-op so backends that don't need it (or null
+  /// implementations) don't have to override.
   GECKO_API virtual void OnSubmit(u64 cpuNowNs) noexcept
   {
     (void)cpuNowNs;
@@ -84,8 +90,10 @@ protected:
   IGpuSampler& operator=(IGpuSampler&&) noexcept = default;
 };
 
-// ── RAII helper ──────────────────────────────────────────────────────────
+// RAII helper -------------------------------------------------------
 
+/// RAII guard that wraps a `BeginZone` / `EndZone` pair around its
+/// lifetime. Use the `GECKO_GPU_PROF_SCOPE` macro to declare one.
 class [[nodiscard("GpuProfScope is a RAII guard - name the variable, e.g. via "
                   "GECKO_GPU_PROF_SCOPE")]] GpuProfScope
 {
@@ -116,8 +124,9 @@ private:
   ICommandList* m_Cmd {nullptr};
 };
 
-// Picks up the IGpuSampler from the command list (set via AttachGpuSampler).
-// Silently no-ops if the cmd has no attached sampler.
+/// RAII guard that picks up the `IGpuSampler` from the command list
+/// (attached via `AttachGpuSampler`). Silently no-ops if the command
+/// list has no attached sampler.
 class [[nodiscard(
     "GpuAutoProfScope is a RAII guard - name the variable, e.g. via "
     "GECKO_GPU_SCOPE_*")]] GpuAutoProfScope
