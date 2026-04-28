@@ -1,5 +1,6 @@
 add_executable(__EXAMPLE__
   src/main.cpp
+  src/App.cpp
 )
 
 target_link_libraries(__EXAMPLE__
