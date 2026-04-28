@@ -297,10 +297,10 @@ void App::PollInput()
   {
     MouseButton Btn;
     const char* Name;
-  } kButtons[] = {{MouseButton::Left, "Left"},
-                  {MouseButton::Right, "Right"},
-                  {MouseButton::Middle, "Middle"}};
-  for (const auto& b : kButtons)
+  } Buttons[] = {{MouseButton::Left, "Left"},
+                 {MouseButton::Right, "Right"},
+                 {MouseButton::Middle, "Middle"}};
+  for (const auto& b : Buttons)
   {
     if (input->WasMouseButtonPressed(b.Btn))
     {

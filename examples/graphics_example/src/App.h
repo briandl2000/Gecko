@@ -46,9 +46,9 @@ public:
   int Run();
 
 private:
-  static constexpr ::gecko::u32 kOffscreenW = 1280;
-  static constexpr ::gecko::u32 kOffscreenH = 720;
-  static constexpr ::gecko::graphics::DataFormat kOffscreenFmt =
+  static constexpr ::gecko::u32 OffscreenW = 1280;
+  static constexpr ::gecko::u32 OffscreenH = 720;
+  static constexpr ::gecko::graphics::DataFormat OffscreenFmt =
       ::gecko::graphics::DataFormat::R8G8B8A8_UNORM;
 
   struct AllocatorInstaller

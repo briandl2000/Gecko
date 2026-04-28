@@ -96,21 +96,21 @@ void RunParticleWorker(int workerId, int numParticles)
 
   {
     GECKO_SCOPE_NAMED(labels::Compute, "PhysicsUpdate");
-    constexpr int kSteps = 50;
-    constexpr float kDt = 0.016f;
-    constexpr float kDamping = 0.999f;
-    for (int step = 0; step < kSteps; ++step)
+    constexpr int Steps = 50;
+    constexpr float Dt = 0.016f;
+    constexpr float Damping = 0.999f;
+    for (int step = 0; step < Steps; ++step)
     {
       GECKO_SCOPE_NAMED(labels::Compute, "PhysicsStep");
       for (int i = 0; i < numParticles; ++i)
       {
         Particle& p = particles[i];
-        p.x += p.vx * kDt;
-        p.y += p.vy * kDt;
-        p.z += p.vz * kDt;
-        p.vx *= kDamping;
-        p.vy *= kDamping;
-        p.vz *= kDamping;
+        p.x += p.vx * Dt;
+        p.y += p.vy * Dt;
+        p.z += p.vz * Dt;
+        p.vx *= Damping;
+        p.vy *= Damping;
+        p.vz *= Damping;
       }
     }
   }
@@ -276,9 +276,9 @@ void RunJobs(::gecko::runtime::TrackingAllocator& tracker)
   GECKO_SCOPE(labels::Main);
 
   // Parallel particle simulations.
-  constexpr int kWorkers = 3;
+  constexpr int NumWorkers = 3;
   ::std::vector<::gecko::JobHandle> sims;
-  for (int i = 0; i < kWorkers; ++i)
+  for (int i = 0; i < NumWorkers; ++i)
   {
     const int particleCount = 800 + i * 400;
     auto job = [i, particleCount]() { RunParticleWorker(i, particleCount); };

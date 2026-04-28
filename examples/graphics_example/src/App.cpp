@@ -30,7 +30,7 @@ struct Vertex
   float Color[3];
 };
 
-constexpr Vertex kTriangleVertices[] = {
+constexpr Vertex TriangleVertices[] = {
     {{0.0F, 0.5F, 0.0F}, {1.0F, 0.0F, 0.0F}},
     {{0.5F, -0.5F, 0.0F}, {0.0F, 1.0F, 0.0F}},
     {{-0.5F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}},
@@ -101,28 +101,36 @@ App::App() : m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus)
 
 App::~App()
 {
+  // Destruction is RAII-driven and *order-sensitive*.
+  //
+  // Every GPU resource handle (Buffer, Texture, RenderTarget, Pipeline,
+  // QueryPool, Sampler, Swapchain) holds a `Shared<void>` whose deleter
+  // captures a raw pointer to the owning device. They MUST destruct
+  // before `m_Device`, otherwise their deleters dereference a dead
+  // device and VMA fires an "allocations not freed" assert.
+  //
+  // Members are declared in the right order — m_Device first, every GPU
+  // resource after it — so reverse-declaration destruction handles it.
+  // We only do here what RAII cannot:
+  //   1. Tear down swapchains explicitly so windows can be destroyed
+  //      before the platform module shuts down.
+  //   2. Destroy windows (the WindowHandle is just an ID, not RAII).
+  //   3. Detach log sinks before the logger dies.
   if (m_Device)
   {
     for (auto& s : m_Slots)
-    {
       if (s.SC.IsValid())
         m_Device->DestroySwapchain(s.SC);
-    }
   }
-  for (auto& s : m_Slots)
+  if (m_Engine)
   {
-    if (s.Handle.IsValid())
-      ::gecko::platform::GetWindows()->DestroyWindow(s.Handle);
+    for (auto& s : m_Slots)
+      if (s.Handle.IsValid())
+        ::gecko::platform::GetWindows()->DestroyWindow(s.Handle);
   }
-
-  // GPU resources release with the device. Sampler unique_ptr first so
-  // any in-flight zones flush before the device dies.
-  m_GpuSampler.reset();
-  m_Device.reset();
 
   if (m_SinksAttached)
     DetachSinks();
-  m_Engine.reset();
 }
 
 void App::ConfigureProfiler()
@@ -163,14 +171,14 @@ void App::DetachSinks()
 
 bool App::CreateWindows()
 {
-  static const char* kTitles[2] = {
+  static const char* WindowTitles[2] = {
       "Gecko Graphics - Window A",
       "Gecko Graphics - Window B",
   };
   for (::gecko::u32 i = 0; i < 2; ++i)
   {
     WindowDesc wd;
-    wd.Title = kTitles[i];
+    wd.Title = WindowTitles[i];
     wd.Size = {1280, 720};
     wd.Visible = true;
     wd.Resizable = true;
@@ -229,22 +237,22 @@ bool App::CreateSwapchains()
 bool App::CreateRenderResources()
 {
   RenderTargetDesc rtDesc;
-  rtDesc.Width = kOffscreenW;
-  rtDesc.Height = kOffscreenH;
+  rtDesc.Width = OffscreenW;
+  rtDesc.Height = OffscreenH;
   rtDesc.NumRenderTargets = 1;
-  rtDesc.RenderTargetFormats[0] = kOffscreenFmt;
+  rtDesc.RenderTargetFormats[0] = OffscreenFmt;
   rtDesc.RenderTargetClearValues[0] =
       ClearValue::RenderTarget(0.1F, 0.1F, 0.15F, 1.0F);
   m_OffscreenRT = m_Device->CreateRenderTarget(rtDesc);
   if (m_OffscreenRT.IsValid())
     GECKO_INFO(Main_Label, "Offscreen render target created (%ux%u)",
-               kOffscreenW, kOffscreenH);
+               OffscreenW, OffscreenH);
   else
     GECKO_WARN(Main_Label, "Offscreen render target creation failed");
 
   TextureDesc plasmaDesc {};
-  plasmaDesc.Width = kOffscreenW;
-  plasmaDesc.Height = kOffscreenH;
+  plasmaDesc.Width = OffscreenW;
+  plasmaDesc.Height = OffscreenH;
   plasmaDesc.Format = DataFormat::R32G32B32A32_FLOAT;
   plasmaDesc.Type = TextureType::Tex2D;
   plasmaDesc.Memory = MemoryType::Dedicated;
@@ -257,7 +265,7 @@ bool App::CreateRenderResources()
   }
   if (m_PlasmaTex[0].IsValid() && m_PlasmaTex[1].IsValid())
     GECKO_INFO(Main_Label, "Plasma storage textures created (2x %ux%u)",
-               kOffscreenW, kOffscreenH);
+               OffscreenW, OffscreenH);
   else
     GECKO_WARN(Main_Label, "Plasma storage texture creation failed");
 
@@ -268,9 +276,8 @@ bool App::CreateRenderResources()
   m_VertexBuffer = m_Device->CreateVertexBuffer(vbDesc);
   if (m_VertexBuffer.IsValid())
   {
-    const auto* raw = reinterpret_cast<const ::gecko::byte*>(kTriangleVertices);
-    m_Device->UploadBufferData(m_VertexBuffer,
-                               {raw, sizeof(kTriangleVertices)});
+    const auto* raw = reinterpret_cast<const ::gecko::byte*>(TriangleVertices);
+    m_Device->UploadBufferData(m_VertexBuffer, {raw, sizeof(TriangleVertices)});
   }
 
   // Indirect args buffer: VkDrawIndirectCommand layout
@@ -318,7 +325,7 @@ bool App::CreatePipelines()
   };
   triPDesc.Layout = triLayout;
   triPDesc.NumRenderTargets = 1;
-  triPDesc.RenderTargetFormats[0] = kOffscreenFmt;
+  triPDesc.RenderTargetFormats[0] = OffscreenFmt;
   triPDesc.Culling = CullMode::None;
   triPDesc.PushConstantBytes = 16;
   triPDesc.DebugName = "TrianglePipeline";
@@ -489,8 +496,8 @@ void App::RecordComputePass(::gecko::f32 time)
       const ::gecko::f32 pc[4] = {time, 0.0F, 0.0F, 0.0F};
       computeCmd[i]->SetConstants(
           0, {reinterpret_cast<const ::gecko::byte*>(pc), sizeof(pc)});
-      const ::gecko::u32 gx = (kOffscreenW + 15) / 16;
-      const ::gecko::u32 gy = (kOffscreenH + 15) / 16;
+      const ::gecko::u32 gx = (OffscreenW + 15) / 16;
+      const ::gecko::u32 gy = (OffscreenH + 15) / 16;
       {
         GECKO_GPU_SCOPE_NORMAL_NAMED(*computeCmd[i], Main_Label, "PlasmaPass");
         computeCmd[i]->Dispatch(gx, gy, 1);
@@ -511,9 +518,9 @@ void App::RecordTrianglePass(ICommandList& cmd, ::gecko::f32 time)
 {
   ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
   cmd.BeginRendering(m_OffscreenRT, &rtClear);
-  cmd.SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(kOffscreenW),
-                  static_cast<::gecko::f32>(kOffscreenH));
-  cmd.SetScissor(0, 0, kOffscreenW, kOffscreenH);
+  cmd.SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(OffscreenW),
+                  static_cast<::gecko::f32>(OffscreenH));
+  cmd.SetScissor(0, 0, OffscreenW, OffscreenH);
   cmd.BindPipeline(m_TrianglePipeline);
   cmd.BindVertexBuffer(m_VertexBuffer);
   const ::gecko::f32 pc[4] = {time, 0.0F, 0.0F, 0.0F};
