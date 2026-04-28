@@ -1,5 +1,13 @@
 #pragma once
 
+/// @file
+/// Integer rectangle defined by a position and a size.
+///
+/// `Rect2D` mirrors the convention used by windowing APIs: the rectangle
+/// covers pixels in the half-open range `[Position, Position + Size)`.
+/// For a min/max representation use `Aabb2i` instead, or convert with
+/// `ToAabb2i()`.
+
 #include "gecko/math/aabb.h"
 #include "gecko/math/vector.h"
 
@@ -7,6 +15,8 @@ namespace gecko::math {
 
 struct Aabb2i;
 
+/// Axis-aligned 2D rectangle in pixel space (position + size).
+/// Treated as the half-open region `[Position, Position + Size)`.
 struct Rect2D
 {
   Int2 Position {};

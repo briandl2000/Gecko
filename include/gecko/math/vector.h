@@ -1,84 +1,113 @@
 #pragma once
 
+/// @file
+/// Fixed-size float and integer vectors plus scalar math helpers.
+///
+/// Defines `Float2`/`Float3`/`Float4`, `Int2`/`Int3`/`Int4` and a small
+/// kit of constexpr scalar utilities (`ToRadians`, `ToDegrees`, `Min`,
+/// `Max`, `Clamp`, `Lerp`, `Smoothstep`, `Abs`) plus thin wrappers over
+/// `<cmath>` (`Sqrt`, `Sin`, `Cos`, `Tan`, `Atan2`). All vector types
+/// expose both named members (`X`/`Y`/`Z`/`W`) and indexed access via
+/// `Data[]` / `operator[]`.
+///
+/// Conventions: angles are in radians unless suffixed `Degrees`; the
+/// coordinate system is right-handed.
+
 #include "gecko/core/types.h"
 
 #include <cmath>
 
 namespace gecko::math {
 
-// Common math constants
+/// Mathematical pi as `f32`.
 inline constexpr f32 Pi = 3.14159265358979323846f;
+/// 2*pi (one full turn in radians).
 inline constexpr f32 TwoPi = 6.28318530717958647692f;
+/// pi/2 (a quarter turn in radians).
 inline constexpr f32 HalfPi = 1.57079632679489661923f;
+/// Default tolerance for approximate equality of `f32` values.
 inline constexpr f32 Epsilon = 1e-6f;
 
-// Utility functions
+/// Convert degrees to radians.
 [[nodiscard]] constexpr f32 ToRadians(f32 degrees) noexcept
 {
   return degrees * (Pi / 180.0f);
 }
 
+/// Convert radians to degrees.
 [[nodiscard]] constexpr f32 ToDegrees(f32 radians) noexcept
 {
   return radians * (180.0f / Pi);
 }
 
+/// Smaller of two `f32` values.
 [[nodiscard]] constexpr f32 Min(f32 a, f32 b) noexcept
 {
   return a < b ? a : b;
 }
 
+/// Larger of two `f32` values.
 [[nodiscard]] constexpr f32 Max(f32 a, f32 b) noexcept
 {
   return a > b ? a : b;
 }
 
+/// Clamp `value` into the closed interval `[min, max]`.
 [[nodiscard]] constexpr f32 Clamp(f32 value, f32 min, f32 max) noexcept
 {
   return value < min ? min : (value > max ? max : value);
 }
 
+/// Linear interpolation: `a + (b - a) * t`. `t` is not clamped.
 [[nodiscard]] constexpr f32 Lerp(f32 a, f32 b, f32 t) noexcept
 {
   return a + (b - a) * t;
 }
 
+/// Hermite smoothstep: 0 below `edge0`, 1 above `edge1`, smooth between.
 [[nodiscard]] constexpr f32 Smoothstep(f32 edge0, f32 edge1, f32 x) noexcept
 {
   const f32 t = Clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
   return t * t * (3.0f - 2.0f * t);
 }
 
+/// Absolute value of `x`.
 [[nodiscard]] constexpr f32 Abs(f32 x) noexcept
 {
   return x < 0.0f ? -x : x;
 }
 
+/// Square root (wraps `std::sqrt`).
 [[nodiscard]] inline f32 Sqrt(f32 x) noexcept
 {
   return ::std::sqrt(x);
 }
 
+/// Sine of `x` (radians).
 [[nodiscard]] inline f32 Sin(f32 x) noexcept
 {
   return ::std::sin(x);
 }
 
+/// Cosine of `x` (radians).
 [[nodiscard]] inline f32 Cos(f32 x) noexcept
 {
   return ::std::cos(x);
 }
 
+/// Tangent of `x` (radians).
 [[nodiscard]] inline f32 Tan(f32 x) noexcept
 {
   return ::std::tan(x);
 }
 
+/// Two-argument arctangent: angle of `(x, y)` in radians.
 [[nodiscard]] inline f32 Atan2(f32 y, f32 x) noexcept
 {
   return ::std::atan2(y, x);
 }
 
+/// Two-component float vector. Members `X`/`Y` alias `Data[0..1]`.
 struct Float2
 {
   union
@@ -107,6 +136,7 @@ struct Float2
   }
 };
 
+/// Three-component float vector. Members `X`/`Y`/`Z` alias `Data[0..2]`.
 struct Float3
 {
   union
@@ -136,6 +166,8 @@ struct Float3
   }
 };
 
+/// Four-component float vector (typically a homogeneous point or RGBA).
+/// Members `X`/`Y`/`Z`/`W` alias `Data[0..3]`.
 struct Float4
 {
   union
@@ -166,6 +198,7 @@ struct Float4
   }
 };
 
+/// Two-component signed-int vector. Members `X`/`Y` alias `Data[0..1]`.
 struct Int2
 {
   union
@@ -194,6 +227,7 @@ struct Int2
   }
 };
 
+/// Three-component signed-int vector. Members `X`/`Y`/`Z` alias `Data[0..2]`.
 struct Int3
 {
   union
@@ -223,6 +257,8 @@ struct Int3
   }
 };
 
+/// Four-component signed-int vector. Members `X`/`Y`/`Z`/`W` alias
+/// `Data[0..3]`.
 struct Int4
 {
   union
@@ -289,26 +325,31 @@ constexpr Float2 operator/(const Float2& v, f32 s) noexcept
   return {v.X / s, v.Y / s};
 }
 
+/// Dot (scalar) product of two vectors. Overloaded for every vector type.
 [[nodiscard]] constexpr f32 Dot(const Float2& a, const Float2& b) noexcept
 {
   return a.X * b.X + a.Y * b.Y;
 }
 
+/// Scalar 2D "cross" product: `a.X*b.Y - a.Y*b.X`. Sign indicates winding.
 [[nodiscard]] constexpr f32 Cross(const Float2& a, const Float2& b) noexcept
 {
   return a.X * b.Y - a.Y * b.X;
 }
 
+/// Squared length of a vector (avoids the sqrt). Overloaded per vector type.
 [[nodiscard]] constexpr f32 LengthSquared(const Float2& v) noexcept
 {
   return v.X * v.X + v.Y * v.Y;
 }
 
+/// Euclidean length (magnitude) of a vector. Overloaded per vector type.
 [[nodiscard]] inline f32 Length(const Float2& v) noexcept
 {
   return ::std::sqrt(LengthSquared(v));
 }
 
+/// Returns `v` scaled to unit length, or the zero vector when `Length(v) == 0`.
 [[nodiscard]] inline Float2 Normalized(const Float2& v) noexcept
 {
   const f32 len = Length(v);
@@ -383,6 +424,7 @@ constexpr Float3 operator/(const Float3& v, f32 s) noexcept
   return a.X * b.X + a.Y * b.Y + a.Z * b.Z;
 }
 
+/// 3D cross product: vector orthogonal to both `a` and `b`, right-handed.
 [[nodiscard]] constexpr Float3 Cross(const Float3& a, const Float3& b) noexcept
 {
   return {a.Y * b.Z - a.Z * b.Y, a.Z * b.X - a.X * b.Z, a.X * b.Y - a.Y * b.X};
@@ -662,25 +704,43 @@ constexpr Int4 operator/(const Int4& v, i32 s) noexcept
 }
 
 // Convenience aliases
+/// Lowercase alias for `Float2` (HLSL/GLSL spelling).
 using float2 = Float2;
+/// Lowercase alias for `Float3` (HLSL/GLSL spelling).
 using float3 = Float3;
+/// Lowercase alias for `Float4` (HLSL/GLSL spelling).
 using float4 = Float4;
+/// Lowercase alias for `Int2`.
 using int2 = Int2;
+/// Lowercase alias for `Int3`.
 using int3 = Int3;
+/// Lowercase alias for `Int4`.
 using int4 = Int4;
 
+/// Semantic alias: a 2D point in space.
 using Point2 = Float2;
+/// Semantic alias: a 3D point in space.
 using Point3 = Float3;
+/// Semantic alias: a 4D (homogeneous) point in space.
 using Point4 = Float4;
+/// Semantic alias: a 2D integer point.
 using Point2i = Int2;
+/// Semantic alias: a 3D integer point.
 using Point3i = Int3;
+/// Semantic alias: a 4D integer point.
 using Point4i = Int4;
 
+/// Semantic alias: a 2D size (width, height) as floats.
 using Size2 = Float2;
+/// Semantic alias: a 3D size as floats.
 using Size3 = Float3;
+/// Semantic alias: a 4D size as floats.
 using Size4 = Float4;
+/// Semantic alias: a 2D size (width, height) as integers.
 using Size2i = Int2;
+/// Semantic alias: a 3D integer size.
 using Size3i = Int3;
+/// Semantic alias: a 4D integer size.
 using Size4i = Int4;
 
 }  // namespace gecko::math
