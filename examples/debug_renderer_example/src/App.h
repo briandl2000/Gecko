@@ -1,9 +1,15 @@
 #pragma once
 
 #include <gecko/core/engine.h>
+#include <gecko/core/ptr.h>
 #include <gecko/core/services.h>
+#include <gecko/core/services/events.h>
 #include <gecko/core/services/modules.h>
 #include <gecko/core/types.h>
+#include <gecko/graphics/graphics_device.h>
+#include <gecko/graphics/graphics_types.h>
+#include <gecko/platform/platform_module.h>
+#include <gecko/platform/window.h>
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/ring_logger.h>
@@ -15,16 +21,9 @@
 
 namespace app::debug_renderer_example {
 
-/// Minimal Gecko application skeleton.
-///
-/// Boot order (each step depends on the one above):
-///   1. install allocator
-///   2. construct concrete service implementations
-///   3. construct module objects (runtime, app)
-///   4. `Engine::Create({...})` boots modules in dependency order
-///   5. attach log sinks and run the workload
-///   6. shutdown is RAII (dtor unregisters sinks, tears down engine, resets
-///      the allocator)
+/// Minimal Gecko + Graphics application: one window, a single coloured
+/// triangle rendered straight into the swapchain backbuffer. Used as the
+/// scratch ground for prototyping the future debug_renderer module.
 class App
 {
 public:
@@ -34,18 +33,14 @@ public:
   App(const App&) = delete;
   App& operator=(const App&) = delete;
 
-  /// Returns true if the engine booted successfully.
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return m_Engine.has_value();
+    return m_Engine.has_value() && m_Device != nullptr && m_Window.IsValid();
   }
 
-  /// Runs the example workload and returns the process exit code.
   int Run();
 
 private:
-  /// RAII helper: installs the allocator on construction, resets it on
-  /// destruction.
   struct AllocatorInstaller
   {
     explicit AllocatorInstaller(::gecko::IAllocator* a) noexcept;
@@ -55,8 +50,6 @@ private:
     bool Ok = false;
   };
 
-  /// Trivial app-side module so `Engine::Create` has somewhere to put
-  /// the application label.
   class AppModule final : public ::gecko::IModule
   {
   public:
@@ -68,7 +61,17 @@ private:
   void AttachSinks();
   void DetachSinks();
 
-  // Order matters: each section depends on what is above it.
+  bool CreateMainWindow();
+  bool CreateDevice();
+  bool CreateSwapchain();
+  bool CreateRenderResources();
+  bool CreatePipeline();
+  void SubscribeEvents();
+
+  void HandlePendingResize();
+  void RenderFrame();
+  void Update();
+
   ::gecko::runtime::TrackingAllocator m_Allocator;
   AllocatorInstaller m_AllocatorInstaller {&m_Allocator};
 
@@ -78,12 +81,30 @@ private:
   ::gecko::runtime::EventBus m_EventBus;
 
   ::gecko::runtime::CoreServicesModule m_RuntimeModule;
+  ::gecko::platform::PlatformModule m_PlatformModule;
   AppModule m_AppModule;
 
   ::std::optional<::gecko::Engine> m_Engine;
 
   ::gecko::runtime::ConsoleLogSink m_ConsoleSink;
-  bool m_SinksAttached = false;
+  bool m_SinksAttached {false};
+
+  ::gecko::platform::WindowHandle m_Window {};
+  ::gecko::Unique<::gecko::graphics::GraphicsDevice> m_Device;
+  ::gecko::graphics::Swapchain m_Swapchain {};
+
+  ::gecko::graphics::Buffer m_VertexBuffer {};
+  ::gecko::graphics::GraphicsPipeline m_DebugLinePipeline {};
+  ::gecko::u32 m_LineCount {0};
+
+  ::gecko::EventSubscription m_CloseSub {};
+  ::gecko::EventSubscription m_ResizeSub {};
+  ::gecko::EventSubscription m_KeySub {};
+
+  bool m_Running {true};
+  bool m_ResizeDirty {false};
+  ::gecko::u32 m_ResizeW {0};
+  ::gecko::u32 m_ResizeH {0};
 };
 
 }  // namespace app::debug_renderer_example
