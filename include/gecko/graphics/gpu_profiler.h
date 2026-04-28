@@ -44,9 +44,8 @@ class IGpuSampler
 public:
   virtual ~IGpuSampler() = default;
 
-  IGpuSampler(const IGpuSampler&) = delete ("IGpuSampler is non-copyable");
-  IGpuSampler& operator=(const IGpuSampler&) =
-      delete ("IGpuSampler is non-copyable");
+  IGpuSampler(const IGpuSampler&) = delete;
+  IGpuSampler& operator=(const IGpuSampler&) = delete;
 
   /// Mark the start of a new GPU frame on `cmd`. Records a frame-start
   /// timestamp and rotates the internal pool ring.
@@ -112,9 +111,8 @@ public:
       m_Sampler->EndZone(*m_Cmd);
   }
 
-  GpuProfScope(const GpuProfScope&) = delete ("GpuProfScope is non-copyable");
-  GpuProfScope& operator=(const GpuProfScope&) =
-      delete ("GpuProfScope is non-copyable");
+  GpuProfScope(const GpuProfScope&) = delete;
+  GpuProfScope& operator=(const GpuProfScope&) = delete;
 
   GpuProfScope(GpuProfScope&&) = delete;
   GpuProfScope& operator=(GpuProfScope&&) = delete;

@@ -56,7 +56,7 @@ void TraceFileSink::Write(const ProfEvent& event) noexcept
     FlushBufferedEvents();
 }
 
-void TraceFileSink::WriteBatch(::std::span<const ProfEvent> events) noexcept
+void TraceFileSink::WriteBatch(::gecko::Span<const ProfEvent> events) noexcept
 {
   if (!m_Writer)
     return;

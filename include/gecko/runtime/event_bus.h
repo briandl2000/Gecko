@@ -32,7 +32,7 @@ public:
       SubscriptionOptions options = {}) noexcept override;
   void Send(const EventEmitter& emitter, EventCode code,
             EventView payload) noexcept override;
-  std::size_t Dispatch(std::size_t maxCount) noexcept override;
+  usize Dispatch(usize maxCount) noexcept override;
 
   bool RegisterModule(u64 moduleId) noexcept override;
   void UnregisterModule(u64 moduleId) noexcept override;

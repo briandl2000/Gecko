@@ -3,18 +3,26 @@
 namespace gecko {
 
 // NullJobSystem - executes jobs synchronously, no profiling overhead
-JobHandle NullJobSystem::Submit(JobFunction job, JobPriority, Label) noexcept
+static void RunAndFree(JobFn& job) noexcept
 {
-  if (job)
-    job();
+  if (job.Invoke)
+    job.Invoke(job.User);
+  // Match ThreadPoolJobSystem and the documented MakeJobFn contract:
+  // only call Free when there is captured state to release.
+  if (job.Free && job.User)
+    job.Free(job.User);
+}
+
+JobHandle NullJobSystem::SubmitRaw(JobFn job, JobPriority, Label) noexcept
+{
+  RunAndFree(job);
   return JobHandle {};
 }
 
-JobHandle NullJobSystem::Submit(JobFunction job, const JobHandle*, u32,
-                                JobPriority, Label) noexcept
+JobHandle NullJobSystem::SubmitRaw(JobFn job, const JobHandle*, u32,
+                                   JobPriority, Label) noexcept
 {
-  if (job)
-    job();
+  RunAndFree(job);
   return JobHandle {};
 }
 

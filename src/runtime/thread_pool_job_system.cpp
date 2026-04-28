@@ -74,20 +74,22 @@ void ThreadPoolJobSystem::Shutdown() noexcept
   m_Initialized = false;
 }
 
-JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
-                                      Label label) noexcept
+JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, JobPriority priority,
+                                         Label label) noexcept
 {
   // Profiler/logger may not exist yet at very early startup; the macros
   // route through GetProfiler()/GetLogger() which fall back to Null impls.
   GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit");
 
-  if (!m_Initialized || !job)
+  if (!m_Initialized || !job.IsValid())
   {
+    if (job.Free && job.User)
+      job.Free(job.User);
     return JobHandle {};
   }
 
   JobHandle handle = GenerateJobHandle();
-  auto jobPtr = std::make_shared<Job>(std::move(job), priority, label, handle);
+  auto jobPtr = std::make_shared<Job>(job, priority, label, handle);
 
   {
     std::lock_guard<std::mutex> lock(m_Mutex);
@@ -99,20 +101,23 @@ JobHandle ThreadPoolJobSystem::Submit(JobFunction job, JobPriority priority,
   return handle;
 }
 
-JobHandle ThreadPoolJobSystem::Submit(JobFunction job,
-                                      const JobHandle* dependencies,
-                                      u32 dependencyCount, JobPriority priority,
-                                      Label label) noexcept
+JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job,
+                                         const JobHandle* dependencies,
+                                         u32 dependencyCount,
+                                         JobPriority priority,
+                                         Label label) noexcept
 {
   GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit(deps)");
 
-  if (!m_Initialized || !job)
+  if (!m_Initialized || !job.IsValid())
   {
+    if (job.Free && job.User)
+      job.Free(job.User);
     return JobHandle {};
   }
 
   JobHandle handle = GenerateJobHandle();
-  auto jobPtr = std::make_shared<Job>(std::move(job), priority, label, handle);
+  auto jobPtr = std::make_shared<Job>(job, priority, label, handle);
 
   // Copy dependencies
   if (dependencies && dependencyCount > 0)
@@ -211,11 +216,18 @@ void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept
 
     try
     {
-      job->Function();
+      if (job->Function.Invoke)
+        job->Function.Invoke(job->Function.User);
+      if (job->Function.Free && job->Function.User)
+        job->Function.Free(job->Function.User);
+      job->Function = JobFn {};
       job->Completed.store(true, std::memory_order_release);
     }
     catch (...)
     {
+      if (job->Function.Free && job->Function.User)
+        job->Function.Free(job->Function.User);
+      job->Function = JobFn {};
       job->Completed.store(true, std::memory_order_release);
     }
 
@@ -266,11 +278,18 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
     try
     {
       GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Run");
-      job->Function();
+      if (job->Function.Invoke)
+        job->Function.Invoke(job->Function.User);
+      if (job->Function.Free && job->Function.User)
+        job->Function.Free(job->Function.User);
+      job->Function = JobFn {};
       job->Completed.store(true, std::memory_order_release);
     }
     catch (...)
     {
+      if (job->Function.Free && job->Function.User)
+        job->Function.Free(job->Function.User);
+      job->Function = JobFn {};
       job->Completed.store(true, std::memory_order_release);
     }
 

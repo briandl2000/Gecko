@@ -29,8 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **GPU sampler** — `IGpuSampler` interface and `VulkanGpuSampler` impl using per-frame timestamp pools. GPU timestamps are rebased to CPU `vkQueueSubmit` time so Perfetto traces line up under their CPU submit calls.
 - **AsyncTraceProfilerSink** — Chrome-trace JSON writer on a worker thread with batched writes, `SetMinLevel` filter, `thread_name` metadata, drains on dtor.
 - **`docs/profiling.md`** — usage guide, GPU sampler timing model, multi-queue notes, and explanation of why GPU zones can legitimately appear before their CPU submit.
+- **ABI lint** — `scripts/lint_abi.py` scans CoreServices interface headers (and `engine.h`) for `std::` types and is wired into `gk test` so the boundary stays clean. Suppression marker `// abi-ok: <reason>` (or `// abi-ok-begin` / `// abi-ok-end` for header-only template regions).
 
 ### Changed
+- **Build system: portable C++23, no fixed compiler.** CMake auto-detects the toolchain (GCC on Linux, MSVC 19.44+ on Windows, aarch64-linux-gnu-g++ for `gk-pi`). Removed the MSYS2/MinGW dependency on Windows; the `gk` workflow now runs from a Developer PowerShell for VS 2022 (or any PowerShell that dot-sources `scripts/setup.ps1`).
+- **CoreServices ABI cleaned up.** All virtuals on `IAllocator`, `IJobSystem`, `IProfiler`, `ILogger`, `IEventBus`, `IModule`, `IProfilerSink`, ... now take only primitives, raw pointers, `const char*`, Gecko PODs, or `gecko::Span<T>` — no `std::string`, `std::span`, `std::function`, or other STL types whose layout differs between MSVC, libstdc++, and libc++.
+- **`gecko::Span<T>`** — new POD `{T*, usize}` view in `include/gecko/core/span.h` that replaces `std::span` on every CoreServices virtual signature. Trivially copyable, layout-stable across toolchains, with both PascalCase and `std::span`-style accessors.
+- **`IJobSystem` is ABI-stable.** `Submit` virtuals now take a `JobFn { Invoke, Free, User }` POD payload; the convenience `Submit<F>(callable, ...)` overload boxes any lambda/`std::function` in the caller's TU. Stateless callables avoid heap allocation entirely. `JobFunction = std::function<void()>` typedef removed.
+- **Shader pipeline portable.** Replaced the C++26 `#embed` path with a CMake helper that emits a 16-byte-per-line `0x..,` header from each `.spv`, so the engine builds against any C++23-conforming compiler.
 - `IWindowsBackend` and `IMonitorsBackend` promoted to services; `PlatformModule` now supports caller-owned backend injection.
 - Runtime trace/log sinks (`TraceFileSink`, `CrashSafeTraceProfilerSink`, `TraceWriter`) migrated to `FileWriter`.
 - `DirIter::Next()` returns `::std::optional<DirEntry>` (was out-reference).
@@ -43,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the example projects to use more of an oop style and make it easier to explore.
 
 ### Fixed
+- **MSVC build** — Win32 sources now include `<Windows.h>` before `<processthreadsapi.h>` / `<ShlObj.h>` / `<fileapi.h>` (wrapped in `// clang-format off` so `IncludeBlocks: Regroup` does not undo the order). Resolves `winnt.h "No Target Architecture"` errors on `cl.exe`.
 - `CreateDir(recursive=true)` no longer writes one byte past `std::string`/`std::wstring` `size()` when terminating path segments (Linux + Win32).
 - Trace sink `WriteFmt` helpers no longer truncate at 1024 bytes — heap fallback via two-pass `vsnprintf` ensures full JSON records.
 - `ConsoleLogSink` heap path no longer overruns its `std::string` buffer by one byte.

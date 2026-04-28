@@ -27,7 +27,7 @@ public:
   /// Foundational services this module depends on. Used by the
   /// module-registry topological sort so graphics initializes after
   /// the services publisher and `PlatformModule`.
-  [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Requires()
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires()
       const noexcept override;
 
   [[nodiscard]] GECKO_API bool Startup(

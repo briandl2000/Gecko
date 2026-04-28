@@ -170,7 +170,7 @@ void EventBus::Send(const EventEmitter& emitter, EventCode code,
     m_EventQueue->push_back(qEvent);
 }
 
-std::size_t EventBus::Dispatch(std::size_t maxCount) noexcept
+::gecko::usize EventBus::Dispatch(::gecko::usize maxCount) noexcept
 {
   GECKO_SCOPE(runtime::labels::General);
 

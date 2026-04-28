@@ -56,6 +56,13 @@ public:
   /// @return The engine on success; `std::nullopt` if any module fails
   ///         to start or the dependency graph is invalid (cycle,
   ///         missing publisher, duplicate publisher).
+  ///
+  /// abi-ok: `std::optional<Engine>` and `std::initializer_list` cross the
+  /// CoreServices DLL boundary. Same-toolchain-per-process is required;
+  /// crossing this with a mismatched STL would corrupt. If cross-toolchain
+  /// plugins ever need to construct an Engine, switch this to
+  /// `Engine* Create(IModule* const* modules, usize count)` and an
+  /// out-pointer/`bool` failure path.
   GECKO_API static ::std::optional<Engine> Create(
       ::std::initializer_list<IModule*> modules) noexcept;
 
@@ -76,6 +83,10 @@ public:
 private:
   Engine() noexcept = default;
 
+  // abi-ok: Engine is moved across the CoreServices DLL boundary by the
+  // factory return; this member's layout must match between producer and
+  // consumer. Safe under the one-toolchain-per-process rule. A cross-
+  // toolchain refactor would PIMPL this behind an opaque `void* m_impl`.
   ::std::unique_ptr<IModuleRegistry> m_registry;
 };
 

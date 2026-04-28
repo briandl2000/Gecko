@@ -30,7 +30,7 @@ public:
 
   virtual void Write(const ProfEvent& event) noexcept override;
   virtual void WriteBatch(
-      ::std::span<const ProfEvent> events) noexcept override;
+      ::gecko::Span<const ProfEvent> events) noexcept override;
   virtual void Flush() noexcept override;
 
 private:

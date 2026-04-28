@@ -74,7 +74,7 @@ struct RecordingSink : ::gecko::IProfilerSink
   {
     Events.push_back(ev);
   }
-  void WriteBatch(::std::span<const ProfEvent> events) noexcept override
+  void WriteBatch(::gecko::Span<const ProfEvent> events) noexcept override
   {
     Events.insert(Events.end(), events.begin(), events.end());
   }
@@ -257,7 +257,7 @@ struct CountingSink : ::gecko::IProfilerSink
   {
     Received.fetch_add(1, ::std::memory_order_relaxed);
   }
-  void WriteBatch(::std::span<const ProfEvent> events) noexcept override
+  void WriteBatch(::gecko::Span<const ProfEvent> events) noexcept override
   {
     Received.fetch_add(static_cast<u32>(events.size()),
                        ::std::memory_order_relaxed);

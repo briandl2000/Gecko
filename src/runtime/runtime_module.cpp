@@ -28,10 +28,10 @@ CoreServicesModule::CoreServicesModule(IJobSystem& jobs, IProfiler& profiler,
   return labels::Runtime;
 }
 
-::std::span<const ::gecko::ServiceId> CoreServicesModule::Publishes()
+::gecko::Span<const ::gecko::ServiceId> CoreServicesModule::Publishes()
     const noexcept
 {
-  return ::std::span<const ::gecko::ServiceId> {Published};
+  return ::gecko::Span<const ::gecko::ServiceId> {Published};
 }
 
 bool CoreServicesModule::Startup(::gecko::IModuleRegistry& modules) noexcept

@@ -89,7 +89,7 @@ public:
     return m_Label;
   }
 
-  ::std::span<const ::gecko::ServiceId> Requires() const noexcept override
+  ::gecko::Span<const ::gecko::ServiceId> Requires() const noexcept override
   {
     static constexpr ::gecko::ServiceId required[] = {
         ::gecko::ServiceIdOf<IJobSystem>(),
@@ -97,7 +97,7 @@ public:
         ::gecko::ServiceIdOf<ILogger>(),
         ::gecko::ServiceIdOf<IEventBus>(),
     };
-    return ::std::span<const ::gecko::ServiceId> {required};
+    return ::gecko::Span<const ::gecko::ServiceId> {required};
   }
 
   bool Startup(IModuleRegistry&) noexcept override

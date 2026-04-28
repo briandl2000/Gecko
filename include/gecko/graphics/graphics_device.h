@@ -64,10 +64,8 @@ class GraphicsDevice
 public:
   virtual ~GraphicsDevice() = default;
 
-  GraphicsDevice(const GraphicsDevice&) =
-      delete ("GraphicsDevice is non-copyable");
-  GraphicsDevice& operator=(const GraphicsDevice&) =
-      delete ("GraphicsDevice is non-copyable");
+  GraphicsDevice(const GraphicsDevice&) = delete;
+  GraphicsDevice& operator=(const GraphicsDevice&) = delete;
 
   GraphicsDevice(GraphicsDevice&&) noexcept = default;
   GraphicsDevice& operator=(GraphicsDevice&&) noexcept = default;

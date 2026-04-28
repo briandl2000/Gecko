@@ -13,10 +13,9 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
+#include "gecko/core/span.h"
 #include "gecko/core/types.h"
 #include "gecko/core/utility/hash.h"
-
-#include <span>
 
 namespace gecko {
 
@@ -42,7 +41,7 @@ struct ServiceId
 template <class T>
 [[nodiscard]] consteval ServiceId ServiceIdOf() noexcept
 {
-  return ServiceId {FNV1a64(__PRETTY_FUNCTION__)};
+  return ServiceId {FNV1a64(GECKO_PRETTY_FUNCTION)};
 }
 
 /// Status returned by registry operations.
@@ -84,7 +83,11 @@ struct IModule
   /// Service IDs this module will publish during `Startup`. The
   /// engine uses this together with `Requires()` to compute startup
   /// order. Default: empty (publishes no services).
-  [[nodiscard]] GECKO_API virtual ::std::span<const ServiceId> Publishes()
+  ///
+  /// Returned as `gecko::Span` rather than `std::span` because this
+  /// is a virtual method on the `CoreServices` DLL boundary; see
+  /// `gecko/core/span.h`.
+  [[nodiscard]] GECKO_API virtual Span<const ServiceId> Publishes()
       const noexcept
   {
     return {};
@@ -94,7 +97,10 @@ struct IModule
   /// The engine guarantees every required ID has been published by
   /// some earlier module before this module's `Startup` is invoked.
   /// Default: empty (no dependencies).
-  [[nodiscard]] GECKO_API virtual ::std::span<const ServiceId> Requires()
+  ///
+  /// See `Publishes()` for why this is `gecko::Span` rather than
+  /// `std::span`.
+  [[nodiscard]] GECKO_API virtual Span<const ServiceId> Requires()
       const noexcept
   {
     return {};
@@ -105,10 +111,8 @@ class ModuleHandle
 {
 public:
   ModuleHandle() = default;
-  ModuleHandle(const ModuleHandle&) =
-      delete ("ModuleHandle is move-only; each handle has unique ownership");
-  ModuleHandle& operator=(const ModuleHandle&) =
-      delete ("ModuleHandle is move-only; each handle has unique ownership");
+  ModuleHandle(const ModuleHandle&) = delete;
+  ModuleHandle& operator=(const ModuleHandle&) = delete;
 
   GECKO_API ModuleHandle(ModuleHandle&& other) noexcept;
   GECKO_API ModuleHandle& operator=(ModuleHandle&& other) noexcept;

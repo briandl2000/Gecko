@@ -153,11 +153,11 @@ GECKO_API ILogger* GetLogger() noexcept;
 #endif
 
 #if GECKO_LOGGING
-#define GECKO_LOG(lvl, label, ...)              \
-  do                                            \
-  {                                             \
-    if (auto* logger = ::gecko::GetLogger())    \
-      logger->Log((lvl), (label), __VA_ARGS__); \
+#define GECKO_LOG(lvl, label, ...)                  \
+  do                                                \
+  {                                                 \
+    if (auto* gk_logger_ = ::gecko::GetLogger())    \
+      gk_logger_->Log((lvl), (label), __VA_ARGS__); \
   } while (0)
 
 #define GECKO_TRACE(label, ...) \

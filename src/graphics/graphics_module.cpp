@@ -21,9 +21,10 @@ constexpr ::gecko::Label GraphicsModule::RootLabel() const noexcept
   return labels::Graphics;
 }
 
-::std::span<const ::gecko::ServiceId> GraphicsModule::Requires() const noexcept
+::gecko::Span<const ::gecko::ServiceId> GraphicsModule::Requires()
+    const noexcept
 {
-  return ::std::span<const ::gecko::ServiceId> {RequiredServices};
+  return ::gecko::Span<const ::gecko::ServiceId> {RequiredServices};
 }
 
 bool GraphicsModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept

@@ -129,7 +129,7 @@ void AsyncTraceProfilerSink::Write(const ProfEvent& event) noexcept
 }
 
 void AsyncTraceProfilerSink::WriteBatch(
-    ::std::span<const ProfEvent> events) noexcept
+    ::gecko::Span<const ProfEvent> events) noexcept
 {
   if (!m_Writer || events.empty())
     return;

@@ -29,10 +29,10 @@ inline void WriteFmt(::gecko::platform::FileWriter* w, const char* fmt,
   static constexpr ::std::size_t StackSize = 4096;
   char stack[StackSize];
 
-  ::va_list ap;
-  ::va_start(ap, fmt);
+  va_list ap;
+  va_start(ap, fmt);
   int n = ::std::vsnprintf(stack, StackSize, fmt, ap);
-  ::va_end(ap);
+  va_end(ap);
   if (n < 0)
     return;
 

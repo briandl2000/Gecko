@@ -19,9 +19,8 @@ public:
   explicit VulkanDevice(const GraphicsDeviceDesc& desc) noexcept;
   ~VulkanDevice() override;
 
-  VulkanDevice(const VulkanDevice&) = delete ("VulkanDevice is not copyable");
-  VulkanDevice& operator=(const VulkanDevice&) =
-      delete ("VulkanDevice is not copyable");
+  VulkanDevice(const VulkanDevice&) = delete;
+  VulkanDevice& operator=(const VulkanDevice&) = delete;
 
   // -- Swapchain -------------------------------------------------
 

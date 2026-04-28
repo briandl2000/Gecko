@@ -7,9 +7,14 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+// clang-format off: <Windows.h> must be included before any sub-header
+// (e.g. <processthreadsapi.h>) so that the architecture macros it sets up
+// are visible to winnt.h.
+#include <Windows.h>
+
 #include <cstddef>
 #include <processthreadsapi.h>
-#include <Windows.h>
+// clang-format on
 
 namespace gecko::platform {
 

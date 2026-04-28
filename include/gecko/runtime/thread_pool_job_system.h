@@ -18,7 +18,7 @@ namespace gecko::runtime {
 
 struct Job
 {
-  JobFunction Function;
+  JobFn Function {};
   JobPriority Priority;
   Label JobLabel;
   JobHandle Handle;
@@ -26,11 +26,18 @@ struct Job
   std::atomic<bool> Completed {false};
 
   Job() = default;
-  Job(JobFunction func, JobPriority prio, gecko::Label label,
+  Job(JobFn func, JobPriority prio, gecko::Label label,
       JobHandle handle) noexcept
-      : Function(std::move(func)), Priority(prio), JobLabel(label),
-        Handle(handle)
+      : Function(func), Priority(prio), JobLabel(label), Handle(handle)
   {}
+
+  ~Job() noexcept
+  {
+    // If the worker ran the job it cleared Function; otherwise we are
+    // tearing down without dispatching, so release captured state.
+    if (Function.Free && Function.User)
+      Function.Free(Function.User);
+  }
 
   // Make non-copyable to avoid atomic copy issues
   Job(const Job&) = delete;
@@ -38,17 +45,22 @@ struct Job
 
   // Allow move operations
   Job(Job&& other) noexcept
-      : Function(std::move(other.Function)), Priority(other.Priority),
+      : Function(other.Function), Priority(other.Priority),
         JobLabel(other.JobLabel), Handle(other.Handle),
         Dependencies(std::move(other.Dependencies)),
         Completed(other.Completed.load())
-  {}
+  {
+    other.Function = JobFn {};
+  }
 
   Job& operator=(Job&& other) noexcept
   {
     if (this != &other)
     {
-      Function = std::move(other.Function);
+      if (Function.Free && Function.User)
+        Function.Free(Function.User);
+      Function = other.Function;
+      other.Function = JobFn {};
       Priority = other.Priority;
       JobLabel = other.JobLabel;
       Handle = other.Handle;
@@ -70,13 +82,13 @@ public:
     Shutdown();
   }
 
-  virtual JobHandle Submit(JobFunction job,
-                           JobPriority priority = JobPriority::Normal,
-                           Label label = Label {}) noexcept override;
-  virtual JobHandle Submit(JobFunction job, const JobHandle* dependencies,
-                           u32 dependencyCount,
-                           JobPriority priority = JobPriority::Normal,
-                           Label label = Label {}) noexcept override;
+  virtual JobHandle SubmitRaw(JobFn job,
+                              JobPriority priority = JobPriority::Normal,
+                              Label label = Label {}) noexcept override;
+  virtual JobHandle SubmitRaw(JobFn job, const JobHandle* dependencies,
+                              u32 dependencyCount,
+                              JobPriority priority = JobPriority::Normal,
+                              Label label = Label {}) noexcept override;
   virtual void Wait(JobHandle handle) noexcept override;
   virtual void WaitAll(const JobHandle* handles, u32 count) noexcept override;
   virtual bool IsComplete(JobHandle handle) noexcept override;

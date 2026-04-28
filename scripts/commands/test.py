@@ -72,6 +72,16 @@ def register(subparsers) -> None:
 def _run(args) -> int:
     config = "Debug" if args.config == "debug" else "Release"
 
+    # Run the ABI lint first -- cheap, fails fast if a CoreServices
+    # interface header sprouted a `std::*` type in a virtual signature.
+    lint_script = Path(_REPO_ROOT) / "scripts" / "lint_abi.py"
+    if lint_script.is_file():
+        lint_rc = subprocess.run(
+            [sys.executable, str(lint_script)], cwd=_REPO_ROOT, check=False
+        ).returncode
+        if lint_rc != 0:
+            return lint_rc
+
     # Decide which targets to build & run
     if args.all:
         targets = UNIT_TARGETS + FEATURE_TARGETS

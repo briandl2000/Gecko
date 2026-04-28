@@ -12,8 +12,9 @@ else()
   set(GECKO_VERSION_FULL "${PROJECT_VERSION}-${GECKO_VERSION_PRERELEASE}")
 endif()
 
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Generate version.h from template with real values stamped in
 configure_file(
@@ -37,7 +38,18 @@ endif()
 # Compiler warnings — GCC and Clang share these flags.
 # The MSVC path covers clang-cl or native MSVC if ever used.
 if(MSVC)
-    add_compile_options(/W4 /WX)
+    add_compile_options(
+        /W4 /WX
+        # C4201: nameless struct/union -- used intentionally in math vector types.
+        /wd4201
+        # C4324: structure padded due to __declspec(align()) -- expected for
+        # cache-aligned PODs like LogMessage / ProfEvent.
+        /wd4324
+    )
+    # Silence MSVC's "use _s suffixed" deprecations for portable C APIs
+    # (getenv, fopen, sscanf, ...). We code to the portable Standard C
+    # surface; the _s variants are not portable.
+    add_compile_definitions(_CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_WARNINGS)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Werror -Wno-unused-parameter)
 endif()
