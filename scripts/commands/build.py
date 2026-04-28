@@ -50,7 +50,10 @@ def _auto_configure() -> int:
     # picks whatever is on PATH (gcc on Linux, MSVC on Windows, the
     # cross compiler when invoked via gk-pi's toolchain file).
     toolchain = env.get("CMAKE_TOOLCHAIN_FILE")
-    if not toolchain and "CXX" not in env:
+    # Treat both unset and set-but-empty CC/CXX as "not configured" so an
+    # accidental `export CXX=` doesn't bypass the compiler-presence check
+    # and surface a less actionable CMake error later.
+    if not toolchain and not env.get("CXX") and not env.get("CC"):
         if not (shutil.which("c++") or shutil.which("g++")
                 or shutil.which("clang++") or shutil.which("cl")):
             print("ERROR: No C++ compiler found on PATH.")

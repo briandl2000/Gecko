@@ -7,7 +7,9 @@ static void RunAndFree(JobFn& job) noexcept
 {
   if (job.Invoke)
     job.Invoke(job.User);
-  if (job.Free)
+  // Match ThreadPoolJobSystem and the documented MakeJobFn contract:
+  // only call Free when there is captured state to release.
+  if (job.Free && job.User)
     job.Free(job.User);
 }
 

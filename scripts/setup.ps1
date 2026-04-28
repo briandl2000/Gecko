@@ -51,7 +51,7 @@ function Initialize-VSDev {
     return $true
 }
 
-Initialize-VSDev | Out-Null
+$script:VSDevReady = Initialize-VSDev
 
 # Define the `gk` command.
 $global:GeckoRepoRoot = $script:RepoRoot
@@ -68,6 +68,12 @@ $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
 $env:GECKO_PLATFORM_ID = "Windows-$arch"
 
 $buildDir = "$script:RepoRoot\out\build\$env:GECKO_PLATFORM_ID"
+
+if (-not $script:VSDevReady) {
+    Write-Host "Skipping CMake configure: Visual Studio developer environment not available." -ForegroundColor Yellow
+    Write-Host "Set up VS Build Tools (or pre-set `$env:CC / `$env:CXX) and re-run setup.ps1." -ForegroundColor Yellow
+    return
+}
 
 if (-not (Test-Path "$buildDir\CMakeCache.txt")) {
     Write-Host "Configuring CMake for $env:GECKO_PLATFORM_ID..."

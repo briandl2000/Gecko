@@ -16,13 +16,18 @@ install command for your platform.
 | Python | 3.7 |
 
 Gecko targets **C++23** and lets CMake auto-detect the host compiler.
-Tier-1 verified configurations:
+Tier-1 (gated in CI):
 
-- GCC 13+ on Linux (x86_64).
-- aarch64-linux-gnu-g++ via the docker toolchain in `docker/aarch64-toolchain.cmake` (used by `gk-pi`).
-- MSVC (Visual Studio 2022 17.6+) on Windows.
+- GCC 15 on Linux (x86_64).
+- aarch64-linux-gnu-g++ 15 cross-compile via the docker toolchain in
+  `docker/aarch64-toolchain.cmake` (used by `gk-pi`).
+- MinGW-w64 GCC (UCRT64) on Windows.
 
-Clang on Linux should also work but is not gated in CI.
+Tier-2 (supported, not gated in CI -- developer workstation default):
+
+- MSVC (Visual Studio 2022 17.6+) on Windows. `scripts/setup.ps1`
+  bootstraps a Developer PowerShell environment.
+- Clang on Linux.
 
 #### Linux (Ubuntu / Debian)
 ```bash

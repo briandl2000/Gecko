@@ -225,7 +225,10 @@ the same process, it's a context.
     boundary-local.
 
   Verified by [`scripts/lint_abi.py`](../../scripts/lint_abi.py), wired
-  into `gk test` and CI. A future cross-toolchain plugin would also
+  into `gk test` (it runs as a pre-step before the test executables).
+  CI does not currently invoke `gk test`; it builds and runs test
+  binaries directly, so the lint is enforced locally via `gk test`
+  rather than by GitHub Actions today. A future cross-toolchain plugin would also
   need a separate C ABI shim (`extern "C" gecko_plugin_register(...)`
   with POD-only types and function pointers); that's deferred until a
   plugin loader exists to validate it.

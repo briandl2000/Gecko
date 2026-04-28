@@ -87,7 +87,7 @@ public:
   /// @returns One-past-the-end iterator (range-for support).
   [[nodiscard]] constexpr T* end() const noexcept
   {
-    return m_Data + m_Count;
+    return m_Count == 0 ? m_Data : m_Data + m_Count;
   }
 
   /// Unchecked element access.
