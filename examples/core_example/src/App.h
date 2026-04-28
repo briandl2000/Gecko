@@ -8,7 +8,7 @@
 #include <gecko/runtime/console_log_sink.h>
 #include <gecko/runtime/event_bus.h>
 #include <gecko/runtime/file_log_sink.h>
-#include <gecko/runtime/ring_logger.h>
+#include <gecko/runtime/immediate_logger.h>
 #include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
 #include <gecko/runtime/thread_pool_job_system.h>
@@ -69,7 +69,7 @@ private:
 
   ::gecko::runtime::ThreadPoolJobSystem m_JobSystem;
   ::gecko::runtime::RingProfiler m_Profiler {1 << 16};
-  ::gecko::runtime::RingLogger m_Logger {1024};
+  ::gecko::runtime::ImmediateLogger m_Logger;
   ::gecko::runtime::EventBus m_EventBus;
 
   ::gecko::runtime::CoreServicesModule m_RuntimeModule;

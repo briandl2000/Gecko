@@ -128,9 +128,6 @@ int App::Run()
   demos::RunProfilerDiagnostics();
 
   GECKO_FRAME(labels::Main, "EndOfDemo");
-  if (auto* logger = ::gecko::GetLogger())
-    logger->Flush();
-
   return 0;
 }
 
