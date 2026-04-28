@@ -1,5 +1,10 @@
 #pragma once
 
+/// @file
+/// `CoreServicesModule` — the lifecycle node that publishes Core's
+/// foundational services (`IJobSystem`, `IProfiler`, `ILogger`,
+/// `IEventBus`) at engine startup.
+
 #include "gecko/core/api.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/jobs.h"
@@ -10,26 +15,32 @@
 namespace gecko::runtime {
 
 namespace labels {
+/// Module label used by the runtime layer.
 inline constexpr ::gecko::Label Runtime = ::gecko::MakeLabel("gecko.runtime");
-}
+}  // namespace labels
 
-// CoreServicesModule is the lifecycle node for the Runtime library.
-//
-// The Runtime layer (Core <- Platform <- Runtime <- Program) is where the
-// concrete implementations of the four foundational service interfaces
-// declared in Core live: IJobSystem, IProfiler, ILogger, IEventBus. It is
-// therefore Runtime's job to publish those impls to the registry.
-//
-// Ownership rule: CoreServicesModule does NOT own the impls — the user
-// constructs them on the stack (or wherever) and passes references in.
-// CoreServicesModule is responsible for Init/Shutdown and PublishService /
-// UnpublishService bookkeeping.
-//
-// Required by every engine instance: pass &runtimeModule as the first
-// module to Engine::Create({...}).
+/// Lifecycle node for the Runtime library.
+///
+/// The Runtime layer (Core <- Platform <- Runtime <- Program) is
+/// where the concrete implementations of Core's four foundational
+/// service interfaces live: `IJobSystem`, `IProfiler`, `ILogger`,
+/// `IEventBus`. `CoreServicesModule` calls `Init`/`Shutdown` on each
+/// and publishes them to the module registry.
+///
+/// **Ownership:** `CoreServicesModule` does NOT own the impls. The
+/// caller constructs them on the stack (or wherever) and passes
+/// references in. Each impl must outlive the module.
+///
+/// Required by every engine instance: pass `&runtimeModule` as the
+/// first module to `Engine::Create({...})`.
 class CoreServicesModule final : public ::gecko::IModule
 {
 public:
+  /// Wire references to the four foundational services.
+  /// @param jobs      Job system implementation.
+  /// @param profiler  Profiler implementation.
+  /// @param logger    Logger implementation.
+  /// @param eventBus  Event bus implementation.
   GECKO_API CoreServicesModule(IJobSystem& jobs, IProfiler& profiler,
                                ILogger& logger, IEventBus& eventBus) noexcept;
 

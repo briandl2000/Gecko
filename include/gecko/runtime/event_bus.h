@@ -1,5 +1,11 @@
 #pragma once
 
+/// @file
+/// `EventBus` — reference `IEventBus` implementation.
+///
+/// Supports both immediate and queued subscriber delivery, plus
+/// per-module emitter capability validation.
+
 #include "gecko/core/services/events.h"
 
 #include <atomic>
@@ -12,6 +18,9 @@
 
 namespace gecko::runtime {
 
+/// Reference event-bus implementation. Routes `Send()` calls to
+/// matching subscribers either immediately on the caller's thread or
+/// queued for `Dispatch()`.
 class EventBus final : public IEventBus
 {
 public:

@@ -1,5 +1,8 @@
 #pragma once
 
+/// @file
+/// `TraceFileSink` — buffered Chrome-trace JSON sink (single-thread).
+
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/profiler.h"
 #include "gecko/platform/platform_io.h"
@@ -9,12 +12,17 @@
 
 namespace gecko::runtime {
 
+/// Mutex-guarded Chrome-trace JSON sink. Buffers events in memory and
+/// flushes on `Flush()` or destruction. Simpler than the async sink;
+/// use when you don't need a worker thread.
 class TraceFileSink final : public IProfilerSink
 {
 public:
+  /// Open `path` for writing.
   explicit TraceFileSink(const char* path);
   ~TraceFileSink();
 
+  /// `true` if the underlying file was opened successfully.
   bool IsOpen() const noexcept
   {
     return m_Writer != nullptr;

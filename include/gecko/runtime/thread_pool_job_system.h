@@ -1,5 +1,9 @@
 ﻿#pragma once
 
+/// @file
+/// `ThreadPoolJobSystem` — priority-queue + dependency-graph
+/// `IJobSystem` implementation backed by a fixed worker-thread pool.
+
 #include "gecko/core/services/jobs.h"
 
 #include <atomic>
@@ -55,6 +59,8 @@ struct Job
   }
 };
 
+/// Worker-pool job-system implementation. Workers pull jobs off a
+/// priority queue and respect declared dependencies.
 class ThreadPoolJobSystem final : public IJobSystem
 {
 public:
@@ -80,6 +86,9 @@ public:
   virtual bool Init() noexcept override;
   virtual void Shutdown() noexcept override;
 
+  /// Override the worker-thread count. Pass `0` (the default) to
+  /// auto-detect from the platform's hardware-thread count. Must be
+  /// called before `Init()` to take effect.
   void SetWorkerThreadCount(u32 count) noexcept
   {
     m_RequestedWorkerCount = count;

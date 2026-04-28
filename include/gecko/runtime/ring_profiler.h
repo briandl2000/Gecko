@@ -1,5 +1,10 @@
 #pragma once
 
+/// @file
+/// `RingProfiler` — lock-free `IProfiler` implementation backed by
+/// a power-of-two ring buffer with an in-process aggregator and
+/// optional per-scope rolling-window watch entries.
+
 #include "gecko/core/services/jobs.h"
 #include "gecko/core/services/profiler.h"
 
@@ -11,9 +16,14 @@
 
 namespace gecko::runtime {
 
+/// Asynchronous profiler backed by a single MPSC ring. Writers emit
+/// `ProfEvent`s; a consumer job drains the ring and forwards events to
+/// every attached `IProfilerSink`. An in-process aggregator updates
+/// per-scope min/max/last/count statistics on every `ZoneEnd`.
 class RingProfiler final : public IProfiler
 {
 public:
+  /// Construct with `capacityPow2` slots (must be a power of two).
   explicit RingProfiler(size_t capacityPow2 = 1u << 20) noexcept;
   RingProfiler() noexcept;
   ~RingProfiler();
@@ -28,6 +38,9 @@ public:
   virtual bool Init() noexcept override;
   virtual void Shutdown() noexcept override;
 
+  /// Pop a single event from the ring without dispatching to sinks.
+  /// Mainly used by tests; production code drains via `Flush()` or the
+  /// background consumer.
   bool TryPop(ProfEvent& event) noexcept;
 
   void AddSink(IProfilerSink* sink) noexcept override;
@@ -64,15 +77,16 @@ public:
   using IProfiler::UnwatchScope;
   using IProfiler::WatchScope;
 
-  // Flushes all pending events to sinks
+  /// Drain all pending events to sinks synchronously.
   void Flush() noexcept;
 
-  // When false, Emit() will not auto-schedule the consumer drain - callers
-  // must invoke Flush() explicitly (or rely on Shutdown's drain) to deliver
-  // events. Default: true. Useful for tests that want a deterministic ring
-  // state and for clients that prefer explicit-flush semantics over the
-  // background-drain scheduling heuristic.
+  /// When `false`, `Emit()` will not auto-schedule the consumer drain;
+  /// callers must invoke `Flush()` explicitly (or rely on `Shutdown`'s
+  /// drain) to deliver events. Default: `true`. Useful for tests that
+  /// want a deterministic ring state and for clients that prefer
+  /// explicit-flush semantics over the background-drain heuristic.
   void SetAutoScheduleEnabled(bool enabled) noexcept;
+  /// Whether auto-scheduling of the consumer drain is enabled.
   bool IsAutoScheduleEnabled() const noexcept;
 
 private:
@@ -182,6 +196,8 @@ private:
   static u64 MonotonicNowNs() noexcept;
 };
 
+/// Stable thread id for the calling thread, suitable for use as
+/// `ProfEvent::ThreadId`.
 u32 ThisThreadId() noexcept;
 
 }  // namespace gecko::runtime

@@ -1,5 +1,9 @@
 #pragma once
 
+/// @file
+/// `TrackingAllocator` — per-`Label` tracking `IAllocator`, plus
+/// supporting types (`MemLabelStats`, `MallocAllocator`).
+
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
 #include "gecko/core/types.h"
@@ -14,10 +18,7 @@
 
 namespace gecko::runtime {
 
-//------------------------------------------------------------
-// Per-Label Stats
-//------------------------------------------------------------
-
+/// Per-label live-bytes / alloc / free counters.
 struct MemLabelStats
 {
   std::atomic<u64> LiveBytes {0};
@@ -48,11 +49,10 @@ struct MemLabelStats
   }
 };
 
-//------------------------------------------------------------
-// MallocAllocator — STL allocator bypassing Gecko
-//------------------------------------------------------------
-// Avoids circular allocation in TrackingAllocator's internal containers.
-
+/// Minimal STL allocator that bypasses `IAllocator` and goes straight
+/// to `std::malloc`/`std::free`. Used inside `TrackingAllocator`'s own
+/// containers so they cannot recurse back through the allocator they
+/// are tracking.
 template <typename T>
 class MallocAllocator
 {
@@ -94,15 +94,13 @@ public:
   }
 };
 
-//------------------------------------------------------------
-// TrackingAllocator
-//------------------------------------------------------------
-// Per-label memory tracking. Uses PlatformAlloc/Free directly with
-// TrackingAllocMagic. Cross-allocator frees are handled: SystemAllocMagic
-// allocations (pre-boot) are forwarded to PlatformFree.
-
+/// Maximum nesting depth for `PushLabel` / `PopLabel`.
 constexpr u32 MaxLabelStackDepth = 64;
 
+/// Per-label-tracking `IAllocator`. Uses `PlatformAlloc`/`PlatformFree`
+/// directly with a `TrackingAllocMagic` header. Cross-allocator frees
+/// are handled: `SystemAllocMagic` allocations (made before boot) are
+/// forwarded to `PlatformFree`.
 class TrackingAllocator final : public IAllocator
 {
 public:
@@ -118,19 +116,26 @@ public:
   bool Init() noexcept override;
   void Shutdown() noexcept override;
 
+  /// Optional profiler used to emit per-label memory counters.
   void SetProfiler(IProfiler* profiler) noexcept
   {
     m_Profiler = profiler;
   }
 
+  /// Total bytes currently live across all labels.
   u64 TotalLiveBytes() const noexcept
   {
     return m_TotalLive.load(std::memory_order_relaxed);
   }
 
+  /// Copy out the stats for `label`. Returns `false` if `label` has no
+  /// recorded allocations.
   bool StatsFor(Label label, MemLabelStats& outStats) const;
+  /// Snapshot every label's stats into `out` (key is `Label::Id`).
   void Snapshot(std::unordered_map<u64, MemLabelStats>& out) const;
+  /// Emit the current per-label counters as profiler events.
   void EmitCounters() noexcept;
+  /// Reset all per-label counters back to zero (does not free memory).
   void ResetCounters() noexcept;
 
 private:

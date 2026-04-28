@@ -1,5 +1,9 @@
 #pragma once
 
+/// @file
+/// `ImmediateLogger` — synchronous `ILogger` implementation that
+/// forwards each call directly to its sinks.
+
 #include "gecko/core/services/log.h"
 
 #include <mutex>
@@ -7,6 +11,9 @@
 
 namespace gecko::runtime {
 
+/// Synchronous logger. Each `LogV` call dispatches to every attached
+/// sink on the calling thread before returning. Suitable for tools and
+/// tests; for production builds prefer `RingLogger`.
 class ImmediateLogger final : public ILogger
 {
 public:
@@ -31,6 +38,8 @@ public:
 
   virtual void Flush() noexcept override;
 
+  /// Toggle a mutex around `LogV` and `Flush` so multiple threads can
+  /// log safely. Off by default for single-threaded use.
   void SetThreadSafe(bool on) noexcept
   {
     m_ThreadSafe = on;
