@@ -33,10 +33,23 @@ import re
 import sys
 from pathlib import Path
 
-# Public interface headers covered by the rule. These are the ones whose
-# virtuals are dispatched through the CoreServices shared-library vtable.
+# Public headers whose declarations cross the CoreServices shared-library
+# boundary. Scanned line-by-line for `std::` types.
+#
+# Includes:
+#   - include/gecko/core/services/  (the IService interfaces themselves)
+#   - include/gecko/core/engine.h   (Engine::Create / dtor / move are
+#                                    GECKO_API and the implementation lives
+#                                    in CoreServices.dll)
+#
+# Other headers under include/gecko/{platform,graphics,runtime}/ live in
+# STATIC libraries -- their GECKO_API decoration is a no-op and they share
+# a TU/STL with their consumer, so std:: types are safe there.
 _SCANNED_DIRS = [
     "include/gecko/core/services",
+]
+_SCANNED_FILES = [
+    "include/gecko/core/engine.h",
 ]
 
 # Pattern matching `std::<identifier>` anywhere on a line. We rely on the
@@ -101,6 +114,14 @@ def main(argv: list[str]) -> int:
             violations = _scan_file(header)
             if violations:
                 bad[header.relative_to(repo_root)] = violations
+    for rel in _SCANNED_FILES:
+        scan_file = repo_root / rel
+        if not scan_file.is_file():
+            print(f"lint_abi: missing scan file: {scan_file}", file=sys.stderr)
+            return 2
+        violations = _scan_file(scan_file)
+        if violations:
+            bad[scan_file.relative_to(repo_root)] = violations
 
     if not bad:
         print("lint_abi: clean")
