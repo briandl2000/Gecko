@@ -1,5 +1,10 @@
 #pragma once
 
+/// @file
+/// Abstract `GraphicsDevice` and the factory that creates concrete
+/// backends. Resource-creation methods return handle types from
+/// `graphics_types.h`; the device must outlive every handle it produces.
+
 #include "gecko/core/api.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/types.h"
@@ -12,36 +17,39 @@
 
 namespace gecko::graphics {
 
-// ── Backend selection ─────────────────────────────────────────────────────
+// Backend selection -------------------------------------------------
 
+/// Concrete backend behind a `GraphicsDevice`.
 enum class GraphicsBackend : u8
 {
-  Null,    ///< Zero-dep no-op backend (default)
-  Vulkan,  ///< Vulkan 1.3 backend
+  Null,    ///< Zero-dep no-op backend (default).
+  Vulkan,  ///< Vulkan 1.3 backend.
 };
 
+/// Parameters for `CreateGraphicsDevice`.
 struct GraphicsDeviceDesc
 {
-  GraphicsBackend Backend {GraphicsBackend::Null};
-  bool Debug {false};  ///< Enable validation layers
-  const char* AppName {"Gecko"};
+  GraphicsBackend Backend {
+      GraphicsBackend::Null};  ///< Which backend to instantiate.
+  bool Debug {false};          ///< Enable validation layers / GPU-side checks.
+  const char* AppName {"Gecko"};  ///< Identifier reported to the driver.
 };
 
-// ── Frame context ─────────────────────────────────────────────────────────
+// -- Frame context ---------------------------------------------------------
 
-/// Returned by `BeginFrame`. Carries the acquired back buffer plus the sync
-/// slot used for that acquisition. Cheap to copy; must be passed to
-/// `Present` (directly or via a span) to complete the frame.
+/// Returned by `BeginFrame`. Carries the acquired back buffer plus
+/// the sync slot used for that acquisition. Cheap to copy; must be
+/// passed to `Present` (directly or via a span) to complete the frame.
 struct FrameContext
 {
-  Swapchain* SC {nullptr};
-  u32 FrameIndex {0};  ///< sync slot [0, MaxFramesInFlight)
-  u32 ImageIndex {0};  ///< acquired swapchain image
-  RenderTarget BackBuffer {};
-  bool Valid {false};
+  Swapchain* SC {nullptr};     ///< Source swapchain pointer.
+  u32 FrameIndex {0};          ///< Sync slot in `[0, MaxFramesInFlight)`.
+  u32 ImageIndex {0};          ///< Acquired swapchain image index.
+  RenderTarget BackBuffer {};  ///< Render target for the acquired image.
+  bool Valid {false};          ///< `true` once acquisition succeeded.
 };
 
-// ── GraphicsDevice ────────────────────────────────────────────────────────
+// -- GraphicsDevice --------------------------------------------------------
 
 /// Abstract graphics device. Concrete backends (`NullDevice`, `VulkanDevice`,
 /// ...) inherit from this class. Users receive a `Unique<GraphicsDevice>`
@@ -64,15 +72,18 @@ public:
   GraphicsDevice(GraphicsDevice&&) noexcept = default;
   GraphicsDevice& operator=(GraphicsDevice&&) noexcept = default;
 
-  // ── Swapchain management ──────────────────────────────────────
+  // Swapchain management ---------------------------------------
 
+  /// Create a swapchain bound to `native` window with `desc`.
   [[nodiscard("Swapchain must be stored to present frames")]]
   GECKO_API virtual Swapchain CreateSwapchain(
       const ::gecko::platform::NativeWindowHandle& native,
       const SwapchainDesc& desc) noexcept = 0;
 
+  /// Destroy a swapchain. The handle is left in an invalid state.
   GECKO_API virtual void DestroySwapchain(Swapchain& swapchain) noexcept = 0;
 
+  /// Re-create the underlying surface to match its window's current size.
   GECKO_API virtual void ResizeSwapchain(Swapchain& swapchain) noexcept = 0;
 
   /// Acquire the next swapchain image and wait on its frame fence.
@@ -91,23 +102,28 @@ public:
     Present(::std::span<const FrameContext> {&frame, 1});
   }
 
-  // ── Command lists ─────────────────────────────────────────────
+  // Command lists ----------------------------------------------
 
+  /// Allocate a graphics command list. Caller fills it and submits via
+  /// `ExecuteGraphicsCommandList`.
   [[nodiscard("Discarding a CommandList without executing it wastes work")]]
   GECKO_API virtual Unique<ICommandList>
   CreateGraphicsCommandList() noexcept = 0;
 
+  /// Allocate a compute command list.
   [[nodiscard("Discarding a CommandList without executing it wastes work")]]
   GECKO_API virtual Unique<ICommandList>
   CreateComputeCommandList() noexcept = 0;
 
+  /// Submit a graphics command list and reclaim its allocator.
   GECKO_API virtual void ExecuteGraphicsCommandList(
       Unique<ICommandList> commandList) noexcept = 0;
 
+  /// Submit a compute command list and reclaim its allocator.
   GECKO_API virtual void ExecuteComputeCommandList(
       Unique<ICommandList> commandList) noexcept = 0;
 
-  // ── Resource creation ─────────────────────────────────────────
+  // Resource creation ------------------------------------------
 
   [[nodiscard(
       "Discarding a RenderTarget immediately releases the GPU resource")]]
@@ -163,21 +179,24 @@ public:
   GECKO_API virtual u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery,
                                        ::std::span<u64> out) noexcept = 0;
 
-  // ── GPU profiler ───────────────────────────────────────────────
+  // GPU profiler -----------------------------------------------
 
-  /// Create a GPU sampler. Returns nullptr on backends that have no
+  /// Create a GPU sampler. Returns `nullptr` on backends that have no
   /// timestamp queries (NullDevice).
   [[nodiscard("Discarding the returned IGpuSampler immediately releases the "
               "GPU resources backing it")]]
   GECKO_API virtual ::gecko::Unique<IGpuSampler> CreateGpuSampler(
       const GpuSamplerDesc& desc) noexcept = 0;
 
-  // ── Data upload ───────────────────────────────────────────────
+  // Data upload ------------------------------------------------
 
+  /// Upload `data` into a mip+slice of `texture`. Stages through a
+  /// CPU-visible buffer when the texture is `Dedicated`.
   GECKO_API virtual void UploadTextureData(
       Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip = 0,
       u32 slice = 0) noexcept = 0;
 
+  /// Upload `data` into `buffer` starting at `offset` bytes.
   GECKO_API virtual void UploadBufferData(Buffer& buffer,
                                           ::std::span<const ::gecko::byte> data,
                                           u32 offset = 0) noexcept = 0;
@@ -186,9 +205,9 @@ protected:
   GraphicsDevice() = default;
 };
 
-// ── Factory ───────────────────────────────────────────────────────────────
+// Factory -----------------------------------------------------------
 
-/// Create a NullDevice (zero-dep, no-op).
+/// Create a `NullDevice` (zero-dep, no-op). Useful for headless tests.
 [[nodiscard]]
 GECKO_API Unique<GraphicsDevice> CreateGraphicsDevice() noexcept;
 

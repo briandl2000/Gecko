@@ -148,7 +148,7 @@ private:
 
 }  // namespace
 
-// ── Public free-function impls ──────────────────────────────────────
+// -- Public free-function impls --------------------------------------
 
 bool Exists(PathView path) noexcept
 {
@@ -393,7 +393,8 @@ bool CreateDir(PathView path, bool recursive) noexcept
   {
     if (i == w.size() || w[i] == L'\\')
     {
-      // Skip the drive-letter prefix (e.g. "C:") — CreateDirectoryW would fail.
+      // Skip the drive-letter prefix (e.g. "C:") -- CreateDirectoryW would
+      // fail.
       if (i == 2 && w.size() >= 2 && w[1] == L':')
         continue;
       ::std::wstring sub(w, 0, i);

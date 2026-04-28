@@ -1,5 +1,8 @@
 #pragma once
 
+/// @file
+/// `Engine` -- RAII owner of the module / service lifecycle.
+
 #include "gecko/core/api.h"
 #include "gecko/core/services/modules.h"
 
@@ -9,45 +12,54 @@
 
 namespace gecko {
 
-// RAII owner for the engine's module / service lifecycle.
-//
-// Engine::Create takes the modules to install. Internally it constructs
-// a runtime ModuleRegistry, registers each module, then runs Startup in
-// dependency order (computed from each module's Requires() / Publishes()
-// declarations). On destruction Shutdown runs in reverse order.
-//
-// Usage:
-//
-//   ::gecko::SetAllocator(&myAllocator);  // optional, before Create
-//
-//   ::gecko::runtime::EventBus events;
-//   MyJobSystem jobs;
-//   MyProfiler  profiler;
-//   MyLogger    logger;
-//   ::gecko::runtime::CoreServicesModule runtimeModule(jobs, profiler, logger,
-//                                                 events);
-//   ::gecko::platform::PlatformModule platformModule;
-//   MyAppModule  app;
-//
-//   auto engine = ::gecko::Engine::Create(
-//       {&runtimeModule, &platformModule, &app});
-//   if (!engine)
-//     return 1;
-//
-//   // ... services are live for the rest of this scope ...
-//   // ~Engine() shuts every module down in reverse topological order.
-//
-// Engine is move-only. A moved-from instance is inert.
+/// RAII owner for the engine's module / service lifecycle.
+///
+/// `Engine::Create` takes the list of modules to install. Internally
+/// it constructs a runtime `ModuleRegistry`, registers each module,
+/// then runs `Startup` in dependency order (computed from each
+/// module's `Requires()` / `Publishes()` declarations). On destruction
+/// `Shutdown` runs in reverse order.
+///
+/// `Engine` is move-only; a moved-from instance is inert.
+///
+/// @par Usage
+/// @code
+/// ::gecko::SetAllocator(&myAllocator);  // optional, before Create
+///
+/// ::gecko::runtime::EventBus events;
+/// MyJobSystem jobs;
+/// MyProfiler  profiler;
+/// MyLogger    logger;
+/// ::gecko::runtime::CoreServicesModule runtimeModule(jobs, profiler, logger,
+///                                                    events);
+/// ::gecko::platform::PlatformModule platformModule;
+/// MyAppModule  app;
+///
+/// auto engine = ::gecko::Engine::Create(
+///     {&runtimeModule, &platformModule, &app});
+/// if (!engine)
+///   return 1;
+///
+/// // ... services are live for the rest of this scope ...
+/// // ~Engine() shuts every module down in reverse topological order.
+/// @endcode
 class Engine
 {
 public:
-  // Constructs the registry, registers each module, then runs Startup in
-  // topological order. Returns std::nullopt if any module fails to start
-  // or if the dependency graph is invalid (cycle, missing publisher,
-  // duplicate publisher).
+  /// Construct an engine and start every module.
+  ///
+  /// Constructs the registry, registers each supplied module, then
+  /// runs `Startup` in topological order.
+  ///
+  /// @param modules Modules to install. Order is irrelevant; the
+  ///        registry topologically sorts them.
+  /// @return The engine on success; `std::nullopt` if any module fails
+  ///         to start or the dependency graph is invalid (cycle,
+  ///         missing publisher, duplicate publisher).
   GECKO_API static ::std::optional<Engine> Create(
       ::std::initializer_list<IModule*> modules) noexcept;
 
+  /// Runs `Shutdown` on every module in reverse topological order.
   GECKO_API ~Engine() noexcept;
 
   GECKO_API Engine(Engine&& other) noexcept;
@@ -56,9 +68,9 @@ public:
   Engine(const Engine&) = delete;
   Engine& operator=(const Engine&) = delete;
 
-  // Returns the live module registry. Precondition: this Engine has not
-  // been moved from. Calling Modules() on a moved-from instance is a
-  // contract violation and triggers an assertion.
+  /// @return The live module registry.
+  /// @pre This `Engine` has not been moved from. Calling on a
+  ///      moved-from instance fires a `GECKO_ASSERT`.
   [[nodiscard]] GECKO_API IModuleRegistry& Modules() noexcept;
 
 private:

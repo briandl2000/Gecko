@@ -1,4 +1,4 @@
-﻿#include "gecko/runtime/tracking_allocator.h"
+#include "gecko/runtime/tracking_allocator.h"
 
 #include "gecko/core/assert.h"
 #include "gecko/core/services/log.h"
@@ -11,9 +11,9 @@
 
 namespace gecko::runtime {
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Thread-local allocation context
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 namespace {
 constexpr Label g_DefaultLabel = MakeLabel("gecko.default");
@@ -28,9 +28,9 @@ thread_local ThreadAllocContext g_AllocContext;
 
 }  // namespace
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Label Stack
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 void TrackingAllocator::PushLabel(Label label) noexcept
 {
@@ -58,9 +58,9 @@ Label TrackingAllocator::CurrentLabel() const noexcept
   return g_AllocContext.LabelStack[g_AllocContext.StackDepth - 1];
 }
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Alloc / Free
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
 {
@@ -134,7 +134,7 @@ void TrackingAllocator::Free(void* ptr) noexcept
   }
   else if (header->Magic == SystemAllocMagic)
   {
-    // Pre-boot allocation — header is valid, just free it.
+    // Pre-boot allocation -- header is valid, just free it.
     void* rawPtr = RawPtrFromHeader(header);
     u32 alignment = header->Alignment;
     header->Magic = 0;

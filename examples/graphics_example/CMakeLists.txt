@@ -7,6 +7,7 @@ endif()
 
 add_executable(graphics_example
   src/main.cpp
+  src/App.cpp
 )
 
 target_link_libraries(graphics_example

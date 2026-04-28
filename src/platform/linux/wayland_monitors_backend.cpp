@@ -95,7 +95,7 @@ static void OutputName(void* data, ::wl_output* /*output*/, const char* name)
 static void OutputDescription(void* /*data*/, ::wl_output* /*output*/,
                               const char* /*description*/)
 {
-  // Not used — we prefer the short name.
+  // Not used -- we prefer the short name.
 }
 
 static constexpr ::wl_output_listener OutputListener = {
@@ -241,7 +241,7 @@ void WaylandMonitorsBackend::HandleGlobal(::wl_registry* registry, u32 name,
 
   m_Monitors.push_back(entry);
 
-  // Listener data points into the list — stable through insert and erase.
+  // Listener data points into the list -- stable through insert and erase.
   ::wl_output_add_listener(output, &OutputListener, &m_Monitors.back());
 
   m_Dirty = true;

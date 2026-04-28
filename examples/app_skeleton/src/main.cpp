@@ -1,66 +1,14 @@
+#include "App.h"
+
 #include <cstdio>
 #include <cstring>
-#include <gecko/core/engine.h>
-#include <gecko/core/scope.h>
-#include <gecko/core/services.h>
-#include <gecko/core/services/log.h>
-#include <gecko/core/services/modules.h>
-#include <gecko/core/types.h>
-#include <gecko/core/utility/thread.h>
-#include <gecko/core/version.h>
-#include <gecko/platform/platform_module.h>
-#include <gecko/runtime/console_log_sink.h>
-#include <gecko/runtime/event_bus.h>
-#include <gecko/runtime/file_log_sink.h>
-#include <gecko/runtime/ring_logger.h>
-#include <gecko/runtime/ring_profiler.h>
-#include <gecko/runtime/runtime_module.h>
-#include <gecko/runtime/thread_pool_job_system.h>
-#include <gecko/runtime/tracking_allocator.h>
 #include <string_view>
-
-using namespace gecko;
-using namespace gecko::platform;
 
 namespace {
 
-namespace app::app_skeleton::labels {
-inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.app_skeleton");
-inline constexpr ::gecko::Label Main =
-    ::gecko::MakeLabel("app.app_skeleton.main");
-}  // namespace app::app_skeleton::labels
+using ::gecko::examples::app_skeleton::AppConfig;
 
-class AppSkeletonModule final : public ::gecko::IModule
-{
-public:
-  [[nodiscard]] ::gecko::Label RootLabel() const noexcept override
-  {
-    return app::app_skeleton::labels::App;
-  }
-
-  [[nodiscard]] bool Startup(
-      ::gecko::IModuleRegistry& /*modules*/) noexcept override
-  {
-    return true;
-  }
-
-  void Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept override
-  {}
-};
-
-AppSkeletonModule g_AppModule;
-
-}  // namespace
-
-struct AppConfig
-{
-  const char* title = "Gecko App";
-  bool windowed = true;
-  u32 maxFrames = 0;  // 0 = run until close
-  DisplayBackendKind backend = DisplayBackendKind::Auto;
-};
-
-static void PrintUsage(const char* exe)
+void PrintUsage(const char* exe)
 {
   ::std::fprintf(
       stderr,
@@ -75,29 +23,29 @@ static void PrintUsage(const char* exe)
       exe ? exe : "app_skeleton");
 }
 
-static bool StartsWith(::std::string_view s, ::std::string_view prefix)
+bool StartsWith(::std::string_view s, ::std::string_view prefix)
 {
   return s.size() >= prefix.size() && s.substr(0, prefix.size()) == prefix;
 }
 
-static bool ParseU32(::std::string_view s, u32& out)
+bool ParseU32(::std::string_view s, ::gecko::u32& out)
 {
   if (s.empty())
     return false;
-  u64 value = 0;
+  ::gecko::u64 value = 0;
   for (char c : s)
   {
     if (c < '0' || c > '9')
       return false;
-    value = value * 10 + static_cast<u64>(c - '0');
+    value = value * 10 + static_cast<::gecko::u64>(c - '0');
     if (value > 0xFFFFFFFFu)
       return false;
   }
-  out = static_cast<u32>(value);
+  out = static_cast<::gecko::u32>(value);
   return true;
 }
 
-static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
+bool ParseArgs(int argc, char** argv, AppConfig& cfg)
 {
   for (int i = 1; i < argc; ++i)
   {
@@ -108,16 +56,14 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
       PrintUsage(argv[0]);
       return false;
     }
-
     if (arg == "--no-window")
     {
       cfg.windowed = false;
       continue;
     }
-
     if (StartsWith(arg, "--frames="))
     {
-      ::std::string_view value = arg.substr(::std::strlen("--frames="));
+      auto value = arg.substr(::std::strlen("--frames="));
       if (!ParseU32(value, cfg.maxFrames))
       {
         ::std::fprintf(stderr, "Invalid --frames value: %.*s\n",
@@ -126,29 +72,21 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
       }
       continue;
     }
-
     if (StartsWith(arg, "--title="))
     {
-      // argv storage stays valid for the life of the process.
       cfg.title = argv[i] + ::std::strlen("--title=");
       continue;
     }
-
     if (StartsWith(arg, "--backend="))
     {
-      ::std::string_view value = arg.substr(::std::strlen("--backend="));
+      using ::gecko::platform::DisplayBackendKind;
+      auto value = arg.substr(::std::strlen("--backend="));
       if (value == "auto")
-      {
         cfg.backend = DisplayBackendKind::Auto;
-      }
       else if (value == "null")
-      {
         cfg.backend = DisplayBackendKind::Null;
-      }
       else if (value == "xlib")
-      {
         cfg.backend = DisplayBackendKind::Xlib;
-      }
       else
       {
         ::std::fprintf(stderr, "Invalid --backend value: %.*s\n",
@@ -163,143 +101,17 @@ static bool ParseArgs(int argc, char** argv, AppConfig& cfg)
     PrintUsage(argv[0]);
     return false;
   }
-
   return true;
 }
 
-static int AppMain(int argc, char** argv)
-{
-  int result = 0;
+}  // namespace
 
+int main(int argc, char** argv)
+{
   AppConfig cfg {};
   if (!ParseArgs(argc, argv, cfg))
-  {
-    // ParseArgs prints usage on errors/help.
     return 2;
-  }
 
-  // 1) Allocator is infrastructure — install it before anything else.
-  runtime::TrackingAllocator trackingAlloc;
-  if (!SetAllocator(&trackingAlloc))
-    return 1;
-
-  // 2) Choose concrete implementations for the remaining services.
-  runtime::ThreadPoolJobSystem jobSystem;
-  jobSystem.SetWorkerThreadCount(4);
-
-  runtime::RingProfiler ringProfiler(1 << 16);
-  runtime::RingLogger ringLogger(1024);
-
-  runtime::EventBus eventBus;
-
-  runtime::CoreServicesModule runtimeModule(jobSystem, ringProfiler, ringLogger,
-                                            eventBus);
-  platform::PlatformConfig platformCfg;
-  platformCfg.Backend = cfg.backend;
-  platform::PlatformModule platformModule(platformCfg);
-
-  // 3) Boot the engine. Modules are started in topological order based
-  // on each module's Requires() / Publishes() declarations.
-  auto engine = Engine::Create({&runtimeModule, &platformModule, &g_AppModule});
-  if (!engine)
-  {
-    ResetAllocator();
-    return 1;
-  }
-
-  // 3) Configure sinks AFTER services are installed - they auto-unregister
-  // when destroyed
-  runtime::ConsoleLogSink consoleSink;
-  runtime::FileLogSink fileSink("log.txt");
-
-  if (auto* logger = GetLogger())
-  {
-    consoleSink.RegisterWith(logger);
-    fileSink.RegisterWith(logger);
-    logger->SetLevel(LogLevel::Info);
-  }
-
-  GECKO_INFO(app::app_skeleton::labels::Main, gecko::VersionFullString());
-
-  // 4) Run either headless or windowed.
-
-  if (!cfg.windowed)
-  {
-    GECKO_INFO(app::app_skeleton::labels::Main, "Running headless");
-    // Your headless work goes here.
-    GECKO_SLEEP_MS(10);
-  }
-  else
-  {
-    WindowDesc windowDesc {};
-    windowDesc.Title = cfg.title;
-    windowDesc.Size = {1280, 720};
-    windowDesc.Visible = true;
-    windowDesc.Resizable = true;
-
-    WindowHandle window =
-        ::gecko::platform::GetWindows()->CreateWindow(windowDesc);
-    if (!window.IsValid())
-    {
-      GECKO_ERROR(app::app_skeleton::labels::Main, "Failed to create window");
-      return 1;
-    }
-
-    bool running = true;
-    u32 frames = 0;
-
-    auto closeSub = gecko::SubscribeEvent(
-        events::WindowCloseRequested,
-        [](void* user, const gecko::EventMeta&, gecko::EventView) {
-          *static_cast<bool*>(user) = false;
-        },
-        &running);
-
-    while (running && ::gecko::platform::GetWindows()->IsWindowAlive(window))
-    {
-      GECKO_SCOPE_NAMED(app::app_skeleton::labels::Main, "Frame");
-
-      ::gecko::platform::PumpEvents();
-      (void)gecko::DispatchEvents();
-
-      // Your update/render work goes here.
-      GECKO_SLEEP_MS(16);
-
-      ++frames;
-      if (cfg.maxFrames != 0 && frames >= cfg.maxFrames)
-      {
-        running = false;
-      }
-    }
-
-    ::gecko::platform::GetWindows()->DestroyWindow(window);
-  }
-
-  // Unregister sinks before shutting down services
-  consoleSink.Unregister();
-  fileSink.Unregister();
-
-  // 5) Shutdown: ~Engine() runs UninstallServices when `engine` goes out
-  // of scope. Allocator is infrastructure, reset it explicitly.
-  engine.reset();
-  ResetAllocator();
-  return result;
+  ::gecko::examples::app_skeleton::App app(cfg);
+  return app.Run();
 }
-
-#if defined(GECKO_PLATFORM_WINDOWS)
-// On Windows, you typically choose ONE of:
-// - main(int,char**) for a console subsystem app
-// - wmain(int,wchar_t**) to preserve Unicode arguments
-// - WinMain/wWinMain for a GUI subsystem app
-// Gecko does not currently provide an entrypoint abstraction; route into
-// AppMain.
-int main(int argc, char** argv)
-{
-  return AppMain(argc, argv);
-}
-#else
-int main(int argc, char** argv)
-{
-  return AppMain(argc, argv);
-}
-#endif

@@ -7,7 +7,7 @@
 
 namespace gecko::graphics {
 
-// ── Per-OS backends (defined in vulkan/<os>/vulkan_*_surface.cpp) ─────────
+// -- Per-OS backends (defined in vulkan/<os>/vulkan_*_surface.cpp) ---------
 
 #if defined(GECKO_GRAPHICS_VULKAN_XLIB)
 VkResult CreateXlibSurface(VkInstance,
@@ -27,7 +27,7 @@ VkResult CreateWin32Surface(VkInstance,
                             VkSurfaceKHR*) noexcept;
 #endif
 
-// ── Public API ────────────────────────────────────────────────────────────
+// -- Public API ------------------------------------------------------------
 
 ::std::span<const char* const> GetRequiredSurfaceExtensions() noexcept
 {

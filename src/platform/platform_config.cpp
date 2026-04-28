@@ -39,7 +39,7 @@ namespace {
     return true;
   }
   GECKO_WARN(labels::Platform,
-             "X11: XOpenDisplay failed – DISPLAY not set or X server "
+             "X11: XOpenDisplay failed - DISPLAY not set or X server "
              "unreachable");
   return false;
 #else
@@ -57,7 +57,7 @@ namespace {
     return true;
   }
   GECKO_WARN(labels::Platform,
-             "Wayland: wl_display_connect failed – WAYLAND_DISPLAY not set or "
+             "Wayland: wl_display_connect failed - WAYLAND_DISPLAY not set or "
              "compositor unreachable");
   return false;
 #else
@@ -142,7 +142,7 @@ PlatformConfig Resolve(const PlatformConfig& requested) noexcept
     return resolved;
   }
 
-  // Explicit backend requested — verify it's available.
+  // Explicit backend requested -- verify it's available.
   if (!IsBackendAvailable(resolved.Backend))
   {
     const DisplayBackendKind fallback = ProbeBackend();

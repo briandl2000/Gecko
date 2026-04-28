@@ -1,17 +1,23 @@
 #pragma once
 
+/// @file
+/// Platform-agnostic key and mouse-button enumerations.
+///
+/// Values match Win32 Virtual-Key codes so the Win32 backend can pass
+/// native codes through unchanged. X11, Wayland and Cocoa backends
+/// translate their native codes into these. Letter and digit values
+/// match ASCII for convenient direct comparison.
+
 #include "gecko/core/types.h"
 
 namespace gecko::platform {
 
-// Platform-agnostic key codes.
-// Values match Win32 Virtual-Key codes so that Win32 can pass them through
-// directly. X11/Wayland/Cocoa backends translate their native codes to these.
+/// Platform-agnostic keyboard key identifier. See `IInput` for usage.
 enum class KeyCode : u16
 {
   Unknown = 0x00,
 
-  // Mouse buttons (VK_LBUTTON – VK_XBUTTON2)
+  // Mouse buttons (VK_LBUTTON - VK_XBUTTON2)
   MouseLeft = 0x01,
   MouseRight = 0x02,
   MouseMiddle = 0x04,
@@ -45,7 +51,7 @@ enum class KeyCode : u16
   Insert = 0x2D,
   Delete = 0x2E,
 
-  // Digits (match ASCII '0'–'9')
+  // Digits (match ASCII '0'-'9')
   D0 = 0x30,
   D1 = 0x31,
   D2 = 0x32,
@@ -57,7 +63,7 @@ enum class KeyCode : u16
   D8 = 0x38,
   D9 = 0x39,
 
-  // Letters (match ASCII 'A'–'Z')
+  // Letters (match ASCII 'A'-'Z')
   A = 0x41,
   B = 0x42,
   C = 0x43,
@@ -150,7 +156,7 @@ enum class KeyCode : u16
   PrintScreen = 0x2C,
 };
 
-// Mouse button indices for WindowMouseButtonPayload
+/// Mouse button identifier (matches the indices in `WindowMouseButtonPayload`).
 enum class MouseButton : u8
 {
   Left = 0,

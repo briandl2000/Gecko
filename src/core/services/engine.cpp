@@ -25,7 +25,7 @@ namespace gecko {
     return ::std::nullopt;
   }
 
-  // Register every user module. Skip nulls silently — some app code
+  // Register every user module. Skip nulls silently -- some app code
   // passes optional modules conditionally.
   for (IModule* m : modules)
   {

@@ -1,5 +1,13 @@
 #pragma once
 
+/// @file
+/// `GraphicsModule` engine module.
+///
+/// The graphics module emits startup/shutdown diagnostics and depends
+/// on the foundational services so the topological sort orders it
+/// after the services-publisher (and, transitively, after
+/// `PlatformModule`).
+
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/jobs.h"
 #include "gecko/core/services/log.h"
@@ -8,17 +16,17 @@
 
 namespace gecko::graphics {
 
-// Graphics library's module. Stack-construct one and pass it to
-// Engine::Create({...}).
+/// Engine module for the graphics library. Stack-construct one and
+/// pass it to `Engine::Create({...})`.
 class GraphicsModule final : public ::gecko::IModule
 {
 public:
   [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
       const noexcept override;
 
-  // Graphics startup/shutdown emits diagnostics. Declare the dependency
-  // on the foundational services so the topo sort orders us after the
-  // services-publisher (and after PlatformModule, transitively).
+  /// Foundational services this module depends on. Used by the
+  /// module-registry topological sort so graphics initializes after
+  /// the services publisher and `PlatformModule`.
   [[nodiscard]] GECKO_API ::std::span<const ::gecko::ServiceId> Requires()
       const noexcept override;
 

@@ -8,21 +8,21 @@ namespace gecko::platform {
 
 inline KeyCode X11KeySymToKeyCode(unsigned long keysym) noexcept
 {
-  // Letters (XK_a–XK_z and XK_A–XK_Z → KeyCode::A–Z)
+  // Letters (XK_a-XK_z and XK_A-XK_Z -> KeyCode::A-Z)
   if (keysym >= XK_a && keysym <= XK_z)
     return static_cast<KeyCode>(0x41 + (keysym - XK_a));
   if (keysym >= XK_A && keysym <= XK_Z)
     return static_cast<KeyCode>(0x41 + (keysym - XK_A));
 
-  // Digits (XK_0–XK_9 → KeyCode::D0–D9)
+  // Digits (XK_0-XK_9 -> KeyCode::D0-D9)
   if (keysym >= XK_0 && keysym <= XK_9)
     return static_cast<KeyCode>(0x30 + (keysym - XK_0));
 
-  // Numpad digits (XK_KP_0–XK_KP_9 → KeyCode::Numpad0–Numpad9)
+  // Numpad digits (XK_KP_0-XK_KP_9 -> KeyCode::Numpad0-Numpad9)
   if (keysym >= XK_KP_0 && keysym <= XK_KP_9)
     return static_cast<KeyCode>(0x60 + (keysym - XK_KP_0));
 
-  // Function keys (XK_F1–XK_F12 → KeyCode::F1–F12)
+  // Function keys (XK_F1-XK_F12 -> KeyCode::F1-F12)
   if (keysym >= XK_F1 && keysym <= XK_F12)
     return static_cast<KeyCode>(0x70 + (keysym - XK_F1));
 

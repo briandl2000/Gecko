@@ -124,7 +124,7 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   }
 
   // Aggregator update for ALL levels (cheap CAS+store). FrameMark no
-  // longer auto-resets — apps can call ResetStats() manually if they want
+  // longer auto-resets -- apps can call ResetStats() manually if they want
   // per-frame reset semantics.
   if (event.Kind == ProfEventKind::ZoneBegin ||
       event.Kind == ProfEventKind::ZoneEnd)
@@ -168,7 +168,7 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   }
   else
   {
-    // overflow — drop event (cheap fallback)
+    // overflow -- drop event (cheap fallback)
     m_DroppedEvents.fetch_add(1, std::memory_order_relaxed);
   }
 }
@@ -176,7 +176,7 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
 bool RingProfiler::TryPop(ProfEvent& event) noexcept
 {
   // Guard against being called after Shutdown() (e.g. trace-sink destructors
-  // running after engine.reset() — they Unregister, which calls Flush, which
+  // running after engine.reset() -- they Unregister, which calls Flush, which
   // calls TryPop). Shutdown swaps the backing storage out, so without this
   // we'd indexing into an empty vector.
   if (m_Ring.empty())
@@ -352,7 +352,7 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   u64 now = NowNs();
   u64 lastTime = m_LastScheduleNs.load(std::memory_order_relaxed);
 
-  // Don't schedule too frequently (at most every 10µs)
+  // Don't schedule too frequently (at most every 10us)
   if (now - lastTime < 10000)  // 10 microseconds
     return;
 

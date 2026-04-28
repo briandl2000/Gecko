@@ -17,7 +17,7 @@ namespace gecko::platform {
 
 namespace {
 
-// ── Key mapping ────────────────────────────────────────────────────────
+// -- Key mapping --------------------------------------------------------
 // KeyCode values match Win32 Virtual-Key codes, so mapping is identity
 // for all defined codes. Unknown VK codes map to KeyCode::Unknown.
 
@@ -77,13 +77,13 @@ KeyCode VkToKeyCode(::WPARAM vk) noexcept
     return static_cast<KeyCode>(code);
 
   default:
-    // Digits 0x30–0x39, Letters 0x41–0x5A
+    // Digits 0x30-0x39, Letters 0x41-0x5A
     if ((code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5A))
       return static_cast<KeyCode>(code);
-    // Numpad 0x60–0x6F
+    // Numpad 0x60-0x6F
     if (code >= 0x60 && code <= 0x6F)
       return static_cast<KeyCode>(code);
-    // Function keys F1–F12 (0x70–0x7B)
+    // Function keys F1-F12 (0x70-0x7B)
     if (code >= 0x70 && code <= 0x7B)
       return static_cast<KeyCode>(code);
     return KeyCode::Unknown;
@@ -117,7 +117,7 @@ constexpr wchar_t WndClassName[] = L"GeckoWindowClass";
 
 Win32WindowsBackend* Win32WindowsBackend::s_Instance = nullptr;
 
-// ── Constructor / Destructor ───────────────────────────────────────────
+// -- Constructor / Destructor -------------------------------------------
 
 Win32WindowsBackend::Win32WindowsBackend() noexcept
 {
@@ -154,7 +154,7 @@ Win32WindowsBackend::~Win32WindowsBackend() noexcept
     s_Instance = nullptr;
 }
 
-// ── Window management ──────────────────────────────────────────────────
+// -- Window management --------------------------------------------------
 
 ::DWORD Win32WindowsBackend::MakeStyle(const WindowDesc& desc) const noexcept
 {
@@ -326,7 +326,7 @@ bool Win32WindowsBackend::RequestClose(WindowHandle window) noexcept
   return true;
 }
 
-// ── Window properties ──────────────────────────────────────────────────
+// -- Window properties --------------------------------------------------
 
 Extent2D Win32WindowsBackend::GetClientSize(WindowHandle window) const noexcept
 {
@@ -436,7 +436,7 @@ NativeWindowHandle Win32WindowsBackend::GetNativeWindowHandle(
   return native;
 }
 
-// ── Window state ───────────────────────────────────────────────────────
+// -- Window state -------------------------------------------------------
 
 void Win32WindowsBackend::SetWindowState(WindowHandle window,
                                          platform::WindowState state) noexcept
@@ -686,7 +686,7 @@ bool Win32WindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
   return entry->AlwaysOnTop;
 }
 
-// ── Cursor ─────────────────────────────────────────────────────────────
+// -- Cursor -------------------------------------------------------------
 
 void Win32WindowsBackend::SetCursorMode(WindowHandle window,
                                         CursorMode mode) noexcept
@@ -702,7 +702,7 @@ void Win32WindowsBackend::SetCursorMode(WindowHandle window,
   if (oldMode == CursorMode::Locked)
     ::ClipCursor(nullptr);
 
-  // ShowCursor uses a global counter — only call when the cursor visibility
+  // ShowCursor uses a global counter -- only call when the cursor visibility
   // actually needs to change, otherwise the counter drifts.
   const bool wasVisible = (oldMode == CursorMode::Normal);
   const bool nowVisible = (mode == CursorMode::Normal);
@@ -736,7 +736,7 @@ CursorMode Win32WindowsBackend::GetCursorMode(
   return entry->Cursor;
 }
 
-// ── Event pump ─────────────────────────────────────────────────────────
+// -- Event pump ---------------------------------------------------------
 
 void Win32WindowsBackend::PumpEvents(
     const gecko::EventEmitter& emitter) noexcept
@@ -755,10 +755,10 @@ void Win32WindowsBackend::PumpEvents(
   FlushStagedEvents();
   // Keep the emitter cached so WM_TIMER can dispatch staged events while
   // Windows is spinning its own modal loop (drag/resize/menu).  The pointer
-  // stays valid — PlatformContext owns the EventEmitter for its lifetime.
+  // stays valid -- PlatformContext owns the EventEmitter for its lifetime.
 }
 
-// ── WndProc ────────────────────────────────────────────────────────────
+// -- WndProc ------------------------------------------------------------
 
 ::LRESULT CALLBACK Win32WindowsBackend::WndProc(::HWND hwnd, ::UINT msg,
                                                 ::WPARAM wParam,
@@ -876,13 +876,13 @@ void Win32WindowsBackend::PumpEvents(
     ::gecko::u32 codepoint = 0;
     if (unit >= 0xD800 && unit <= 0xDBFF)
     {
-      // High surrogate — wait for the low surrogate in the next WM_CHAR.
+      // High surrogate -- wait for the low surrogate in the next WM_CHAR.
       entry->PendingHighSurrogate = static_cast<::gecko::u16>(unit);
       break;
     }
     if (unit >= 0xDC00 && unit <= 0xDFFF)
     {
-      // Low surrogate — combine with stored high surrogate.
+      // Low surrogate -- combine with stored high surrogate.
       if (entry->PendingHighSurrogate == 0)
         break;  // unpaired, drop
       codepoint = 0x10000 +
@@ -1097,7 +1097,7 @@ void Win32WindowsBackend::PumpEvents(
   return ::DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------
 
 Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
     WindowHandle window) noexcept
@@ -1121,7 +1121,7 @@ Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindByHwnd(
     ::HWND hwnd) noexcept
 {
   const u64 id = static_cast<u64>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-  if (id == 0)
+  if (id == WindowHandle::InvalidId)
     return nullptr;
   auto it = m_Windows.find(id);
   return (it != m_Windows.end()) ? &it->second : nullptr;
@@ -1156,7 +1156,7 @@ void Win32WindowsBackend::SetModalFrameCallback(ModalFrameFn callback,
   m_ModalFrameUserData = userData;
 }
 
-// ── Factory ────────────────────────────────────────────────────────────
+// -- Factory ------------------------------------------------------------
 
 Unique<IWindowsBackend> CreateWin32WindowsBackend() noexcept
 {

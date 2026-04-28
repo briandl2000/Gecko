@@ -8,7 +8,7 @@
 
 namespace gecko::graphics {
 
-// ── Platform surface creation ─────────────────────────────────────────────
+// -- Platform surface creation ---------------------------------------------
 //
 // Implemented per-OS in `vulkan/<os>/vulkan_*_surface.cpp`. The
 // CMakeLists.txt only compiles the TUs whose platform was detected.

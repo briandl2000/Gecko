@@ -1,5 +1,14 @@
 #pragma once
 
+/// @file
+/// Backend interface for the platform window system (`IWindowsBackend`).
+///
+/// Concrete implementations live under `src/platform/<backend>/` and are
+/// constructed via `IWindowsBackend::Create`. The high-level `IWindows`
+/// service (see `gecko/platform/window.h` and the platform module) wraps
+/// this interface for application code; most users should not call
+/// `IWindowsBackend` directly.
+
 #include "gecko/core/api.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/events.h"
@@ -33,7 +42,7 @@ public:
   GECKO_API static Unique<IWindowsBackend> Create(
       const PlatformConfig& cfg) noexcept;
 
-  // ── Window management ────────────────────────────────────────
+  // -- Window management ----------------------------------------
 
   [[nodiscard]]
   GECKO_API virtual WindowHandle CreateWindow(
@@ -47,7 +56,7 @@ public:
   [[nodiscard]]
   GECKO_API virtual bool RequestClose(WindowHandle window) noexcept = 0;
 
-  // ── Window properties ────────────────────────────────────────
+  // -- Window properties ----------------------------------------
 
   [[nodiscard]]
   GECKO_API virtual Extent2D GetClientSize(
@@ -73,11 +82,12 @@ public:
   [[nodiscard]]
   GECKO_API virtual DpiInfo GetDpi(WindowHandle window) const noexcept = 0;
 
+  /// Pointer to the underlying native window plus its display/connection.
   [[nodiscard]]
   GECKO_API virtual NativeWindowHandle GetNativeWindowHandle(
       WindowHandle window) const noexcept = 0;
 
-  // ── Window state ─────────────────────────────────────────────
+  // -- Window state ---------------------------------------------
 
   GECKO_API virtual void SetWindowState(WindowHandle window,
                                         WindowState state) noexcept = 0;
@@ -94,7 +104,7 @@ public:
 
   GECKO_API virtual void RequestFocus(WindowHandle window) noexcept = 0;
 
-  // ── Resizability ─────────────────────────────────────────────
+  // -- Resizability ---------------------------------------------
 
   GECKO_API virtual void SetResizable(WindowHandle window,
                                       bool resizable) noexcept = 0;
@@ -102,7 +112,7 @@ public:
   [[nodiscard]]
   GECKO_API virtual bool IsResizable(WindowHandle window) const noexcept = 0;
 
-  // ── Window mode ──────────────────────────────────────────────
+  // -- Window mode ----------------------------------------------
 
   GECKO_API virtual void SetWindowMode(WindowHandle window,
                                        WindowMode mode) noexcept = 0;
@@ -111,7 +121,7 @@ public:
   GECKO_API virtual WindowMode GetWindowMode(
       WindowHandle window) const noexcept = 0;
 
-  // ── Title-bar button control ─────────────────────────────────
+  // -- Title-bar button control ---------------------------------
 
   GECKO_API virtual void SetWindowButtons(WindowHandle window,
                                           WindowButtons buttons) noexcept = 0;
@@ -120,7 +130,7 @@ public:
   GECKO_API virtual WindowButtons GetWindowButtons(
       WindowHandle window) const noexcept = 0;
 
-  // ── Size constraints ─────────────────────────────────────────
+  // -- Size constraints -----------------------------------------
 
   GECKO_API virtual void SetMinSize(WindowHandle window,
                                     Extent2D size) noexcept = 0;
@@ -128,7 +138,7 @@ public:
   GECKO_API virtual void SetMaxSize(WindowHandle window,
                                     Extent2D size) noexcept = 0;
 
-  // ── Always on top ────────────────────────────────────────────
+  // -- Always on top --------------------------------------------
 
   GECKO_API virtual void SetAlwaysOnTop(WindowHandle window,
                                         bool topmost) noexcept = 0;
@@ -136,7 +146,7 @@ public:
   [[nodiscard]]
   GECKO_API virtual bool IsAlwaysOnTop(WindowHandle window) const noexcept = 0;
 
-  // ── Cursor ───────────────────────────────────────────────────
+  // -- Cursor ---------------------------------------------------
 
   GECKO_API virtual void SetCursorMode(WindowHandle window,
                                        CursorMode mode) noexcept = 0;
@@ -145,7 +155,7 @@ public:
   GECKO_API virtual CursorMode GetCursorMode(
       WindowHandle window) const noexcept = 0;
 
-  // ── Event pump ───────────────────────────────────────────────
+  // -- Event pump -----------------------------------------------
   //
   // Process pending OS events and enqueue them on the global event bus
   // using the provided emitter.  Call once per frame via PlatformContext.
@@ -153,7 +163,7 @@ public:
   GECKO_API virtual void PumpEvents(
       const gecko::EventEmitter& emitter) noexcept = 0;
 
-  // ── Modal frame callback ─────────────────────────────────────
+  // -- Modal frame callback -------------------------------------
   //
   // On platforms with modal event loops (Win32 drag/resize), the backend
   // calls this callback at regular intervals so the application can

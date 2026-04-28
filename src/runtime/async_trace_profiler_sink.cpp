@@ -113,7 +113,7 @@ void AsyncTraceProfilerSink::Write(const ProfEvent& event) noexcept
 {
   if (!m_Writer)
     return;
-  // Always allow Counter / Mark events through regardless of min-level —
+  // Always allow Counter / Mark events through regardless of min-level --
   // these are typically per-frame summaries the user explicitly opted into.
   if (event.Kind == ProfEventKind::ZoneBegin ||
       event.Kind == ProfEventKind::ZoneEnd)

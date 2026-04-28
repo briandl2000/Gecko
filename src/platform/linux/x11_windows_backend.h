@@ -21,7 +21,7 @@ using Window = unsigned long;
 
 namespace gecko::platform {
 
-// ── Per-window state ───────────────────────────────────────────────────
+// -- Per-window state ---------------------------------------------------
 
 struct X11WindowState
 {
@@ -41,7 +41,7 @@ struct X11WindowState
   ::Window WindowId {0};
 };
 
-// ── Staged event ───────────────────────────────────────────────────────
+// -- Staged event -------------------------------------------------------
 
 struct StagedEvent
 {
@@ -61,7 +61,7 @@ StagedEvent MakeStagedEvent(gecko::EventCode code, const T& payload) noexcept
   return ev;
 }
 
-// ── MWM hints (Motif) ──────────────────────────────────────────────────
+// -- MWM hints (Motif) --------------------------------------------------
 
 struct MwmHints
 {
@@ -81,7 +81,7 @@ constexpr unsigned long MwmFuncMinimize = 1UL << 3;
 constexpr unsigned long MwmFuncMaximize = 1UL << 4;
 constexpr unsigned long MwmFuncClose = 1UL << 5;
 
-// ── Backend class ──────────────────────────────────────────────────────
+// -- Backend class ------------------------------------------------------
 
 class X11WindowsBackend final : public IWindowsBackend
 {

@@ -36,7 +36,7 @@ static std::atomic<IAllocator*> g_UserAllocator {nullptr};
 
 // Active module registry, owned by gecko::Engine. Set by Engine::Create
 // (via SetActiveModuleRegistry) and cleared on Engine destruction. All
-// service accessors route through this — the engine is the single source
+// service accessors route through this -- the engine is the single source
 // of truth for which implementation is live.
 static std::atomic<IModuleRegistry*> g_Modules {nullptr};
 

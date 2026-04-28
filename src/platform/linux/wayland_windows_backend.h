@@ -27,7 +27,7 @@ struct ::zxdg_toplevel_decoration_v1;
 
 namespace gecko::platform {
 
-// ── Per-window state ───────────────────────────────────────────────────
+// -- Per-window state ---------------------------------------------------
 
 struct WaylandWindowState
 {
@@ -63,7 +63,7 @@ struct WaylandWindowState
   bool Configured {false};
 };
 
-// ── Staged event ───────────────────────────────────────────────────────
+// -- Staged event -------------------------------------------------------
 
 struct StagedEvent
 {
@@ -83,7 +83,7 @@ StagedEvent MakeStagedEvent(gecko::EventCode code, const T& payload) noexcept
   return ev;
 }
 
-// ── Toplevel listener data ─────────────────────────────────────────────
+// -- Toplevel listener data ---------------------------------------------
 
 struct ToplevelListenerData
 {
@@ -91,7 +91,7 @@ struct ToplevelListenerData
   WaylandWindowState* State {nullptr};
 };
 
-// ── Backend class ──────────────────────────────────────────────────────
+// -- Backend class ------------------------------------------------------
 
 class WaylandWindowsBackend final : public IWindowsBackend
 {

@@ -1,5 +1,13 @@
 #pragma once
 
+/// @file
+/// Color-aware writes to standard output / standard error streams.
+///
+/// `Print` / `PrintLine` write UTF-8 text with optional ANSI colour
+/// support. On Win32 the console code page is forced to `CP_UTF8` and
+/// virtual-terminal mode is enabled (Windows 10+); colour is suppressed
+/// automatically when the destination is not a TTY.
+
 #include "gecko/core/api.h"
 #include "gecko/core/types.h"
 
@@ -7,10 +15,10 @@
 
 namespace gecko::platform {
 
-// Terminal text colors. Mirror the ANSI 8-color palette plus
-// "Default" which leaves the terminal default in place. Bright
-// variants use the "bold" / "1;3x" ANSI sequence on POSIX and
-// the FOREGROUND_INTENSITY bit on Win32.
+/// Terminal text colour, mirroring the ANSI 8-colour palette plus a
+/// `Default` value (leave terminal default in place). Bright variants
+/// use the bold / `1;3x` ANSI sequence on POSIX and the
+/// `FOREGROUND_INTENSITY` bit on Win32.
 enum class TermColor : ::gecko::u8
 {
   Default,
@@ -32,43 +40,39 @@ enum class TermColor : ::gecko::u8
   BrightWhite,
 };
 
+/// Standard stream selector for `Print` / `PrintLine`.
 enum class TermStream : ::gecko::u8
 {
-  Stdout,
-  Stderr,
+  Stdout,  ///< Standard output.
+  Stderr,  ///< Standard error.
 };
 
-// Write UTF-8 text to the given standard stream, optionally colorized.
-//
-// On Win32, the console code page is forced to CP_UTF8 once on first
-// use so that multi-byte UTF-8 input is rendered correctly. Console
-// virtual-terminal mode is enabled where supported so the same ANSI
-// escape sequences work cross-platform. Gecko targets Windows 10+,
-// which has VT support; on hosts where VT cannot be enabled, color
-// codes may appear as raw escape sequences.
-//
-// When the target stream is not a TTY (e.g. redirected to a file or
-// piped), color is suppressed entirely so logs and tools never get
-// raw escape codes in their captured output.
+/// Write UTF-8 `text` to `stream`, optionally colorized with `fg`.
+///
+/// On Win32 the console code page is set to `CP_UTF8` once at first use
+/// and virtual-terminal mode is enabled where supported. When `stream`
+/// is not a TTY (redirection or pipe) colour is suppressed so captured
+/// output never contains raw escape sequences.
 GECKO_API void Print(TermStream stream, TermColor fg,
                      ::std::string_view text) noexcept;
 
-// Convenience: write text + newline.
+/// Convenience: write `text` followed by a newline.
 GECKO_API void PrintLine(TermStream stream, TermColor fg,
                          ::std::string_view text) noexcept;
 
-// Default-color writes.
+/// Default-colour overload.
 inline void Print(TermStream stream, ::std::string_view text) noexcept
 {
   Print(stream, TermColor::Default, text);
 }
+/// Default-colour overload.
 inline void PrintLine(TermStream stream, ::std::string_view text) noexcept
 {
   PrintLine(stream, TermColor::Default, text);
 }
 
-// Returns true if the given stream looks like an interactive
-// terminal (will receive color escapes from Print).
+/// `true` if `stream` looks like an interactive terminal (i.e. will
+/// receive colour escapes from `Print`).
 [[nodiscard]] GECKO_API bool IsTerminal(TermStream stream) noexcept;
 
 }  // namespace gecko::platform

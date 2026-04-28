@@ -1,9 +1,19 @@
 #pragma once
 
+/// @file
+/// Axis-aligned bounding boxes (min/max representation).
+///
+/// Provides 2D float (`Aabb2`) and 2D integer (`Aabb2i`) AABBs along with
+/// free helpers (`Size`, `Center`, `Contains`, `Intersects`, `Expand`,
+/// `Union`, `Clamp`). For a position+size rectangle use `Rect2D` from
+/// `gecko/math/rect.h`. The aliases `RectF` / `RectI` are provided for
+/// readability when the AABB represents a viewport-style rectangle.
+
 #include "gecko/math/vector.h"
 
 namespace gecko::math {
 
+/// 2D axis-aligned bounding box stored as inclusive `Min` / `Max`.
 struct Aabb2
 {
   Float2 Min {};
@@ -25,6 +35,7 @@ struct Aabb2
   }
 };
 
+/// 2D integer axis-aligned bounding box stored as inclusive `Min` / `Max`.
 struct Aabb2i
 {
   Int2 Min {};
@@ -132,7 +143,9 @@ struct Aabb2i
   return ::gecko::math::Clamp(p, box.Min, box.Max);
 }
 
+/// Alias: float AABB used as a position-rectangle. See also `Rect2D`.
 using RectF = Aabb2;
+/// Alias: integer AABB used as a position-rectangle. See also `Rect2D`.
 using RectI = Aabb2i;
 
 }  // namespace gecko::math

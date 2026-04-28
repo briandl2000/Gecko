@@ -1,5 +1,21 @@
 #pragma once
 
+/// @file
+/// Row-major square matrices in 2x2, 3x3 and 4x4 sizes.
+///
+/// `Float2x2`, `Float3x3` and `Float4x4` are stored row-major. Default
+/// construction yields the identity matrix. Each type provides a set of
+/// `static` factory methods for common transforms (`Identity`,
+/// `Translation`, `Scale`, `RotationX`/`Y`/`Z`, `LookAt`,
+/// `Orthographic`, `Perspective`).
+///
+/// Conventions:
+/// - Right-handed coordinate system.
+/// - Matrices apply on the **left**: `M * v` (column-vector semantics).
+/// - Angles are in radians.
+/// - `Perspective` produces a clip space matching the engine's GPU
+///   convention (Z in `[-1, 1]`, Y down to GPU swap chain orientation).
+
 #include "gecko/math/vector.h"
 
 namespace gecko::math {
@@ -7,6 +23,7 @@ namespace gecko::math {
 // Forward declaration
 struct Rotor;
 
+/// Row-major 2x2 float matrix. Default constructs to identity.
 struct Float2x2
 {
   union
@@ -52,6 +69,7 @@ struct Float2x2
   }
 };
 
+/// Row-major 3x3 float matrix. Default constructs to identity.
 struct Float3x3
 {
   union
@@ -120,6 +138,8 @@ struct Float3x3
   }
 };
 
+/// Row-major 4x4 float matrix. Default constructs to identity. Used for
+/// affine and projective transforms in 3D space.
 struct Float4x4
 {
   union
@@ -212,6 +232,8 @@ struct Float4x4
             0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
+  /// Build a right-handed view matrix that places the camera at `eye`
+  /// looking toward `target`, with `up` as the world up direction.
   static inline Float4x4 LookAt(const Float3& eye, const Float3& target,
                                 const Float3& up) noexcept
   {
@@ -222,6 +244,8 @@ struct Float4x4
             -f.X, -f.Y, -f.Z, Dot(f, eye),  0.0f, 0.0f, 0.0f, 1.0f};
   }
 
+  /// Build an orthographic projection mapping the box
+  /// `[left, right] x [bottom, top] x [near, far]` into clip space.
   static inline Float4x4 Orthographic(f32 left, f32 right, f32 bottom, f32 top,
                                       f32 near, f32 far) noexcept
   {
@@ -234,6 +258,11 @@ struct Float4x4
             0.0f,      0.0f,      0.0f,       1.0f};
   }
 
+  /// Build a right-handed perspective projection.
+  /// @param fovY    Vertical field of view in radians.
+  /// @param aspect  Width / height aspect ratio.
+  /// @param near    Near plane distance (positive).
+  /// @param far     Far plane distance (positive, > `near`).
   static inline Float4x4 Perspective(f32 fovY, f32 aspect, f32 near,
                                      f32 far) noexcept
   {
@@ -319,6 +348,8 @@ constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
           m.M30 * v.X + m.M31 * v.Y + m.M32 * v.Z + m.M33 * v.W};
 }
 
+/// Transform a 3D **point** by `m` (treats `v` as homogeneous `(v, 1)`).
+/// Use this for positions; translations are applied.
 [[nodiscard]] constexpr Float3 TransformPoint(const Float4x4& m,
                                               const Float3& v) noexcept
 {
@@ -326,6 +357,8 @@ constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
   return {p.X, p.Y, p.Z};
 }
 
+/// Transform a 3D **direction/vector** by `m` (treats `v` as `(v, 0)`).
+/// Use this for directions; translations are ignored.
 [[nodiscard]] constexpr Float3 TransformVector(const Float4x4& m,
                                                const Float3& v) noexcept
 {
@@ -334,12 +367,18 @@ constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
 }
 
 // Rotor conversion functions (declarations)
+/// Convert a unit `Rotor` to its equivalent 3x3 rotation matrix.
 Float3x3 ToMatrix3(const Rotor& r) noexcept;
+/// Convert a unit `Rotor` to its equivalent 4x4 rotation matrix.
 Float4x4 ToMatrix4(const Rotor& r) noexcept;
+/// Recover a unit `Rotor` from a pure 3x3 rotation matrix.
 Rotor ToRotor(const Float3x3& m) noexcept;
 
+/// Lowercase alias for `Float2x2`.
 using float2x2 = Float2x2;
+/// Lowercase alias for `Float3x3`.
 using float3x3 = Float3x3;
+/// Lowercase alias for `Float4x4`.
 using float4x4 = Float4x4;
 
 }  // namespace gecko::math

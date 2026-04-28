@@ -25,7 +25,7 @@ int X11ErrorHandler(::Display* /*display*/, ::XErrorEvent* event)
 }
 }  // namespace
 
-// ── Constructor / Destructor ───────────────────────────────────────────
+// -- Constructor / Destructor -------------------------------------------
 
 X11WindowsBackend::X11WindowsBackend() noexcept
 {
@@ -236,7 +236,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
           static_cast<Atom>(event.xclient.data.l[0]) == m_WmDeleteWindow)
       {
         const u64 id = FindWindowId(event.xclient.window);
-        if (id != 0)
+        if (id != WindowHandle::InvalidId)
         {
           gecko::SendEvent(
               emitter, events::WindowCloseRequested,
@@ -248,7 +248,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 
     case ConfigureNotify: {
       const u64 id = FindWindowId(event.xconfigure.window);
-      if (id == 0)
+      if (id == WindowHandle::InvalidId)
         break;
 
       auto it = m_Windows.find(id);
@@ -281,7 +281,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
     case KeyPress:
     case KeyRelease: {
       const u64 id = FindWindowId(event.xkey.window);
-      if (id == 0)
+      if (id == WindowHandle::InvalidId)
         break;
 
       const bool down = (event.type == KeyPress);
@@ -300,7 +300,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
         const int len =
             ::XLookupString(&event.xkey, buf, sizeof(buf), &sym, &compose);
         // Decode the UTF-8 (XLookupString returns Latin-1, but for the
-        // ASCII subset that's identical to UTF-8 — full Unicode requires
+        // ASCII subset that's identical to UTF-8 -- full Unicode requires
         // an XIM input context which we don't currently set up). Skip
         // C0 control characters except tab/CR/LF.
         if (len > 0)
@@ -361,7 +361,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 
     case MotionNotify: {
       const u64 id = FindWindowId(event.xmotion.window);
-      if (id == 0)
+      if (id == WindowHandle::InvalidId)
         break;
 
       gecko::SendEvent(
@@ -375,7 +375,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
     case ButtonPress:
     case ButtonRelease: {
       const u64 id = FindWindowId(event.xbutton.window);
-      if (id == 0)
+      if (id == WindowHandle::InvalidId)
         break;
 
       const bool down = (event.type == ButtonPress);
@@ -415,7 +415,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
     case FocusIn:
     case FocusOut: {
       const u64 id = FindWindowId(event.xfocus.window);
-      if (id != 0)
+      if (id != WindowHandle::InvalidId)
       {
         const u8 focused = (event.type == FocusIn) ? 1 : 0;
         gecko::SendEvent(emitter, events::WindowFocusChanged,
@@ -427,7 +427,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 
     case EnterNotify: {
       const u64 id = FindWindowId(event.xcrossing.window);
-      if (id != 0)
+      if (id != WindowHandle::InvalidId)
       {
         gecko::SendEvent(
             emitter, events::WindowMouseEntered,
@@ -438,7 +438,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 
     case LeaveNotify: {
       const u64 id = FindWindowId(event.xcrossing.window);
-      if (id != 0)
+      if (id != WindowHandle::InvalidId)
       {
         gecko::SendEvent(
             emitter, events::WindowMouseExited,
@@ -996,7 +996,7 @@ u64 X11WindowsBackend::FindWindowId(::Window xid) const noexcept
 {
   auto it = m_WindowByXid.find(xid);
   if (it == m_WindowByXid.end())
-    return 0;
+    return WindowHandle::InvalidId;
   return it->second;
 }
 

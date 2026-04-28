@@ -7,14 +7,14 @@
 
 namespace gecko::graphics {
 
-// ── Named constants ───────────────────────────────────────────────────────
+// -- Named constants -------------------------------------------------------
 
 inline constexpr u32 MaxSwapchainImages = 8;
 inline constexpr u32 MaxFramesInFlight = 2;
 inline constexpr u32 MaxSwapchainsPerSubmit = 4;
 inline constexpr u32 MaxPushConstantBytes = 128;
 
-// ── Enums ─────────────────────────────────────────────────────────────────
+// -- Enums -----------------------------------------------------------------
 
 enum class ShaderType : u8
 {
@@ -49,21 +49,24 @@ enum class DataFormat : u16
   D16_UNORM,
 };
 
+/// Source format of a `ShaderCode` blob.
 enum class ShaderFormat : u8
 {
   None,
-  SPIRV,        ///< Vulkan native; portable for runtime translation
-  DXIL,         ///< DX12 native
-  GLSL_Source,  ///< runtime-compiled (future)
-  HLSL_Source,  ///< runtime-compiled (future)
+  SPIRV,        ///< Vulkan native; portable for runtime translation.
+  DXIL,         ///< DX12 native.
+  GLSL_Source,  ///< Runtime-compiled (future).
+  HLSL_Source,  ///< Runtime-compiled (future).
 };
 
+/// Discriminator for a `ClearValue`.
 enum class ClearValueType : u8
 {
-  RenderTarget,
-  DepthStencil,
+  RenderTarget,  ///< `Color` is meaningful.
+  DepthStencil,  ///< `Depth` and `Stencil` are meaningful.
 };
 
+/// Logical texture dimension / array-ness.
 enum class TextureType : u8
 {
   None,
@@ -75,6 +78,7 @@ enum class TextureType : u8
   Tex2DArray,
 };
 
+/// Triangle culling mode for a graphics pipeline.
 enum class CullMode : u8
 {
   None,
@@ -82,42 +86,48 @@ enum class CullMode : u8
   Front,
 };
 
+/// Front-face winding order for triangle culling.
 enum class WindingOrder : u8
 {
   ClockWise,
   CounterClockWise,
 };
 
+/// Primitive topology fed to the rasterizer.
 enum class PrimitiveType : u8
 {
   Lines,
   Triangles,
 };
 
+/// Texture filter mode for a `Sampler`.
 enum class SamplerFilter : u8
 {
   Linear,
   Point,
 };
 
+/// Address-mode applied to texture coordinates outside `[0, 1]`.
 enum class SamplerWrapMode : u8
 {
   Wrap,
   Clamp,
 };
 
+/// Kind of resource bound at a pipeline-resource slot.
 enum class ResourceType : u8
 {
   None,
-  Texture,
-  RWTexture,
-  ConstantBuffer,
-  StructuredBuffer,
-  RWStructuredBuffer,
-  Sampler,
-  LocalData,
+  Texture,             ///< Read-only sampled texture.
+  RWTexture,           ///< Read-write storage texture (UAV).
+  ConstantBuffer,      ///< Small uniform block.
+  StructuredBuffer,    ///< Read-only structured buffer.
+  RWStructuredBuffer,  ///< Read-write structured buffer (UAV).
+  Sampler,             ///< Standalone sampler object.
+  LocalData,           ///< Push-constant / inline-data block.
 };
 
+/// `Buffer` usage class. Determines which `*Desc` is meaningful.
 enum class BufferType : u8
 {
   None,
@@ -127,13 +137,15 @@ enum class BufferType : u8
   Structured,
 };
 
+/// Memory residency hint for buffer / texture allocations.
 enum class MemoryType : u8
 {
   None,
-  Shared,
-  Dedicated,
+  Shared,     ///< CPU-visible (upload / readback).
+  Dedicated,  ///< GPU-only (fast path).
 };
 
+/// Comparison function for depth, stencil and shader sampler ops.
 enum class CompareFunc : u8
 {
   Never,
@@ -146,6 +158,7 @@ enum class CompareFunc : u8
   Always,
 };
 
+/// Stencil-buffer operation taken on test result.
 enum class StencilOp : u8
 {
   Keep,
@@ -158,6 +171,7 @@ enum class StencilOp : u8
   DecrementWrap,
 };
 
+/// Source / destination factor for the blending equation.
 enum class BlendFactor : u8
 {
   Zero,
@@ -173,6 +187,7 @@ enum class BlendFactor : u8
   SrcAlphaSaturate,
 };
 
+/// Combine operation applied between source and destination factors.
 enum class BlendOp : u8
 {
   Add,
@@ -182,6 +197,7 @@ enum class BlendOp : u8
   Max,
 };
 
+/// Per-channel write mask for a render-target blend state. Bitwise.
 enum class ColorWriteMask : u8
 {
   None = 0,
@@ -192,8 +208,10 @@ enum class ColorWriteMask : u8
   All = Red | Green | Blue | Alpha,
 };
 
-// ── Utility functions ─────────────────────────────────────────────────────
+// Utility functions -------------------------------------------------
 
+/// Returns the size in bytes of one element of `format`, or `0` if
+/// the format is not a supported single-element type.
 [[nodiscard]] constexpr u32 FormatSizeInBytes(DataFormat format) noexcept
 {
   switch (format)
@@ -233,6 +251,7 @@ enum class ColorWriteMask : u8
   }
 }
 
+/// `true` if `format` is a depth or depth-stencil format.
 [[nodiscard]] constexpr bool IsDepthFormat(DataFormat format) noexcept
 {
   switch (format)
@@ -246,6 +265,7 @@ enum class ColorWriteMask : u8
   }
 }
 
+/// `true` if `format` includes a stencil channel.
 [[nodiscard]] constexpr bool HasStencilComponent(DataFormat format) noexcept
 {
   switch (format)
@@ -257,6 +277,8 @@ enum class ColorWriteMask : u8
   }
 }
 
+/// Compute the full mip-chain count for a 2D texture of `width` x
+/// `height`. Returns `0` if either dimension is zero.
 [[nodiscard]] constexpr u32 CalculateNumberOfMips(u32 width,
                                                   u32 height) noexcept
 {
@@ -272,8 +294,10 @@ enum class ColorWriteMask : u8
   return mips;
 }
 
-// ── Descriptor structs ────────────────────────────────────────────────────
+// Descriptor structs ------------------------------------------------
 
+/// One vertex-stream attribute. `Size` and `Offset` are filled in by
+/// `VertexLayout::AddAttribute` from `AttributeFormat`.
 struct VertexAttribute
 {
   const char* Name {"VertexAttribute"};
@@ -304,6 +328,9 @@ struct VertexAttribute
   }
 };
 
+/// Ordered set of vertex attributes plus a derived stride. Build by
+/// repeatedly calling `AddAttribute()`; each attribute is appended
+/// tightly packed.
 struct VertexLayout
 {
   static constexpr u32 MaxAttributes = 16;
@@ -347,6 +374,8 @@ struct VertexLayout
   }
 };
 
+/// Clear value for a render-target or depth-stencil attachment. Use
+/// the `RenderTarget(...)` and `DepthStencil(...)` factories.
 struct ClearValue
 {
   ClearValueType Type {ClearValueType::RenderTarget};
@@ -377,6 +406,7 @@ struct ClearValue
   }
 };
 
+/// Sampler creation parameters.
 struct SamplerDesc
 {
   SamplerFilter Filter {SamplerFilter::Linear};
@@ -389,6 +419,7 @@ struct SamplerDesc
   }
 };
 
+/// Opaque sampler handle. The device must outlive every `Sampler`.
 struct Sampler
 {
   SamplerDesc Desc {};
@@ -404,6 +435,7 @@ struct Sampler
   }
 };
 
+/// One pipeline binding-table slot. Use the `*Binding(...)` factories.
 struct PipelineResource
 {
   ResourceType Type {ResourceType::None};
@@ -480,6 +512,7 @@ struct PipelineResource
   }
 };
 
+/// Per-face stencil operations and compare function.
 struct StencilOpDesc
 {
   StencilOp Fail {StencilOp::Keep};
@@ -488,6 +521,7 @@ struct StencilOpDesc
   CompareFunc Compare {CompareFunc::Always};
 };
 
+/// Combined depth- and stencil-test state for a graphics pipeline.
 struct DepthStencilState
 {
   bool DepthTestEnable {false};
@@ -500,6 +534,7 @@ struct DepthStencilState
   StencilOpDesc StencilBack {};
 };
 
+/// Per-render-target blend state. Disabled by default.
 struct RenderTargetBlendState
 {
   bool BlendEnable {false};
@@ -512,8 +547,9 @@ struct RenderTargetBlendState
   u8 WriteMask {static_cast<u8>(ColorWriteMask::All)};
 };
 
-// ── Buffer descriptors & object ───────────────────────────────────────────
+// Buffer descriptors & object --------------------------------------
 
+/// Description of a `Buffer` of type `Vertex`.
 struct VertexBufferDesc
 {
   u32 NumVertices {0};
@@ -531,6 +567,7 @@ struct VertexBufferDesc
   }
 };
 
+/// Description of a `Buffer` of type `Index` (32-bit indices).
 struct IndexBufferDesc
 {
   u32 NumIndices {0};
@@ -547,6 +584,7 @@ struct IndexBufferDesc
   }
 };
 
+/// Description of a `Buffer` of type `Constant` (uniform block).
 struct ConstantBufferDesc
 {
   u32 SizeInBytes {0};
@@ -563,6 +601,7 @@ struct ConstantBufferDesc
   }
 };
 
+/// Description of a `Buffer` of type `Structured`.
 struct StructuredBufferDesc
 {
   u32 NumElements {0};
@@ -581,6 +620,12 @@ struct StructuredBufferDesc
   }
 };
 
+/// Opaque buffer handle. Holds the matching `*Desc` for the active
+/// `Type` plus a shared device-pointer payload. The owning device
+/// must outlive every `Buffer`.
+/// Opaque buffer handle. Holds the matching `*Desc` for the active
+/// `Type` plus a shared device-pointer payload. The owning device
+/// must outlive every `Buffer`.
 struct Buffer
 {
   BufferType Type {BufferType::None};
@@ -600,8 +645,9 @@ struct Buffer
   }
 };
 
-// ── Texture descriptor & object ───────────────────────────────────────────
+// Texture descriptor & object ---------------------------------------
 
+/// Description of a texture allocation.
 struct TextureDesc
 {
   u32 Width {0};
@@ -629,6 +675,7 @@ struct TextureDesc
   }
 };
 
+/// Opaque texture handle. The owning device must outlive every `Texture`.
 struct Texture
 {
   TextureDesc Desc {};
@@ -644,8 +691,10 @@ struct Texture
   }
 };
 
-// ── RenderTarget descriptor & object ──────────────────────────────────────
+// RenderTarget descriptor & object ----------------------------------
 
+/// Description of a render-target group (color attachments + optional
+/// depth-stencil).
 struct RenderTargetDesc
 {
   static constexpr u32 MaxRenderTargets = 8;
@@ -680,6 +729,8 @@ struct RenderTargetDesc
   }
 };
 
+/// Opaque render-target handle. Owns the backing color textures plus
+/// the optional depth texture. The owning device must outlive it.
 struct RenderTarget
 {
   RenderTargetDesc Desc {};
@@ -697,8 +748,10 @@ struct RenderTarget
   }
 };
 
-// ── Shader code ───────────────────────────────────────────────────────────
+// Shader code -------------------------------------------------------
 
+/// Shader-source reference. Either points to inline `Bytes` (e.g. via
+/// `#embed`) or to an on-disk `Path`. `Entry` names the entry point.
 struct ShaderCode
 {
   ShaderFormat Format {ShaderFormat::None};
@@ -712,8 +765,9 @@ struct ShaderCode
   }
 };
 
-// ── Pipeline descriptors & objects ────────────────────────────────────────
+// Pipeline descriptors & objects ------------------------------------
 
+/// Description of a graphics pipeline (vertex + pixel shader).
 struct GraphicsPipelineDesc
 {
   ShaderCode VertexShader {};
@@ -731,7 +785,7 @@ struct GraphicsPipelineDesc
   u32 NumPipelineResources {0};
 
   /// Size in bytes of the push-constant block visible to all stages.
-  /// Must be a multiple of 4 and ≤ `MaxPushConstantBytes`.
+  /// Must be a multiple of 4 and <= `MaxPushConstantBytes`.
   u32 PushConstantBytes {0};
 
   CullMode Culling {CullMode::None};
@@ -765,6 +819,7 @@ struct GraphicsPipelineDesc
   }
 };
 
+/// Opaque graphics-pipeline handle. The owning device must outlive it.
 struct GraphicsPipeline
 {
   GraphicsPipelineDesc Desc {};
@@ -780,6 +835,7 @@ struct GraphicsPipeline
   }
 };
 
+/// Description of a compute pipeline.
 struct ComputePipelineDesc
 {
   ShaderCode ComputeShader {};
@@ -789,7 +845,7 @@ struct ComputePipelineDesc
   u32 NumPipelineResources {0};
 
   /// Size in bytes of the push-constant block. Must be a multiple of 4
-  /// and ≤ `MaxPushConstantBytes`.
+  /// and <= `MaxPushConstantBytes`.
   u32 PushConstantBytes {0};
 
   const char* DebugName {nullptr};
@@ -809,6 +865,7 @@ struct ComputePipelineDesc
   }
 };
 
+/// Opaque compute-pipeline handle. The owning device must outlive it.
 struct ComputePipeline
 {
   ComputePipelineDesc Desc {};
@@ -824,8 +881,9 @@ struct ComputePipeline
   }
 };
 
-// ── Swapchain descriptor & object ─────────────────────────────────────────
+// Swapchain descriptor & object -------------------------------------
 
+/// Description of a swapchain attached to a window.
 struct SwapchainDesc
 {
   u32 Width {0};
@@ -870,8 +928,9 @@ struct Swapchain
   }
 };
 
-// ── Query pool (timestamps) ───────────────────────────────────────────────
+// Query pool (timestamps) -------------------------------------------
 
+/// Description of a timestamp query pool.
 struct QueryPoolDesc
 {
   u32 Count {0};
@@ -883,6 +942,7 @@ struct QueryPoolDesc
   }
 };
 
+/// Opaque query-pool handle. The owning device must outlive it.
 struct QueryPool
 {
   QueryPoolDesc Desc {};
