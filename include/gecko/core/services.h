@@ -34,7 +34,7 @@ namespace detail {
 
 /// Engine-internal: install or clear the active module registry.
 ///
-/// User code must not call this directly — use `Engine::Create`, which
+/// User code must not call this directly -- use `Engine::Create`, which
 /// owns the registry lifetime and calls this on boot/teardown.
 GECKO_API void SetActiveModuleRegistry(IModuleRegistry* registry) noexcept;
 

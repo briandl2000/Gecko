@@ -35,7 +35,7 @@
 
 namespace gecko::graphics {
 
-// ── Small allocation helpers (route through Gecko allocator) ─────────────
+// -- Small allocation helpers (route through Gecko allocator) -------------
 
 template <typename T>
 [[nodiscard]] static T* AllocObject() noexcept
@@ -55,7 +55,7 @@ static void FreeObject(T* obj) noexcept
   ::gecko::DeallocBytes(obj);
 }
 
-// ── Debug messenger callback ─────────────────────────────────────────────
+// -- Debug messenger callback ---------------------------------------------
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -69,15 +69,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
   return VK_FALSE;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // VulkanDevice construction / teardown
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::Ctor");
 
-  // ── Instance ──────────────────────────────────────────────────
+  // -- Instance --------------------------------------------------
 
   VkApplicationInfo appInfo {};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -89,7 +89,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   auto surfaceExts = GetRequiredSurfaceExtensions();
 
-  // ── Enumerate available layers / extensions (for graceful fallback) ──
+  // -- Enumerate available layers / extensions (for graceful fallback) --
   ::std::vector<VkExtensionProperties> availableExts;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan,
@@ -197,7 +197,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   m_HasDebugUtils = haveDebugUtils;
 
-  // ── Physical device ───────────────────────────────────────────
+  // -- Physical device -------------------------------------------
 
   u32 physicalDeviceCount = 0;
   {
@@ -256,7 +256,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   }
   m_PresentQueueFamily = m_GraphicsQueueFamily;  // assume unified
 
-  // ── Logical device ────────────────────────────────────────────
+  // -- Logical device --------------------------------------------
 
   f32 queuePriority = 1.0F;
   VkDeviceQueueCreateInfo queueCreateInfo {};
@@ -299,7 +299,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   VkPhysicalDeviceVulkan12Features features12 {};
   features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-  // hostQueryReset is optional — only enable when supported, otherwise
+  // hostQueryReset is optional -- only enable when supported, otherwise
   // fall back to cmdResetQueryPool (see CreateTimestampQueryPool).
   m_HasHostQueryReset = (supported12.hostQueryReset == VK_TRUE);
   features12.hostQueryReset = m_HasHostQueryReset ? VK_TRUE : VK_FALSE;
@@ -330,7 +330,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   vkGetDeviceQueue(m_Device, m_GraphicsQueueFamily, 0, &m_GraphicsQueue);
   m_PresentQueue = m_GraphicsQueue;
 
-  // ── Command pool ──────────────────────────────────────────────
+  // -- Command pool ----------------------------------------------
 
   VkCommandPoolCreateInfo cmdPoolCreateInfo {};
   cmdPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -342,7 +342,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
                                      &m_GraphicsCommandPool));
   }
 
-  // ── VMA allocator ─────────────────────────────────────────────
+  // -- VMA allocator ---------------------------------------------
 
   VmaVulkanFunctions vulkanFunctions {};
   vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
@@ -359,7 +359,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     VULKAN_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator));
   }
 
-  // ── Descriptor pool ───────────────────────────────────────────
+  // -- Descriptor pool -------------------------------------------
   // Example-grade: a single large pool, never reset. Sufficient for the
   // current example (one or two BindTexture calls per frame, short-lived).
   // Production code should switch to per-frame ring pools.
@@ -389,7 +389,7 @@ VulkanDevice::~VulkanDevice()
   if (m_Device != VK_NULL_HANDLE)
     vkDeviceWaitIdle(m_Device);
 
-  // GPU is idle — drain deferred command lists and the tracker-fence pool.
+  // GPU is idle -- drain deferred command lists and the tracker-fence pool.
   DrainPending();
   for (VkFence f : m_FreeFences)
   {
@@ -547,9 +547,9 @@ void VulkanDevice::DrainPending() noexcept
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Swapchain
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
                                            VkSwapchainKHR oldSC) noexcept
@@ -605,7 +605,7 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
   }
   data.Format = chosenFormat.format;
 
-  // Present mode — FIFO is guaranteed; only pick IMMEDIATE if supported.
+  // Present mode -- FIFO is guaranteed; only pick IMMEDIATE if supported.
   VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
   if (!data.Desc.VSync)
   {
@@ -1000,9 +1000,9 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Command lists
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 Unique<ICommandList> VulkanDevice::CreateGraphicsCommandList() noexcept
 {
@@ -1070,7 +1070,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(
   }
 
   // Acquire a tracker fence so we can safely defer destruction of this
-  // command list until the GPU is done with it — no vkDeviceWaitIdle needed.
+  // command list until the GPU is done with it -- no vkDeviceWaitIdle needed.
   VkFence trackerFence = AcquireTrackerFence();
   const bool useTrackerAsPrimary = (primaryFence == VK_NULL_HANDLE);
   if (useTrackerAsPrimary)
@@ -1104,7 +1104,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(
     }
 
     // If the real submit was already using a swapchain fence as primary,
-    // we still need the tracker to fire — push an empty submit for it.
+    // we still need the tracker to fire -- push an empty submit for it.
     if (!useTrackerAsPrimary && trackerFence != VK_NULL_HANDLE)
     {
       VkSubmitInfo empty {};
@@ -1126,9 +1126,9 @@ void VulkanDevice::ExecuteComputeCommandList(
   ExecuteGraphicsCommandList(::std::move(commandList));
 }
 
-// ─────────────────────────────────────────────────────────────────────────
-// Resource creation (stubs for now — triangle path doesn't need most)
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
+// Resource creation (stubs for now -- triangle path doesn't need most)
+// -------------------------------------------------------------------------
 
 RenderTarget VulkanDevice::CreateRenderTarget(
     const RenderTargetDesc& desc) noexcept
@@ -1142,7 +1142,7 @@ RenderTarget VulkanDevice::CreateRenderTarget(
   auto* rtd = AllocObject<VulkanRTData>();
   rtd->RTKind = VulkanRTData::Kind::Offscreen;
 
-  // ── Colour textures ───────────────────────────────────────────
+  // -- Colour textures -------------------------------------------
   for (u32 i = 0; i < desc.NumRenderTargets; ++i)
   {
     TextureDesc td {};
@@ -1178,7 +1178,7 @@ RenderTarget VulkanDevice::CreateRenderTarget(
   }
   rtd->NumOffscreen = desc.NumRenderTargets;
 
-  // ── Depth texture (optional) ──────────────────────────────────
+  // -- Depth texture (optional) ----------------------------------
   if (desc.DepthStencilFormat != DataFormat::None)
   {
     TextureDesc td {};
@@ -1481,9 +1481,9 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   return t;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Pipelines
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
 {
@@ -1657,7 +1657,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   pipelineLayoutCreateInfo.sType =
       VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-  // ── Descriptor set layout ─────────────────────────────────────
+  // -- Descriptor set layout -------------------------------------
   // Resources are laid out as consecutive bindings in the order they
   // appear in `PipelineResources`, each `PipelineResource` contributing
   // `NumResources` individual descriptor slots of its type.
@@ -1831,7 +1831,7 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   if (cs == VK_NULL_HANDLE)
     return ComputePipeline {};
 
-  // ── Descriptor set layout ─────────────────────────────────────
+  // -- Descriptor set layout -------------------------------------
   VkDescriptorSetLayoutBinding bindings[VulkanPipelineData::MaxBindings] {};
   VkDescriptorType bindingTypes[VulkanPipelineData::MaxBindings] {};
   u32 numBindings = 0;
@@ -1947,9 +1947,9 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   return cp;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Sampler
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
 {
@@ -2001,9 +2001,9 @@ Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
   return s;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Timestamp query pool
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 QueryPool VulkanDevice::CreateTimestampQueryPool(
     const QueryPoolDesc& desc) noexcept
@@ -2102,9 +2102,9 @@ u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
   return count;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // GPU profiler
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
                                       u32 count) noexcept
@@ -2147,9 +2147,9 @@ void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
   return sampler;
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Debug naming
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
                                  const char* name) const noexcept
@@ -2168,9 +2168,9 @@ void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
   fn(m_Device, &info);
 }
 
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 // Uploads
-// ─────────────────────────────────────────────────────────────────────────
+// -------------------------------------------------------------------------
 
 void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
                                  void* ctx) noexcept

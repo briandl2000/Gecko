@@ -158,7 +158,7 @@ private:
 
 }  // namespace gecko::graphics
 
-// ── Macro helpers ────────────────────────────────────────────────────────
+// -- Macro helpers --------------------------------------------------------
 
 #define GECKO_GPU_PROF_CONCAT_IMPL(a, b) a##b
 #define GECKO_GPU_PROF_CONCAT(a, b) GECKO_GPU_PROF_CONCAT_IMPL(a, b)
@@ -172,7 +172,7 @@ private:
     (sampler_ref), (cmd_ref), (label), name                           \
   }
 
-// ── Ergonomic GPU scope macros (mirror CPU GECKO_SCOPE_*) ─────────
+// -- Ergonomic GPU scope macros (mirror CPU GECKO_SCOPE_*) ---------
 //
 // Sampler is picked up from the command list via AttachGpuSampler; pass
 // the cmd, a Label, and a literal name. Compiles out at GECKO_PROFILING=0.

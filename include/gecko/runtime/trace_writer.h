@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `TraceWriter` — low-level Chrome-trace JSON writer used by the
+/// `TraceWriter` -- low-level Chrome-trace JSON writer used by the
 /// runtime trace sinks.
 
 #include "gecko/core/ptr.h"

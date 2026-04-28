@@ -7,14 +7,14 @@
 
 namespace gecko::graphics {
 
-// ── Named constants ───────────────────────────────────────────────────────
+// -- Named constants -------------------------------------------------------
 
 inline constexpr u32 MaxSwapchainImages = 8;
 inline constexpr u32 MaxFramesInFlight = 2;
 inline constexpr u32 MaxSwapchainsPerSubmit = 4;
 inline constexpr u32 MaxPushConstantBytes = 128;
 
-// ── Enums ─────────────────────────────────────────────────────────────────
+// -- Enums -----------------------------------------------------------------
 
 enum class ShaderType : u8
 {
@@ -785,7 +785,7 @@ struct GraphicsPipelineDesc
   u32 NumPipelineResources {0};
 
   /// Size in bytes of the push-constant block visible to all stages.
-  /// Must be a multiple of 4 and ≤ `MaxPushConstantBytes`.
+  /// Must be a multiple of 4 and <= `MaxPushConstantBytes`.
   u32 PushConstantBytes {0};
 
   CullMode Culling {CullMode::None};
@@ -845,7 +845,7 @@ struct ComputePipelineDesc
   u32 NumPipelineResources {0};
 
   /// Size in bytes of the push-constant block. Must be a multiple of 4
-  /// and ≤ `MaxPushConstantBytes`.
+  /// and <= `MaxPushConstantBytes`.
   u32 PushConstantBytes {0};
 
   const char* DebugName {nullptr};

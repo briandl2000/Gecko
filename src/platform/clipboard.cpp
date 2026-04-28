@@ -99,7 +99,7 @@ namespace {
 // CLIPBOARD selection owner and serve the text in response to
 // SelectionRequest events, which means the data must outlive the
 // SetClipboardText call. A static thread-local-ish store is fine
-// here — clipboard ops are single-threaded by convention.
+// here -- clipboard ops are single-threaded by convention.
 struct X11ClipboardOwnerState
 {
   ::Display* Display {nullptr};
@@ -207,11 +207,11 @@ bool SetClipboardText(::std::string_view utf8) noexcept
   ::XSetSelectionOwner(display, clipboard, window, CurrentTime);
   ::XFlush(display);
   s.Owns = (::XGetSelectionOwner(display, clipboard) == window);
-  // Note: this implementation is "fire-and-forget" — we do not run a
+  // Note: this implementation is "fire-and-forget" -- we do not run a
   // background event loop to service SelectionRequest events, so other
   // X11 clients won't actually be able to paste from us until/unless
   // the engine pumps X11 events with our helper window in scope. Good
-  // enough for round-trip Set→Get within a single Gecko process. A
+  // enough for round-trip Set->Get within a single Gecko process. A
   // future revision will hook this into the X11 backend's event loop.
   return s.Owns;
 }

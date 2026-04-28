@@ -8,7 +8,7 @@
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #include <vk_mem_alloc.h>
 
-// ── Vulkan backend GPU-object payloads ──────────────────────────────────
+// -- Vulkan backend GPU-object payloads ----------------------------------
 // These are the structs attached to Swapchain/Texture/RenderTarget/Buffer/
 // Pipeline `Data` (via Shared<void>) when the Vulkan backend is active.
 // They are strictly internal to the graphics module's Vulkan TUs; no
@@ -16,9 +16,9 @@
 
 namespace gecko::graphics {
 
-// ── Swapchain GPU data ──────────────────────────────────────────────────
+// -- Swapchain GPU data --------------------------------------------------
 // One `VulkanSwapchainData` per Swapchain. Sync objects are sized by
-// `MaxFramesInFlight` — decoupled from the driver-chosen `ImageCount`.
+// `MaxFramesInFlight` -- decoupled from the driver-chosen `ImageCount`.
 
 struct VulkanSwapchainData
 {
@@ -38,7 +38,7 @@ struct VulkanSwapchainData
   // Per-frame sync (indexed by FrameIndex)
   VkSemaphore ImageAvailable[MaxFramesInFlight] {};
   // Signaled by submit, waited on by vkQueuePresentKHR. Must be per-image
-  // (not per-frame-in-flight) — the present engine may still be using it
+  // (not per-frame-in-flight) -- the present engine may still be using it
   // by the time the frame slot recycles. See Khronos swapchain semaphore
   // reuse guidance.
   VkSemaphore RenderFinished[MaxSwapchainImages] {};
@@ -51,7 +51,7 @@ struct VulkanSwapchainData
   SwapchainDesc Desc {};
 };
 
-// ── Texture GPU data ────────────────────────────────────────────────────
+// -- Texture GPU data ----------------------------------------------------
 // Attached to Texture::Data. Owns VkImage + VkImageView + VMA allocation.
 // `CurrentLayout` is mutated by the command list as barriers are recorded.
 
@@ -68,7 +68,7 @@ struct VulkanTextureData
   bool IsRenderTarget {false};
 };
 
-// ── RenderTarget GPU data ───────────────────────────────────────────────
+// -- RenderTarget GPU data -----------------------------------------------
 // Attached to RenderTarget::Data. Back buffers are per-image and owned by
 // the Swapchain; offscreen RTs reference their own Texture data (which the
 // containing RenderTarget holds alive via RenderTextures[]).
@@ -99,7 +99,7 @@ struct VulkanRTData
   u32 NumOffscreen {0};
 };
 
-// ── Buffer GPU data ─────────────────────────────────────────────────────
+// -- Buffer GPU data -----------------------------------------------------
 
 struct VulkanBufferData
 {
@@ -107,7 +107,7 @@ struct VulkanBufferData
   VmaAllocation Allocation {nullptr};
 };
 
-// ── Pipeline GPU data ───────────────────────────────────────────────────
+// -- Pipeline GPU data ---------------------------------------------------
 
 struct VulkanPipelineData
 {
@@ -122,14 +122,14 @@ struct VulkanPipelineData
   bool IsCompute {false};
 };
 
-// ── Sampler GPU data ────────────────────────────────────────────────────
+// -- Sampler GPU data ----------------------------------------------------
 
 struct VulkanSamplerData
 {
   VkSampler Sampler {VK_NULL_HANDLE};
 };
 
-// ── Query pool GPU data ─────────────────────────────────────────────────
+// -- Query pool GPU data -------------------------------------------------
 
 struct VulkanQueryPoolData
 {

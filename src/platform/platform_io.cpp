@@ -4,7 +4,7 @@
 
 namespace gecko::platform {
 
-// ── ReadResult ──────────────────────────────────────────────────────
+// -- ReadResult ------------------------------------------------------
 
 ReadResult::ReadResult(::std::vector<::std::byte> bytes) noexcept
     : m_Bytes(::std::move(bytes)), m_Ok(true)
@@ -35,7 +35,7 @@ ReadResult::~ReadResult() noexcept = default;
   return ::std::move(m_Bytes);
 }
 
-// ── MappedFile ──────────────────────────────────────────────────────
+// -- MappedFile ------------------------------------------------------
 
 MappedFile::MappedFile(const ::std::byte* data, ::std::size_t size,
                        void* handle, Deleter deleter) noexcept
@@ -84,7 +84,7 @@ void MappedFile::Reset() noexcept
   m_Deleter = nullptr;
 }
 
-// ── DirIter ─────────────────────────────────────────────────────────
+// -- DirIter ---------------------------------------------------------
 
 DirIter::DirIter(void* handle, NextFn nextFn, CloseFn closeFn) noexcept
     : m_Handle(handle), m_Next(nextFn), m_Close(closeFn)
@@ -137,7 +137,7 @@ void DirIter::Close() noexcept
   m_Close = nullptr;
 }
 
-// ── FileWriter helpers ──────────────────────────────────────────────
+// -- FileWriter helpers ----------------------------------------------
 
 bool FileWriter::WriteString(::std::string_view text) noexcept
 {

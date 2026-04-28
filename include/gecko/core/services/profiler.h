@@ -141,7 +141,7 @@ struct IProfiler
   virtual void Shutdown() noexcept = 0;
 
   // Trace output gate. When false, sinks receive nothing (file/network
-  // writes pause), but the in-process aggregator keeps tracking — query
+  // writes pause), but the in-process aggregator keeps tracking -- query
   // GetStats() to read live timings. Default: true.
   virtual void SetTraceEnabled(bool enabled) noexcept = 0;
   virtual bool IsTraceEnabled() const noexcept = 0;
@@ -155,7 +155,7 @@ struct IProfiler
 
   // Aggregator query. Returns a snapshot of stats for the given scope.
   // Returns a default-constructed ScopeStats if unseen since the last reset.
-  // The (const char*) overload hashes once per call — cache the hash
+  // The (const char*) overload hashes once per call -- cache the hash
   // yourself if you query in a hot loop.
   virtual ScopeStats GetStats(
       u32 nameHash, ProfSource source = ProfSource::CPU) const noexcept = 0;
@@ -164,7 +164,7 @@ struct IProfiler
 
   // Watch a scope for rolling-average tracking. AvgNs in the returned
   // ScopeStats becomes the mean of the last `windowSize` samples. Calling
-  // again with a different window resizes. Use sparingly — each watched
+  // again with a different window resizes. Use sparingly -- each watched
   // scope owns a ring of `windowSize * 8` bytes.
   virtual void WatchScope(u32 nameHash, u32 windowSize = 256,
                           ProfSource source = ProfSource::CPU) noexcept = 0;
@@ -221,7 +221,7 @@ GECKO_API const char* GetThreadProfilerName() noexcept;
 GECKO_API const char* LookupThreadProfilerName(u32 threadId) noexcept;
 
 // Register a profiler-side name for a synthetic / virtual thread id. Unlike
-// SetThreadProfilerName this does NOT touch TLS — use it for non-OS-thread
+// SetThreadProfilerName this does NOT touch TLS -- use it for non-OS-thread
 // rows in the trace (e.g. GPU queues, async I/O lanes). Pass nullptr to
 // remove a previously registered name.
 GECKO_API void RegisterThreadProfilerName(u32 threadId,

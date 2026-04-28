@@ -15,7 +15,7 @@
 /// | `GECKO_SCOPE(label)`                  | Detailed | `__func__` |
 /// | `GECKO_SCOPE_NAMED(label, name)`      | Detailed | custom |
 /// | `GECKO_SCOPE_CAT(label, name, cat)`   | Detailed | custom + category id |
-/// | `GECKO_SCOPE_NORMAL[_NAMED|_CAT]`     | Normal   | — |
+/// | `GECKO_SCOPE_NORMAL[_NAMED|_CAT]`     | Normal   | -- |
 /// | `GECKO_SCOPE_ALWAYS[_NAMED|_CAT]`     | Always   | cannot be disabled |
 
 #define GECKO_SCOPE(label) \

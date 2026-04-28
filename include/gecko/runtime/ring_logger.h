@@ -1,7 +1,7 @@
-﻿#pragma once
+#pragma once
 
 /// @file
-/// `RingLogger` — lock-free MPSC ring-buffer `ILogger` implementation.
+/// `RingLogger` -- lock-free MPSC ring-buffer `ILogger` implementation.
 ///
 /// Writers push fixed-size entries into a power-of-two ring; a
 /// background consumer job drains them and forwards to sinks. Suitable

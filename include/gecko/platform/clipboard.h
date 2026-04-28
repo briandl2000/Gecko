@@ -7,7 +7,7 @@
 /// `wl_data_device` on Wayland, `CF_UNICODETEXT` on Win32). Text is
 /// UTF-8 in both directions.
 ///
-/// These are simple synchronous calls — they may block briefly while
+/// These are simple synchronous calls -- they may block briefly while
 /// the windowing system completes the request, but never wait on user
 /// interaction. Returning an empty string from `GetClipboardText()` is
 /// a soft failure: the clipboard is empty, contains non-text data, or

@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `TraceFileSink` — buffered Chrome-trace JSON sink (single-thread).
+/// `TraceFileSink` -- buffered Chrome-trace JSON sink (single-thread).
 
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/profiler.h"

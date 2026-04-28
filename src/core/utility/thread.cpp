@@ -60,9 +60,9 @@ void PreciseSleepNs(u64 nanoseconds) noexcept
   // On Windows the default timer resolution is ~15.6ms, so short sleeps
   // overshoot massively.  Use a larger spin threshold to compensate.
 #if defined(GECKO_PLATFORM_WINDOWS)
-  const u64 spinThresholdNs = 2000000;  // 2ms — stay within one timer tick
+  const u64 spinThresholdNs = 2000000;  // 2ms -- stay within one timer tick
 #else
-  const u64 spinThresholdNs = 100000;  // 100us — Linux/macOS are fine
+  const u64 spinThresholdNs = 100000;  // 100us -- Linux/macOS are fine
 #endif
 
   if (nanoseconds > spinThresholdNs)

@@ -267,7 +267,7 @@ void RingLogger::TryScheduleConsumerJob() noexcept
   u64 now = NowNs();
   u64 lastTime = m_LastScheduleNs.load(std::memory_order_relaxed);
 
-  // Don't schedule too frequently (at most every 100µs)
+  // Don't schedule too frequently (at most every 100us)
   if (now - lastTime < 100000)  // 100 microseconds
     return;
 

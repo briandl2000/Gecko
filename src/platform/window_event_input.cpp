@@ -130,7 +130,7 @@ WindowHandle WindowEventInput::HoveredWindow() const noexcept
   return m_TypedText;
 }
 
-// ── Event handlers ──────────────────────────────────────────────
+// -- Event handlers ----------------------------------------------
 
 void WindowEventInput::OnKey(void* user, const ::gecko::EventMeta&,
                              ::gecko::EventView view) noexcept

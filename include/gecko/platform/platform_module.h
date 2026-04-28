@@ -33,7 +33,7 @@ inline constexpr ::gecko::Label Platform = ::gecko::MakeLabel("gecko.platform");
 /// During `Startup()` the module:
 /// - Resolves the `PlatformConfig` (`Auto` picks an appropriate backend).
 /// - Creates the `IWindowsBackend` + `IMonitorsBackend` (self-installed
-///   services — only one canonical impl per OS, so the module owns them
+///   services -- only one canonical impl per OS, so the module owns them
 ///   instead of taking them via constructor).
 /// - Publishes both as services so application code can call
 ///   `gecko::platform::GetWindows()` / `GetMonitors()`.
@@ -50,7 +50,7 @@ public:
   /// the resolved `PlatformConfig`. Production code passes nothing and
   /// gets the OS-appropriate defaults.
   ///
-  /// The `IInput` service is not exposed here — there is only one
+  /// The `IInput` service is not exposed here -- there is only one
   /// implementation (`WindowEventInput`) and tests use `MockInput`
   /// directly without going through the module registry.
   struct Backends

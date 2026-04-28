@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `RingProfiler` — lock-free `IProfiler` implementation backed by
+/// `RingProfiler` -- lock-free `IProfiler` implementation backed by
 /// a power-of-two ring buffer with an in-process aggregator and
 /// optional per-scope rolling-window watch entries.
 

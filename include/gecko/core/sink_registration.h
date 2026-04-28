@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// CRTP-style helper for self-registering sinks (logger, profiler, …).
+/// CRTP-style helper for self-registering sinks (logger, profiler, ...).
 ///
 /// Sinks derive from `RegisteredSink<SinkInterface, Service>` and call
 /// `RegisterWith(service)` to attach themselves. The destructor

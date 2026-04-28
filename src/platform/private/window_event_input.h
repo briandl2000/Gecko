@@ -16,8 +16,8 @@ namespace gecko::platform {
 //
 // Frame ordering expected by the app:
 //   1. WindowEventInput::NewFrame()           // roll edges, clear scroll
-//   2. PumpEvents()                           // OS  →  bus
-//   3. DispatchEvents()                       // bus → state updates
+//   2. PumpEvents()                           // OS  ->  bus
+//   3. DispatchEvents()                       // bus -> state updates
 //   4. App polls IsKeyDown / GetMousePosition / ...
 class WindowEventInput final : public IInput
 {
@@ -77,7 +77,7 @@ private:
   static void OnMouseExited(void* user, const ::gecko::EventMeta& meta,
                             ::gecko::EventView view) noexcept;
 
-  // ── State ────────────────────────────────────────────────────
+  // -- State ----------------------------------------------------
   ::std::array<bool, KeyCount> m_KeyDown {};
   ::std::array<bool, KeyCount> m_KeyDownPrev {};
 
@@ -97,7 +97,7 @@ private:
   // Per-frame UTF-8 typed text. Cleared on NewFrame().
   ::std::string m_TypedText {};
 
-  // ── Subscriptions ────────────────────────────────────────────
+  // -- Subscriptions --------------------------------------------
   ::gecko::EventSubscription m_KeySub;
   ::gecko::EventSubscription m_CharSub;
   ::gecko::EventSubscription m_MouseMoveSub;

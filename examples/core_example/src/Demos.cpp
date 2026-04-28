@@ -20,7 +20,7 @@ namespace gecko::examples::core_example::demos {
 
 namespace {
 
-// ── Memory demo helpers ─────────────────────────────────────────────
+// -- Memory demo helpers ---------------------------------------------
 
 void PrintMemoryStats(const ::gecko::runtime::TrackingAllocator& tracker)
 {
@@ -54,7 +54,7 @@ void PrintMemoryStats(const ::gecko::runtime::TrackingAllocator& tracker)
              totalAllocs, totalFrees, totalLive);
 }
 
-// ── Particle simulation (used by the job system demo) ───────────────
+// -- Particle simulation (used by the job system demo) ---------------
 
 struct Particle
 {
@@ -121,7 +121,7 @@ void RunParticleWorker(int workerId, int numParticles)
   }
 }
 
-// ── Event demo helpers ──────────────────────────────────────────────
+// -- Event demo helpers ----------------------------------------------
 
 struct EventDemoState
 {
@@ -225,7 +225,7 @@ void RunEvents()
   const ::gecko::EventEmitter emitter =
       ::gecko::CreateEmitterForModule(labels::App, /*sender=*/0xC0DE);
 
-  // Three Send calls — two from main, one from a worker job.
+  // Three Send calls -- two from main, one from a worker job.
   {
     events::TestEventPayload payload {.value = 1};
     ::gecko::SendEvent(emitter, events::TestEvent, payload);

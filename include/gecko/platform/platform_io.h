@@ -25,7 +25,7 @@
 
 namespace gecko::platform {
 
-// ── Plain data ──────────────────────────────────────────────────────
+// -- Plain data ------------------------------------------------------
 
 struct FileStat
 {
@@ -57,7 +57,7 @@ struct DirEntry
   bool IsDirectory {false};
 };
 
-// ── Move-only owning result types ───────────────────────────────────
+// -- Move-only owning result types -----------------------------------
 
 class GECKO_API ReadResult
 {
@@ -196,7 +196,7 @@ public:
   [[nodiscard]] virtual ::gecko::u64 Tell() noexcept = 0;
 };
 
-// ── Public API: stateless free functions ────────────────────────────
+// -- Public API: stateless free functions ----------------------------
 //
 // All paths are forward-slash PathView. All functions are noexcept and
 // return false / empty / nullopt on error.

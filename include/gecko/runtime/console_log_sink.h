@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `ConsoleLogSink` — `ILogSink` that writes formatted messages to the
+/// `ConsoleLogSink` -- `ILogSink` that writes formatted messages to the
 /// terminal via `gecko::platform::Print`.
 
 #include "gecko/core/services/log.h"

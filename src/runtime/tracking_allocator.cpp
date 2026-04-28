@@ -1,4 +1,4 @@
-﻿#include "gecko/runtime/tracking_allocator.h"
+#include "gecko/runtime/tracking_allocator.h"
 
 #include "gecko/core/assert.h"
 #include "gecko/core/services/log.h"
@@ -134,7 +134,7 @@ void TrackingAllocator::Free(void* ptr) noexcept
   }
   else if (header->Magic == SystemAllocMagic)
   {
-    // Pre-boot allocation — header is valid, just free it.
+    // Pre-boot allocation -- header is valid, just free it.
     void* rawPtr = RawPtrFromHeader(header);
     u32 alignment = header->Alignment;
     header->Magic = 0;

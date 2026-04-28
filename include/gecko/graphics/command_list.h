@@ -28,7 +28,7 @@ class IGpuSampler;
 ///     cmd->End();
 ///
 /// `BeginRendering` may be called multiple times between `Begin`/`End`,
-/// including against back buffers from different swapchains — the backend
+/// including against back buffers from different swapchains -- the backend
 /// tracks touched swapchains and coalesces their wait/signal semaphores on
 /// submit.
 class ICommandList
@@ -120,7 +120,7 @@ public:
 
   /// Upload `bytes` into the currently-bound pipeline's push-constant
   /// block starting at `offset`. `offset + bytes.size_bytes()` must be
-  /// ≤ the pipeline's declared `PushConstantBytes`.
+  /// <= the pipeline's declared `PushConstantBytes`.
   GECKO_API virtual void SetConstants(
       u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept = 0;
 
@@ -135,7 +135,7 @@ public:
                                      u32 firstInstance = 0) noexcept = 0;
 
   /// Indirect draw from a buffer of `VkDrawIndirectCommand`-style records
-  /// (vertexCount, instanceCount, firstVertex, firstInstance — four u32).
+  /// (vertexCount, instanceCount, firstVertex, firstInstance -- four u32).
   GECKO_API virtual void DrawIndirect(const Buffer& buffer, u64 offset,
                                       u32 drawCount = 1,
                                       u32 stride = 16) noexcept = 0;
@@ -161,7 +161,7 @@ public:
   GECKO_API virtual void TransitionTextureForRead(
       const Texture& texture) noexcept = 0;
 
-  // ── Copy commands ─────────────────────────────────────────────
+  // -- Copy commands ---------------------------------------------
 
   GECKO_API virtual void CopyBuffer(const Buffer& dst, u64 dstOffset,
                                     const Buffer& src, u64 srcOffset,
@@ -175,7 +175,7 @@ public:
                                              const Texture& src, u32 mip,
                                              u32 slice) noexcept = 0;
 
-  // ── Timestamp queries ─────────────────────────────────────────
+  // -- Timestamp queries -----------------------------------------
 
   GECKO_API virtual void ResetTimestamps(const QueryPool& pool, u32 first,
                                          u32 count) noexcept = 0;
@@ -183,7 +183,7 @@ public:
   GECKO_API virtual void WriteTimestamp(const QueryPool& pool,
                                         u32 index) noexcept = 0;
 
-  // ── GPU auto-zones ────────────────────────────────────────────
+  // -- GPU auto-zones --------------------------------------------
   //
   // Attach an IGpuSampler so every Draw/DrawIndexed/DrawIndirect/
   // DrawIndexedIndirect/Dispatch/DispatchIndirect call on this command

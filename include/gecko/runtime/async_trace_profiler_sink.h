@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `AsyncTraceProfilerSink` — buffered Chrome-trace JSON sink with a
+/// `AsyncTraceProfilerSink` -- buffered Chrome-trace JSON sink with a
 /// dedicated worker thread.
 
 #include "gecko/core/ptr.h"
@@ -44,7 +44,7 @@ public:
 
   /// Drop any event whose level is more verbose than `level` before
   /// queueing for the worker. Stats / aggregates inside `IProfiler`
-  /// are unaffected — this only thins the Chrome-trace JSON.
+  /// are unaffected -- this only thins the Chrome-trace JSON.
   /// Default: `Detailed` (no filtering).
   void SetMinLevel(ProfLevel level) noexcept
   {

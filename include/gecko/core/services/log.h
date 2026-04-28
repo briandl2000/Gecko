@@ -4,7 +4,7 @@
 /// Engine-wide logging service interface.
 ///
 /// Use the `GECKO_TRACE` / `GECKO_DEBUG` / `GECKO_INFO` / `GECKO_WARN` /
-/// `GECKO_ERROR` / `GECKO_FATAL` macros for application logging — they
+/// `GECKO_ERROR` / `GECKO_FATAL` macros for application logging -- they
 /// route through `GetLogger()` and compile out when `GECKO_LOGGING` is
 /// defined to `0`. Concrete loggers (e.g. `ImmediateLogger`,
 /// `RingLogger`) live in the runtime module.
@@ -59,7 +59,7 @@ inline const char* LevelName(LogLevel level)
 ///
 /// Layout is hand-tuned to fit exactly one 64-byte cache line so that
 /// `RingLogger` can move records between threads without straddling
-/// lines. Member declaration order is significant — do not reorder.
+/// lines. Member declaration order is significant -- do not reorder.
 struct alignas(64) LogMessage
 {
   u64 TimeNs {0};  ///< Timestamp, nanoseconds since process start.

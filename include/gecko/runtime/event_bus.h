@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `EventBus` — reference `IEventBus` implementation.
+/// `EventBus` -- reference `IEventBus` implementation.
 ///
 /// Supports both immediate and queued subscriber delivery, plus
 /// per-module emitter capability validation.

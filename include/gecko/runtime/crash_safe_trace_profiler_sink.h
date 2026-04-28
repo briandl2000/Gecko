@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `CrashSafeTraceProfilerSink` — synchronous Chrome-trace JSON sink
+/// `CrashSafeTraceProfilerSink` -- synchronous Chrome-trace JSON sink
 /// that keeps the file in a valid state across abnormal termination.
 
 #include "gecko/core/ptr.h"
@@ -14,7 +14,7 @@ namespace gecko::runtime {
 
 /// Chrome-trace JSON sink that flushes after every event group and
 /// keeps the file as valid JSON even if the process aborts. Slower
-/// than `AsyncTraceProfilerSink` — use for crash-debug builds.
+/// than `AsyncTraceProfilerSink` -- use for crash-debug builds.
 class CrashSafeTraceProfilerSink final : public IProfilerSink
 {
 public:

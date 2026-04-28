@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `ImmediateLogger` — synchronous `ILogger` implementation that
+/// `ImmediateLogger` -- synchronous `ILogger` implementation that
 /// forwards each call directly to its sinks.
 
 #include "gecko/core/services/log.h"

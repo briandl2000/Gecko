@@ -40,7 +40,7 @@ struct AppConfig
 ///      the allocator)
 ///
 /// All services and modules are owned as members of this class. The
-/// declaration order of those members is intentional — see App.cpp.
+/// declaration order of those members is intentional -- see App.cpp.
 class App
 {
 public:

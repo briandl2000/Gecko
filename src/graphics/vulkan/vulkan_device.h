@@ -11,7 +11,7 @@
 
 namespace gecko::graphics {
 
-// ── VulkanDevice ──────────────────────────────────────────────────────────
+// -- VulkanDevice ----------------------------------------------------------
 
 class VulkanDevice final : public GraphicsDevice
 {
@@ -23,7 +23,7 @@ public:
   VulkanDevice& operator=(const VulkanDevice&) =
       delete ("VulkanDevice is not copyable");
 
-  // ── Swapchain ─────────────────────────────────────────────────
+  // -- Swapchain -------------------------------------------------
 
   Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle& native,
                             const SwapchainDesc& desc) noexcept override;
@@ -33,14 +33,14 @@ public:
   FrameContext BeginFrame(Swapchain& swapchain) noexcept override;
   void Present(::std::span<const FrameContext> frames) noexcept override;
 
-  // ── Command lists ──────────────────────────────────────────────
+  // -- Command lists ----------------------------------------------
 
   Unique<ICommandList> CreateGraphicsCommandList() noexcept override;
   Unique<ICommandList> CreateComputeCommandList() noexcept override;
   void ExecuteGraphicsCommandList(Unique<ICommandList>) noexcept override;
   void ExecuteComputeCommandList(Unique<ICommandList>) noexcept override;
 
-  // ── Resource creation ─────────────────────────────────────────
+  // -- Resource creation -----------------------------------------
 
   RenderTarget CreateRenderTarget(
       const RenderTargetDesc& desc) noexcept override;
@@ -63,7 +63,7 @@ public:
   ::gecko::Unique<IGpuSampler> CreateGpuSampler(
       const GpuSamplerDesc& desc) noexcept override;
 
-  // ── Data upload ────────────────────────────────────────────────
+  // -- Data upload ------------------------------------------------
 
   void UploadTextureData(Texture& texture,
                          ::std::span<const ::gecko::byte> data, u32 mip,
@@ -71,7 +71,7 @@ public:
   void UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data,
                         u32 offset) noexcept override;
 
-  // ── Internal accessors used by VulkanCommandList ──────────────
+  // -- Internal accessors used by VulkanCommandList --------------
 
   [[nodiscard]] VkDevice Device() const noexcept
   {
@@ -131,7 +131,7 @@ public:
                           u32 count) noexcept;
 
 private:
-  // ── Helpers ───────────────────────────────────────────────────
+  // -- Helpers ---------------------------------------------------
 
   /// Build the swapchain + image views + (re)create sync objects once.
   /// Used by CreateSwapchain and ResizeSwapchain.
@@ -147,7 +147,7 @@ private:
   void OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
                      void* ctx) noexcept;
 
-  // ── Vulkan objects ─────────────────────────────────────────────
+  // -- Vulkan objects ---------------------------------------------
 
   VkInstance m_Instance {VK_NULL_HANDLE};
   VkPhysicalDevice m_PhysicalDevice {VK_NULL_HANDLE};
@@ -162,7 +162,7 @@ private:
 
   // Per-thread command pools for thread-safe command-list recording.
   // Protected by m_ThreadPoolsMutex. Entries are never removed during the
-  // device's lifetime — freed together in the destructor.
+  // device's lifetime -- freed together in the destructor.
   ::std::mutex m_ThreadPoolsMutex;
   ::std::unordered_map<::std::thread::id, VkCommandPool> m_ThreadPools;
 
@@ -172,7 +172,7 @@ private:
 
   // Deferred command-list destruction: each Execute* submits with a tracker
   // fence and pushes the owning Unique here. ReapPending() runs each frame
-  // and drops entries whose fence is signalled (GPU done → safe to free).
+  // and drops entries whose fence is signalled (GPU done -> safe to free).
   // This avoids a vkDeviceWaitIdle stall on every command-list teardown.
   struct PendingSubmit
   {

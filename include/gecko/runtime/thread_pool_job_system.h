@@ -1,7 +1,7 @@
-﻿#pragma once
+#pragma once
 
 /// @file
-/// `ThreadPoolJobSystem` — priority-queue + dependency-graph
+/// `ThreadPoolJobSystem` -- priority-queue + dependency-graph
 /// `IJobSystem` implementation backed by a fixed worker-thread pool.
 
 #include "gecko/core/services/jobs.h"

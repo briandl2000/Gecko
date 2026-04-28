@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `TrackingAllocator` — per-`Label` tracking `IAllocator`, plus
+/// `TrackingAllocator` -- per-`Label` tracking `IAllocator`, plus
 /// supporting types (`MemLabelStats`, `MallocAllocator`).
 
 #include "gecko/core/services/memory.h"

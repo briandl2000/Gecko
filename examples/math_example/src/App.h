@@ -6,7 +6,7 @@ namespace gecko::examples::math_example {
 ///
 /// Each `Run*` method is a self-contained demo of one topic. They are
 /// grouped here so a newcomer can read them top-to-bottom and learn the
-/// API by example. The class itself is stateless — it exists purely to
+/// API by example. The class itself is stateless -- it exists purely to
 /// give the demos a shared home and a single entry point (`Run()`).
 class App
 {

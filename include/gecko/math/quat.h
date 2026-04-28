@@ -219,7 +219,7 @@ struct Quat
 /// Rotate a 3D vector by a unit quaternion. Equivalent to `q * v * q^-1`.
 [[nodiscard]] inline Float3 Rotate(const Quat& q, const Float3& v) noexcept
 {
-  // Optimized formula: v' = v + 2w(q_xyz × v) + 2(q_xyz × (q_xyz × v))
+  // Optimized formula: v' = v + 2w(q_xyz x v) + 2(q_xyz x (q_xyz x v))
   const Float3 qv {q.X, q.Y, q.Z};
   const Float3 cross1 = Cross(qv, v);
   const Float3 cross2 = Cross(qv, cross1);

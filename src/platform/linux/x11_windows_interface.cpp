@@ -25,7 +25,7 @@ int X11ErrorHandler(::Display* /*display*/, ::XErrorEvent* event)
 }
 }  // namespace
 
-// ── Constructor / Destructor ───────────────────────────────────────────
+// -- Constructor / Destructor -------------------------------------------
 
 X11WindowsBackend::X11WindowsBackend() noexcept
 {
@@ -300,7 +300,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
         const int len =
             ::XLookupString(&event.xkey, buf, sizeof(buf), &sym, &compose);
         // Decode the UTF-8 (XLookupString returns Latin-1, but for the
-        // ASCII subset that's identical to UTF-8 — full Unicode requires
+        // ASCII subset that's identical to UTF-8 -- full Unicode requires
         // an XIM input context which we don't currently set up). Skip
         // C0 control characters except tab/CR/LF.
         if (len > 0)

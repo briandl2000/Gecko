@@ -54,7 +54,7 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   // Advance the ring; resolve the slot we are about to wrap into (its
   // GPU work from FramesInFlight frames ago is now assumed signalled).
   // Doing rotation in BeginFrame (rather than EndFrame) lets EndZone
-  // calls fire after EndFrame — e.g. the graphics command list's
+  // calls fire after EndFrame -- e.g. the graphics command list's
   // auto 'CommandList' Always zone is closed by cmd->End() which the
   // app calls after gpuSampler->EndFrame.
   if (m_Frames[m_Current].Pending)
@@ -83,7 +83,7 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   else
     slot.CpuFrameStartNs = 0;
 
-  // No cmd-side ResetTimestamps here — the pool was reset from the host
+  // No cmd-side ResetTimestamps here -- the pool was reset from the host
   // either at creation (first use) or after ResolveSlot (subsequent
   // uses). Embedding the reset on `cmd` would race with cmd lists
   // submitted later in record order but earlier in GPU-execution order
@@ -156,7 +156,7 @@ void VulkanGpuSampler::OnSubmit(u64 cpuNowNs) noexcept
     return;
   // Record the CPU timestamp of the first submit covering the slot
   // currently being recorded. Subsequent submits in the same frame
-  // don't override it — only the first submit's CPU time anchors the
+  // don't override it -- only the first submit's CPU time anchors the
   // GPU timeline so its earliest GPU timestamp lands on the
   // vkQueueSubmit call site.
   FrameSlot& slot = m_Frames[m_Current];
@@ -176,7 +176,7 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
     return;
   }
 
-  // Pull all timestamps in one shot. ReadTimestamps converts ticks→ns
+  // Pull all timestamps in one shot. ReadTimestamps converts ticks->ns
   // internally using the device timestamp period.
   std::vector<u64> ts(slot.NextQuery, 0);
   const u32 got = m_Device->ReadTimestamps(

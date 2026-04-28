@@ -21,7 +21,7 @@ namespace {
 constexpr i32 DefaultCursorSize = 24;
 constexpr u32 PlaceholderBufferColor = 0xFF333333;  // ARGB dark grey
 
-// ── Xkbcommon key mapping ──────────────────────────────────────────────
+// -- Xkbcommon key mapping ----------------------------------------------
 
 #if defined(GECKO_HAS_XKBCOMMON)
 KeyCode XkbKeysymToKeyCode(xkb_keysym_t sym) noexcept
@@ -156,7 +156,7 @@ MouseButton WaylandButtonToMouseButton(u32 button) noexcept
 
 }  // namespace
 
-// ── Listener callbacks (static) ────────────────────────────────────────
+// -- Listener callbacks (static) ----------------------------------------
 
 namespace {
 
@@ -309,7 +309,7 @@ const wl_pointer_listener kPointerListener = {PtrEnter,
 
 }  // namespace
 
-// ── Constructor / Destructor ───────────────────────────────────────────
+// -- Constructor / Destructor -------------------------------------------
 
 WaylandWindowsBackend::WaylandWindowsBackend() noexcept
 {
@@ -405,7 +405,7 @@ WaylandWindowsBackend::~WaylandWindowsBackend() noexcept
   }
 }
 
-// ── Registry callbacks ─────────────────────────────────────────────────
+// -- Registry callbacks -------------------------------------------------
 
 void WaylandWindowsBackend::OnRegistryGlobal(::wl_registry* registry, u32 name,
                                              const char* interface,
@@ -448,7 +448,7 @@ void WaylandWindowsBackend::OnRegistryGlobalRemove(::wl_registry* /*registry*/,
                                                    u32 /*name*/) noexcept
 {}
 
-// ── Seat capabilities ──────────────────────────────────────────────────
+// -- Seat capabilities --------------------------------------------------
 
 void WaylandWindowsBackend::OnSeatCapabilities(::wl_seat* seat,
                                                u32 caps) noexcept
@@ -479,9 +479,9 @@ void WaylandWindowsBackend::OnSeatCapabilities(::wl_seat* seat,
   }
 }
 
-// ── XDG surface / toplevel callbacks ───────────────────────────────────
+// -- XDG surface / toplevel callbacks -----------------------------------
 
-// Static ::xdg_surface listener — data is WaylandWindowState*
+// Static ::xdg_surface listener -- data is WaylandWindowState*
 namespace {
 void XdgSurfaceConfigureCb(void* data, ::xdg_surface* /*surface*/, u32 serial)
 {
@@ -512,7 +512,7 @@ void WaylandWindowsBackend::OnToplevelClose(WaylandWindowState* ws) noexcept
                           WindowHandle {ws->GeckoId}, NowNsSafe()}));
 }
 
-// ── Window management ──────────────────────────────────────────────────
+// -- Window management --------------------------------------------------
 
 WindowHandle WaylandWindowsBackend::CreateWindow(
     const WindowDesc& desc) noexcept
@@ -702,7 +702,7 @@ bool WaylandWindowsBackend::RequestClose(WindowHandle window) noexcept
   return true;
 }
 
-// ── Window properties ──────────────────────────────────────────────────
+// -- Window properties --------------------------------------------------
 
 Extent2D WaylandWindowsBackend::GetClientSize(
     WindowHandle window) const noexcept
@@ -793,7 +793,7 @@ NativeWindowHandle WaylandWindowsBackend::GetNativeWindowHandle(
   return nh;
 }
 
-// ── Window state ───────────────────────────────────────────────────────
+// -- Window state -------------------------------------------------------
 
 void WaylandWindowsBackend::SetWindowState(WindowHandle window,
                                            platform::WindowState state) noexcept
@@ -1149,11 +1149,11 @@ void WaylandWindowsBackend::AttachBlankBuffer(WaylandWindowState& ws) noexcept
   ::wl_surface_damage(ws.Surface, 0, 0, w, h);
   ::wl_surface_commit(ws.Surface);
 
-  // The buffer can be destroyed after commit — the compositor keeps a ref.
+  // The buffer can be destroyed after commit -- the compositor keeps a ref.
   ::wl_buffer_destroy(buffer);
 }
 
-// ── Event pump ─────────────────────────────────────────────────────────
+// -- Event pump ---------------------------------------------------------
 
 void WaylandWindowsBackend::PumpEvents(
     const gecko::EventEmitter& emitter) noexcept
@@ -1218,7 +1218,7 @@ void WaylandWindowsBackend::PumpEvents(
   }
 }
 
-// ── Keyboard callbacks ─────────────────────────────────────────────────
+// -- Keyboard callbacks -------------------------------------------------
 
 void WaylandWindowsBackend::OnKeyboardKeymap(::wl_keyboard* /*kb*/, u32 format,
                                              i32 fd, u32 size) noexcept
@@ -1306,7 +1306,7 @@ void WaylandWindowsBackend::OnKeyboardKey(::wl_keyboard* /*kb*/, u32 /*serial*/,
   const u64 now = NowNsSafe();
 
 #if defined(GECKO_HAS_XKBCOMMON)
-  // evdev scancode → xkb keycode (offset by 8)
+  // evdev scancode -> xkb keycode (offset by 8)
   const xkb_keycode_t xkbCode = key + 8;
   const xkb_keysym_t sym =
       m_XkbState ? ::xkb_state_key_get_one_sym(m_XkbState, xkbCode)
@@ -1359,7 +1359,7 @@ void WaylandWindowsBackend::OnKeyboardModifiers(::wl_keyboard* /*kb*/,
 #endif
 }
 
-// ── Pointer callbacks ──────────────────────────────────────────────────
+// -- Pointer callbacks --------------------------------------------------
 
 void WaylandWindowsBackend::OnPointerEnter(::wl_pointer* /*pointer*/,
                                            u32 serial, ::wl_surface* surface,
@@ -1449,7 +1449,7 @@ void WaylandWindowsBackend::OnPointerAxis(::wl_pointer* /*pointer*/,
                                        NowNsSafe(), dx, dy}));
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// -- Helpers ------------------------------------------------------------
 
 u64 WaylandWindowsBackend::FindWindowBySurface(
     ::wl_surface* surface) const noexcept
@@ -1462,7 +1462,7 @@ u64 WaylandWindowsBackend::FindWindowBySurface(
 
 u64 NowNsSafe() noexcept;
 
-// ── Factory ────────────────────────────────────────────────────────────
+// -- Factory ------------------------------------------------------------
 
 Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept
 {

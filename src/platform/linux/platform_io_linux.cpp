@@ -150,7 +150,7 @@ private:
 
 }  // namespace
 
-// ── Public free-function impls ──────────────────────────────────────
+// -- Public free-function impls --------------------------------------
 
 bool Exists(PathView path) noexcept
 {

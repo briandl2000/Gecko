@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `FileLogSink` — simple `ILogSink` that appends formatted log
+/// `FileLogSink` -- simple `ILogSink` that appends formatted log
 /// messages to a file via `gecko::platform::FileWriter`.
 
 #include "gecko/core/ptr.h"

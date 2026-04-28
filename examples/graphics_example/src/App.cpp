@@ -109,8 +109,8 @@ App::~App()
   // before `m_Device`, otherwise their deleters dereference a dead
   // device and VMA fires an "allocations not freed" assert.
   //
-  // Members are declared in the right order — m_Device first, every GPU
-  // resource after it — so reverse-declaration destruction handles it.
+  // Members are declared in the right order -- m_Device first, every GPU
+  // resource after it -- so reverse-declaration destruction handles it.
   // We only do here what RAII cannot:
   //   1. Tear down swapchains explicitly so windows can be destroyed
   //      before the platform module shuts down.

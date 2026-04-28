@@ -35,7 +35,7 @@ struct GraphicsDeviceDesc
   const char* AppName {"Gecko"};  ///< Identifier reported to the driver.
 };
 
-// ── Frame context ─────────────────────────────────────────────────────────
+// -- Frame context ---------------------------------------------------------
 
 /// Returned by `BeginFrame`. Carries the acquired back buffer plus
 /// the sync slot used for that acquisition. Cheap to copy; must be
@@ -49,7 +49,7 @@ struct FrameContext
   bool Valid {false};          ///< `true` once acquisition succeeded.
 };
 
-// ── GraphicsDevice ────────────────────────────────────────────────────────
+// -- GraphicsDevice --------------------------------------------------------
 
 /// Abstract graphics device. Concrete backends (`NullDevice`, `VulkanDevice`,
 /// ...) inherit from this class. Users receive a `Unique<GraphicsDevice>`

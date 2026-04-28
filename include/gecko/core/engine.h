@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `Engine` — RAII owner of the module / service lifecycle.
+/// `Engine` -- RAII owner of the module / service lifecycle.
 
 #include "gecko/core/api.h"
 #include "gecko/core/services/modules.h"

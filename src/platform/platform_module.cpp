@@ -152,7 +152,7 @@ void PlatformModule::Shutdown(::gecko::IModuleRegistry& modules) noexcept
 #endif
 }
 
-// ── Free function accessors ─────────────────────────────────────────
+// -- Free function accessors -----------------------------------------
 
 IWindowsBackend* GetWindows() noexcept
 {

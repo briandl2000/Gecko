@@ -1,7 +1,7 @@
 #pragma once
 
 /// @file
-/// `CoreServicesModule` — the lifecycle node that publishes Core's
+/// `CoreServicesModule` -- the lifecycle node that publishes Core's
 /// foundational services (`IJobSystem`, `IProfiler`, `ILogger`,
 /// `IEventBus`) at engine startup.
 
