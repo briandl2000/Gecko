@@ -69,9 +69,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
   return VK_FALSE;
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // VulkanDevice construction / teardown
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 {
@@ -547,9 +547,9 @@ void VulkanDevice::DrainPending() noexcept
   }
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Swapchain
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
                                            VkSwapchainKHR oldSC) noexcept
@@ -1000,9 +1000,9 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
   }
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Command lists
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 Unique<ICommandList> VulkanDevice::CreateGraphicsCommandList() noexcept
 {
@@ -1126,9 +1126,9 @@ void VulkanDevice::ExecuteComputeCommandList(
   ExecuteGraphicsCommandList(::std::move(commandList));
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Resource creation (stubs for now -- triangle path doesn't need most)
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 RenderTarget VulkanDevice::CreateRenderTarget(
     const RenderTargetDesc& desc) noexcept
@@ -1481,9 +1481,9 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   return t;
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Pipelines
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
 {
@@ -1947,9 +1947,9 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   return cp;
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Sampler
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
 {
@@ -2001,9 +2001,9 @@ Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
   return s;
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Timestamp query pool
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 QueryPool VulkanDevice::CreateTimestampQueryPool(
     const QueryPoolDesc& desc) noexcept
@@ -2102,9 +2102,9 @@ u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
   return count;
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // GPU profiler
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
                                       u32 count) noexcept
@@ -2147,9 +2147,9 @@ void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
   return sampler;
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Debug naming
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
                                  const char* name) const noexcept
@@ -2168,9 +2168,9 @@ void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
   fn(m_Device, &info);
 }
 
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 // Uploads
-// -------------------------------------------------------------------------
+// ------------------------------------------------------------
 
 void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
                                  void* ctx) noexcept

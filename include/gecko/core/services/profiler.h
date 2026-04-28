@@ -260,7 +260,7 @@ ProfScope
 #define GECKO_PROF_CONCAT_(x, y) x##y
 #define GECKO_PROF_CONCAT(x, y) GECKO_PROF_CONCAT_(x, y)
 
-// ============================================================================
+// ------------------------------------------------------------
 // Profiler-only scope macros. These do NOT push a memory label.
 // Consumers should usually prefer the combined macros in <gecko/core/scope.h>
 // (`GECKO_SCOPE`, `GECKO_SCOPE_NAMED`, ...) which push a label AND start a
@@ -272,7 +272,7 @@ ProfScope
 //   GECKO_PROFILE_CAT            -> Detailed + category
 //   GECKO_PROFILE_NORMAL[_NAMED|_CAT]
 //   GECKO_PROFILE_ALWAYS[_NAMED|_CAT]
-// ============================================================================
+// ------------------------------------------------------------
 
 #if GECKO_PROF_MAX_LEVEL >= GECKO_PROF_LEVEL_DETAILED
 #define GECKO_PROFILE(label)                                                  \

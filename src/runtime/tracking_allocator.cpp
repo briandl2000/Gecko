@@ -11,9 +11,9 @@
 
 namespace gecko::runtime {
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Thread-local allocation context
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 namespace {
 constexpr Label g_DefaultLabel = MakeLabel("gecko.default");
@@ -28,9 +28,9 @@ thread_local ThreadAllocContext g_AllocContext;
 
 }  // namespace
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Label Stack
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 void TrackingAllocator::PushLabel(Label label) noexcept
 {
@@ -58,9 +58,9 @@ Label TrackingAllocator::CurrentLabel() const noexcept
   return g_AllocContext.LabelStack[g_AllocContext.StackDepth - 1];
 }
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Alloc / Free
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
 {

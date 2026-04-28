@@ -20,9 +20,9 @@ namespace gecko {
 
 struct LabelScope;
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Allocation Header
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 // All `IAllocator` implementations prepend an `AllocHeader` to every
 // user pointer. The `Magic` field enables safe cross-allocator frees
@@ -66,9 +66,9 @@ inline bool IsAllocHeaderValid(const AllocHeader* header) noexcept
                     header->Magic == TrackingAllocMagic);
 }
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Platform Allocation
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 /// Aligned allocation directly from the OS (bypasses `IAllocator`).
 /// @param size Number of bytes to allocate.
@@ -79,9 +79,9 @@ GECKO_API void* PlatformAlloc(u64 size, u32 alignment) noexcept;
 /// @param alignment Must match the original `PlatformAlloc` request.
 GECKO_API void PlatformFree(void* ptr, u32 alignment) noexcept;
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // Allocation Header Helpers
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 /// Returns the user-alignment rounded up to at least `alignof(AllocHeader)`.
 inline u32 EffectiveAlignment(u32 userAlignment) noexcept
@@ -127,9 +127,9 @@ inline u64 TotalAllocSize(u64 userSize, u32 userAlignment) noexcept
   return sizeof(AllocHeader) + (effAlign - 1) + userSize;
 }
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // IAllocator Interface
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 /// Engine-wide allocator interface.
 ///
@@ -251,9 +251,9 @@ struct LabelScope
     (label)                                                              \
   }
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // SystemAllocator
-//------------------------------------------------------------
+// ------------------------------------------------------------
 
 struct SystemAllocator final : IAllocator
 {
