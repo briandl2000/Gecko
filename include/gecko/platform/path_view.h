@@ -1,5 +1,22 @@
 #pragma once
 
+/// @file
+/// Borrowed forward-slash path string view used throughout Gecko I/O.
+///
+/// `PathView` is the Gecko-wide convention for passing filesystem paths.
+/// Backends normalise at syscall boundaries (Win32 converts to
+/// backslashes / wide strings; Linux passes through). Implicit
+/// construction from `const char*`, `std::string_view`, and
+/// `std::string` keeps call sites natural:
+///
+/// @code
+/// io.Read("config/game.toml");
+/// io.AtomicWrite(myStdString, bytes);
+/// @endcode
+///
+/// Construction from `std::filesystem::path` is deliberately omitted so
+/// that callers convert explicitly and preserve the forward-slash form.
+
 #include "gecko/core/types.h"
 
 #include <string>
@@ -7,19 +24,8 @@
 
 namespace gecko::platform {
 
-// Forward-slash path view. Borrowed; the underlying string must outlive
-// the PathView. All Gecko engine code passes paths around as PathView so
-// the platform IO backends can normalize at syscall boundaries (Win32
-// converts to backslashes / wide strings; Linux passes through).
-//
-// Construction is implicit from the common borrowed-string types so call
-// sites read naturally:
-//   io.Read("config/game.toml");
-//   io.AtomicWrite(myStdString, bytes);
-//
-// Construction from std::filesystem::path is intentionally not provided;
-// callers that have one must convert to a string explicitly so the
-// forward-slash convention is preserved.
+/// Borrowed forward-slash path. The underlying string buffer must
+/// outlive every `PathView` referencing it.
 class PathView
 {
 public:
@@ -50,9 +56,9 @@ public:
     return m_View.empty();
   }
 
-  // True if the path begins with '/' (POSIX-absolute) or with a Windows
-  // drive letter ("C:/...") or UNC prefix ("//server/share/..."). The
-  // Windows backend honours all three; the Linux backend only the first.
+  /// `true` if the path begins with `/` (POSIX-absolute) or with a
+  /// Windows drive letter (`C:/...`) or UNC prefix (`//server/share/...`).
+  /// The Windows backend honours all three; the Linux backend only the first.
   [[nodiscard]] constexpr bool IsAbsolute() const noexcept
   {
     if (m_View.empty())
@@ -70,8 +76,8 @@ public:
     return false;
   }
 
-  // Everything before the final '/' (excluding the slash). Returns an
-  // empty view if there is no '/' or if the path is just "/".
+  /// Everything before the final `/` (excluding the slash). Returns an
+  /// empty view if there is no `/`, or `"/"` if the path is just `"/"`.
   [[nodiscard]] constexpr PathView ParentDir() const noexcept
   {
     if (m_View.empty())
@@ -84,8 +90,8 @@ public:
     return PathView {m_View.substr(0, pos)};
   }
 
-  // Everything after the final '/'. Returns the whole view if there
-  // is no '/'.
+  /// Everything after the final `/`. Returns the whole view if there
+  /// is no `/`.
   [[nodiscard]] constexpr PathView Filename() const noexcept
   {
     if (m_View.empty())
@@ -96,8 +102,8 @@ public:
     return PathView {m_View.substr(pos + 1)};
   }
 
-  // Filename minus its extension. Leading dots on the basename do not
-  // count as an extension separator (".bashrc" -> empty stem).
+  /// Filename minus its extension. Leading dots on the basename do not
+  /// count as an extension separator (`.bashrc` -> empty stem).
   [[nodiscard]] constexpr PathView Stem() const noexcept
   {
     auto fn = Filename().View();
@@ -116,8 +122,8 @@ public:
     return PathView {fn.substr(0, dot)};
   }
 
-  // Last '.'-suffix of the basename including the dot, or empty view if
-  // no extension is present. Returns "" for ".bashrc" by convention.
+  /// Last `.`-suffix of the basename including the dot, or empty view
+  /// if no extension is present. Returns `""` for `.bashrc`.
   [[nodiscard]] constexpr PathView Extension() const noexcept
   {
     auto fn = Filename().View();

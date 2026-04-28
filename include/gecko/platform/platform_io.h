@@ -94,6 +94,7 @@ private:
   bool m_Ok {false};
 };
 
+/// Read-only memory-mapped file. Owns the mapping; move-only.
 class GECKO_API MappedFile
 {
 public:
@@ -135,6 +136,8 @@ private:
   Deleter m_Deleter {nullptr};
 };
 
+/// Forward-iterator-style directory enumeration handle. Move-only.
+/// Forward-iterator-style directory enumeration handle. Move-only.
 class GECKO_API DirIter
 {
 public:

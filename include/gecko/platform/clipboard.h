@@ -1,5 +1,25 @@
 #pragma once
 
+/// @file
+/// System clipboard text I/O.
+///
+/// All functions operate on the OS-level clipboard (`CLIPBOARD` on X11,
+/// `wl_data_device` on Wayland, `CF_UNICODETEXT` on Win32). Text is
+/// UTF-8 in both directions.
+///
+/// These are simple synchronous calls — they may block briefly while
+/// the windowing system completes the request, but never wait on user
+/// interaction. Returning an empty string from `GetClipboardText()` is
+/// a soft failure: the clipboard is empty, contains non-text data, or
+/// the platform backend does not support it.
+///
+/// Backends:
+/// - **Win32**: `SetClipboardData` / `GetClipboardData` with
+///   `CF_UNICODETEXT`, converted to/from UTF-8 via `MultiByteToWideChar`.
+/// - **X11**: `XConvertSelection` + ICCCM round-trip on a hidden window.
+/// - **Wayland**: not yet implemented (needs a valid serial); returns
+///   empty / no-op.
+
 #include "gecko/core/api.h"
 
 #include <string>
@@ -7,30 +27,14 @@
 
 namespace gecko::platform {
 
-// System clipboard text I/O.
-//
-// All functions operate on the OS-level "selection clipboard"
-// (CLIPBOARD on X11, the standard wl_data_device on Wayland, the
-// WM_CLIPBOARD on Win32). Text is UTF-8 in both directions.
-//
-// These are simple synchronous calls — they may block briefly while
-// the windowing system completes the request, but should never wait
-// on user interaction. Returning an empty string from
-// GetClipboardText() is a soft-failure: clipboard is empty, contains
-// non-text data, or the platform backend doesn't support it.
-//
-// Backends:
-//   * Win32: SetClipboardData / GetClipboardData with CF_UNICODETEXT,
-//     converted to/from UTF-8 via MultiByteToWideChar.
-//   * X11:   XConvertSelection + ICCCM round-trip on a hidden window.
-//   * Wayland: not yet implemented (needs wl_data_device with a
-//     valid serial). Returns empty / no-op until then.
-
+/// Read UTF-8 text from the system clipboard.
+/// @return The clipboard text, or an empty string on failure / non-text data.
 [[nodiscard]] GECKO_API ::std::string GetClipboardText() noexcept;
 
-// Returns true when the platform reports the text was successfully
-// placed on the clipboard. Returns false on backend failure or when
-// the backend does not support clipboard writes (e.g. Wayland).
+/// Place UTF-8 text on the system clipboard.
+/// @param utf8  The text to copy.
+/// @return `true` on success, `false` on backend failure or when writes
+///         are unsupported (e.g. current Wayland backend).
 GECKO_API bool SetClipboardText(::std::string_view utf8) noexcept;
 
 }  // namespace gecko::platform

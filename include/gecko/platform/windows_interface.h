@@ -1,5 +1,14 @@
 #pragma once
 
+/// @file
+/// Backend interface for the platform window system (`IWindowsBackend`).
+///
+/// Concrete implementations live under `src/platform/<backend>/` and are
+/// constructed via `IWindowsBackend::Create`. The high-level `IWindows`
+/// service (see `gecko/platform/window.h` and the platform module) wraps
+/// this interface for application code; most users should not call
+/// `IWindowsBackend` directly.
+
 #include "gecko/core/api.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/events.h"
@@ -73,6 +82,7 @@ public:
   [[nodiscard]]
   GECKO_API virtual DpiInfo GetDpi(WindowHandle window) const noexcept = 0;
 
+  /// Pointer to the underlying native window plus its display/connection.
   [[nodiscard]]
   GECKO_API virtual NativeWindowHandle GetNativeWindowHandle(
       WindowHandle window) const noexcept = 0;
