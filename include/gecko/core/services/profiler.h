@@ -1,4 +1,14 @@
 #pragma once
+
+/// @file
+/// Lightweight in-process profiler service.
+///
+/// Use `GECKO_PROFILE` / `GECKO_PROFILE_NORMAL` / `GECKO_PROFILE_ALWAYS`
+/// (or the combined `GECKO_SCOPE*` macros from `<gecko/core/scope.h>`)
+/// to time scopes; `GECKO_COUNTER` to record a value; `GECKO_FRAME`
+/// to mark frame boundaries. Sinks (Chrome trace writer, ETW, ...)
+/// register through `IProfilerSink::RegisterWith(profiler)`.
+
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/sink_registration.h"
@@ -8,11 +18,13 @@
 
 namespace gecko {
 
+/// Verbosity tier of a profiler event. Compile-time gated by
+/// `GECKO_PROF_MAX_LEVEL` and runtime gated by `IProfiler::SetMinLevel`.
 enum class ProfLevel : u8
 {
-  Always = 0,
-  Normal = 1,
-  Detailed = 2,
+  Always = 0,    ///< Frame markers, errors, never compiled out.
+  Normal = 1,    ///< Default for game-loop work.
+  Detailed = 2,  ///< Inner-loop detail; off in release by default.
 };
 
 // Compile-time max level (set via CMake per-module)
@@ -28,45 +40,56 @@ enum class ProfLevel : u8
 #define GECKO_PROF_LEVEL_NORMAL 1
 #define GECKO_PROF_LEVEL_DETAILED 2
 
+/// Type of an event written to the profiler stream.
 enum class ProfEventKind : u8
 {
-  ZoneBegin,
-  ZoneEnd,
-  Counter,
-  FrameMark
+  ZoneBegin,  ///< Start of a timed scope.
+  ZoneEnd,    ///< End of a timed scope; pairs with ZoneBegin.
+  Counter,    ///< Single sampled value; emitted by `GECKO_COUNTER`.
+  FrameMark   ///< Frame boundary; emitted by `GECKO_FRAME`.
 };
 
+/// Origin domain of a profiler event.
 enum class ProfSource : u8
 {
-  CPU = 0,
-  GPU = 1,
+  CPU = 0,  ///< Sampled on the host CPU.
+  GPU = 1,  ///< Sampled on the GPU (resolved via timestamp queries).
 };
 
 // Category 0 means "uncategorized". Modules call IProfiler::RegisterCategory()
 // to obtain a stable u8 id (1..63) and pass it via GECKO_PROF_SCOPE_CAT.
+/// One profiler record. Padded to a full cache line so producers may
+/// hand records to a SPSC ring without false sharing.
 struct alignas(64) ProfEvent
 {
-  u64 TimestampNs {0};
-  u64 Value {0};
-  const char* Name {nullptr};
-  Label EventLabel {};
-  u32 ThreadId {0};
-  u32 NameHash {0};
+  u64 TimestampNs {0};         ///< Capture time, ns since boot.
+  u64 Value {0};               ///< Counter value (Kind==Counter).
+  const char* Name {nullptr};  ///< Static name pointer.
+  Label EventLabel {};         ///< Originating scope label.
+  u32 ThreadId {0};            ///< Logical thread id.
+  u32 NameHash {0};            ///< FNV-1a of `Name`.
   ProfEventKind Kind {ProfEventKind::ZoneBegin};
   ProfLevel Level {ProfLevel::Normal};
   ProfSource Source {ProfSource::CPU};
-  u8 Category {0};
+  u8 Category {0};  ///< 0=uncategorised; 1..63 from `RegisterCategory`.
 };
 
 static_assert(sizeof(ProfEvent) == 64, "ProfEvent must be 64 bytes");
 
 struct IProfiler;
 
+/// Sink that consumes profiler events. Implementations are e.g. the
+/// Chrome-trace writer or an ETW emitter. Registered through
+/// `RegisteredSink::RegisterWith(profiler)`.
 struct IProfilerSink : public RegisteredSink<IProfilerSink, IProfiler>
 {
   virtual ~IProfilerSink() = default;
+  /// Receive a single event.
   virtual void Write(const ProfEvent& event) noexcept = 0;
+  /// Receive a batch of events. Implementations may forward each entry
+  /// to `Write` if they have no batching path.
   virtual void WriteBatch(::std::span<const ProfEvent> events) noexcept = 0;
+  /// Block until queued events have been written out.
   virtual void Flush() noexcept = 0;
 };
 
@@ -81,25 +104,29 @@ struct IProfilerSink : public RegisteredSink<IProfilerSink, IProfiler>
 // those get a fixed-window rolling average over the last N samples.
 struct ScopeStats
 {
-  u64 LastNs {0};
-  u64 MinNs {~u64 {0}};
-  u64 MaxNs {0};
-  u64 AvgNs {0};  // 0 if scope is not watched
-  u32 Count {0};
+  u64 LastNs {0};        ///< Most recent sample (never auto-cleared).
+  u64 MinNs {~u64 {0}};  ///< Min over the current window.
+  u64 MaxNs {0};         ///< Max over the current window.
+  u64 AvgNs {0};         ///< 0 unless scope is registered via `WatchScope`.
+  u32 Count {0};         ///< Samples seen in the current window.
 };
 
+/// Counters returned by `IProfiler::GetDiagnostics`.
 struct ProfilerDiagnostics
 {
-  u64 DroppedEvents {0};
-  u64 ReentrantDrops {0};
-  u64 AggregatorOverflow {0};
+  u64 DroppedEvents {0};       ///< Events dropped because the ring was full.
+  u64 ReentrantDrops {0};      ///< Events dropped due to reentrant emit guards.
+  u64 AggregatorOverflow {0};  ///< Scope-aggregator slot exhaustion.
 };
 
+/// Maximum number of categories an `IProfiler` will track.
 constexpr u8 ProfMaxCategories = 64;
+/// Sentinel returned by `RegisterCategory` / `FindCategory` on failure.
 constexpr u8 ProfInvalidCategory = 0xFF;
 
 struct IProfilerStream;  // forward decl for DumpStats
 
+/// Profiler service interface. Apps usually go through the macros.
 struct IProfiler
 {
   virtual ~IProfiler() = default;

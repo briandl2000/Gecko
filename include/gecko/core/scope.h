@@ -2,17 +2,21 @@
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
 
-// Combined memory-label-push + profiler scope macros.
-//
-// The default `GECKO_SCOPE` family runs at Detailed level, which means the
-// aggregator (GetStats / WatchScope) always observes the scope but the
-// ring/sink path is gated by IProfiler::SetMinLevel + SetDetailedSampleRate.
-//
-//   GECKO_SCOPE(label)                  -> Detailed, name = __func__
-//   GECKO_SCOPE_NAMED(label, name)      -> Detailed, custom name
-//   GECKO_SCOPE_CAT(label, name, cat)   -> Detailed, named, with category id
-//   GECKO_SCOPE_NORMAL[_NAMED|_CAT]     -> Normal level
-//   GECKO_SCOPE_ALWAYS[_NAMED|_CAT]     -> Always level (cannot be disabled)
+/// @file
+/// Combined memory-label-push + profiler scope macros.
+///
+/// The default `GECKO_SCOPE` family runs at `Detailed` level, so the
+/// aggregator (`GetStats`/`WatchScope`) always observes the scope but
+/// the ring/sink path is gated by `IProfiler::SetMinLevel` and
+/// `SetDetailedSampleRate`.
+///
+/// | Macro | Level | Name source |
+/// |---|---|---|
+/// | `GECKO_SCOPE(label)`                  | Detailed | `__func__` |
+/// | `GECKO_SCOPE_NAMED(label, name)`      | Detailed | custom |
+/// | `GECKO_SCOPE_CAT(label, name, cat)`   | Detailed | custom + category id |
+/// | `GECKO_SCOPE_NORMAL[_NAMED|_CAT]`     | Normal   | — |
+/// | `GECKO_SCOPE_ALWAYS[_NAMED|_CAT]`     | Always   | cannot be disabled |
 
 #define GECKO_SCOPE(label) \
   GECKO_PUSH_LABEL(label); \
