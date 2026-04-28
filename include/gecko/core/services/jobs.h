@@ -4,25 +4,39 @@
 /// Job system service interface for offloading work to worker threads.
 ///
 /// Apps usually go through the free `SubmitJob` / `WaitForJob` /
-/// `IsJobComplete` helpers, which forward to the active `IJobSystem`
-/// or no-op when none is installed.
+/// `IsJobComplete` helpers, or call `IJobSystem::Submit(callable, ...)`
+/// directly. Both forward to the `SubmitRaw(JobFn, ...)` virtual after
+/// boxing the callable into an ABI-stable `JobFn` payload.
 
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/types.h"
 
-#include <functional>
+#include <type_traits>
+#include <utility>
 
 namespace gecko {
 
-/// Opaque payload submitted to the job system.
+/// ABI-stable job payload. Carries native function pointers only, so it
+/// is safe to cross the CoreServices DLL boundary regardless of which
+/// toolchain produced the closure.
 ///
-/// Implementation note: this is currently `::std::function<void()>`, which
-/// means the job system is **not** ABI-stable across compilers/STLs. It is
-/// safe today because Gecko is one-toolchain-per-process; if cross-toolchain
-/// plugins ever submit jobs, replace with a `(void (*)(void*), void*)` pair
-/// or a small POD closure.
-using JobFunction = ::std::function<void()>;  // abi-ok: see note above
+/// `Invoke` runs the work on a worker thread. `Free` releases captured
+/// state once the job has finished (or is cancelled before running);
+/// pass `nullptr` if `User` has static lifetime. `User` is opaque to
+/// the job system.
+struct JobFn
+{
+  void (*Invoke)(void* user) {nullptr};
+  void (*Free)(void* user) noexcept {nullptr};
+  void* User {nullptr};
+
+  /// @return `true` if this payload has an invoke function.
+  bool IsValid() const noexcept
+  {
+    return Invoke != nullptr;
+  }
+};
 
 /// Lightweight identifier for a submitted job. Cheap to copy. A value-
 /// initialised handle (`Id == 0`) is the canonical "empty" handle and
@@ -64,31 +78,94 @@ enum class JobPriority : u8
   High     ///< Latency-sensitive work; scheduled ahead of Normal.
 };
 
+namespace detail {
+
+// abi-ok-begin: header-only template, instantiated per consumer TU. The
+// closure is allocated and freed by the same toolchain that produced it,
+// so std:: type uses below never appear in CoreServices.dll itself.
+
+/// Boxes any callable into an ABI-stable `JobFn`. Stateless callables
+/// are stored as a function pointer in `User`; stateful callables are
+/// heap-allocated in the caller's TU so that allocation, invocation,
+/// and deallocation all use the same toolchain's runtime.
+template <class F>
+inline JobFn MakeJobFn(F&& f)
+{
+  using Fn = ::std::decay_t<F>;
+  if constexpr (::std::is_convertible_v<Fn, void (*)()>)
+  {
+    void (*fp)() = +f;
+    JobFn job {};
+    job.Invoke = [](void* u) { reinterpret_cast<void (*)()>(u)(); };
+    job.Free = nullptr;
+    job.User = reinterpret_cast<void*>(fp);
+    return job;
+  }
+  else
+  {
+    auto* state = new Fn(::std::forward<F>(f));
+    JobFn job {};
+    job.Invoke = [](void* u) { (*static_cast<Fn*>(u))(); };
+    job.Free = [](void* u) noexcept { delete static_cast<Fn*>(u); };
+    job.User = state;
+    return job;
+  }
+}
+
+// abi-ok-end
+
+}  // namespace detail
+
 /// Job system service interface.
 struct IJobSystem
 {
   GECKO_API virtual ~IJobSystem() = default;
 
-  /// Submit a job for asynchronous execution.
-  /// @param job Function object to invoke on a worker thread.
+  /// Submit a pre-built `JobFn` for asynchronous execution.
+  /// @param job ABI-stable payload; see `JobFn`.
   /// @param priority Scheduler hint.
   /// @param label Memory label active during the job.
   /// @return A handle usable with `Wait` / `IsComplete`.
-  GECKO_API virtual JobHandle Submit(JobFunction job,
-                                     JobPriority priority = JobPriority::Normal,
-                                     Label label = {}) noexcept = 0;
+  GECKO_API virtual JobHandle SubmitRaw(
+      JobFn job, JobPriority priority = JobPriority::Normal,
+      Label label = {}) noexcept = 0;
 
-  /// Submit a job that runs only after every dependency has finished.
-  /// @param job Function object to invoke.
+  /// Submit a pre-built `JobFn` that runs only after every dependency has
+  /// finished.
+  /// @param job ABI-stable payload; see `JobFn`.
   /// @param dependencies Pointer to an array of handles.
   /// @param dependencyCount Number of entries in `dependencies`.
   /// @param priority Scheduler hint.
   /// @param label Memory label active during the job.
-  GECKO_API virtual JobHandle Submit(JobFunction job,
-                                     const JobHandle* dependencies,
-                                     u32 dependencyCount,
-                                     JobPriority priority = JobPriority::Normal,
-                                     Label label = {}) noexcept = 0;
+  GECKO_API virtual JobHandle SubmitRaw(
+      JobFn job, const JobHandle* dependencies, u32 dependencyCount,
+      JobPriority priority = JobPriority::Normal,
+      Label label = {}) noexcept = 0;
+
+  /// Convenience overload that boxes any callable (lambda, function
+  /// pointer, `std::function`, ...) into a `JobFn` and forwards to
+  /// `SubmitRaw`. Boxing happens in the caller's TU, so the closure's
+  /// memory is allocated and freed by the same toolchain that produced
+  /// it -- safe to call across the CoreServices DLL boundary.
+  // abi-ok-begin: header-only templates; std:: forwarding refs are
+  // resolved per consumer TU and never reach the dispatched virtual.
+  template <class F>
+  JobHandle Submit(F&& f, JobPriority priority = JobPriority::Normal,
+                   Label label = {})
+  {
+    return SubmitRaw(detail::MakeJobFn(::std::forward<F>(f)), priority, label);
+  }
+
+  /// Convenience overload with explicit dependencies; see the unary
+  /// `Submit` for the boxing rules.
+  template <class F>
+  JobHandle Submit(F&& f, const JobHandle* dependencies, u32 dependencyCount,
+                   JobPriority priority = JobPriority::Normal, Label label = {})
+  {
+    return SubmitRaw(detail::MakeJobFn(::std::forward<F>(f)), dependencies,
+                     dependencyCount, priority, label);
+  }
+  // abi-ok-end
 
   /// Block the calling thread until a job completes. Safe to call
   /// with an invalid handle.
@@ -123,30 +200,34 @@ struct IJobSystem
 /// @return Active job system, or `NullJobSystem` if none is installed.
 GECKO_API IJobSystem* GetJobSystem() noexcept;
 
+// abi-ok-begin: free helpers are header-only templates; same per-TU
+// argument as IJobSystem::Submit.
+
 /// Convenience wrapper around `IJobSystem::Submit`.
-inline JobHandle SubmitJob(JobFunction job,
-                           JobPriority priority = JobPriority::Normal,
-                           Label label = {}) noexcept
+template <class F>
+inline JobHandle SubmitJob(F&& f, JobPriority priority = JobPriority::Normal,
+                           Label label = {})
 {
-  // abi-ok: inline helper, instantiated per TU; does not cross the boundary.
   auto* jobSystem = GetJobSystem();
-  return jobSystem ? jobSystem->Submit(::std::move(job), priority, label)
+  return jobSystem ? jobSystem->Submit(::std::forward<F>(f), priority, label)
                    : JobHandle {};
 }
 
 /// Convenience wrapper that submits a job with explicit dependencies.
-inline JobHandle SubmitJob(JobFunction job, const JobHandle* dependencies,
+template <class F>
+inline JobHandle SubmitJob(F&& f, const JobHandle* dependencies,
                            u32 dependencyCount,
                            JobPriority priority = JobPriority::Normal,
-                           Label label = {}) noexcept
+                           Label label = {})
 {
-  // abi-ok: inline helper, instantiated per TU; does not cross the boundary.
   auto* jobSystem = GetJobSystem();
   if (!jobSystem)
     return JobHandle {};
-  return jobSystem->Submit(::std::move(job), dependencies, dependencyCount,
+  return jobSystem->Submit(::std::forward<F>(f), dependencies, dependencyCount,
                            priority, label);
 }
+
+// abi-ok-end
 
 /// Block until the supplied handle completes.
 /// @param handle Job to wait on.
@@ -177,14 +258,13 @@ inline bool IsJobComplete(JobHandle handle) noexcept
 
 struct NullJobSystem final : IJobSystem
 {
-  GECKO_API virtual JobHandle Submit(JobFunction job,
-                                     JobPriority priority = JobPriority::Normal,
-                                     Label label = Label {}) noexcept override;
-  GECKO_API virtual JobHandle Submit(JobFunction job,
-                                     const JobHandle* dependencies,
-                                     u32 dependencyCount,
-                                     JobPriority priority = JobPriority::Normal,
-                                     Label label = Label {}) noexcept override;
+  GECKO_API virtual JobHandle SubmitRaw(
+      JobFn job, JobPriority priority = JobPriority::Normal,
+      Label label = Label {}) noexcept override;
+  GECKO_API virtual JobHandle SubmitRaw(
+      JobFn job, const JobHandle* dependencies, u32 dependencyCount,
+      JobPriority priority = JobPriority::Normal,
+      Label label = Label {}) noexcept override;
   GECKO_API virtual void Wait(JobHandle handle) noexcept override;
   GECKO_API virtual void WaitAll(const JobHandle* handles,
                                  u32 count) noexcept override;

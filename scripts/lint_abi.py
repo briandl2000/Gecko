@@ -61,15 +61,32 @@ _STD_PATTERN = re.compile(r"\bstd\s*::\s*[A-Za-z_][A-Za-z0-9_]*")
 # Place it either on the offending line itself (trailing comment) or on
 # any preceding line of the same logical statement (separated by no blank
 # line), so it survives clang-format wrapping.
+#
+# For longer header-only template/inline regions where every line would
+# otherwise need a marker, wrap the block with:
+#   // abi-ok-begin: <reason>
+#   ... code ...
+#   // abi-ok-end
 _OK_MARKER = "// abi-ok"
+_REGION_BEGIN = "// abi-ok-begin"
+_REGION_END = "// abi-ok-end"
 
 
 def _scan_file(path: Path) -> list[tuple[int, str]]:
     violations: list[tuple[int, str]] = []
     text = path.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
+    in_region = False
     for idx, line in enumerate(lines):
         lineno = idx + 1
+        if _REGION_BEGIN in line:
+            in_region = True
+            continue
+        if _REGION_END in line:
+            in_region = False
+            continue
+        if in_region:
+            continue
         # Inline marker on the offending line itself.
         if _OK_MARKER in line:
             continue
