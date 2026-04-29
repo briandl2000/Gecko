@@ -6,10 +6,10 @@
 #include <gecko/core/services/log.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
+#include <gecko/math/math.h>
 #include <gecko/platform/platform_events.h>
 #include <gecko/platform/windows_interface.h>
 #include <utility>
-#include <gecko/math/math.h>
 
 namespace app::debug_renderer_example {
 
@@ -29,16 +29,16 @@ namespace {
 /// Layout (32 B): float2 A | float2 B | float3 Color | float Thickness.
 struct DebugLine
 {
-  gecko::math::float2 A;          ///< Start, pixels, top-left origin.
-  gecko::math::float2 B;          ///< End,   pixels.
-  gecko::math::float3 Color;      ///< RGB, linear, [0,1].
-  gecko::f32          Thickness;  ///< Width in pixels.
+  gecko::math::float2 A;      ///< Start, pixels, top-left origin.
+  gecko::math::float2 B;      ///< End,   pixels.
+  gecko::math::float3 Color;  ///< RGB, linear, [0,1].
+  gecko::f32 Thickness;       ///< Width in pixels.
 };
 
 static constexpr DebugLine DebugLines[] = {
     {{100.0f, 100.0f}, {500.0f, 300.0f}, {1.0f, 1.0f, 0.0f}, 1.0f},
     {{200.0f, 500.0f}, {800.0f, 150.0f}, {0.0f, 1.0f, 1.0f}, 1.0f},
-    {{640.0f,  50.0f}, {640.0f, 670.0f}, {1.0f, 0.2f, 0.2f}, 1.0f},
+    {{640.0f, 50.0f}, {640.0f, 670.0f}, {1.0f, 0.2f, 0.2f}, 1.0f},
 };
 
 struct DebugLinePushConstants
@@ -215,8 +215,8 @@ bool App::CreatePipeline()
       .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineFrag),
                 sizeof(shaders::DebugLineFrag)},
   };
-  pDesc.PipelineResources[0] = PipelineResource::StructuredBufferBinding(
-      1, ShaderType::Vertex);
+  pDesc.PipelineResources[0] =
+      PipelineResource::StructuredBufferBinding(1, ShaderType::Vertex);
   pDesc.NumPipelineResources = 1;
   pDesc.PushConstantBytes = sizeof(DebugLinePushConstants);
   pDesc.NumRenderTargets = 1;
@@ -313,9 +313,9 @@ void App::RenderFrame()
                      static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height)},
       ._Pad = {0.0f, 0.0f},
   };
-  cmd->SetConstants(
-      0, gecko::Span<const gecko::byte>(
-             reinterpret_cast<const gecko::byte*>(&pc), sizeof(pc)));
+  cmd->SetConstants(0,
+                    gecko::Span<const gecko::byte>(
+                        reinterpret_cast<const gecko::byte*>(&pc), sizeof(pc)));
 
   const ::gecko::u32 numLines =
       static_cast<::gecko::u32>(std::size(DebugLines));
@@ -342,8 +342,8 @@ int App::Run()
 
   GECKO_INFO(labels::Main, "Entering frame loop - Escape or close to quit");
 
-  SetModalFrameCallback(
-      [](void* ud) { static_cast<App*>(ud)->Update(); }, this);
+  SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); },
+                        this);
 
   while (m_Running)
   {
