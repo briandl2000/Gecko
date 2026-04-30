@@ -2,17 +2,13 @@
 
 #include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
+#include <gecko/core/services/memory.h>
 #include <gecko/core/services/modules.h>
 #include <gecko/core/types.h>
 #include <gecko/platform/input.h>
 #include <gecko/platform/platform_module.h>
-#include <gecko/runtime/console_log_sink.h>
-#include <gecko/runtime/event_bus.h>
-#include <gecko/runtime/file_log_sink.h>
-#include <gecko/runtime/immediate_logger.h>
-#include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
-#include <gecko/runtime/thread_pool_job_system.h>
+#include <gecko/runtime/standard_log_sinks.h>
 #include <gecko/runtime/tracking_allocator.h>
 #include <optional>
 #include <vector>
@@ -45,15 +41,6 @@ public:
   int Run();
 
 private:
-  struct AllocatorInstaller
-  {
-    explicit AllocatorInstaller(::gecko::IAllocator* a) noexcept;
-    ~AllocatorInstaller();
-    AllocatorInstaller(const AllocatorInstaller&) = delete;
-    AllocatorInstaller& operator=(const AllocatorInstaller&) = delete;
-    bool Ok = false;
-  };
-
   class ExampleModule final : public ::gecko::IModule
   {
   public:
@@ -71,8 +58,6 @@ private:
     bool Initialized = false;
   };
 
-  void AttachSinks();
-  void DetachSinks();
   void CreateMainWindow();
   void SubscribeWindowEvents();
   void RunFrame();
@@ -90,22 +75,14 @@ private:
 
   // Services / modules / sinks (declaration order = boot order).
   ::gecko::runtime::TrackingAllocator m_Allocator;
-  AllocatorInstaller m_AllocatorInstaller {&m_Allocator};
+  ::gecko::AllocatorScope m_AllocScope {m_Allocator};
 
-  ::gecko::runtime::ThreadPoolJobSystem m_JobSystem;
-  ::gecko::runtime::RingProfiler m_Profiler {1 << 16};
-  ::gecko::runtime::ImmediateLogger m_Logger;
-  ::gecko::runtime::EventBus m_EventBus;
-
-  ::gecko::runtime::CoreServicesModule m_RuntimeModule;
+  ::gecko::runtime::RuntimeModule m_RuntimeModule;
   ::gecko::platform::PlatformModule m_PlatformModule;
   ExampleModule m_AppModule;
 
   ::std::optional<::gecko::Engine> m_Engine;
-
-  ::gecko::runtime::ConsoleLogSink m_ConsoleSink;
-  ::gecko::runtime::FileLogSink m_FileSink {"log.txt"};
-  bool m_SinksAttached = false;
+  ::std::optional<::gecko::runtime::StandardLogSinks> m_LogSinks;
 
   // Application state.
   ::gecko::platform::WindowHandle m_MainWindow {};

@@ -26,7 +26,7 @@ struct InputTestScope
   NullProfiler profiler;
   NullLogger logger;
   runtime::EventBus events;
-  runtime::CoreServicesModule runtimeMod;
+  runtime::RuntimeModule runtimeMod;
   PlatformModule platformMod;
   ::std::optional<::gecko::Engine> engine;
 

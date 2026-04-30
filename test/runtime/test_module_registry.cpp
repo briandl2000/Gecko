@@ -1,5 +1,7 @@
 #include "gecko/core/engine.h"
 #include "gecko/core/services.h"
+#include "gecko/graphics/graphics_module.h"
+#include "gecko/platform/platform_module.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/runtime_module.h"
 
@@ -18,7 +20,7 @@ struct TestServiceScope
   NullProfiler profiler;
   NullLogger logger;
   EventBus eventBus;
-  CoreServicesModule runtimeMod;
+  RuntimeModule runtimeMod;
   ::std::optional<::gecko::Engine> engine;
 
   TestServiceScope() : runtimeMod(jobs, profiler, logger, eventBus)
@@ -226,8 +228,8 @@ TEST_CASE("ModuleRegistry ForEachModule visits all modules",
       },
       &visitCount);
 
-  // Engine starts the test scope with a CoreServicesModule already registered;
-  // the two MockModules registered above bring the total to three.
+  // Engine starts the test scope with a RuntimeModule already
+  // registered; the two MockModules registered above bring the total to three.
   REQUIRE(visitCount == 3);
 
   scope.modules().ShutdownAllModules();
@@ -240,7 +242,7 @@ TEST_CASE(
 {
   // Build the engine ourselves so we can register the spy module up
   // front and observe the topological start order. The spy is
-  // intentionally registered *before* CoreServicesModule to prove that
+  // intentionally registered *before* RuntimeModule to prove that
   // ordering is driven by Requires()/Publishes(), not registration
   // order.
   SystemAllocator alloc;
@@ -250,7 +252,7 @@ TEST_CASE(
   NullProfiler profiler;
   NullLogger logger;
   EventBus events;
-  CoreServicesModule services(jobs, profiler, logger, events);
+  RuntimeModule services(jobs, profiler, logger, events);
   ServiceSpyModule spy {"test.spy"};
 
   auto engine = ::gecko::Engine::Create({&spy, &services});
@@ -270,6 +272,39 @@ TEST_CASE(
   // Shutdown order is the reverse of startup, so the spy must have
   // shut down BEFORE services were unpublished -> still live.
   REQUIRE(spy.m_ShutdownJobs == &jobs);
+
+  ResetAllocator();
+}
+
+TEST_CASE("Topological sort orders Platform and Graphics after Runtime",
+          "[runtime][modules][topo]")
+{
+  SystemAllocator alloc;
+  REQUIRE(SetAllocator(&alloc));
+
+  NullJobSystem jobs;
+  NullProfiler profiler;
+  NullLogger logger;
+  EventBus events;
+  RuntimeModule runtime(jobs, profiler, logger, events);
+  ::gecko::platform::PlatformModule platform {};
+  ::gecko::graphics::GraphicsModule graphics {};
+
+  // Register graphics first to prove ordering is driven by the
+  // dependency graph, not registration order.
+  auto engine = ::gecko::Engine::Create({&graphics, &platform, &runtime});
+  REQUIRE(engine.has_value());
+
+  // All published services must be visible after Startup.
+  REQUIRE(engine->Modules().Service<IJobSystem>() == &jobs);
+  REQUIRE(engine->Modules().Service<::gecko::graphics::GraphicsDevice>() !=
+          nullptr);
+  REQUIRE(::gecko::platform::GetWindows() != nullptr);
+  REQUIRE(::gecko::graphics::GetGraphicsDevice() != nullptr);
+
+  engine.reset();
+  REQUIRE(::gecko::graphics::GetGraphicsDevice() == nullptr);
+  REQUIRE(::gecko::platform::GetWindows() == nullptr);
 
   ResetAllocator();
 }

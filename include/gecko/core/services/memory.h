@@ -189,6 +189,55 @@ GECKO_API bool SetAllocator(IAllocator* allocator) noexcept;
 /// revert to the default `SystemAllocator`.
 GECKO_API void ResetAllocator() noexcept;
 
+/// RAII wrapper around `SetAllocator` / `ResetAllocator`.
+///
+/// Construct with a reference to a stack-owned allocator; on
+/// destruction the default `SystemAllocator` is restored. Convert to
+/// `bool` (or check `Ok()`) to verify `Init()` succeeded.
+///
+/// Typical use in `main()` or an application class:
+///
+/// ```cpp
+/// runtime::TrackingAllocator tracker;
+/// AllocatorScope             scope {tracker};
+/// if (!scope) return 1;       // tracker->Init() failed
+/// // ... boot engine ...
+/// // scope's dtor calls ResetAllocator() last.
+/// ```
+class AllocatorScope
+{
+public:
+  /// Calls `SetAllocator(&allocator)`. Records whether init succeeded.
+  explicit AllocatorScope(IAllocator& allocator) noexcept
+      : m_Ok(SetAllocator(&allocator))
+  {}
+  /// Calls `ResetAllocator()` if construction succeeded.
+  ~AllocatorScope() noexcept
+  {
+    if (m_Ok)
+      ResetAllocator();
+  }
+
+  AllocatorScope(const AllocatorScope&) = delete;
+  AllocatorScope& operator=(const AllocatorScope&) = delete;
+  AllocatorScope(AllocatorScope&&) = delete;
+  AllocatorScope& operator=(AllocatorScope&&) = delete;
+
+  /// @return `true` if the allocator's `Init()` succeeded.
+  [[nodiscard]] bool Ok() const noexcept
+  {
+    return m_Ok;
+  }
+  /// @return `true` if the allocator's `Init()` succeeded.
+  [[nodiscard]] explicit operator bool() const noexcept
+  {
+    return m_Ok;
+  }
+
+private:
+  bool m_Ok;
+};
+
 /// Allocate bytes from the active allocator.
 /// Asserts on zero size and non-power-of-two alignment in debug.
 /// @param size Number of bytes to allocate.

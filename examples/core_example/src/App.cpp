@@ -11,15 +11,6 @@
 
 namespace gecko::examples::core_example {
 
-App::AllocatorInstaller::AllocatorInstaller(::gecko::IAllocator* a) noexcept
-    : Ok(::gecko::SetAllocator(a))
-{}
-
-App::AllocatorInstaller::~AllocatorInstaller()
-{
-  ::gecko::ResetAllocator();
-}
-
 ::gecko::Label App::ExampleModule::RootLabel() const noexcept
 {
   return labels::App;
@@ -33,38 +24,16 @@ bool App::ExampleModule::Startup(::gecko::IModuleRegistry&) noexcept
 void App::ExampleModule::Shutdown(::gecko::IModuleRegistry&) noexcept
 {}
 
-App::App() : m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus)
+App::App()
 {
-  if (!m_AllocatorInstaller.Ok)
+  if (!m_AllocScope)
     return;
-
-  m_JobSystem.SetWorkerThreadCount(4);
 
   m_Engine = ::gecko::Engine::Create({&m_RuntimeModule, &m_AppModule});
   if (!m_Engine)
     return;
 
-  AttachSinks();
-  ::gecko::SetThreadProfilerName("main");
-  GECKO_INFO(labels::Main, ::gecko::VersionFullString());
-}
-
-App::~App()
-{
-  if (m_SinksAttached)
-    DetachSinks();
-  m_Engine.reset();
-}
-
-void App::AttachSinks()
-{
-  auto* logger = ::gecko::GetLogger();
-  if (logger)
-  {
-    m_FileSink.RegisterWith(logger);
-    m_ConsoleSink.RegisterWith(logger);
-    logger->SetLevel(::gecko::LogLevel::Info);
-  }
+  m_LogSinks.emplace();
 
   // Force Detailed profiler events so users can inspect every emitted
   // event in Perfetto / chrome://tracing when running this example.
@@ -85,16 +54,8 @@ void App::AttachSinks()
     GECKO_WARN(labels::Main, "Failed to open trace profiler sink");
   }
 
-  m_SinksAttached = true;
-}
-
-void App::DetachSinks()
-{
-  m_ConsoleSink.Unregister();
-  m_FileSink.Unregister();
-  // m_TraceSink unregisters itself via RAII so any final ZoneEnd events
-  // still land in the trace before the writer closes.
-  m_SinksAttached = false;
+  ::gecko::SetThreadProfilerName("main");
+  GECKO_INFO(labels::Main, ::gecko::VersionFullString());
 }
 
 int App::Run()

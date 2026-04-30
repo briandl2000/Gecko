@@ -30,13 +30,14 @@ namespace gecko {
 /// MyJobSystem jobs;
 /// MyProfiler  profiler;
 /// MyLogger    logger;
-/// ::gecko::runtime::CoreServicesModule runtimeModule(jobs, profiler, logger,
+/// ::gecko::runtime::RuntimeModule servicesModule(jobs, profiler,
+/// logger,
 ///                                                    events);
 /// ::gecko::platform::PlatformModule platformModule;
 /// MyAppModule  app;
 ///
 /// auto engine = ::gecko::Engine::Create(
-///     {&runtimeModule, &platformModule, &app});
+///     {&servicesModule, &platformModule, &app});
 /// if (!engine)
 ///   return 1;
 ///

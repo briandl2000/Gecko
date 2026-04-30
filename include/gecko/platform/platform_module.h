@@ -45,7 +45,7 @@ public:
   ///
   /// The caller owns each non-null backend and must keep it alive for
   /// the lifetime of the `PlatformModule` (same ownership rule as
-  /// `CoreServicesModule`'s service references). Any backend left
+  /// `RuntimeModule`'s service references). Any backend left
   /// `nullptr` is created and owned internally during `Startup()` from
   /// the resolved `PlatformConfig`. Production code passes nothing and
   /// gets the OS-appropriate defaults.

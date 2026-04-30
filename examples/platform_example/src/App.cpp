@@ -61,15 +61,6 @@ const char* BoolStr(bool v) noexcept
 
 }  // namespace
 
-App::AllocatorInstaller::AllocatorInstaller(::gecko::IAllocator* a) noexcept
-    : Ok(::gecko::SetAllocator(a))
-{}
-
-App::AllocatorInstaller::~AllocatorInstaller()
-{
-  ::gecko::ResetAllocator();
-}
-
 ::gecko::Label App::ExampleModule::RootLabel() const noexcept
 {
   return App_Label;
@@ -83,19 +74,18 @@ bool App::ExampleModule::Startup(::gecko::IModuleRegistry&) noexcept
 void App::ExampleModule::Shutdown(::gecko::IModuleRegistry&) noexcept
 {}
 
-App::App() : m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus)
+App::App()
 {
-  if (!m_AllocatorInstaller.Ok)
+  if (!m_AllocScope)
     return;
 
-  m_JobSystem.SetWorkerThreadCount(4);
   m_Engine = ::gecko::Engine::Create(
       {&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
   if (!m_Engine)
     return;
 
   ::gecko::SetThreadProfilerName("main");
-  AttachSinks();
+  m_LogSinks.emplace();
   GECKO_INFO(Main_Label, ::gecko::VersionFullString());
 
   CreateMainWindow();
@@ -117,28 +107,6 @@ App::~App()
 
   if (m_MainWindow.IsValid() && Windows().IsWindowAlive(m_MainWindow))
     Windows().DestroyWindow(m_MainWindow);
-
-  if (m_SinksAttached)
-    DetachSinks();
-  m_Engine.reset();
-}
-
-void App::AttachSinks()
-{
-  if (auto* logger = ::gecko::GetLogger())
-  {
-    m_FileSink.RegisterWith(logger);
-    m_ConsoleSink.RegisterWith(logger);
-    logger->SetLevel(::gecko::LogLevel::Info);
-  }
-  m_SinksAttached = true;
-}
-
-void App::DetachSinks()
-{
-  m_ConsoleSink.Unregister();
-  m_FileSink.Unregister();
-  m_SinksAttached = false;
 }
 
 void App::CreateMainWindow()

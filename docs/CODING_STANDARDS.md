@@ -957,7 +957,7 @@ When designing a new public API in a module, choose its shape based on the state
 
 ### Vocabulary
 
-A **module** is an entire library (Core, Platform, Runtime, Math, Graphics, …). Each module has a **module interface object** — a single concrete class (`CoreServicesModule`, `PlatformModule`, `RuntimeModule`, …) that owns the module's lifecycle state, gets stack-constructed by the application, and participates in `Engine::Create({...})`.
+A **module** is an entire library (Core, Platform, Runtime, Math, Graphics, …). Each module has a **module interface object** — a single concrete class (`RuntimeModule`, `PlatformModule`, `GraphicsModule`, …) that owns the module's lifecycle state, gets stack-constructed by the application, and participates in `Engine::Create({...})`.
 
 The module's namespace (`::gecko::core`, `::gecko::platform`, …) and the module interface object together make up the module's public surface. Both are "the module"; the namespace is not a smaller component within the module.
 
