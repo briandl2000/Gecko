@@ -50,6 +50,9 @@ endif()
 
 # Mirror Graphics' GECKO_GRAPHICS_VULKAN gate so feature tests can
 # compile-out backend-specific paths when Vulkan isn't available.
+# find_package() result from src/graphics/ does not propagate across
+# add_subdirectory scopes, so re-detect here.
+find_package(Vulkan QUIET)
 if(Vulkan_FOUND)
   target_compile_definitions(graphics_feature_tests PRIVATE GECKO_GRAPHICS_VULKAN)
 endif()
