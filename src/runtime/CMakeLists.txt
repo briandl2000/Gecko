@@ -12,6 +12,7 @@ target_sources(Runtime
     immediate_logger.cpp
     ring_logger.cpp
     ring_profiler.cpp
+    standard_log_sinks.cpp
     thread_pool_job_system.cpp
     trace_file_sink.cpp
     trace_writer.cpp

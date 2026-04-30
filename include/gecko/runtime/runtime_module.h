@@ -1,11 +1,12 @@
 #pragma once
 
 /// @file
-/// `CoreServicesModule` -- the lifecycle node that publishes Core's
+/// `RuntimeModule` -- the lifecycle node that publishes Core's
 /// foundational services (`IJobSystem`, `IProfiler`, `ILogger`,
 /// `IEventBus`) at engine startup.
 
 #include "gecko/core/api.h"
+#include "gecko/core/ptr.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/jobs.h"
 #include "gecko/core/services/log.h"
@@ -19,30 +20,51 @@ namespace labels {
 inline constexpr ::gecko::Label Runtime = ::gecko::MakeLabel("gecko.runtime");
 }  // namespace labels
 
-/// Lifecycle node for the Runtime library.
+/// Engine module that owns the foundational service implementations
+/// (jobs, profiler, logger, event bus).
 ///
-/// The Runtime layer (Core <- Platform <- Runtime <- Program) is
-/// where the concrete implementations of Core's four foundational
-/// service interfaces live: `IJobSystem`, `IProfiler`, `ILogger`,
-/// `IEventBus`. `CoreServicesModule` calls `Init`/`Shutdown` on each
-/// and publishes them to the module registry.
+/// During `Startup()` the module calls `Init` on each service in order
+/// (jobs -> profiler -> logger -> events) and publishes them so app
+/// code can call `gecko::GetJobSystem()` / `GetProfiler()` /
+/// `GetLogger()` / `GetEventBus()`. `Shutdown()` is the reverse.
 ///
-/// **Ownership:** `CoreServicesModule` does NOT own the impls. The
-/// caller constructs them on the stack (or wherever) and passes
-/// references in. Each impl must outlive the module.
+/// Default-construct for sensible defaults (`ThreadPoolJobSystem`,
+/// `RingProfiler`, `ImmediateLogger`, `EventBus`); pass a `Backends`
+/// struct to inject custom impls. Same pattern as `PlatformModule`
+/// and `GraphicsModule`.
 ///
 /// Required by every engine instance: pass `&runtimeModule` as the
 /// first module to `Engine::Create({...})`.
-class CoreServicesModule final : public ::gecko::IModule
+class RuntimeModule final : public ::gecko::IModule
 {
 public:
-  /// Wire references to the four foundational services.
-  /// @param jobs      Job system implementation.
-  /// @param profiler  Profiler implementation.
-  /// @param logger    Logger implementation.
-  /// @param eventBus  Event bus implementation.
-  GECKO_API CoreServicesModule(IJobSystem& jobs, IProfiler& profiler,
-                               ILogger& logger, IEventBus& eventBus) noexcept;
+  /// Optional service injection for tests and specialised hosts.
+  ///
+  /// The caller owns each non-null impl and must keep it alive for the
+  /// lifetime of the `RuntimeModule`. Any field left `nullptr` is
+  /// created and owned internally during construction (sensible
+  /// production defaults). Production code passes nothing and gets the
+  /// defaults.
+  struct Backends
+  {
+    IJobSystem* Jobs = nullptr;     ///< Optional injected job system.
+    IProfiler* Profiler = nullptr;  ///< Optional injected profiler.
+    ILogger* Logger = nullptr;      ///< Optional injected logger.
+    IEventBus* EventBus = nullptr;  ///< Optional injected event bus.
+  };
+
+  /// Default-construct with production defaults (owned internally).
+  GECKO_API RuntimeModule() noexcept;
+
+  /// Construct with caller-injected backends. Any null field gets a
+  /// production default owned by the module.
+  GECKO_API explicit RuntimeModule(Backends backends) noexcept;
+
+  /// Explicit-injection ctor (all four impls externally owned).
+  GECKO_API RuntimeModule(IJobSystem& jobs, IProfiler& profiler,
+                          ILogger& logger, IEventBus& eventBus) noexcept;
+
+  GECKO_API ~RuntimeModule() noexcept override;
 
   [[nodiscard]] GECKO_API ::gecko::Label RootLabel() const noexcept override;
 
@@ -54,10 +76,19 @@ public:
       const noexcept override;
 
 private:
+  // Resolved service pointers (either injected or pointing to the
+  // owned defaults below).
   IJobSystem* m_jobs {nullptr};
   IProfiler* m_profiler {nullptr};
   ILogger* m_logger {nullptr};
   IEventBus* m_eventBus {nullptr};
+
+  // Internally-owned defaults; populated by ctors when no impl was
+  // injected for the corresponding slot.
+  ::gecko::Unique<IJobSystem> m_OwnedJobs;
+  ::gecko::Unique<IProfiler> m_OwnedProfiler;
+  ::gecko::Unique<ILogger> m_OwnedLogger;
+  ::gecko::Unique<IEventBus> m_OwnedEventBus;
 
   bool m_jobsInited {false};
   bool m_profilerInited {false};

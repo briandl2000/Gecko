@@ -32,7 +32,7 @@ live in Platform, while *threaded job system* lives in Runtime.
 | --------- | ------------------ | ----------- | ----------------------- | -------------------------------- |
 | Library   | Program-wide       | Build sys   | n/a (source artifact)   | `GeckoCore`, `GeckoPlatform`     |
 | Service   | Engine boot-time   | User code   | Yes                     | `ILogger`, `IJobSystem`          |
-| Module    | Engine boot-time   | User code   | n/a (publishes services)| `CoreServicesModule`, `PlatformModule`|
+| Module    | Engine boot-time   | User code   | n/a (publishes services)| `RuntimeModule`, `PlatformModule`|
 | System    | Module-internal    | Module      | No (private)            | Job dispatcher inside Runtime    |
 | Context   | Scoped (RAII)      | User code   | No (handle, not service)| `PlatformContext`                |
 
@@ -75,16 +75,21 @@ are always stack-constructed (or otherwise user-owned) and passed by
 pointer to `Engine::Create`:
 
 ```cpp
-runtime::ThreadPoolJobSystem  jobs;
-runtime::RingProfiler         profiler {1 << 16};
-runtime::RingLogger           logger {1024};
-runtime::EventBus             events;
-
-runtime::CoreServicesModule  rt {jobs, profiler, logger, events};
-platform::PlatformModule plat;
-MyAppModule              app;
+// Production: each module owns sensible defaults.
+runtime::RuntimeModule    rt;     // ThreadPoolJobSystem + RingProfiler +
+                                  // ImmediateLogger + EventBus
+platform::PlatformModule  plat;   // OS-default windowing + monitors
+MyAppModule               app;
 
 auto engine = Engine::Create({&rt, &plat, &app});
+```
+
+To customise impls (custom logger, mock profiler, etc.), pass a `Backends`
+struct or use the explicit-injection ctor:
+
+```cpp
+runtime::RingLogger logger {1024};
+runtime::RuntimeModule rt {{.Logger = &logger}};  // owns defaults for the rest
 ```
 
 Module construction patterns we deliberately *don't* use:

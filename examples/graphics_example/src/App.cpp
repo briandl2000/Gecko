@@ -44,15 +44,6 @@ bool WantValidation()
 
 }  // namespace
 
-App::AllocatorInstaller::AllocatorInstaller(::gecko::IAllocator* a) noexcept
-    : Ok(::gecko::SetAllocator(a))
-{}
-
-App::AllocatorInstaller::~AllocatorInstaller()
-{
-  ::gecko::ResetAllocator();
-}
-
 ::gecko::Label App::ExampleModule::RootLabel() const noexcept
 {
   return App_Label;
@@ -66,28 +57,31 @@ bool App::ExampleModule::Startup(::gecko::IModuleRegistry&) noexcept
 void App::ExampleModule::Shutdown(::gecko::IModuleRegistry&) noexcept
 {}
 
-App::App() : m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus)
+App::App() : m_GraphicsModule(MakeGraphicsConfig())
 {
-  if (!m_AllocatorInstaller.Ok)
+  if (!m_AllocScope)
     return;
 
-  m_Logger.SetThreadSafe(true);
-  m_JobSystem.SetWorkerThreadCount(4);
-
   m_Engine = ::gecko::Engine::Create(
-      {&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
+      {&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule, &m_AppModule});
   if (!m_Engine)
     return;
 
+  m_Device = ::gecko::graphics::GetGraphicsDevice();
+  m_GpuSampler = ::gecko::graphics::GetGpuSampler();
+  if (!m_Device)
+  {
+    GECKO_ERROR(Main_Label, "GraphicsModule did not publish a device");
+    return;
+  }
+
   ConfigureProfiler();
-  AttachSinks();
+  m_LogSinks.emplace();
   ::gecko::SetThreadProfilerName("main");
 
   GECKO_INFO(Main_Label, ::gecko::VersionFullString());
 
   if (!CreateWindows())
-    return;
-  if (!CreateDevice())
     return;
   if (!CreateSwapchains())
     return;
@@ -105,13 +99,17 @@ App::~App()
   //
   // Every GPU resource handle (Buffer, Texture, RenderTarget, Pipeline,
   // QueryPool, Sampler, Swapchain) holds a `Shared<void>` whose deleter
-  // captures a raw pointer to the owning device. They MUST destruct
-  // before `m_Device`, otherwise their deleters dereference a dead
-  // device and VMA fires an "allocations not freed" assert.
+  // captures a raw pointer to the device. They MUST destruct before the
+  // device, otherwise their deleters dereference a dead device and VMA
+  // fires an "allocations not freed" assert.
   //
-  // Members are declared in the right order -- m_Device first, every GPU
-  // resource after it -- so reverse-declaration destruction handles it.
-  // We only do here what RAII cannot:
+  // The device now lives in `GraphicsModule`, which is destroyed when
+  // `m_Engine` shuts down. Members are declared so resources sit AFTER
+  // `m_Engine` in the class -- reverse-order destruction tears them
+  // down first, then the engine runs `GraphicsModule::Shutdown()` which
+  // destroys the device.
+  //
+  // We do here only what RAII cannot:
   //   1. Tear down swapchains explicitly so windows can be destroyed
   //      before the platform module shuts down.
   //   2. Destroy windows (the WindowHandle is just an ID, not RAII).
@@ -128,9 +126,6 @@ App::~App()
       if (s.Handle.IsValid())
         ::gecko::platform::GetWindows()->DestroyWindow(s.Handle);
   }
-
-  if (m_SinksAttached)
-    DetachSinks();
 }
 
 void App::ConfigureProfiler()
@@ -151,22 +146,16 @@ void App::ConfigureProfiler()
   }
 }
 
-void App::AttachSinks()
+::gecko::graphics::GraphicsConfig App::MakeGraphicsConfig() noexcept
 {
-  if (auto* logger = ::gecko::GetLogger())
-  {
-    m_FileSink.RegisterWith(logger);
-    m_ConsoleSink.RegisterWith(logger);
-    logger->SetLevel(::gecko::LogLevel::Info);
-  }
-  m_SinksAttached = true;
-}
-
-void App::DetachSinks()
-{
-  m_ConsoleSink.Unregister();
-  m_FileSink.Unregister();
-  m_SinksAttached = false;
+  ::gecko::graphics::GraphicsConfig cfg {};
+  cfg.Backend = ::gecko::graphics::GraphicsBackend::Vulkan;
+  cfg.Debug = WantValidation();
+  cfg.AppName = "graphics_example";
+  cfg.Sampler.MaxZonesPerFrame = 64;
+  cfg.Sampler.FramesInFlight = 3;
+  cfg.Sampler.GpuThreadName = "GPU.Graphics";
+  return cfg;
 }
 
 bool App::CreateWindows()
@@ -191,22 +180,6 @@ bool App::CreateWindows()
     }
   }
   GECKO_INFO(Main_Label, "Two windows created");
-  return true;
-}
-
-bool App::CreateDevice()
-{
-  m_Device = CreateGraphicsDevice(GraphicsDeviceDesc {
-      .Backend = GraphicsBackend::Vulkan,
-      .Debug = WantValidation(),
-      .AppName = "graphics_example",
-  });
-  if (!m_Device)
-  {
-    GECKO_ERROR(Main_Label, "Failed to create graphics device");
-    return false;
-  }
-  GECKO_INFO(Main_Label, "Graphics device created");
   return true;
 }
 
@@ -389,13 +362,8 @@ void App::CreateProfilingResources()
   qpDesc.DebugName = "FrameTimestamps";
   m_TimestampPool = m_Device->CreateTimestampQueryPool(qpDesc);
 
-  GpuSamplerDesc samplerDesc {};
-  samplerDesc.MaxZonesPerFrame = 64;
-  samplerDesc.FramesInFlight = 3;
-  samplerDesc.GpuThreadName = "GPU.Graphics";
-  m_GpuSampler = m_Device->CreateGpuSampler(samplerDesc);
   if (m_GpuSampler)
-    GECKO_INFO(Main_Label, "GPU profiler sampler created");
+    GECKO_INFO(Main_Label, "GPU profiler sampler available via service");
 }
 
 void App::SubscribeEvents()
@@ -487,7 +455,7 @@ void App::RecordComputePass(::gecko::f32 time)
       continue;
     computeCmd[i]->Begin();
     if (m_GpuSampler)
-      computeCmd[i]->AttachGpuSampler(m_GpuSampler.get(), Main_Label);
+      computeCmd[i]->AttachGpuSampler(m_GpuSampler, Main_Label);
 
     if (i == 0)
     {
@@ -609,7 +577,7 @@ void App::RenderFrame()
   if (m_GpuSampler)
   {
     m_GpuSampler->BeginFrame(*cmd);
-    cmd->AttachGpuSampler(m_GpuSampler.get(), Main_Label);
+    cmd->AttachGpuSampler(m_GpuSampler, Main_Label);
   }
   if (m_TimestampPool.IsValid())
     cmd->ResetTimestamps(m_TimestampPool, 0, 4);

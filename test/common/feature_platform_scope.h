@@ -46,7 +46,7 @@ struct FeaturePlatformScope
   NullProfiler Profiler;
   NullLogger Logger;
   runtime::EventBus Events;
-  runtime::CoreServicesModule Runtime;
+  runtime::RuntimeModule Runtime;
   platform::PlatformModule Platform;
   ::std::optional<::gecko::Engine> EngineHandle;
 

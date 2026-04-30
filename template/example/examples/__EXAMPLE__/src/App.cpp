@@ -1,8 +1,8 @@
 #include "App.h"
 
+#include <gecko/core/labels.h>
+#include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
-#include <gecko/core/utility/thread.h>
-#include <gecko/core/version.h>
 
 namespace app::__EXAMPLE__ {
 
@@ -11,15 +11,6 @@ inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.__EXAMPLE__");
 inline constexpr ::gecko::Label Main =
     ::gecko::MakeLabel("app.__EXAMPLE__.main");
 }  // namespace labels
-
-App::AllocatorInstaller::AllocatorInstaller(::gecko::IAllocator* a) noexcept
-    : Ok(::gecko::SetAllocator(a))
-{}
-
-App::AllocatorInstaller::~AllocatorInstaller()
-{
-  ::gecko::ResetAllocator();
-}
 
 ::gecko::Label App::AppModule::RootLabel() const noexcept
 {
@@ -35,51 +26,22 @@ void App::AppModule::Shutdown(::gecko::IModuleRegistry&) noexcept
 {}
 
 App::App()
-    : m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus)
 {
-  if (!m_AllocatorInstaller.Ok)
+  if (!m_AllocScope)
     return;
-
-  m_JobSystem.SetWorkerThreadCount(4);
 
   m_Engine = ::gecko::Engine::Create({&m_RuntimeModule, &m_AppModule});
   if (!m_Engine)
     return;
 
-  AttachSinks();
-  GECKO_INFO(labels::Main, "Gecko %s", ::gecko::VersionFullString());
-}
-
-App::~App()
-{
-  if (m_SinksAttached)
-    DetachSinks();
-  m_Engine.reset();
-}
-
-void App::AttachSinks()
-{
-  auto* logger = ::gecko::GetLogger();
-  if (!logger)
-    return;
-  m_ConsoleSink.RegisterWith(logger);
-  logger->SetLevel(::gecko::LogLevel::Info);
-  m_SinksAttached = true;
-}
-
-void App::DetachSinks()
-{
-  m_ConsoleSink.Unregister();
-  m_SinksAttached = false;
+  m_LogSinks.emplace();
 }
 
 int App::Run()
 {
   if (!IsValid())
     return 1;
-
-  GECKO_INFO(labels::Main, "Hello from __EXAMPLE__");
-  GECKO_SLEEP_MS(16);
+  GECKO_INFO(labels::Main, "Hello from __EXAMPLE__!");
   return 0;
 }
 

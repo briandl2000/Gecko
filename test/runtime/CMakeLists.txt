@@ -12,6 +12,7 @@ target_link_libraries(runtime_tests
   PRIVATE
     Gecko::Runtime
     Gecko::Platform
+    Gecko::Graphics
     Gecko::Core
     Gecko::CoreServices
     Catch2::Catch2WithMain
@@ -27,6 +28,7 @@ endif()
 
 add_executable(runtime_feature_tests
   feature_profiler.cpp
+  feature_runtime.cpp
 )
 
 target_link_libraries(runtime_feature_tests
