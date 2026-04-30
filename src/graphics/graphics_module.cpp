@@ -17,9 +17,16 @@ constexpr ::gecko::ServiceId RequiredServices[] = {
     ::gecko::ServiceIdOf<::gecko::IEventBus>(),
 };
 
+// IGpuSampler is *not* listed here -- it is published only when the
+// device actually returns one (NullDevice does not, and other devices
+// may legitimately decline). Advertising it unconditionally would make
+// dependents assume it will exist after Startup and would block any
+// other module from publishing IGpuSampler in those configs. Consumers
+// that want a sampler look it up via the free accessor `GetGpuSampler()`
+// or `IModuleRegistry::Service<IGpuSampler>()` and treat a null result
+// as "no sampler available".
 constexpr ::gecko::ServiceId PublishedServices[] = {
     ::gecko::ServiceIdOf<GraphicsDevice>(),
-    ::gecko::ServiceIdOf<IGpuSampler>(),
 };
 
 // File-scope pointers populated by Startup, cleared by Shutdown. Free

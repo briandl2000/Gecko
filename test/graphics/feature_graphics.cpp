@@ -142,7 +142,8 @@ TEST_CASE("Full stack: GraphicsModule honours Backends injection",
 #include <chrono>
 #include <thread>
 
-#if defined(GECKO_PLATFORM_LINUX) || defined(GECKO_PLATFORM_WINDOWS)
+#if (defined(GECKO_PLATFORM_LINUX) || defined(GECKO_PLATFORM_WINDOWS)) && \
+    defined(GECKO_GRAPHICS_VULKAN)
 TEST_CASE("Visible: window + Vulkan device + swapchain bind",
           "[.visible][feature][graphics][window]")
 {

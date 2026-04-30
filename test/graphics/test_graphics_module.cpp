@@ -45,10 +45,11 @@ TEST_CASE("GraphicsModule reports its label and service contract",
   REQUIRE(requires_.size() == 4);
 
   auto publishes = module.Publishes();
-  REQUIRE(publishes.size() == 2);
-  // GraphicsDevice is always published; IGpuSampler is conditional on
-  // backend support, but the contract advertises both either way so the
-  // topo-sort still works.
+  REQUIRE(publishes.size() == 1);
+  // GraphicsDevice is the only unconditionally-published service.
+  // IGpuSampler is published only when the device returns one
+  // (NullDevice does not), so it is intentionally absent from
+  // Publishes() to keep the topo-sort honest.
 }
 
 TEST_CASE("GraphicsModule with default config publishes GraphicsDevice via "

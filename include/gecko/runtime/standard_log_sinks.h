@@ -13,9 +13,12 @@ namespace gecko::runtime {
 
 /// Attaches a console sink and a file sink to the active logger.
 ///
-/// Construct after the engine has booted (so `GetLogger()` returns the
-/// real logger, not the null fallback). Both sinks are unregistered in
-/// the destructor.
+/// Construct after the engine has booted. The constructor probes the
+/// module registry (`GetModules()->Service<ILogger>()`) and only
+/// attaches when a real `ILogger` has been published; if no logger is
+/// available the object becomes a no-op (`Ok()` returns `false`,
+/// destructor does nothing). The sinks are unregistered in the
+/// destructor.
 ///
 /// Typical use:
 ///
@@ -25,10 +28,6 @@ namespace gecko::runtime {
 /// // ... run ...
 /// // sinks goes out of scope before engine.reset().
 /// ```
-///
-/// If the active logger when the constructor runs is the process-wide
-/// null logger (engine not booted), `Ok()` returns `false` and the
-/// destructor is a no-op.
 class StandardLogSinks
 {
 public:

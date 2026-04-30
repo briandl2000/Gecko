@@ -47,3 +47,9 @@ target_include_directories(graphics_feature_tests PRIVATE
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   target_compile_options(graphics_feature_tests PRIVATE -Wno-pedantic)
 endif()
+
+# Mirror Graphics' GECKO_GRAPHICS_VULKAN gate so feature tests can
+# compile-out backend-specific paths when Vulkan isn't available.
+if(Vulkan_FOUND)
+  target_compile_definitions(graphics_feature_tests PRIVATE GECKO_GRAPHICS_VULKAN)
+endif()
