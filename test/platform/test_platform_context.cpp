@@ -22,7 +22,7 @@ struct TestServiceScope
   NullProfiler profiler;
   NullLogger logger;
   runtime::EventBus events;
-  runtime::CoreServicesModule runtimeMod;
+  runtime::RuntimeModule runtimeMod;
   PlatformModule platformMod;
   ::std::optional<::gecko::Engine> engine;
 
@@ -487,7 +487,7 @@ TEST_CASE("PlatformModule publishes injected backends",
   NullProfiler profiler;
   NullLogger logger;
   runtime::EventBus events;
-  runtime::CoreServicesModule runtimeMod {jobs, profiler, logger, events};
+  runtime::RuntimeModule runtimeMod {jobs, profiler, logger, events};
 
   PlatformModule platformMod {cfg, PlatformModule::Backends {
                                        .Windows = windowsRaw,

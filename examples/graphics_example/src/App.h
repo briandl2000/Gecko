@@ -5,18 +5,15 @@
 #include <gecko/core/ptr.h>
 #include <gecko/core/scope.h>
 #include <gecko/core/services/events.h>
+#include <gecko/core/services/memory.h>
 #include <gecko/core/services/modules.h>
 #include <gecko/core/types.h>
 #include <gecko/graphics/gpu_profiler.h>
 #include <gecko/graphics/graphics_device.h>
+#include <gecko/graphics/graphics_module.h>
 #include <gecko/platform/platform_module.h>
-#include <gecko/runtime/console_log_sink.h>
-#include <gecko/runtime/event_bus.h>
-#include <gecko/runtime/file_log_sink.h>
-#include <gecko/runtime/immediate_logger.h>
-#include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
-#include <gecko/runtime/thread_pool_job_system.h>
+#include <gecko/runtime/standard_log_sinks.h>
 #include <gecko/runtime/tracking_allocator.h>
 #include <optional>
 
@@ -51,15 +48,6 @@ private:
   static constexpr ::gecko::graphics::DataFormat OffscreenFmt =
       ::gecko::graphics::DataFormat::R8G8B8A8_UNORM;
 
-  struct AllocatorInstaller
-  {
-    explicit AllocatorInstaller(::gecko::IAllocator* a) noexcept;
-    ~AllocatorInstaller();
-    AllocatorInstaller(const AllocatorInstaller&) = delete;
-    AllocatorInstaller& operator=(const AllocatorInstaller&) = delete;
-    bool Ok = false;
-  };
-
   class ExampleModule final : public ::gecko::IModule
   {
   public:
@@ -78,11 +66,9 @@ private:
     ::gecko::u32 ResizeH = 0;
   };
 
-  void AttachSinks();
-  void DetachSinks();
+  static ::gecko::graphics::GraphicsConfig MakeGraphicsConfig() noexcept;
 
   bool CreateWindows();
-  bool CreateDevice();
   bool CreateSwapchains();
   bool CreateRenderResources();
   bool CreatePipelines();
@@ -102,27 +88,23 @@ private:
   void OnKey(::gecko::platform::KeyCode key);
   void PrintHudIfDue(::gecko::u32 drawCalls);
 
-  // Services / modules / sinks.
+  // Services / modules / sinks. Each module owns its production
+  // defaults internally via its default ctor.
   ::gecko::runtime::TrackingAllocator m_Allocator;
-  AllocatorInstaller m_AllocatorInstaller {&m_Allocator};
+  ::gecko::AllocatorScope m_AllocScope {m_Allocator};
 
-  ::gecko::runtime::RingProfiler m_Profiler {1 << 20};
-  ::gecko::runtime::ImmediateLogger m_Logger;
-  ::gecko::runtime::EventBus m_EventBus;
-  ::gecko::runtime::ThreadPoolJobSystem m_JobSystem;
-
-  ::gecko::runtime::CoreServicesModule m_RuntimeModule;
+  ::gecko::runtime::RuntimeModule m_RuntimeModule;
   ::gecko::platform::PlatformModule m_PlatformModule;
+  ::gecko::graphics::GraphicsModule m_GraphicsModule;
   ExampleModule m_AppModule;
 
   ::std::optional<::gecko::Engine> m_Engine;
+  ::std::optional<::gecko::runtime::StandardLogSinks> m_LogSinks;
 
-  ::gecko::runtime::ConsoleLogSink m_ConsoleSink;
-  ::gecko::runtime::FileLogSink m_FileSink {"log.txt"};
-  bool m_SinksAttached = false;
-
-  // Graphics resources.
-  ::gecko::Unique<::gecko::graphics::GraphicsDevice> m_Device;
+  // Graphics resources -- declared after m_Engine so they are destroyed
+  // before the engine tears the GraphicsModule (and its device) down.
+  ::gecko::graphics::GraphicsDevice* m_Device = nullptr;
+  ::gecko::graphics::IGpuSampler* m_GpuSampler = nullptr;
   WindowSlot m_Slots[2] {};
 
   ::gecko::graphics::RenderTarget m_OffscreenRT {};
@@ -135,8 +117,6 @@ private:
   ::gecko::graphics::GraphicsPipeline m_TrianglePipeline {};
   ::gecko::graphics::GraphicsPipeline m_BlitPipeline {};
   ::gecko::graphics::ComputePipeline m_PlasmaPipeline {};
-
-  ::gecko::Unique<::gecko::graphics::IGpuSampler> m_GpuSampler;
 
   // Event subscriptions kept alive for Run().
   ::gecko::EventSubscription m_CloseSub {};

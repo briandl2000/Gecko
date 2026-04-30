@@ -24,6 +24,8 @@ _TEST_TARGETS = (
     "math_tests",
     "graphics_tests",
     "platform_feature_tests",
+    "runtime_feature_tests",
+    "graphics_feature_tests",
 )
 
 

@@ -13,7 +13,8 @@ target_sources(Core
     services/memory.cpp
     services/profiler.cpp
     services/modules.cpp
-    
+    services/module_registry.cpp
+
     utility/thread.cpp
     utility/time.cpp
     utility/random.cpp
@@ -40,7 +41,6 @@ target_sources(CoreServices
   PRIVATE
     services.cpp
     services/engine.cpp
-    services/module_registry.cpp
 )
 
 target_link_libraries(CoreServices PUBLIC Gecko::Core)

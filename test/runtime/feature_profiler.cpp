@@ -156,7 +156,7 @@ TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer",
   NullProfiler nullProf;
   NullLogger logger;
   EventBus eventBus;
-  CoreServicesModule coreMod(jobs, nullProf, logger, eventBus);
+  RuntimeModule coreMod(jobs, nullProf, logger, eventBus);
 
   {
     auto engine = ::gecko::Engine::Create({&coreMod});
@@ -207,7 +207,7 @@ TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer",
     const u32 expected = NumWaves * EmitsPerWave * 2;
     REQUIRE(sink.Count.load(::std::memory_order_relaxed) == expected);
   }
-  // engine destructor runs CoreServicesModule shutdown which stops jobs
+  // engine destructor runs RuntimeModule shutdown which stops jobs
 
   ResetAllocator();
 }

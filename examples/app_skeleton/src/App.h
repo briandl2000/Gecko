@@ -2,16 +2,12 @@
 
 #include <gecko/core/engine.h>
 #include <gecko/core/scope.h>
+#include <gecko/core/services/memory.h>
 #include <gecko/core/services/modules.h>
 #include <gecko/core/types.h>
 #include <gecko/platform/platform_module.h>
-#include <gecko/runtime/console_log_sink.h>
-#include <gecko/runtime/event_bus.h>
-#include <gecko/runtime/file_log_sink.h>
-#include <gecko/runtime/ring_logger.h>
-#include <gecko/runtime/ring_profiler.h>
 #include <gecko/runtime/runtime_module.h>
-#include <gecko/runtime/thread_pool_job_system.h>
+#include <gecko/runtime/standard_log_sinks.h>
 #include <gecko/runtime/tracking_allocator.h>
 #include <optional>
 
@@ -29,52 +25,40 @@ struct AppConfig
 
 /// Minimal Gecko application.
 ///
-/// Demonstrates the boot order every Gecko app follows:
+/// Demonstrates the canonical boot order every Gecko app follows:
 ///
-///   1. install allocator (infrastructure)
-///   2. construct concrete service implementations
-///   3. construct module objects (runtime, platform, app)
-///   4. `Engine::Create({...})` boots modules in dependency order
-///   5. attach log sinks and run the main loop
-///   6. shutdown is RAII (dtor unregisters sinks, tears down engine, resets
-///      the allocator)
-///
-/// All services and modules are owned as members of this class. The
-/// declaration order of those members is intentional -- see App.cpp.
+///   1. install the allocator (`AllocatorScope`)
+///   2. construct module objects (`RuntimeModule`, `PlatformModule`,
+///      app module). Each module's default ctor owns sensible
+///      production defaults internally; pass a `Backends` struct only
+///      when overriding a slot.
+///   3. `Engine::Create({...})` boots the modules in dependency order
+///   4. attach log sinks (`StandardLogSinks`) and run the main loop
+///   5. shutdown is RAII -- the destructor unregisters sinks, tears
+///      down the engine, and resets the allocator in reverse member
+///      declaration order.
 class App
 {
 public:
-  /// Boots the engine using `cfg`. Throws nothing; if boot fails,
-  /// `IsValid()` returns false and `Run()` will exit with non-zero.
+  /// Boots the engine using `cfg`. If boot fails, `IsValid()` returns
+  /// false and `Run()` will exit with non-zero.
   explicit App(const AppConfig& cfg);
-  ~App();
+  ~App() = default;
 
   App(const App&) = delete;
   App& operator=(const App&) = delete;
 
-  /// Returns true if the engine booted successfully.
+  /// @return `true` if the engine booted successfully.
   [[nodiscard]] bool IsValid() const noexcept
   {
     return m_Engine.has_value();
   }
 
-  /// Runs the configured workload (windowed or headless) and returns the
-  /// process exit code.
+  /// Runs the configured workload (windowed or headless) and returns
+  /// the process exit code.
   int Run();
 
 private:
-  /// RAII helper: installs the allocator on construction, resets it on
-  /// destruction. Declared between the allocator member and the rest so
-  /// member construction order produces the right install/reset bracket.
-  struct AllocatorInstaller
-  {
-    explicit AllocatorInstaller(::gecko::IAllocator* a) noexcept;
-    ~AllocatorInstaller();
-    AllocatorInstaller(const AllocatorInstaller&) = delete;
-    AllocatorInstaller& operator=(const AllocatorInstaller&) = delete;
-    bool Ok = false;
-  };
-
   /// Trivial app-side module so `Engine::Create` has somewhere to put
   /// the application label.
   class SkeletonModule final : public ::gecko::IModule
@@ -87,29 +71,27 @@ private:
 
   void RunHeadless();
   void RunWindowed();
-  void AttachSinks();
-  void DetachSinks();
 
   AppConfig m_Config;
 
-  // Order matters: each section depends on what is above it.
+  // Order matters: each section depends on what is above it. The
+  // destructor tears down in reverse member-declaration order, which
+  // gives the correct sink-detach -> engine-stop -> allocator-reset
+  // bracket without any explicit cleanup code.
+
   ::gecko::runtime::TrackingAllocator m_Allocator;
-  AllocatorInstaller m_AllocatorInstaller {&m_Allocator};
+  ::gecko::AllocatorScope m_AllocScope {m_Allocator};
 
-  ::gecko::runtime::ThreadPoolJobSystem m_JobSystem;
-  ::gecko::runtime::RingProfiler m_Profiler {1 << 16};
-  ::gecko::runtime::RingLogger m_Logger {1024};
-  ::gecko::runtime::EventBus m_EventBus;
-
-  ::gecko::runtime::CoreServicesModule m_RuntimeModule;
+  ::gecko::runtime::RuntimeModule m_RuntimeModule;
   ::gecko::platform::PlatformModule m_PlatformModule;
   SkeletonModule m_AppModule;
 
+  // Booted in App's ctor body and torn down implicitly by the dtor.
+  // m_LogSinks must declare *after* m_Engine so that it dies first
+  // (sinks unregister from the still-alive logger before Engine
+  // destroys the registry).
   ::std::optional<::gecko::Engine> m_Engine;
-
-  ::gecko::runtime::ConsoleLogSink m_ConsoleSink;
-  ::gecko::runtime::FileLogSink m_FileSink {"log.txt"};
-  bool m_SinksAttached = false;
+  ::std::optional<::gecko::runtime::StandardLogSinks> m_LogSinks;
 };
 
 }  // namespace gecko::examples::app_skeleton

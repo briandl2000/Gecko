@@ -16,15 +16,6 @@ inline constexpr ::gecko::Label Main =
     ::gecko::MakeLabel("app.app_skeleton.main");
 }  // namespace labels
 
-App::AllocatorInstaller::AllocatorInstaller(::gecko::IAllocator* a) noexcept
-    : Ok(::gecko::SetAllocator(a))
-{}
-
-App::AllocatorInstaller::~AllocatorInstaller()
-{
-  ::gecko::ResetAllocator();
-}
-
 ::gecko::Label App::SkeletonModule::RootLabel() const noexcept
 {
   return labels::App;
@@ -39,48 +30,22 @@ void App::SkeletonModule::Shutdown(::gecko::IModuleRegistry&) noexcept
 {}
 
 App::App(const AppConfig& cfg)
-    : m_Config(cfg), m_JobSystem(),
-      m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus),
-      m_PlatformModule(::gecko::platform::PlatformConfig {
-          .Backend = cfg.backend, .Window = {}, .Monitor = {}})
+    : m_Config(cfg), m_PlatformModule(::gecko::platform::PlatformConfig {
+                         .Backend = cfg.backend, .Window = {}, .Monitor = {}})
 {
-  if (!m_AllocatorInstaller.Ok)
+  if (!m_AllocScope)
     return;
-
-  m_JobSystem.SetWorkerThreadCount(4);
 
   m_Engine = ::gecko::Engine::Create(
       {&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
   if (!m_Engine)
     return;
 
-  AttachSinks();
+  // Engine is booted: GetLogger() now returns the real logger. Attach
+  // standard sinks for the rest of the run; they unregister in the
+  // dtor before Engine tears down.
+  m_LogSinks.emplace();
   GECKO_INFO(labels::Main, ::gecko::VersionFullString());
-}
-
-App::~App()
-{
-  if (m_SinksAttached)
-    DetachSinks();
-  m_Engine.reset();
-}
-
-void App::AttachSinks()
-{
-  auto* logger = ::gecko::GetLogger();
-  if (!logger)
-    return;
-  m_ConsoleSink.RegisterWith(logger);
-  m_FileSink.RegisterWith(logger);
-  logger->SetLevel(::gecko::LogLevel::Info);
-  m_SinksAttached = true;
-}
-
-void App::DetachSinks()
-{
-  m_ConsoleSink.Unregister();
-  m_FileSink.Unregister();
-  m_SinksAttached = false;
 }
 
 int App::Run()

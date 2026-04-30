@@ -18,19 +18,22 @@ CLI flags: `--no-window`, `--frames=N`, `--title=TEXT`,
 
 The full Gecko boot sequence, in order:
 
-1. `TrackingAllocator` is installed via `SetAllocator()` (allocator is
+1. `TrackingAllocator` is installed via `AllocatorScope` (allocator is
    *infrastructure* — must be available before anything else).
-2. Concrete service implementations (`ThreadPoolJobSystem`,
-   `RingProfiler`, `RingLogger`, `EventBus`) are constructed.
-3. Module objects (`CoreServicesModule`, `PlatformModule`, app module)
-   are constructed but not yet started.
-4. `Engine::Create({...})` boots all modules in dependency order.
-5. Log sinks (`ConsoleLogSink`, `FileLogSink`) are attached to the
-   logger after services are installed.
-6. The main loop runs windowed (`PumpEvents` + `DispatchEvents`) or
+2. Module objects (`RuntimeModule`, `PlatformModule`, app module) are
+   constructed. Each module's default ctor owns sensible production
+   defaults internally; pass a `Backends` struct only when you want to
+   override a specific slot (custom logger, mock job system, ...).
+3. `Engine::Create({...})` boots all modules in dependency order.
+4. `StandardLogSinks` is engaged — it registers a `ConsoleLogSink` and
+   a `FileLogSink` with the (now-real) logger and unregisters them on
+   destruction.
+5. The main loop runs windowed (`PumpEvents` + `DispatchEvents`) or
    headless work runs once.
-7. Shutdown is RAII via the `App` destructor — sinks unregister, the
-   engine tears modules down in reverse, then `ResetAllocator()` runs.
+6. Shutdown is RAII via the `App` destructor — members destruct in
+   reverse declaration order: sinks unregister, then `Engine` tears
+   modules down in reverse boot order, then `AllocatorScope` resets the
+   allocator.
 
 ## Files
 

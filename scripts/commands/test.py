@@ -22,7 +22,7 @@ def _is_cross_compile() -> bool:
 UNIT_TARGETS = ["core_tests", "platform_tests", "runtime_tests", "math_tests", "graphics_tests"]
 
 # Feature test targets (need live display / real backends)
-FEATURE_TARGETS = ["platform_feature_tests", "runtime_feature_tests"]
+FEATURE_TARGETS = ["platform_feature_tests", "runtime_feature_tests", "graphics_feature_tests"]
 
 
 def register(subparsers) -> None:
@@ -149,13 +149,14 @@ def _run(args) -> int:
     overall_result = 0
 
     # When --visible is set, append the Catch2 tag filter that opts in to the
-    # hidden [.visible] cases. Catch2 hides any tag starting with '.' from the
-    # default run; passing the tag explicitly enables them. We pass it to every
-    # selected target — non-feature targets simply have no matching cases and
-    # exit cleanly with --allow-running-no-tests.
+    # hidden visible cases. Catch2 parses `[.visible]` as two separate tags --
+    # `[.]` (the "hidden" marker) and `[visible]` (the actual tag name) -- so
+    # the correct opt-in filter is `[visible]`. We pass it to every selected
+    # target -- non-feature targets simply have no matching cases and exit
+    # cleanly with --allow-running-no-tests.
     extra_args = []
     if args.visible:
-        extra_args = ["[.visible]", "--allow-running-no-tests"]
+        extra_args = ["[visible]", "--allow-running-no-tests"]
 
     # On Windows network shares, SmartScreen blocks unsigned executables in
     # non-interactive mode. Copy to a local temp dir so they run without prompts.
