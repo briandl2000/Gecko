@@ -3,6 +3,7 @@
 #include "shaders.h"
 
 #include <gecko/core/labels.h>
+#include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
@@ -16,26 +17,24 @@ namespace app::debug_renderer_example {
 using namespace ::gecko::graphics;
 using namespace ::gecko::platform;
 
-namespace labels {
-inline constexpr ::gecko::Label App =
-    ::gecko::MakeLabel("app.debug_renderer_example");
-inline constexpr ::gecko::Label Main =
-    ::gecko::MakeLabel("app.debug_renderer_example.main");
-}  // namespace labels
-
 namespace {
+
+constexpr ::gecko::Label App_Label =
+    ::gecko::MakeLabel("app.debug_renderer_example");
+constexpr ::gecko::Label Main_Label =
+    ::gecko::MakeLabel("app.debug_renderer_example.main");
 
 /// One screenspace debug line. Mirrors the HLSL `DebugLine` struct.
 /// Layout (32 B): float2 A | float2 B | float3 Color | float Thickness.
 struct DebugLine
 {
-  gecko::math::float2 A;      ///< Start, pixels, top-left origin.
-  gecko::math::float2 B;      ///< End,   pixels.
-  gecko::math::float3 Color;  ///< RGB, linear, [0,1].
-  gecko::f32 Thickness;       ///< Width in pixels.
+  ::gecko::math::float2 A;      ///< Start, pixels, top-left origin.
+  ::gecko::math::float2 B;      ///< End,   pixels.
+  ::gecko::math::float3 Color;  ///< RGB, linear, [0,1].
+  ::gecko::f32 Thickness;       ///< Width in pixels.
 };
 
-static constexpr DebugLine DebugLines[] = {
+constexpr DebugLine DebugLines[] = {
     {{100.0f, 100.0f}, {500.0f, 300.0f}, {1.0f, 1.0f, 0.0f}, 1.0f},
     {{200.0f, 500.0f}, {800.0f, 150.0f}, {0.0f, 1.0f, 1.0f}, 1.0f},
     {{640.0f, 50.0f}, {640.0f, 670.0f}, {1.0f, 0.2f, 0.2f}, 1.0f},
@@ -43,24 +42,15 @@ static constexpr DebugLine DebugLines[] = {
 
 struct DebugLinePushConstants
 {
-  gecko::math::float2 ViewportPx;
-  gecko::math::float2 _Pad;
+  ::gecko::math::float2 ViewportPx;
+  ::gecko::math::float2 _Pad;
 };
 
 }  // namespace
 
-App::AllocatorInstaller::AllocatorInstaller(::gecko::IAllocator* a) noexcept
-    : Ok(::gecko::SetAllocator(a))
-{}
-
-App::AllocatorInstaller::~AllocatorInstaller()
-{
-  ::gecko::ResetAllocator();
-}
-
 ::gecko::Label App::AppModule::RootLabel() const noexcept
 {
-  return labels::App;
+  return App_Label;
 }
 
 bool App::AppModule::Startup(::gecko::IModuleRegistry&) noexcept
@@ -71,25 +61,37 @@ bool App::AppModule::Startup(::gecko::IModuleRegistry&) noexcept
 void App::AppModule::Shutdown(::gecko::IModuleRegistry&) noexcept
 {}
 
-App::App() : m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus)
+::gecko::graphics::GraphicsConfig App::MakeGraphicsConfig() noexcept
 {
-  if (!m_AllocatorInstaller.Ok)
+  ::gecko::graphics::GraphicsConfig cfg {};
+  cfg.Backend = ::gecko::graphics::GraphicsBackend::Vulkan;
+  cfg.Debug = false;
+  cfg.AppName = "debug_renderer_example";
+  return cfg;
+}
+
+App::App() : m_GraphicsModule(MakeGraphicsConfig())
+{
+  if (!m_AllocScope)
     return;
 
-  m_JobSystem.SetWorkerThreadCount(4);
-
   m_Engine = ::gecko::Engine::Create(
-      {&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
+      {&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule, &m_AppModule});
   if (!m_Engine)
     return;
 
-  AttachSinks();
+  m_Device = ::gecko::graphics::GetGraphicsDevice();
+  if (!m_Device)
+  {
+    GECKO_ERROR(Main_Label, "GraphicsModule did not publish a device");
+    return;
+  }
+
+  m_LogSinks.emplace();
   ::gecko::SetThreadProfilerName("main");
-  GECKO_INFO(labels::Main, "Gecko %s", ::gecko::VersionFullString());
+  GECKO_INFO(Main_Label, "Gecko %s", ::gecko::VersionFullString());
 
   if (!CreateMainWindow())
-    return;
-  if (!CreateDevice())
     return;
   if (!CreateSwapchain())
     return;
@@ -102,32 +104,21 @@ App::App() : m_RuntimeModule(m_JobSystem, m_Profiler, m_Logger, m_EventBus)
 
 App::~App()
 {
+  // GPU resources (Swapchain, Buffer, Pipeline) hold a Shared<void>
+  // whose deleter captures a raw pointer to the device. They MUST
+  // destruct before the device, which lives in m_GraphicsModule and
+  // is torn down by m_Engine.reset(). Members are declared so these
+  // resources sit AFTER m_Engine in the class, so reverse-order
+  // destruction handles them automatically.
+  //
+  // We only do here what RAII cannot: destroy the swapchain explicitly
+  // so the window can be destroyed before the platform module shuts
+  // down, and destroy the window (WindowHandle is just an ID).
   if (m_Device && m_Swapchain.IsValid())
     m_Device->DestroySwapchain(m_Swapchain);
 
   if (m_Engine && m_Window.IsValid())
     GetWindows()->DestroyWindow(m_Window);
-
-  if (m_SinksAttached)
-    DetachSinks();
-
-  m_Engine.reset();
-}
-
-void App::AttachSinks()
-{
-  if (auto* logger = ::gecko::GetLogger())
-  {
-    m_ConsoleSink.RegisterWith(logger);
-    logger->SetLevel(::gecko::LogLevel::Info);
-  }
-  m_SinksAttached = true;
-}
-
-void App::DetachSinks()
-{
-  m_ConsoleSink.Unregister();
-  m_SinksAttached = false;
 }
 
 bool App::CreateMainWindow()
@@ -141,22 +132,7 @@ bool App::CreateMainWindow()
   m_Window = GetWindows()->CreateWindow(wd);
   if (!m_Window.IsValid())
   {
-    GECKO_ERROR(labels::Main, "Failed to create window");
-    return false;
-  }
-  return true;
-}
-
-bool App::CreateDevice()
-{
-  m_Device = CreateGraphicsDevice(GraphicsDeviceDesc {
-      .Backend = GraphicsBackend::Vulkan,
-      .Debug = false,
-      .AppName = "debug_renderer_example",
-  });
-  if (!m_Device)
-  {
-    GECKO_ERROR(labels::Main, "Failed to create graphics device");
+    GECKO_ERROR(Main_Label, "Failed to create window");
     return false;
   }
   return true;
@@ -177,7 +153,7 @@ bool App::CreateSwapchain()
   m_Swapchain = m_Device->CreateSwapchain(native, scDesc);
   if (!m_Swapchain.IsValid())
   {
-    GECKO_ERROR(labels::Main, "Failed to create swapchain");
+    GECKO_ERROR(Main_Label, "Failed to create swapchain");
     return false;
   }
   return true;
@@ -187,16 +163,17 @@ bool App::CreateRenderResources()
 {
   StructuredBufferDesc vbDesc;
   vbDesc.ElementSize = sizeof(DebugLine);
-  vbDesc.NumElements = static_cast<gecko::u32>(std::size(DebugLines));
+  vbDesc.NumElements = static_cast<::gecko::u32>(std::size(DebugLines));
   vbDesc.Memory = MemoryType::Dedicated;
   m_VertexBuffer = m_Device->CreateStructuredBuffer(vbDesc);
   if (!m_VertexBuffer.IsValid())
   {
-    GECKO_ERROR(labels::Main, "Failed to create line buffer");
+    GECKO_ERROR(Main_Label, "Failed to create line buffer");
     return false;
   }
   const auto* raw = reinterpret_cast<const ::gecko::byte*>(DebugLines);
   m_Device->UploadBufferData(m_VertexBuffer, {raw, sizeof(DebugLines)});
+  m_LineCount = static_cast<::gecko::u32>(std::size(DebugLines));
   return true;
 }
 
@@ -227,7 +204,7 @@ bool App::CreatePipeline()
 
   if (!m_DebugLinePipeline.IsValid())
   {
-    GECKO_ERROR(labels::Main, "Failed to create debug line pipeline");
+    GECKO_ERROR(Main_Label, "Failed to create debug line pipeline");
     return false;
   }
   return true;
@@ -313,13 +290,11 @@ void App::RenderFrame()
                      static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height)},
       ._Pad = {0.0f, 0.0f},
   };
-  cmd->SetConstants(0,
-                    gecko::Span<const gecko::byte>(
-                        reinterpret_cast<const gecko::byte*>(&pc), sizeof(pc)));
+  cmd->SetConstants(
+      0, ::gecko::Span<const ::gecko::byte>(
+             reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)));
 
-  const ::gecko::u32 numLines =
-      static_cast<::gecko::u32>(std::size(DebugLines));
-  cmd->Draw(numLines * 6u);
+  cmd->Draw(m_LineCount * 6u);
   cmd->EndRendering();
 
   cmd->End();
@@ -340,7 +315,7 @@ int App::Run()
   if (!IsValid())
     return 1;
 
-  GECKO_INFO(labels::Main, "Entering frame loop - Escape or close to quit");
+  GECKO_INFO(Main_Label, "Entering frame loop - Escape or close to quit");
 
   SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); },
                         this);
@@ -352,7 +327,7 @@ int App::Run()
   }
 
   SetModalFrameCallback(nullptr, nullptr);
-  GECKO_INFO(labels::Main, "Shutdown complete");
+  GECKO_INFO(Main_Label, "Shutdown complete");
   return 0;
 }
 
