@@ -2,11 +2,25 @@
 
 /// @file
 /// `DebugRendererContext` -- per-view recorder of 2D debug lines.
-/// Lines accumulated during a frame are uploaded and drawn by
-/// `Submit`. One context owns one CPU/GPU line buffer; create more
-/// contexts to render different content into different surfaces.
+///
+/// Lifecycle (per frame):
+/// @code
+///   ctx.NewFrame();                    // CPU: rotate ring, reset cursors
+///   ctx.DrawLine(a, b, ...);           // CPU: append to staging buffer
+///   ...
+///   cmd->BeginRendering(target, ...);  // user owns the render pass
+///   ctx.Submit(cmd, {.Target = target});
+///   cmd->EndRendering();
+///   ...
+///   ctx.EndFrame();                    // upload staging -> GPU; once per
+///   frame device->ExecuteGraphicsCommandList(::std::move(cmd));
+/// @endcode
+///
+/// `DrawLine` is purely CPU and may be called any time -- before, between,
+/// or after `BeginRendering` / `Submit` calls. `Submit` only records draw
+/// commands; it does NOT open or close a render pass. The caller is
+/// responsible for `BeginRendering` / `EndRendering` and any clears.
 
-#include <array>
 #include <gecko/core/types.h>
 #include <gecko/graphics/command_list.h>
 #include <gecko/graphics/graphics_types.h>
@@ -15,85 +29,116 @@
 
 namespace gecko::debug_renderer {
 
-/// Records 2D debug lines for one frame and submits them to a graphics
-/// command list. One context per logical "view" -- a single context
-/// can fan recorded lines out to several render targets via
-/// `SetTarget`.
+/// Per-`Submit` parameters. Today only carries the color attachment;
+/// reserved for `Depth` and `ViewProj` once 3D lines land so the call
+/// site doesn't need to change.
+struct DebugRendererSubmitInfo
+{
+  /// Color attachment the lines will be rasterised into. Must already
+  /// be bound by an open `BeginRendering` on the command list passed
+  /// to `Submit`. Width/Height are read from `Target.Desc` for the
+  /// pixel-to-NDC mapping in the line shader.
+  ///
+  /// Format constraint: `Target.Desc.Format` must currently be
+  /// `R8G8B8A8_UNORM` -- the shared pipeline is created for that
+  /// format. Mismatches will fail at validation time on Vulkan.
+  ::gecko::graphics::RenderTarget Target {};
+
+  // Reserved for 3D / future:
+  // const ::gecko::graphics::RenderTarget* Depth = nullptr;
+  // ::gecko::math::float4x4 ViewProj = ::gecko::math::Identity4x4();
+};
+
+/// Records 2D debug lines and submits them to a graphics command list.
 ///
-/// Lifetime: the context owns a GPU buffer; it MUST be destroyed
+/// Owns a ring of CPU staging buffers and matching GPU structured
+/// buffers, sized to `framesInFlight` so a frame's GPU buffer isn't
+/// being read by an in-flight prior frame while the CPU writes it.
+///
+/// Lifetime: the context owns GPU buffers; it MUST be destroyed
 /// before the `GraphicsDevice` (i.e. before `GraphicsModule` shuts
 /// down).
-///
-/// Frame loop:
-/// @code
-///   ctx.NewFrame();
-///   ctx.SetTarget(backBuffer);  // optionally with a clear value
-///   ctx.DrawLine(a, b, color, thickness);
-///   ...
-///   ctx.Submit(cmd);            // begins/ends a render pass per target
-/// @endcode
 class DebugRendererContext
 {
 public:
-  /// Maximum number of distinct render targets a single frame can fan
-  /// recorded lines out to. Excess `SetTarget` calls in one frame are
-  /// dropped with a warning rather than overrunning memory.
-  static constexpr ::gecko::u32 MaxTargetsPerFrame = 8;
-
-  /// Default capacity of the per-context line buffer used when no
-  /// explicit capacity is supplied to the constructor. 128K lines is
-  /// roughly 4 MB of GPU memory at `sizeof(Line2D) == 32`.
+  /// Default per-frame line capacity (~4 MB at `sizeof(Line2D) == 32`).
   static constexpr ::gecko::u32 DefaultLineCapacity = 128u * 1024u;
 
-  /// Construct a context with at most `lineCapacity` lines recordable
-  /// per frame. Allocates a CPU staging buffer and a matching GPU
-  /// structured buffer up-front. Must be called after
-  /// `GraphicsModule::Startup`.
+  /// Default ring size. Should match the swapchain's frames-in-flight.
+  static constexpr ::gecko::u32 DefaultFramesInFlight = 2;
+
+  /// Hard cap on ring size as a sanity guard.
+  static constexpr ::gecko::u32 MaxFramesInFlight = 4;
+
+  /// Construct a context.
+  ///
+  /// @param lineCapacity    Maximum lines recordable per frame.
+  ///                        Must be > 0.
+  /// @param framesInFlight  Ring size; should be at least the
+  ///                        swapchain's frames-in-flight. Must be in
+  ///                        `[1, MaxFramesInFlight]`.
   explicit DebugRendererContext(
-      ::gecko::u32 lineCapacity = DefaultLineCapacity);
+      ::gecko::u32 lineCapacity = DefaultLineCapacity,
+      ::gecko::u32 framesInFlight = DefaultFramesInFlight);
   ~DebugRendererContext() = default;
 
   DebugRendererContext(const DebugRendererContext&) = delete;
   DebugRendererContext& operator=(const DebugRendererContext&) = delete;
 
-  /// Returns true if both the CPU staging buffer and the GPU
-  /// structured buffer were created successfully.
+  /// True if every ring slot's GPU buffer was created successfully.
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return m_LineBufferGPU.IsValid();
+    return m_Valid;
   }
 
-  /// Reset all per-frame recording state. Call once at the top of the
-  /// frame before any `SetTarget` / `DrawLine` calls.
+  /// Rotate to the next ring slot and reset per-frame cursors.
+  ///
+  /// CPU only. Call exactly once per game frame, before any
+  /// `DrawLine` / `Submit` calls on this context. If the previous
+  /// frame did not call `EndFrame` after recording lines, a warning
+  /// is emitted because those lines never reached the GPU.
   void NewFrame();
 
-  /// Begin a new render-target group. All `DrawLine` calls after this
-  /// (until the next `SetTarget` or `Submit`) are routed to `target`.
+  /// Append one 2D line. CPU only; does not touch the command list
+  /// and may be called any time during a frame.
   ///
-  /// @param target  Render target to draw subsequent lines into.
-  /// @param clear   If non-null, the clear value used when `Submit`
-  ///                begins the render pass for this target. If null,
-  ///                target contents are loaded.
-  void SetTarget(const ::gecko::graphics::RenderTarget& target,
-                 const ::gecko::graphics::ClearValue* clear = nullptr);
-
-  /// Record a 2D line in pixel coordinates (top-left origin).
+  /// On overflow the line is dropped and a single warning is emitted
+  /// per frame (subsequent overflows in the same frame are silent).
   ///
-  /// @param a          Line start in pixels.
-  /// @param b          Line end in pixels.
+  /// @param a          Start point in pixels (top-left origin).
+  /// @param b          End point in pixels.
   /// @param color      Linear RGB in `[0, 1]`.
   /// @param thickness  Width in pixels.
   void DrawLine(::gecko::math::float2 a, ::gecko::math::float2 b,
                 ::gecko::math::float3 color, ::gecko::f32 thickness);
 
-  /// Upload the recorded lines and issue draw calls. The context owns
-  /// the `BeginRendering` / `EndRendering` pair for each target it was
-  /// told about, so the caller MUST NOT have an open render pass at
-  /// the time of this call and need not close one afterwards.
+  /// Record a draw command for the lines added since the last
+  /// `Submit` (or since `NewFrame` for the first call this frame).
   ///
-  /// @param cmd  Command list to record into. Must be in the
-  ///             recording state (between `Begin` and `End`).
-  void Submit(::gecko::graphics::ICommandList* cmd);
+  /// The caller MUST already have an open render pass on `cmd`
+  /// (i.e. between `BeginRendering` and `EndRendering`) targeting
+  /// `info.Target`. `Submit` only records pipeline / buffer / draw
+  /// state; it does not open or close render passes, and does not
+  /// clear the target.
+  ///
+  /// Subsequent `DrawLine` calls accumulate into the next batch;
+  /// later `Submit` calls draw only that next batch.
+  ///
+  /// @param cmd   Command list in the recording state.
+  /// @param info  Submit parameters (color target today, more later).
+  void Submit(::gecko::graphics::ICommandList* cmd,
+              const DebugRendererSubmitInfo& info);
+
+  /// Upload the current frame slot's staging buffer to the GPU.
+  ///
+  /// Call once per frame, after all `DrawLine` / `Submit` calls and
+  /// before executing the command list. The upload is performed on
+  /// the device directly (not recorded into `cmd`); we rely on the
+  /// device's `UploadBufferData` to be ordered before any subsequent
+  /// `ExecuteGraphicsCommandList`. TODO(#debug_renderer): confirm
+  /// upload-vs-execute ordering on Vulkan and add an explicit
+  /// barrier or copy command if needed.
+  void EndFrame();
 
 private:
   struct Line2D
@@ -104,27 +149,22 @@ private:
     ::gecko::f32 Thickness;       ///< Width in pixels.
   };
 
-  struct Target
+  struct FrameSlot
   {
-    ::gecko::graphics::RenderTarget RenderTarget {};
-    ::gecko::graphics::ClearValue Clear {};
-    bool HasClear {false};
-    ::gecko::u32 LineBeginIndex {0};
-    ::gecko::u32 LineCount {0};
+    ::std::vector<Line2D> CPU {};
+    ::gecko::graphics::Buffer GPU {};
   };
 
-  ::std::vector<Line2D> m_LineBufferCPU {};
-  ::gecko::u32 m_CurrentLineIndex {0};
+  ::std::vector<FrameSlot> m_FrameSlots {};
+  ::gecko::u32 m_LineCapacity {0};
+  ::gecko::u32 m_CurrentSlot {0};
+  ::gecko::u32 m_LineCursor {0};  ///< Next free slot in the CPU buffer.
+  ::gecko::u32 m_BatchStart {0};  ///< First line of the current batch.
 
-  ::gecko::graphics::Buffer m_LineBufferGPU {};
-
-  ::std::array<Target, MaxTargetsPerFrame> m_Targets {};
-  ::gecko::u32 m_CurrentTargetIndex {0};
-
-  // Per-frame "warned once" latches so overflow noise is bounded to a
-  // single message per kind per frame.
-  bool m_LineOverflowWarned {false};
-  bool m_TargetOverflowWarned {false};
+  bool m_Valid {false};
+  bool m_FrameStarted {false};        ///< NewFrame called, EndFrame pending.
+  bool m_FrameUploaded {true};        ///< Last frame's lines reached the GPU.
+  bool m_LineOverflowWarned {false};  ///< Per-frame latch.
 };
 
 }  // namespace gecko::debug_renderer

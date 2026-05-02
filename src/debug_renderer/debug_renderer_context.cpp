@@ -1,20 +1,26 @@
 #include "gecko/debug_renderer/debug_renderer_context.h"
 
 #include "gecko/core/services/log.h"
-#include "gecko/debug_renderer/debug_renderer_module.h"
 #include "gecko/graphics/graphics_module.h"
-#include "gecko/graphics/graphics_types.h"
 #include "private/labels.h"
 #include "private/types.h"
 
+#include <algorithm>
+
 namespace gecko::debug_renderer {
 
-DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity)
+DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity,
+                                           ::gecko::u32 framesInFlight)
 {
   if (lineCapacity == 0)
   {
-    GECKO_ERROR(labels::Context,
-                "DebugRendererContext: lineCapacity must be > 0");
+    GECKO_ERROR(labels::Context, "lineCapacity must be > 0");
+    return;
+  }
+  if (framesInFlight == 0 || framesInFlight > MaxFramesInFlight)
+  {
+    GECKO_ERROR(labels::Context, "framesInFlight ({}) must be in [1, {}]",
+                framesInFlight, MaxFramesInFlight);
     return;
   }
 
@@ -25,52 +31,48 @@ DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity)
     return;
   }
 
-  m_LineBufferCPU.resize(lineCapacity);
+  m_LineCapacity = lineCapacity;
+  m_FrameSlots.resize(framesInFlight);
 
   ::gecko::graphics::StructuredBufferDesc desc {};
   desc.ElementSize = sizeof(Line2D);
   desc.NumElements = lineCapacity;
   desc.Memory = ::gecko::graphics::MemoryType::Dedicated;
-  m_LineBufferGPU = device->CreateStructuredBuffer(desc);
-  if (!m_LineBufferGPU.IsValid())
+
+  for (auto& slot : m_FrameSlots)
   {
-    GECKO_ERROR(labels::Context, "Failed to create line buffer");
-    m_LineBufferCPU.clear();
-    m_LineBufferCPU.shrink_to_fit();
-    return;
+    slot.CPU.resize(lineCapacity);
+    slot.GPU = device->CreateStructuredBuffer(desc);
+    if (!slot.GPU.IsValid())
+    {
+      GECKO_ERROR(labels::Context, "Failed to create per-frame line buffer");
+      m_FrameSlots.clear();
+      return;
+    }
   }
+
+  m_Valid = true;
 }
 
 void DebugRendererContext::NewFrame()
 {
-  m_CurrentLineIndex = 0;
-  m_CurrentTargetIndex = 0;
-  m_LineOverflowWarned = false;
-  m_TargetOverflowWarned = false;
-}
-
-void DebugRendererContext::SetTarget(
-    const ::gecko::graphics::RenderTarget& target,
-    const ::gecko::graphics::ClearValue* clear)
-{
-  if (m_CurrentTargetIndex >= m_Targets.size())
-  {
-    if (!m_TargetOverflowWarned)
-    {
-      GECKO_WARN(labels::Context,
-                 "Exceeded debug target capacity ({}); subsequent targets "
-                 "this frame will be dropped",
-                 static_cast<::gecko::u32>(m_Targets.size()));
-      m_TargetOverflowWarned = true;
-    }
+  if (!m_Valid)
     return;
+
+  if (m_FrameStarted && !m_FrameUploaded && m_LineCursor > 0)
+  {
+    GECKO_WARN(labels::Context,
+               "NewFrame called before EndFrame; previous frame's {} line(s) "
+               "were never uploaded to the GPU and will not appear",
+               m_LineCursor);
   }
-  Target& slot = m_Targets[m_CurrentTargetIndex++];
-  slot.RenderTarget = target;
-  slot.LineBeginIndex = m_CurrentLineIndex;
-  slot.LineCount = 0;
-  slot.HasClear = (clear != nullptr);
-  slot.Clear = clear ? *clear : ::gecko::graphics::ClearValue {};
+
+  m_CurrentSlot = (m_CurrentSlot + 1) % m_FrameSlots.size();
+  m_LineCursor = 0;
+  m_BatchStart = 0;
+  m_FrameStarted = true;
+  m_FrameUploaded = false;
+  m_LineOverflowWarned = false;
 }
 
 void DebugRendererContext::DrawLine(::gecko::math::float2 a,
@@ -78,84 +80,89 @@ void DebugRendererContext::DrawLine(::gecko::math::float2 a,
                                     ::gecko::math::float3 color,
                                     ::gecko::f32 thickness)
 {
-  if (m_CurrentLineIndex >= m_LineBufferCPU.size())
+  if (!m_Valid)
+    return;
+
+  if (m_LineCursor >= m_LineCapacity)
   {
     if (!m_LineOverflowWarned)
     {
       GECKO_WARN(labels::Context,
                  "Exceeded debug line buffer capacity ({}); subsequent lines "
                  "this frame will be dropped",
-                 static_cast<::gecko::u32>(m_LineBufferCPU.size()));
+                 m_LineCapacity);
       m_LineOverflowWarned = true;
     }
     return;
   }
-  m_LineBufferCPU[m_CurrentLineIndex++] = Line2D {a, b, color, thickness};
+
+  auto& slot = m_FrameSlots[m_CurrentSlot];
+  slot.CPU[m_LineCursor++] = Line2D {a, b, color, thickness};
 }
 
-void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
+void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd,
+                                  const DebugRendererSubmitInfo& info)
 {
-  if (!cmd || !IsValid() || m_CurrentTargetIndex == 0)
+  if (!cmd || !m_Valid)
     return;
-
-  // Resolve per-target line counts from the recorded begin indices.
-  for (::gecko::u32 i = 0; i < m_CurrentTargetIndex; ++i)
+  if (!m_FrameStarted)
   {
-    const ::gecko::u32 begin = m_Targets[i].LineBeginIndex;
-    const ::gecko::u32 end = (i + 1 < m_CurrentTargetIndex)
-                                 ? m_Targets[i + 1].LineBeginIndex
-                                 : m_CurrentLineIndex;
-    m_Targets[i].LineCount = end - begin;
-  }
-
-  auto* device = ::gecko::graphics::GetGraphicsDevice();
-  if (!device)
-  {
-    GECKO_ERROR(labels::Context, "GraphicsModule did not publish a device");
+    GECKO_WARN(labels::Context, "Submit called before NewFrame; ignored");
     return;
   }
 
-  // Upload only the lines that were actually recorded this frame.
-  if (m_CurrentLineIndex > 0)
-  {
-    const auto* raw =
-        reinterpret_cast<const ::gecko::byte*>(m_LineBufferCPU.data());
-    device->UploadBufferData(m_LineBufferGPU,
-                             {raw, sizeof(Line2D) * m_CurrentLineIndex});
-  }
+  const ::gecko::u32 batchSize = m_LineCursor - m_BatchStart;
+  if (batchSize == 0)
+    return;
+
+  auto& slot = m_FrameSlots[m_CurrentSlot];
 
   cmd->BindPipeline(GetDebugLinePipeline());
-  cmd->BindStructuredBuffer(0, m_LineBufferGPU);
+  cmd->BindStructuredBuffer(0, slot.GPU);
 
-  for (::gecko::u32 i = 0; i < m_CurrentTargetIndex; ++i)
+  const ::gecko::u32 w = info.Target.Desc.Width;
+  const ::gecko::u32 h = info.Target.Desc.Height;
+  cmd->SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(w),
+                   static_cast<::gecko::f32>(h));
+  cmd->SetScissor(0, 0, w, h);
+
+  DebugLinePushConstants pc {
+      .ViewportPx = {static_cast<::gecko::f32>(w),
+                     static_cast<::gecko::f32>(h)},
+      ._Pad = {0.0F, 0.0F},
+  };
+  cmd->SetConstants(
+      0, ::gecko::Span<const ::gecko::byte> {
+             reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)});
+
+  // 6 vertices per line (2 triangles).
+  cmd->Draw(batchSize * 6u, 1, m_BatchStart * 6u, 0);
+
+  m_BatchStart = m_LineCursor;
+}
+
+void DebugRendererContext::EndFrame()
+{
+  if (!m_Valid)
+    return;
+  if (!m_FrameStarted)
+    return;
+
+  if (m_LineCursor > 0)
   {
-    const Target& target = m_Targets[i];
-    if (target.LineCount == 0)
-      continue;
+    auto* device = ::gecko::graphics::GetGraphicsDevice();
+    if (!device)
+    {
+      GECKO_ERROR(labels::Context, "GraphicsModule did not publish a device");
+      return;
+    }
 
-    const ::gecko::graphics::ClearValue* clearPtr =
-        target.HasClear ? &target.Clear : nullptr;
-    cmd->BeginRendering(target.RenderTarget, clearPtr);
-    cmd->SetViewport(
-        0.0F, 0.0F, static_cast<::gecko::f32>(target.RenderTarget.Desc.Width),
-        static_cast<::gecko::f32>(target.RenderTarget.Desc.Height));
-    cmd->SetScissor(0, 0, target.RenderTarget.Desc.Width,
-                    target.RenderTarget.Desc.Height);
-
-    DebugLinePushConstants pc {
-        .ViewportPx =
-            {static_cast<::gecko::f32>(target.RenderTarget.Desc.Width),
-             static_cast<::gecko::f32>(target.RenderTarget.Desc.Height)},
-        ._Pad = {0.0F, 0.0F},
-    };
-    cmd->SetConstants(
-        0, ::gecko::Span<const ::gecko::byte> {
-               reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)});
-
-    // 6 vertices per line (2 triangles).
-    cmd->Draw(target.LineCount * 6u, 1, target.LineBeginIndex * 6u, 0);
-    cmd->EndRendering();
+    auto& slot = m_FrameSlots[m_CurrentSlot];
+    const auto* raw = reinterpret_cast<const ::gecko::byte*>(slot.CPU.data());
+    device->UploadBufferData(slot.GPU, {raw, sizeof(Line2D) * m_LineCursor});
   }
+
+  m_FrameUploaded = true;
 }
 
 }  // namespace gecko::debug_renderer
