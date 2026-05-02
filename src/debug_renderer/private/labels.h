@@ -1,10 +1,6 @@
 #pragma once
 
-#include "gecko/core/labels.h"
-
-namespace gecko::debug_renderer::labels {
-
-inline constexpr ::gecko::Label General =
-    ::gecko::MakeLabel("gecko.debug_renderer.general");
-
-}  // namespace gecko::debug_renderer::labels
+// Internal alias header: re-exposes the public module label so
+// translation units inside the DebugRenderer module can include just
+// `private/labels.h` without dragging in module setup details.
+#include "gecko/debug_renderer/debug_renderer_module.h"

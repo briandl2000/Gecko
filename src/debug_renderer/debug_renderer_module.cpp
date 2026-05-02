@@ -11,7 +11,9 @@
 
 namespace gecko::debug_renderer {
 
-static ::gecko::graphics::GraphicsPipeline g_DebugLinePipeline {};
+namespace {
+
+::gecko::graphics::GraphicsPipeline g_DebugLinePipeline {};
 
 constexpr ::gecko::ServiceId RequiredServices[] = {
     ::gecko::ServiceIdOf<::gecko::graphics::GraphicsDevice>(),
@@ -19,7 +21,7 @@ constexpr ::gecko::ServiceId RequiredServices[] = {
 
 bool CreatePipeline()
 {
-  auto device = ::gecko::graphics::GetGraphicsDevice();
+  auto* device = ::gecko::graphics::GetGraphicsDevice();
   if (!device)
   {
     GECKO_ERROR(labels::DebugRenderer,
@@ -27,28 +29,28 @@ bool CreatePipeline()
     return false;
   }
 
-  gecko::graphics::GraphicsPipelineDesc pDesc;
-  pDesc.VertexShader = gecko::graphics::ShaderCode {
-      .Format = gecko::graphics::ShaderFormat::SPIRV,
+  ::gecko::graphics::GraphicsPipelineDesc desc {};
+  desc.VertexShader = ::gecko::graphics::ShaderCode {
+      .Format = ::gecko::graphics::ShaderFormat::SPIRV,
       .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineVert),
                 sizeof(shaders::DebugLineVert)},
   };
-  pDesc.PixelShader = gecko::graphics::ShaderCode {
-      .Format = gecko::graphics::ShaderFormat::SPIRV,
+  desc.PixelShader = ::gecko::graphics::ShaderCode {
+      .Format = ::gecko::graphics::ShaderFormat::SPIRV,
       .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineFrag),
                 sizeof(shaders::DebugLineFrag)},
   };
-  pDesc.PipelineResources[0] =
-      gecko::graphics::PipelineResource::StructuredBufferBinding(
-          1, gecko::graphics::ShaderType::Vertex);
-  pDesc.NumPipelineResources = 1;
-  pDesc.PushConstantBytes = sizeof(DebugLinePushConstants);
-  pDesc.NumRenderTargets = 1;
-  pDesc.RenderTargetFormats[0] = gecko::graphics::DataFormat::R8G8B8A8_UNORM;
-  pDesc.Culling = graphics::CullMode::None;
-  pDesc.DebugName = "DebugLinePipeline";
-  g_DebugLinePipeline = device->CreateGraphicsPipeline(pDesc);
+  desc.PipelineResources[0] =
+      ::gecko::graphics::PipelineResource::StructuredBufferBinding(
+          1, ::gecko::graphics::ShaderType::Vertex);
+  desc.NumPipelineResources = 1;
+  desc.PushConstantBytes = sizeof(DebugLinePushConstants);
+  desc.NumRenderTargets = 1;
+  desc.RenderTargetFormats[0] = ::gecko::graphics::DataFormat::R8G8B8A8_UNORM;
+  desc.Culling = ::gecko::graphics::CullMode::None;
+  desc.DebugName = "DebugLinePipeline";
 
+  g_DebugLinePipeline = device->CreateGraphicsPipeline(desc);
   if (!g_DebugLinePipeline.IsValid())
   {
     GECKO_ERROR(labels::DebugRenderer, "Failed to create debug line pipeline");
@@ -57,26 +59,24 @@ bool CreatePipeline()
   return true;
 }
 
+}  // namespace
+
+const ::gecko::graphics::GraphicsPipeline& GetDebugLinePipeline()
+{
+  return g_DebugLinePipeline;
+}
+
 ::gecko::Span<const ::gecko::ServiceId> DebugRendererModule::Requires()
     const noexcept
 {
   return ::gecko::Span<const ::gecko::ServiceId> {RequiredServices};
 }
 
-const gecko::graphics::GraphicsPipeline& GetDebugLinePipeline()
-{
-  return g_DebugLinePipeline;
-}
-
 bool DebugRendererModule::Startup(
     ::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_SCOPE(labels::DebugRenderer);
-
-  if (!CreatePipeline())
-    return false;
-
-  return true;
+  return CreatePipeline();
 }
 
 void DebugRendererModule::Shutdown(

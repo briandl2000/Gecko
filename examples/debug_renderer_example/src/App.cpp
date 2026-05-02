@@ -78,6 +78,12 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
 
   m_DebugRendererContext =
       ::gecko::CreateShared<gecko::debug_renderer::DebugRendererContext>();
+  if (!m_DebugRendererContext || !m_DebugRendererContext->IsValid())
+  {
+    GECKO_ERROR(Main_Label, "Failed to create DebugRendererContext");
+    m_DebugRendererContext.reset();
+    return;
+  }
 }
 
 App::~App()
@@ -199,50 +205,46 @@ void App::RenderFrame()
     return;
 
   m_DebugRendererContext->NewFrame();
-  m_DebugRendererContext->SetTarget(frame.BackBuffer);
+  ::gecko::graphics::ClearValue clear =
+      ::gecko::graphics::ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
+  m_DebugRendererContext->SetTarget(frame.BackBuffer, &clear);
 
-  auto DrawCircile = [this,
-                      &frame](gecko::math::float2 center, gecko::f32 radius,
-                              gecko::math::float3 color, gecko::f32 thickness) {
-    gecko::u32 circle_segments = 32;
-    for (gecko::u32 i = 0; i < circle_segments; ++i)
+  auto DrawCircle = [this](::gecko::math::float2 center, ::gecko::f32 radius,
+                           ::gecko::math::float3 color,
+                           ::gecko::f32 thickness) {
+    constexpr ::gecko::u32 kSegments = 32;
+    for (::gecko::u32 i = 0; i < kSegments; ++i)
     {
-      gecko::f32 angle1 =
-          (static_cast<gecko::f32>(i) / circle_segments) * gecko::math::TwoPi;
-      gecko::f32 angle2 = (static_cast<gecko::f32>(i + 1) / circle_segments) *
-                          gecko::math::TwoPi;
-      gecko::math::float2 point1 {center.X + radius * std::cos(angle1),
-                                  center.Y + radius * std::sin(angle1)};
-      gecko::math::float2 point2 {center.X + radius * std::cos(angle2),
-                                  center.Y + radius * std::sin(angle2)};
-      m_DebugRendererContext->DrawLine(point1, point2, color, thickness);
+      const ::gecko::f32 a1 =
+          (static_cast<::gecko::f32>(i) / kSegments) * ::gecko::math::TwoPi;
+      const ::gecko::f32 a2 =
+          (static_cast<::gecko::f32>(i + 1) / kSegments) * ::gecko::math::TwoPi;
+      const ::gecko::math::float2 p1 {center.X + radius * ::std::cos(a1),
+                                      center.Y + radius * ::std::sin(a1)};
+      const ::gecko::math::float2 p2 {center.X + radius * ::std::cos(a2),
+                                      center.Y + radius * ::std::sin(a2)};
+      m_DebugRendererContext->DrawLine(p1, p2, color, thickness);
     }
   };
 
-  for (gecko::u32 i = 0; i < 4000; ++i)
+  const auto fbW = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Width);
+  const auto fbH = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height);
+  for (::gecko::u32 i = 0; i < 4000; ++i)
   {
-    gecko::math::float2 center {
-        gecko::RandomF32(0.0F,
-                         static_cast<gecko::f32>(frame.BackBuffer.Desc.Width)),
-        gecko::RandomF32(
-            0.0F, static_cast<gecko::f32>(frame.BackBuffer.Desc.Height))};
-    DrawCircile(center, gecko::RandomF32(20.0F, 100.0F), {1.0F, 0.0F, 0.0F},
-                2.0F);
+    const ::gecko::math::float2 center {::gecko::RandomF32(0.0F, fbW),
+                                        ::gecko::RandomF32(0.0F, fbH)};
+    DrawCircle(center, ::gecko::RandomF32(20.0F, 100.0F), {1.0F, 0.0F, 0.0F},
+               2.0F);
   }
 
-  // draw a line from the center to the mouse position
-  auto mousePos = GetInput()->GetMousePosition(m_Window);
-  gecko::math::float2 mousePosF {static_cast<gecko::f32>(mousePos.X),
-                                 static_cast<gecko::f32>(mousePos.Y)};
-  DrawCircile(mousePosF, 10.0F, {0.0F, 1.0F, 0.0F}, 4.0F);
+  const auto mousePos = GetInput()->GetMousePosition(m_Window);
+  const ::gecko::math::float2 mousePosF {static_cast<::gecko::f32>(mousePos.X),
+                                         static_cast<::gecko::f32>(mousePos.Y)};
+  DrawCircle(mousePosF, 10.0F, {0.0F, 1.0F, 0.0F}, 4.0F);
 
   auto cmd = m_Device->CreateGraphicsCommandList();
   cmd->Begin();
-
   m_DebugRendererContext->Submit(cmd.get());
-
-  cmd->EndRendering();
-
   cmd->End();
   m_Device->ExecuteGraphicsCommandList(::std::move(cmd));
 

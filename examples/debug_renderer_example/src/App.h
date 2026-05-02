@@ -35,7 +35,8 @@ public:
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return m_Engine.has_value() && m_Device != nullptr && m_Window.IsValid();
+    return m_Engine.has_value() && m_Device != nullptr && m_Window.IsValid() &&
+           m_DebugRendererContext != nullptr;
   }
 
   int Run();

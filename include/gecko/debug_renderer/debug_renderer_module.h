@@ -10,15 +10,17 @@ inline constexpr ::gecko::Label DebugRenderer =
     ::gecko::MakeLabel("gecko.debug_renderer");
 }  // namespace labels
 
-// DebugRenderer library's module. Stack-construct one and pass &it
-// into Engine::Create({...}).
+/// DebugRenderer library's module. Stack-construct one and pass `&it`
+/// into `Engine::Create({...})`. Owns the shared graphics pipeline used
+/// by every `DebugRendererContext` in the process.
 class DebugRendererModule final : public ::gecko::IModule
 {
 public:
-  [[nodiscard]] ::gecko::Span<const ::gecko::ServiceId> Requires()
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires()
       const noexcept override;
 
-  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel() const noexcept
+  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
+      const noexcept override
   {
     return labels::DebugRenderer;
   }

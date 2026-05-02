@@ -9,9 +9,37 @@
 
 namespace gecko::debug_renderer {
 
-DebugRendererContext::DebugRendererContext()
+DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity)
 {
-  CreateRenderResources();
+  if (lineCapacity == 0)
+  {
+    GECKO_ERROR(labels::DebugRenderer,
+                "DebugRendererContext: lineCapacity must be > 0");
+    return;
+  }
+
+  auto* device = ::gecko::graphics::GetGraphicsDevice();
+  if (!device)
+  {
+    GECKO_ERROR(labels::DebugRenderer,
+                "GraphicsModule did not publish a device");
+    return;
+  }
+
+  m_LineBufferCPU.resize(lineCapacity);
+
+  ::gecko::graphics::StructuredBufferDesc desc {};
+  desc.ElementSize = sizeof(Line2D);
+  desc.NumElements = lineCapacity;
+  desc.Memory = ::gecko::graphics::MemoryType::Dedicated;
+  m_LineBufferGPU = device->CreateStructuredBuffer(desc);
+  if (!m_LineBufferGPU.IsValid())
+  {
+    GECKO_ERROR(labels::DebugRenderer, "Failed to create line buffer");
+    m_LineBufferCPU.clear();
+    m_LineBufferCPU.shrink_to_fit();
+    return;
+  }
 }
 
 void DebugRendererContext::NewFrame()
@@ -20,8 +48,29 @@ void DebugRendererContext::NewFrame()
   m_CurrentTargetIndex = 0;
 }
 
-void DebugRendererContext::DrawLine(math::float2 a, math::float2 b,
-                                    math::float3 color, f32 thickness)
+void DebugRendererContext::SetTarget(
+    const ::gecko::graphics::RenderTarget& target,
+    const ::gecko::graphics::ClearValue* clear)
+{
+  if (m_CurrentTargetIndex >= m_Targets.size())
+  {
+    GECKO_WARN(
+        labels::DebugRenderer,
+        "Exceeded debug target capacity; some lines will not be rendered");
+    return;
+  }
+  Target& slot = m_Targets[m_CurrentTargetIndex++];
+  slot.RenderTarget = target;
+  slot.LineBeginIndex = m_CurrentLineIndex;
+  slot.LineCount = 0;
+  slot.HasClear = (clear != nullptr);
+  slot.Clear = clear ? *clear : ::gecko::graphics::ClearValue {};
+}
+
+void DebugRendererContext::DrawLine(::gecko::math::float2 a,
+                                    ::gecko::math::float2 b,
+                                    ::gecko::math::float3 color,
+                                    ::gecko::f32 thickness)
 {
   if (m_CurrentLineIndex >= m_LineBufferCPU.size())
   {
@@ -33,33 +82,21 @@ void DebugRendererContext::DrawLine(math::float2 a, math::float2 b,
   m_LineBufferCPU[m_CurrentLineIndex++] = Line2D {a, b, color, thickness};
 }
 
-void DebugRendererContext::SetTarget(const graphics::RenderTarget& target)
+void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
 {
-  if (m_CurrentTargetIndex >= m_Targets.size())
-  {
-    GECKO_WARN(
-        labels::DebugRenderer,
-        "Exceeded debug target capacity; some lines will not be rendered");
+  if (!cmd || !IsValid() || m_CurrentTargetIndex == 0)
     return;
-  }
-  m_Targets[m_CurrentTargetIndex++] = Target {target, m_CurrentLineIndex, 0};
-}
 
-void DebugRendererContext::Submit(gecko::graphics::ICommandList* cmd)
-{
-  // Update line counts for each target based on the next target's line begin.
-  for (u32 i = 0; i < m_CurrentTargetIndex; ++i)
+  // Resolve per-target line counts from the recorded begin indices.
+  for (::gecko::u32 i = 0; i < m_CurrentTargetIndex; ++i)
   {
-    u32 begin = m_Targets[i].LineBeginIndex;
-    u32 end = (i + 1 < m_CurrentTargetIndex) ? m_Targets[i + 1].LineBeginIndex
-                                             : m_CurrentLineIndex;
+    const ::gecko::u32 begin = m_Targets[i].LineBeginIndex;
+    const ::gecko::u32 end = (i + 1 < m_CurrentTargetIndex)
+                                 ? m_Targets[i + 1].LineBeginIndex
+                                 : m_CurrentLineIndex;
     m_Targets[i].LineCount = end - begin;
   }
 
-  // Upload the entire line buffer every frame. This is wasteful, but simple.
-  // In a real implementation we'd want to only upload the portion of the
-  // buffer that's actually used, and ideally use a more efficient strategy than
-  // a full buffer update.
   auto* device = ::gecko::graphics::GetGraphicsDevice();
   if (!device)
   {
@@ -67,23 +104,28 @@ void DebugRendererContext::Submit(gecko::graphics::ICommandList* cmd)
                 "GraphicsModule did not publish a device");
     return;
   }
-  const auto* raw =
-      reinterpret_cast<const ::gecko::byte*>(m_LineBufferCPU.data());
-  device->UploadBufferData(m_LineBufferGPU,
-                           {raw, sizeof(Line2D) * m_CurrentLineIndex});
 
-  // Issue draw calls for each target.
+  // Upload only the lines that were actually recorded this frame.
+  if (m_CurrentLineIndex > 0)
+  {
+    const auto* raw =
+        reinterpret_cast<const ::gecko::byte*>(m_LineBufferCPU.data());
+    device->UploadBufferData(m_LineBufferGPU,
+                             {raw, sizeof(Line2D) * m_CurrentLineIndex});
+  }
+
   cmd->BindPipeline(GetDebugLinePipeline());
   cmd->BindStructuredBuffer(0, m_LineBufferGPU);
-  for (u32 i = 0; i < m_CurrentTargetIndex; ++i)
+
+  for (::gecko::u32 i = 0; i < m_CurrentTargetIndex; ++i)
   {
     const Target& target = m_Targets[i];
     if (target.LineCount == 0)
-      continue;  // Skip targets with no lines.
+      continue;
 
-    graphics::ClearValue clear =
-        graphics::ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
-    cmd->BeginRendering(target.RenderTarget, &clear);
+    const ::gecko::graphics::ClearValue* clearPtr =
+        target.HasClear ? &target.Clear : nullptr;
+    cmd->BeginRendering(target.RenderTarget, clearPtr);
     cmd->SetViewport(
         0.0F, 0.0F, static_cast<::gecko::f32>(target.RenderTarget.Desc.Width),
         static_cast<::gecko::f32>(target.RenderTarget.Desc.Height));
@@ -94,42 +136,16 @@ void DebugRendererContext::Submit(gecko::graphics::ICommandList* cmd)
         .ViewportPx =
             {static_cast<::gecko::f32>(target.RenderTarget.Desc.Width),
              static_cast<::gecko::f32>(target.RenderTarget.Desc.Height)},
-        ._Pad = {0.0f, 0.0f},
+        ._Pad = {0.0F, 0.0F},
     };
     cmd->SetConstants(
-        0, ::gecko::Span<const ::gecko::byte>(
-               reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)));
+        0, ::gecko::Span<const ::gecko::byte> {
+               reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)});
 
-    cmd->Draw(target.LineCount * 6u, 1, target.LineBeginIndex * 6u,
-              0);  // 6 vertices per line (2 triangles)
+    // 6 vertices per line (2 triangles).
+    cmd->Draw(target.LineCount * 6u, 1, target.LineBeginIndex * 6u, 0);
+    cmd->EndRendering();
   }
 }
 
-bool DebugRendererContext::CreateRenderResources()
-{
-  gecko::graphics::GraphicsDevice* device =
-      ::gecko::graphics::GetGraphicsDevice();
-  if (!device)
-  {
-    GECKO_ERROR(labels::DebugRenderer,
-                "GraphicsModule did not publish a device");
-    return false;
-  }
-
-  graphics::StructuredBufferDesc vbDesc;
-  vbDesc.ElementSize = sizeof(Line2D);
-  vbDesc.NumElements = static_cast<::gecko::u32>(m_LineBufferCPU.size());
-  vbDesc.Memory = graphics::MemoryType::Dedicated;
-  m_LineBufferGPU = device->CreateStructuredBuffer(vbDesc);
-  if (!m_LineBufferGPU.IsValid())
-  {
-    GECKO_ERROR(labels::DebugRenderer, "Failed to create line buffer");
-    return false;
-  }
-  const auto* raw =
-      reinterpret_cast<const ::gecko::byte*>(m_LineBufferCPU.data());
-  device->UploadBufferData(m_LineBufferGPU,
-                           {raw, sizeof(Line2D) * m_LineBufferCPU.size()});
-  return true;
-}
 }  // namespace gecko::debug_renderer
