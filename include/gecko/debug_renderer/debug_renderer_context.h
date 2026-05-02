@@ -5,21 +5,23 @@
 ///
 /// Lifecycle (per frame):
 /// @code
+///   cmd->Begin();
 ///   ctx.NewFrame();                    // CPU: rotate ring, reset cursors
-///   ctx.DrawLine(a, b, ...);           // CPU: append to staging buffer
-///   ...
 ///   cmd->BeginRendering(target, ...);  // user owns the render pass
-///   ctx.Submit(cmd, {.Target = target});
+///   ctx.SetFrame(target);              // bind target to the context
+///   ctx.DrawLine(a, b, ...);           // append lines for this pass
+///   ctx.Submit(cmd);                   // record draws into the open pass
 ///   cmd->EndRendering();
-///   ...
-///   ctx.EndFrame();                    // upload staging -> GPU; once per
-///   frame device->ExecuteGraphicsCommandList(::std::move(cmd));
+///   ctx.EndFrame();                    // upload staging -> GPU; validate
+///   cmd->End();
+///   device->ExecuteGraphicsCommandList(::std::move(cmd));
 /// @endcode
 ///
-/// `DrawLine` is purely CPU and may be called any time -- before, between,
-/// or after `BeginRendering` / `Submit` calls. `Submit` only records draw
-/// commands; it does NOT open or close a render pass. The caller is
-/// responsible for `BeginRendering` / `EndRendering` and any clears.
+/// `Submit` only records draw commands; it does NOT open or close a
+/// render pass. The caller is responsible for `BeginRendering` /
+/// `EndRendering` and any clears. `SetFrame` tells the context which
+/// target the next `Submit` will draw into (used for the viewport
+/// push constant today; will carry view/projection in the future).
 
 #include <gecko/core/types.h>
 #include <gecko/graphics/command_list.h>
@@ -28,26 +30,6 @@
 #include <vector>
 
 namespace gecko::debug_renderer {
-
-/// Per-`Submit` parameters. Today only carries the color attachment;
-/// reserved for `Depth` and `ViewProj` once 3D lines land so the call
-/// site doesn't need to change.
-struct DebugRendererSubmitInfo
-{
-  /// Color attachment the lines will be rasterised into. Must already
-  /// be bound by an open `BeginRendering` on the command list passed
-  /// to `Submit`. Width/Height are read from `Target.Desc` for the
-  /// pixel-to-NDC mapping in the line shader.
-  ///
-  /// Format constraint: `Target.Desc.Format` must currently be
-  /// `R8G8B8A8_UNORM` -- the shared pipeline is created for that
-  /// format. Mismatches will fail at validation time on Vulkan.
-  ::gecko::graphics::RenderTarget Target {};
-
-  // Reserved for 3D / future:
-  // const ::gecko::graphics::RenderTarget* Depth = nullptr;
-  // ::gecko::math::float4x4 ViewProj = ::gecko::math::Identity4x4();
-};
 
 /// Records 2D debug lines and submits them to a graphics command list.
 ///
@@ -93,14 +75,30 @@ public:
 
   /// Rotate to the next ring slot and reset per-frame cursors.
   ///
-  /// CPU only. Call exactly once per game frame, before any
-  /// `DrawLine` / `Submit` calls on this context. If the previous
-  /// frame did not call `EndFrame` after recording lines, a warning
-  /// is emitted because those lines never reached the GPU.
+  /// CPU only. Call exactly once per game frame, before any other
+  /// context call. If the previous frame did not call `EndFrame`
+  /// after recording lines, a warning is emitted because those lines
+  /// never reached the GPU.
   void NewFrame();
 
-  /// Append one 2D line. CPU only; does not touch the command list
-  /// and may be called any time during a frame.
+  /// Bind the render target the next `Submit` will draw into.
+  ///
+  /// CPU only. Call inside the open render pass (after
+  /// `BeginRendering`) so the binding's lifetime matches the
+  /// recorded draws. Used today for the viewport push constant; will
+  /// later also carry view/projection for 3D lines.
+  ///
+  /// `SetFrame` may be called multiple times per frame to fan
+  /// batches across multiple targets; each `SetFrame` rebinds and
+  /// the next `Submit` consumes the lines accumulated since the
+  /// previous `Submit` (or `NewFrame`).
+  ///
+  /// Format constraint: `target.Desc.Format` must currently be
+  /// `R8G8B8A8_UNORM` -- the shared pipeline is created for that
+  /// format.
+  void SetFrame(::gecko::graphics::RenderTarget target);
+
+  /// Append one 2D line. CPU only; does not touch the command list.
   ///
   /// On overflow the line is dropped and a single warning is emitted
   /// per frame (subsequent overflows in the same frame are silent).
@@ -116,20 +114,15 @@ public:
   /// `Submit` (or since `NewFrame` for the first call this frame).
   ///
   /// The caller MUST already have an open render pass on `cmd`
-  /// (i.e. between `BeginRendering` and `EndRendering`) targeting
-  /// `info.Target`. `Submit` only records pipeline / buffer / draw
-  /// state; it does not open or close render passes, and does not
-  /// clear the target.
+  /// matching the target last passed to `SetFrame`. `Submit` only
+  /// records pipeline / buffer / draw state; it does not open or
+  /// close render passes, and does not clear the target.
   ///
-  /// Subsequent `DrawLine` calls accumulate into the next batch;
-  /// later `Submit` calls draw only that next batch.
-  ///
-  /// @param cmd   Command list in the recording state.
-  /// @param info  Submit parameters (color target today, more later).
-  void Submit(::gecko::graphics::ICommandList* cmd,
-              const DebugRendererSubmitInfo& info);
+  /// @param cmd  Command list in the recording state.
+  void Submit(::gecko::graphics::ICommandList* cmd);
 
-  /// Upload the current frame slot's staging buffer to the GPU.
+  /// Upload the current frame slot's staging buffer to the GPU and
+  /// validate frame state.
   ///
   /// Call once per frame, after all `DrawLine` / `Submit` calls and
   /// before executing the command list. The upload is performed on
@@ -138,6 +131,9 @@ public:
   /// `ExecuteGraphicsCommandList`. TODO(#debug_renderer): confirm
   /// upload-vs-execute ordering on Vulkan and add an explicit
   /// barrier or copy command if needed.
+  ///
+  /// Warns if lines were appended but never `Submit`-ted in this
+  /// frame (those lines were uploaded but never drawn).
   void EndFrame();
 
 private:
@@ -156,6 +152,7 @@ private:
   };
 
   ::std::vector<FrameSlot> m_FrameSlots {};
+  ::gecko::graphics::RenderTarget m_CurrentTarget {};
   ::gecko::u32 m_LineCapacity {0};
   ::gecko::u32 m_CurrentSlot {0};
   ::gecko::u32 m_LineCursor {0};  ///< Next free slot in the CPU buffer.
@@ -164,6 +161,7 @@ private:
   bool m_Valid {false};
   bool m_FrameStarted {false};        ///< NewFrame called, EndFrame pending.
   bool m_FrameUploaded {true};        ///< Last frame's lines reached the GPU.
+  bool m_FrameBound {false};          ///< SetFrame called this frame.
   bool m_LineOverflowWarned {false};  ///< Per-frame latch.
 };
 

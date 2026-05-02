@@ -204,8 +204,6 @@ void App::RenderFrame()
   if (!frame.Valid)
     return;
 
-  m_DebugRendererContext->NewFrame();
-
   auto DrawCircle = [this](::gecko::math::float2 center, ::gecko::f32 radius,
                            ::gecko::math::float3 color,
                            ::gecko::f32 thickness) {
@@ -224,6 +222,15 @@ void App::RenderFrame()
     }
   };
 
+  auto cmd = m_Device->CreateGraphicsCommandList();
+  cmd->Begin();
+  m_DebugRendererContext->NewFrame();
+
+  ::gecko::graphics::ClearValue clear =
+      ::gecko::graphics::ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
+  cmd->BeginRendering(frame.BackBuffer, &clear);
+  m_DebugRendererContext->SetFrame(frame.BackBuffer);
+
   const auto fbW = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Width);
   const auto fbH = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height);
   for (::gecko::u32 i = 0; i < 4000; ++i)
@@ -239,18 +246,11 @@ void App::RenderFrame()
                                          static_cast<::gecko::f32>(mousePos.Y)};
   DrawCircle(mousePosF, 10.0F, {0.0F, 1.0F, 0.0F}, 4.0F);
 
-  auto cmd = m_Device->CreateGraphicsCommandList();
-  cmd->Begin();
-
-  ::gecko::graphics::ClearValue clear =
-      ::gecko::graphics::ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
-  cmd->BeginRendering(frame.BackBuffer, &clear);
-  m_DebugRendererContext->Submit(cmd.get(), {.Target = frame.BackBuffer});
+  m_DebugRendererContext->Submit(cmd.get());
   cmd->EndRendering();
 
-  cmd->End();
-
   m_DebugRendererContext->EndFrame();
+  cmd->End();
   m_Device->ExecuteGraphicsCommandList(::std::move(cmd));
 
   FrameContext toPresent[1] = {::std::move(frame)};

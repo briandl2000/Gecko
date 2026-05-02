@@ -5,8 +5,6 @@
 #include "private/labels.h"
 #include "private/types.h"
 
-#include <algorithm>
-
 namespace gecko::debug_renderer {
 
 DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity,
@@ -70,9 +68,24 @@ void DebugRendererContext::NewFrame()
   m_CurrentSlot = (m_CurrentSlot + 1) % m_FrameSlots.size();
   m_LineCursor = 0;
   m_BatchStart = 0;
+  m_CurrentTarget = {};
   m_FrameStarted = true;
   m_FrameUploaded = false;
+  m_FrameBound = false;
   m_LineOverflowWarned = false;
+}
+
+void DebugRendererContext::SetFrame(::gecko::graphics::RenderTarget target)
+{
+  if (!m_Valid)
+    return;
+  if (!m_FrameStarted)
+  {
+    GECKO_WARN(labels::Context, "SetFrame called before NewFrame; ignored");
+    return;
+  }
+  m_CurrentTarget = ::std::move(target);
+  m_FrameBound = true;
 }
 
 void DebugRendererContext::DrawLine(::gecko::math::float2 a,
@@ -81,6 +94,8 @@ void DebugRendererContext::DrawLine(::gecko::math::float2 a,
                                     ::gecko::f32 thickness)
 {
   if (!m_Valid)
+    return;
+  if (!m_FrameStarted)
     return;
 
   if (m_LineCursor >= m_LineCapacity)
@@ -100,14 +115,18 @@ void DebugRendererContext::DrawLine(::gecko::math::float2 a,
   slot.CPU[m_LineCursor++] = Line2D {a, b, color, thickness};
 }
 
-void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd,
-                                  const DebugRendererSubmitInfo& info)
+void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
 {
   if (!cmd || !m_Valid)
     return;
   if (!m_FrameStarted)
   {
     GECKO_WARN(labels::Context, "Submit called before NewFrame; ignored");
+    return;
+  }
+  if (!m_FrameBound)
+  {
+    GECKO_WARN(labels::Context, "Submit called before SetFrame; ignored");
     return;
   }
 
@@ -120,8 +139,8 @@ void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd,
   cmd->BindPipeline(GetDebugLinePipeline());
   cmd->BindStructuredBuffer(0, slot.GPU);
 
-  const ::gecko::u32 w = info.Target.Desc.Width;
-  const ::gecko::u32 h = info.Target.Desc.Height;
+  const ::gecko::u32 w = m_CurrentTarget.Desc.Width;
+  const ::gecko::u32 h = m_CurrentTarget.Desc.Height;
   cmd->SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(w),
                    static_cast<::gecko::f32>(h));
   cmd->SetScissor(0, 0, w, h);
@@ -147,6 +166,14 @@ void DebugRendererContext::EndFrame()
     return;
   if (!m_FrameStarted)
     return;
+
+  if (m_LineCursor > m_BatchStart)
+  {
+    GECKO_WARN(labels::Context,
+               "EndFrame: {} line(s) appended after the last Submit were not "
+               "drawn this frame",
+               m_LineCursor - m_BatchStart);
+  }
 
   if (m_LineCursor > 0)
   {
