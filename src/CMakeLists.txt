@@ -4,3 +4,7 @@ add_subdirectory(runtime)
 add_subdirectory(math)
 add_subdirectory(graphics)
 add_subdirectory(debug_renderer)
+
+if(GECKO_BUILD_BENCHMARKS)
+  add_subdirectory(bench)
+endif()

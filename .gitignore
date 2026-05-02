@@ -1,6 +1,9 @@
 # Build outputs
 /out/
 
+# Benchmark results (per-run JSON + generated HTML reports)
+/bench_results/
+
 # Compilation database
 compile_commands.json
 .cache/

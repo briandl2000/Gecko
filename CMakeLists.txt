@@ -78,6 +78,7 @@ endforeach()
 
 option(GECKO_BUILD_EXAMPLES "Build examples" ON)
 option(GECKO_BUILD_TESTS "Build tests" OFF)
+option(GECKO_BUILD_BENCHMARKS "Build benchmarks" OFF)
 option(GECKO_OVERRIDE_NEW "Override global operator new/delete to route through Gecko allocator" OFF)
 
 # On MinGW, copy GCC/C++ runtime DLLs to the output directory so
@@ -140,6 +141,10 @@ endif()
 # Test targets require GECKO_BUILD_TESTS=ON (set by setup scripts and gk test).
 # EXCLUDE_FROM_ALL keeps them out of the default 'gk build' target.
 add_subdirectory(test EXCLUDE_FROM_ALL)
+
+# Benchmark targets require GECKO_BUILD_BENCHMARKS=ON (set by gk bench).
+# EXCLUDE_FROM_ALL keeps them out of the default 'gk build' target.
+add_subdirectory(bench EXCLUDE_FROM_ALL)
 
 include(CMakePackageConfigHelpers)
 
