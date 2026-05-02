@@ -1,12 +1,12 @@
 #include "App.h"
 
-#include "shaders.h"
-
 #include <gecko/core/labels.h>
 #include <gecko/core/services.h>
 #include <gecko/core/services/log.h>
+#include <gecko/core/utility/random.h>
 #include <gecko/core/utility/thread.h>
 #include <gecko/core/version.h>
+#include <gecko/debug_renderer/debug_renderer_context.h>
 #include <gecko/math/math.h>
 #include <gecko/platform/platform_events.h>
 #include <gecko/platform/windows_interface.h>
@@ -23,28 +23,6 @@ constexpr ::gecko::Label App_Label =
     ::gecko::MakeLabel("app.debug_renderer_example");
 constexpr ::gecko::Label Main_Label =
     ::gecko::MakeLabel("app.debug_renderer_example.main");
-
-/// One screenspace debug line. Mirrors the HLSL `DebugLine` struct.
-/// Layout (32 B): float2 A | float2 B | float3 Color | float Thickness.
-struct DebugLine
-{
-  ::gecko::math::float2 A;      ///< Start, pixels, top-left origin.
-  ::gecko::math::float2 B;      ///< End,   pixels.
-  ::gecko::math::float3 Color;  ///< RGB, linear, [0,1].
-  ::gecko::f32 Thickness;       ///< Width in pixels.
-};
-
-constexpr DebugLine DebugLines[] = {
-    {{100.0f, 100.0f}, {500.0f, 300.0f}, {1.0f, 1.0f, 0.0f}, 1.0f},
-    {{200.0f, 500.0f}, {800.0f, 150.0f}, {0.0f, 1.0f, 1.0f}, 1.0f},
-    {{640.0f, 50.0f}, {640.0f, 670.0f}, {1.0f, 0.2f, 0.2f}, 1.0f},
-};
-
-struct DebugLinePushConstants
-{
-  ::gecko::math::float2 ViewportPx;
-  ::gecko::math::float2 _Pad;
-};
 
 }  // namespace
 
@@ -75,8 +53,9 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
   if (!m_AllocScope)
     return;
 
-  m_Engine = ::gecko::Engine::Create(
-      {&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule, &m_AppModule});
+  m_Engine = ::gecko::Engine::Create({&m_RuntimeModule, &m_PlatformModule,
+                                      &m_GraphicsModule, &m_DebugRendererModule,
+                                      &m_AppModule});
   if (!m_Engine)
     return;
 
@@ -95,11 +74,10 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
     return;
   if (!CreateSwapchain())
     return;
-  if (!CreateRenderResources())
-    return;
-  if (!CreatePipeline())
-    return;
   SubscribeEvents();
+
+  m_DebugRendererContext =
+      ::gecko::CreateShared<gecko::debug_renderer::DebugRendererContext>();
 }
 
 App::~App()
@@ -114,6 +92,9 @@ App::~App()
   // We only do here what RAII cannot: destroy the swapchain explicitly
   // so the window can be destroyed before the platform module shuts
   // down, and destroy the window (WindowHandle is just an ID).
+
+  m_DebugRendererContext.reset();
+
   if (m_Device && m_Swapchain.IsValid())
     m_Device->DestroySwapchain(m_Swapchain);
 
@@ -154,57 +135,6 @@ bool App::CreateSwapchain()
   if (!m_Swapchain.IsValid())
   {
     GECKO_ERROR(Main_Label, "Failed to create swapchain");
-    return false;
-  }
-  return true;
-}
-
-bool App::CreateRenderResources()
-{
-  StructuredBufferDesc vbDesc;
-  vbDesc.ElementSize = sizeof(DebugLine);
-  vbDesc.NumElements = static_cast<::gecko::u32>(std::size(DebugLines));
-  vbDesc.Memory = MemoryType::Dedicated;
-  m_VertexBuffer = m_Device->CreateStructuredBuffer(vbDesc);
-  if (!m_VertexBuffer.IsValid())
-  {
-    GECKO_ERROR(Main_Label, "Failed to create line buffer");
-    return false;
-  }
-  const auto* raw = reinterpret_cast<const ::gecko::byte*>(DebugLines);
-  m_Device->UploadBufferData(m_VertexBuffer, {raw, sizeof(DebugLines)});
-  m_LineCount = static_cast<::gecko::u32>(std::size(DebugLines));
-  return true;
-}
-
-bool App::CreatePipeline()
-{
-  namespace shaders = ::app::debug_renderer_example::shaders;
-
-  GraphicsPipelineDesc pDesc;
-  pDesc.VertexShader = ShaderCode {
-      .Format = ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineVert),
-                sizeof(shaders::DebugLineVert)},
-  };
-  pDesc.PixelShader = ShaderCode {
-      .Format = ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineFrag),
-                sizeof(shaders::DebugLineFrag)},
-  };
-  pDesc.PipelineResources[0] =
-      PipelineResource::StructuredBufferBinding(1, ShaderType::Vertex);
-  pDesc.NumPipelineResources = 1;
-  pDesc.PushConstantBytes = sizeof(DebugLinePushConstants);
-  pDesc.NumRenderTargets = 1;
-  pDesc.RenderTargetFormats[0] = m_Swapchain.Desc.Format;
-  pDesc.Culling = CullMode::None;
-  pDesc.DebugName = "DebugLinePipeline";
-  m_DebugLinePipeline = m_Device->CreateGraphicsPipeline(pDesc);
-
-  if (!m_DebugLinePipeline.IsValid())
-  {
-    GECKO_ERROR(Main_Label, "Failed to create debug line pipeline");
     return false;
   }
   return true;
@@ -264,37 +194,53 @@ void App::RenderFrame()
 {
   HandlePendingResize();
 
-  if (!m_DebugLinePipeline.IsValid() || !m_VertexBuffer.IsValid() ||
-      !m_Swapchain.IsValid())
-    return;
-
   FrameContext frame = m_Device->BeginFrame(m_Swapchain);
   if (!frame.Valid)
     return;
 
+  m_DebugRendererContext->NewFrame();
+  m_DebugRendererContext->SetTarget(frame.BackBuffer);
+
+  auto DrawCircile = [this,
+                      &frame](gecko::math::float2 center, gecko::f32 radius,
+                              gecko::math::float3 color, gecko::f32 thickness) {
+    gecko::u32 circle_segments = 32;
+    for (gecko::u32 i = 0; i < circle_segments; ++i)
+    {
+      gecko::f32 angle1 =
+          (static_cast<gecko::f32>(i) / circle_segments) * gecko::math::TwoPi;
+      gecko::f32 angle2 = (static_cast<gecko::f32>(i + 1) / circle_segments) *
+                          gecko::math::TwoPi;
+      gecko::math::float2 point1 {center.X + radius * std::cos(angle1),
+                                  center.Y + radius * std::sin(angle1)};
+      gecko::math::float2 point2 {center.X + radius * std::cos(angle2),
+                                  center.Y + radius * std::sin(angle2)};
+      m_DebugRendererContext->DrawLine(point1, point2, color, thickness);
+    }
+  };
+
+  for (gecko::u32 i = 0; i < 4000; ++i)
+  {
+    gecko::math::float2 center {
+        gecko::RandomF32(0.0F,
+                         static_cast<gecko::f32>(frame.BackBuffer.Desc.Width)),
+        gecko::RandomF32(
+            0.0F, static_cast<gecko::f32>(frame.BackBuffer.Desc.Height))};
+    DrawCircile(center, gecko::RandomF32(20.0F, 100.0F), {1.0F, 0.0F, 0.0F},
+                2.0F);
+  }
+
+  // draw a line from the center to the mouse position
+  auto mousePos = GetInput()->GetMousePosition(m_Window);
+  gecko::math::float2 mousePosF {static_cast<gecko::f32>(mousePos.X),
+                                 static_cast<gecko::f32>(mousePos.Y)};
+  DrawCircile(mousePosF, 10.0F, {0.0F, 1.0F, 0.0F}, 4.0F);
+
   auto cmd = m_Device->CreateGraphicsCommandList();
   cmd->Begin();
 
-  ClearValue clear = ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
-  cmd->BeginRendering(frame.BackBuffer, &clear);
-  cmd->SetViewport(0.0F, 0.0F,
-                   static_cast<::gecko::f32>(frame.BackBuffer.Desc.Width),
-                   static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height));
-  cmd->SetScissor(0, 0, frame.BackBuffer.Desc.Width,
-                  frame.BackBuffer.Desc.Height);
-  cmd->BindPipeline(m_DebugLinePipeline);
-  cmd->BindStructuredBuffer(0, m_VertexBuffer);
+  m_DebugRendererContext->Submit(cmd.get());
 
-  DebugLinePushConstants pc {
-      .ViewportPx = {static_cast<::gecko::f32>(frame.BackBuffer.Desc.Width),
-                     static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height)},
-      ._Pad = {0.0f, 0.0f},
-  };
-  cmd->SetConstants(
-      0, ::gecko::Span<const ::gecko::byte>(
-             reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)));
-
-  cmd->Draw(m_LineCount * 6u);
   cmd->EndRendering();
 
   cmd->End();
@@ -307,6 +253,7 @@ void App::RenderFrame()
 void App::Update()
 {
   (void)::gecko::DispatchEvents();
+
   RenderFrame();
 }
 

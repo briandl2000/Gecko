@@ -6,6 +6,8 @@
 #include <gecko/core/services/memory.h>
 #include <gecko/core/services/modules.h>
 #include <gecko/core/types.h>
+#include <gecko/debug_renderer/debug_renderer_context.h>
+#include <gecko/debug_renderer/debug_renderer_module.h>
 #include <gecko/graphics/graphics_device.h>
 #include <gecko/graphics/graphics_module.h>
 #include <gecko/graphics/graphics_types.h>
@@ -51,8 +53,6 @@ private:
 
   bool CreateMainWindow();
   bool CreateSwapchain();
-  bool CreateRenderResources();
-  bool CreatePipeline();
   void SubscribeEvents();
 
   void HandlePendingResize();
@@ -67,6 +67,7 @@ private:
   ::gecko::runtime::RuntimeModule m_RuntimeModule;
   ::gecko::platform::PlatformModule m_PlatformModule;
   ::gecko::graphics::GraphicsModule m_GraphicsModule;
+  ::gecko::debug_renderer::DebugRendererModule m_DebugRendererModule;
   AppModule m_AppModule;
 
   ::std::optional<::gecko::Engine> m_Engine;
@@ -79,9 +80,8 @@ private:
   ::gecko::platform::WindowHandle m_Window {};
   ::gecko::graphics::Swapchain m_Swapchain {};
 
-  ::gecko::graphics::Buffer m_VertexBuffer {};
-  ::gecko::graphics::GraphicsPipeline m_DebugLinePipeline {};
-  ::gecko::u32 m_LineCount {0};
+  gecko::Shared<gecko::debug_renderer::DebugRendererContext>
+      m_DebugRendererContext {};
 
   ::gecko::EventSubscription m_CloseSub {};
   ::gecko::EventSubscription m_ResizeSub {};

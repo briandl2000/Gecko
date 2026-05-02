@@ -16,13 +16,5 @@ target_link_libraries(debug_renderer_example
     Gecko::Runtime
     Gecko::Platform
     Gecko::Graphics
-)
-
-gecko_add_shaders(
-  TARGET    debug_renderer_example
-  NAMESPACE app::debug_renderer_example::shaders
-  HEADER    shaders.h
-  SHADERS
-    debug_line.vert.hlsl=DebugLineVert
-    debug_line.frag.hlsl=DebugLineFrag
+    Gecko::DebugRenderer
 )
