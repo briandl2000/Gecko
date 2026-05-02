@@ -13,7 +13,7 @@ DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity)
 {
   if (lineCapacity == 0)
   {
-    GECKO_ERROR(labels::DebugRenderer,
+    GECKO_ERROR(labels::Context,
                 "DebugRendererContext: lineCapacity must be > 0");
     return;
   }
@@ -21,8 +21,7 @@ DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity)
   auto* device = ::gecko::graphics::GetGraphicsDevice();
   if (!device)
   {
-    GECKO_ERROR(labels::DebugRenderer,
-                "GraphicsModule did not publish a device");
+    GECKO_ERROR(labels::Context, "GraphicsModule did not publish a device");
     return;
   }
 
@@ -35,7 +34,7 @@ DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity)
   m_LineBufferGPU = device->CreateStructuredBuffer(desc);
   if (!m_LineBufferGPU.IsValid())
   {
-    GECKO_ERROR(labels::DebugRenderer, "Failed to create line buffer");
+    GECKO_ERROR(labels::Context, "Failed to create line buffer");
     m_LineBufferCPU.clear();
     m_LineBufferCPU.shrink_to_fit();
     return;
@@ -46,6 +45,8 @@ void DebugRendererContext::NewFrame()
 {
   m_CurrentLineIndex = 0;
   m_CurrentTargetIndex = 0;
+  m_LineOverflowWarned = false;
+  m_TargetOverflowWarned = false;
 }
 
 void DebugRendererContext::SetTarget(
@@ -54,9 +55,14 @@ void DebugRendererContext::SetTarget(
 {
   if (m_CurrentTargetIndex >= m_Targets.size())
   {
-    GECKO_WARN(
-        labels::DebugRenderer,
-        "Exceeded debug target capacity; some lines will not be rendered");
+    if (!m_TargetOverflowWarned)
+    {
+      GECKO_WARN(labels::Context,
+                 "Exceeded debug target capacity ({}); subsequent targets "
+                 "this frame will be dropped",
+                 static_cast<::gecko::u32>(m_Targets.size()));
+      m_TargetOverflowWarned = true;
+    }
     return;
   }
   Target& slot = m_Targets[m_CurrentTargetIndex++];
@@ -74,9 +80,14 @@ void DebugRendererContext::DrawLine(::gecko::math::float2 a,
 {
   if (m_CurrentLineIndex >= m_LineBufferCPU.size())
   {
-    GECKO_WARN(labels::DebugRenderer,
-               "Exceeded debug line buffer capacity; some lines will not be "
-               "rendered");
+    if (!m_LineOverflowWarned)
+    {
+      GECKO_WARN(labels::Context,
+                 "Exceeded debug line buffer capacity ({}); subsequent lines "
+                 "this frame will be dropped",
+                 static_cast<::gecko::u32>(m_LineBufferCPU.size()));
+      m_LineOverflowWarned = true;
+    }
     return;
   }
   m_LineBufferCPU[m_CurrentLineIndex++] = Line2D {a, b, color, thickness};
@@ -100,8 +111,7 @@ void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
   auto* device = ::gecko::graphics::GetGraphicsDevice();
   if (!device)
   {
-    GECKO_ERROR(labels::DebugRenderer,
-                "GraphicsModule did not publish a device");
+    GECKO_ERROR(labels::Context, "GraphicsModule did not publish a device");
     return;
   }
 

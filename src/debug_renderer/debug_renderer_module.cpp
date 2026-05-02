@@ -24,8 +24,7 @@ bool CreatePipeline()
   auto* device = ::gecko::graphics::GetGraphicsDevice();
   if (!device)
   {
-    GECKO_ERROR(labels::DebugRenderer,
-                "GraphicsModule did not publish a device");
+    GECKO_ERROR(labels::Pipeline, "GraphicsModule did not publish a device");
     return false;
   }
 
@@ -53,7 +52,7 @@ bool CreatePipeline()
   g_DebugLinePipeline = device->CreateGraphicsPipeline(desc);
   if (!g_DebugLinePipeline.IsValid())
   {
-    GECKO_ERROR(labels::DebugRenderer, "Failed to create debug line pipeline");
+    GECKO_ERROR(labels::Pipeline, "Failed to create debug line pipeline");
     return false;
   }
   return true;
