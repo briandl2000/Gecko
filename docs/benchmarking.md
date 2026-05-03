@@ -139,6 +139,37 @@ The harness raises the profiler `MinLevel` to `Detailed` and sets
 Every metric (frame total, CPU sub-zones, GPU zones) appears in the
 JSON output as a separate entry under `metrics`.
 
+### Built-in metrics
+
+Every case automatically gets these two metrics, computed from the
+per-iteration monotonic timestamps -- you don't have to do anything:
+
+| Metric | Source | Unit | Meaning |
+|---|---|---|---|
+| `frame_total`      | cpu | ns | Wall-clock duration of the iteration body. |
+| `iters_per_second` | cpu | hz | `1e9 / frame_total` -- real engine-side throughput, not a JS derivation. |
+
+`iters_per_second` is the right number to look at for a render bench:
+it bounds how often you can run the work, and it scales monotonically
+with the GPU/CPU cost of the iteration.
+
+### Custom metrics (non-time)
+
+For anything that isn't time -- counts, ratios, your own throughput
+numbers -- record one value per measured iteration with `State::Record`:
+
+```cpp
+for (auto _ : s) {
+    const auto stats = ctx.DoWork();
+    s.Record("draw_calls",    double(stats.DrawCalls), Unit::Count);
+    s.Record("verts_per_sec", double(stats.Verts) / dt, Unit::Hz);
+}
+```
+
+The three units (`Unit::Ns`, `Unit::Hz`, `Unit::Count`) drive axis
+labels and unit auto-picking in the report. Calls during warmup are
+ignored. Custom metrics show up in the report tagged `user` (green).
+
 ### Multi-axis sweeps
 
 Run the same case across multiple parameter values with `.Sweep(...)`:
@@ -224,18 +255,26 @@ static void my_render_case(::gecko::bench::State& s)
 GPU samples are resolved via the `IGpuSampler`'s frames-in-flight
 queue, so the final ~3 iterations of a measured run will not have
 GPU values. The harness tracks per-iteration *presence* and emits
-those slots as `null` in `samples_ns`; stats are computed only from
+those slots as `null` in `samples`; stats are computed only from
 the present samples (no zero-fill, no min=0 artefact).
 
 ## Run artefacts
 
-Each `gk bench run` writes two files into
-`bench_results/<program>/`:
+Each `gk bench run` writes the JSON results plus one snapshot per
+requested working-dir file into `bench_results/<program>/`:
 
-| File          | Contents |
-|---------------|---|
-| `<run>.json`  | Stats + samples per case (consumed by the report). |
-| `<run>.log`   | Snapshot of `working_dir/log.txt` from this run. Useful for catching warnings / errors that surface during a bench (e.g. buffer-overflow warnings) without having them clobbered by the next run. |
+| File                       | Contents |
+|----------------------------|---|
+| `<run>.json`               | Stats + samples per case (consumed by the report). |
+| `<run>.<snapshot>`         | Tail of `working_dir/<snapshot>` produced by the run. |
+
+Default snapshot is `log.txt` (so you get `<run>.log`). Use
+`--snapshot FILE` to change or extend the list (it's repeatable);
+`--snapshot ""` disables snapshots entirely. The `.txt` extension is
+stripped from the snapshot name -- so `log.txt` lands as `<run>.log`,
+but `gecko_trace.json` keeps its full name as `<run>.gecko_trace.json`.
+Files with a compound suffix are skipped by `bench results` (only
+single-suffix `.json` files are loaded as bench results).
 
 The harness writes JSON only to disk when `--out` is given; running
 the binary directly with no `--out` prints JSON to stdout for piping.
@@ -251,6 +290,9 @@ gk bench run <program> [<case>]      build + run; write JSON
   --build-only                       build but don't execute
   --iters <n>                        override per-case iteration count
   --warmup <n>                       override per-case warmup count
+  --snapshot <file>                  capture working_dir/<file> tail
+                                     (repeatable; default: log.txt;
+                                     pass "" to disable)
 
 gk bench results <program>           collect every JSON in
                                      bench_results/<program>/ into one
@@ -315,20 +357,24 @@ remembers.
       "view": "bars",                     // or "lines" if swept
       "metrics": {
         "frame_total": {
-          "source": "cpu",                // "cpu" | "gpu"
-          "stats_ns": {
+          "source": "cpu",                // "cpu" | "gpu" | "user"
+          "unit":   "ns",                 // "ns"  | "hz"  | "count"
+          "stats": {
             "min": 2409928, "max": 4109457,
             "mean": 3044956, "p50": 2765378, "p95": 4109457,
             "stddev": 662142
           },
-          "samples_ns": [2409928, 3502148, ...]
+          "samples": [2409928, 3502148, ...]
         },
-        "cpu_record":     { "source": "cpu", "stats_ns": {...}, "samples_ns": [...] },
+        "iters_per_second": { "source": "cpu",  "unit": "hz",    "stats": {...}, "samples": [...] },
+        "cpu_record":       { "source": "cpu",  "unit": "ns",    "stats": {...}, "samples": [...] },
+        "draw_calls":       { "source": "user", "unit": "count", "stats": {...}, "samples": [...] },
         "gpu_draw_lines": {
           "source": "gpu",
-          "stats_ns": {...},
-          "samples_ns": [..., null, null, null], // last few iters unresolved
-          "sample_count": 27                     // present only when < iterations
+          "unit":   "ns",
+          "stats":  {...},
+          "samples": [..., null, null, null], // last few iters unresolved
+          "sample_count": 27                  // present only when < iterations
         }
       }
     }
@@ -336,10 +382,23 @@ remembers.
 }
 ```
 
-`frame_total` is always present and is computed by the harness from
-the per-iteration monotonic timestamps. All other metric names come
-straight from the `GECKO_PROFILE_*` / `GECKO_GPU_PROF_SCOPE` macros
-the case body uses.
+`frame_total` and `iters_per_second` are always present and are
+computed by the harness from the per-iteration monotonic timestamps.
+Profiler-derived metric names come straight from the `GECKO_PROFILE_*`
+/ `GECKO_GPU_PROF_SCOPE` macros the case body uses; `user`-source
+metrics come from `State::Record`.
+
+`ns` samples are emitted as integers; `hz` and `count` samples as
+floats. Stats are always floats.
+
+### Report rendering
+
+The report picks a display unit per chart from the geometric mean of
+the values: `ns` -> `ns`/`us`/`ms`/`s`, `hz` -> `Hz`/`kHz`/`MHz`,
+`count` -> `count`. Each chart has a `log` toggle button next to the
+metric dropdown that switches the Y axis between linear and
+logarithmic -- useful when sweep values span orders of magnitude
+(e.g. 0.8 ms at 500 circles vs 5.3 ms at 8000).
 
 ## What's NOT here
 

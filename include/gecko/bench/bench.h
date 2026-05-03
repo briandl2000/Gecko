@@ -54,6 +54,15 @@ namespace gecko::bench {
 
 class Case;  // opaque, defined in .cpp
 
+/// Unit of a recorded metric. Drives axis labels + auto unit-picking
+/// in the report. Profiler-derived zones always emit `Ns`.
+enum class Unit : ::gecko::u8
+{
+  Ns,     ///< Nanoseconds. Report auto-picks ns/us/ms/s for display.
+  Hz,     ///< Frequency (e.g. fps, iterations per second).
+  Count,  ///< Plain dimensionless count.
+};
+
 /// Per-case state passed to bench functions.
 class State
 {
@@ -88,6 +97,15 @@ public:
 
   /// True if the harness is in a warmup iteration (samples discarded).
   [[nodiscard]] GECKO_API bool IsWarmup() const noexcept;
+
+  /// Record a non-profiler-derived sample for the current iteration.
+  /// Use this for metrics that aren't a time interval (FPS, counts,
+  /// throughputs). One call per iteration is the intended usage;
+  /// multiple calls in the same iteration overwrite. The harness
+  /// already auto-emits `iters_per_second` (Hz) from the iteration
+  /// wall-clock, so explicit `Record(..., Unit::Hz)` is only needed
+  /// when measuring a sub-rate (not the whole iter).
+  GECKO_API void Record(const char* name, double value, Unit unit) noexcept;
 
   // Internals: harness uses these. User code should not.
   struct Impl;

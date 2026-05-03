@@ -95,6 +95,17 @@ struct State::Impl
   // Stack of open zones, keyed by (ThreadId<<1 | source).
   ::std::map<::gecko::u64, ::std::vector<OpenZone>> OpenStacks;
 
+  // User-recorded custom metrics: name -> per-measured-iter samples.
+  // Index in vectors is `Index - WarmupIters`. Present[i] = 1 means
+  // a real call to State::Record happened for that iter.
+  struct CustomMetric
+  {
+    Unit MetricUnit {Unit::Count};
+    ::std::vector<double> Samples;
+    ::std::vector<::gecko::u8> Present;
+  };
+  ::std::map<::std::string, CustomMetric> Customs;
+
   ::std::string AbortReason;
   bool Aborted {false};
   bool Started {false};
@@ -280,6 +291,28 @@ bool State::IsWarmup() const noexcept
   return m_Impl && m_Impl->Index < m_Impl->WarmupIters;
 }
 
+void State::Record(const char* name, double value, Unit unit) noexcept
+{
+  if (!m_Impl || !name)
+    return;
+  // Drop pre-loop / warmup samples; only measured iters are reported.
+  if (m_Impl->Index < m_Impl->WarmupIters)
+    return;
+  const ::gecko::u32 measured = m_Impl->Index - m_Impl->WarmupIters;
+  const ::gecko::u32 N = m_Impl->TotalIters - m_Impl->WarmupIters;
+  if (measured >= N)
+    return;
+  auto& cm = m_Impl->Customs[name];
+  cm.MetricUnit = unit;
+  if (cm.Samples.size() < N)
+  {
+    cm.Samples.resize(N, 0.0);
+    cm.Present.resize(N, 0);
+  }
+  cm.Samples[measured] = value;
+  cm.Present[measured] = 1;
+}
+
 State::Iterator State::begin() noexcept
 {
   if (m_Impl)
@@ -369,34 +402,33 @@ namespace {
 
 struct Stats
 {
-  ::gecko::u64 Min {0};
-  ::gecko::u64 Max {0};
-  ::gecko::u64 Mean {0};
-  ::gecko::u64 P50 {0};
-  ::gecko::u64 P95 {0};
+  double Min {0.0};
+  double Max {0.0};
+  double Mean {0.0};
+  double P50 {0.0};
+  double P95 {0.0};
   double Stddev {0.0};
 };
 
-Stats ComputeStats(const ::std::vector<::gecko::u64>& samples)
+Stats ComputeStats(const ::std::vector<double>& samples)
 {
   Stats s;
   if (samples.empty())
     return s;
-  ::std::vector<::gecko::u64> sorted = samples;
+  ::std::vector<double> sorted = samples;
   ::std::sort(sorted.begin(), sorted.end());
   s.Min = sorted.front();
   s.Max = sorted.back();
-  ::gecko::u64 sum = 0;
+  double sum = 0.0;
   for (auto v : sorted)
     sum += v;
-  s.Mean = sum / sorted.size();
+  s.Mean = sum / static_cast<double>(sorted.size());
   s.P50 = sorted[sorted.size() / 2];
   s.P95 = sorted[(sorted.size() * 95) / 100];
-  double meanD = static_cast<double>(s.Mean);
   double acc = 0.0;
   for (auto v : sorted)
   {
-    double d = static_cast<double>(v) - meanD;
+    double d = v - s.Mean;
     acc += d * d;
   }
   s.Stddev = ::std::sqrt(acc / static_cast<double>(sorted.size()));
@@ -473,8 +505,33 @@ const char* SourceStr(::gecko::ProfSource s)
   return s == ::gecko::ProfSource::GPU ? "gpu" : "cpu";
 }
 
+const char* UnitStr(Unit u)
+{
+  switch (u)
+  {
+  case Unit::Hz:
+    return "hz";
+  case Unit::Count:
+    return "count";
+  case Unit::Ns:
+  default:
+    return "ns";
+  }
+}
+
+/// Format a double for JSON. Integer-valued nanosecond samples emit as
+/// ints (preserves the previous compact look); other units always emit
+/// as floating point.
+void EmitNumber(::std::ostream& json, double v, Unit unit)
+{
+  if (unit == Unit::Ns)
+    json << static_cast<::gecko::u64>(v);
+  else
+    json << v;
+}
+
 /// Bin captured zones by iteration. Each iter gets a map of
-/// metric name -> (source, samples_ns, present_flags). Iterations
+/// metric name -> (source, samples, present_flags). Iterations
 /// that produced no event for a metric are marked absent (typical
 /// for the last few iters of a GPU metric, since the sampler
 /// resolves frames `FramesInFlight` ago).
@@ -523,15 +580,15 @@ PerIterMetrics BinZones(const State::Impl& impl)
 }
 
 void EmitMetric(::std::ostream& json, bool& first, const ::std::string& name,
-                ::gecko::ProfSource source,
-                const ::std::vector<::gecko::u64>& samples,
+                const char* source, Unit unit,
+                const ::std::vector<double>& samples,
                 const ::std::vector<::gecko::u8>* present)
 {
   if (!first)
     json << ",";
   first = false;
   // Compact to only present samples for stats.
-  ::std::vector<::gecko::u64> compact;
+  ::std::vector<double> compact;
   compact.reserve(samples.size());
   if (present)
   {
@@ -545,13 +602,23 @@ void EmitMetric(::std::ostream& json, bool& first, const ::std::string& name,
   }
   Stats st = ComputeStats(compact);
   json << "\n        \"" << EscapeJson(name) << "\": {";
-  json << "\"source\": \"" << SourceStr(source) << "\"";
-  json << ", \"stats_ns\": {";
-  json << "\"min\": " << st.Min << ", \"max\": " << st.Max
-       << ", \"mean\": " << st.Mean << ", \"p50\": " << st.P50
-       << ", \"p95\": " << st.P95
-       << ", \"stddev\": " << static_cast<::gecko::u64>(st.Stddev) << "}";
-  json << ", \"samples_ns\": [";
+  json << "\"source\": \"" << source << "\"";
+  json << ", \"unit\": \"" << UnitStr(unit) << "\"";
+  json << ", \"stats\": {";
+  json << "\"min\": ";
+  EmitNumber(json, st.Min, unit);
+  json << ", \"max\": ";
+  EmitNumber(json, st.Max, unit);
+  json << ", \"mean\": ";
+  EmitNumber(json, st.Mean, unit);
+  json << ", \"p50\": ";
+  EmitNumber(json, st.P50, unit);
+  json << ", \"p95\": ";
+  EmitNumber(json, st.P95, unit);
+  json << ", \"stddev\": ";
+  EmitNumber(json, st.Stddev, unit);
+  json << "}";
+  json << ", \"samples\": [";
   for (size_t i = 0; i < samples.size(); ++i)
   {
     if (i)
@@ -559,7 +626,7 @@ void EmitMetric(::std::ostream& json, bool& first, const ::std::string& name,
     if (present && !(*present)[i])
       json << "null";
     else
-      json << samples[i];
+      EmitNumber(json, samples[i], unit);
   }
   json << "]";
   if (present && compact.size() != samples.size())
@@ -600,12 +667,20 @@ void RunOneInvocation(Case& c,
   }
 
   // Build per-iter metrics. Always emit synthetic 'frame_total' from
-  // the harness's own timing (CPU).
+  // the harness's own timing (CPU), and an 'iters_per_second' rate
+  // metric (Hz) derived from the same wall-clock. FPS isn't a derived
+  // lie -- iter wall-clock is exactly what bounds throughput.
   PerIterMetrics metrics = BinZones(impl);
-  ::std::vector<::gecko::u64> frameTotal;
+  ::std::vector<double> frameTotal;
+  ::std::vector<double> itersPerSec;
   frameTotal.reserve(impl.IterStartNs.size());
+  itersPerSec.reserve(impl.IterStartNs.size());
   for (size_t i = 0; i < impl.IterStartNs.size(); ++i)
-    frameTotal.push_back(impl.IterEndNs[i] - impl.IterStartNs[i]);
+  {
+    const ::gecko::u64 dur = impl.IterEndNs[i] - impl.IterStartNs[i];
+    frameTotal.push_back(static_cast<double>(dur));
+    itersPerSec.push_back(dur > 0 ? 1.0e9 / static_cast<double>(dur) : 0.0);
+  }
 
   if (!firstInvocation)
     json << ",";

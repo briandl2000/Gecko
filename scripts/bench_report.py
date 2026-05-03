@@ -70,11 +70,14 @@ HTML = """<!doctype html>
   .case .desc {{ color: #888; font-size: 12px; margin-bottom: 10px; }}
   .toolbar {{ display: flex; gap: 10px; align-items: center;
               margin-bottom: 8px; font-size: 12px; color: #888; }}
-  .toolbar select {{ background: #222; color: #ddd; border: 1px solid #333;
-                     padding: 4px 6px; border-radius: 3px; font: inherit; }}
+  .toolbar select, .toolbar button {{ background: #222; color: #ddd;
+      border: 1px solid #333; padding: 4px 6px; border-radius: 3px;
+      font: inherit; cursor: pointer; }}
+  .toolbar button.on {{ background: #345; border-color: #456; }}
   .src {{ font-size: 11px; padding: 1px 6px; border-radius: 3px; }}
   .src-cpu {{ color: #aaf; background: #1a1a2a; }}
   .src-gpu {{ color: #faa; background: #2a1a1a; }}
+  .src-user {{ color: #afa; background: #1a2a1a; }}
   .chart-wrap {{ height: 360px; }}
   .drill {{ margin-top: 14px; border-top: 1px solid #2a2a2a; padding-top: 12px; }}
   .drill .label {{ font-size: 12px; color: #888;
@@ -98,11 +101,57 @@ function rgba(hex, a) {{
   return `rgba(${{r}},${{g}},${{b}},${{a}})`;
 }}
 
-function buildBars(metric) {{
+// Pick a presentation unit + scale factor from a metric's raw unit
+// and the geometric mean of its values. Returns {{label, scale}}
+// such that displayValue = rawValue * scale.
+function pickUnit(rawUnit, samples) {{
+  const xs = samples.filter(v => v != null && isFinite(v) && v > 0);
+  let mag = 0;
+  if (xs.length) {{
+    let s = 0;
+    for (const v of xs) s += Math.log(v);
+    mag = Math.exp(s / xs.length);
+  }}
+  if (rawUnit === 'ns') {{
+    if (mag >= 1e9)  return {{ label: 's',  scale: 1e-9 }};
+    if (mag >= 1e6)  return {{ label: 'ms', scale: 1e-6 }};
+    if (mag >= 1e3)  return {{ label: 'us', scale: 1e-3 }};
+    return {{ label: 'ns', scale: 1.0 }};
+  }}
+  if (rawUnit === 'hz') {{
+    if (mag >= 1e6) return {{ label: 'MHz', scale: 1e-6 }};
+    if (mag >= 1e3) return {{ label: 'kHz', scale: 1e-3 }};
+    return {{ label: 'Hz', scale: 1.0 }};
+  }}
+  return {{ label: rawUnit || '', scale: 1.0 }};
+}}
+
+function collectAll(metric) {{
+  // Flatten everything we'll need to plot for unit-picking purposes.
+  const out = [];
+  if (metric.points) {{
+    for (const p of metric.points) {{
+      if (p.min != null) out.push(p.min);
+      if (p.mean != null) out.push(p.mean);
+      if (p.max != null) out.push(p.max);
+    }}
+  }}
+  if (metric.runs) {{
+    for (const r of metric.runs) {{
+      for (const v of (r.mean  || [])) if (v != null) out.push(v);
+      for (const v of (r.min   || [])) if (v != null) out.push(v);
+      for (const v of (r.max   || [])) if (v != null) out.push(v);
+    }}
+  }}
+  return out;
+}}
+
+function buildBars(metric, scale, axisLabel, logScale) {{
   const labels = metric.points.map(p => p.x);
+  const apply = v => (v == null ? null : v * scale);
   const ds = ['min','mean','max'].map(k => ({{
     label: k,
-    data: metric.points.map(p => p[k]),
+    data: metric.points.map(p => apply(p[k])),
     backgroundColor: {{min:'#88cc66', mean:'#5599dd', max:'#dd5577'}}[k],
   }}));
   return {{
@@ -112,34 +161,36 @@ function buildBars(metric) {{
       responsive: true, maintainAspectRatio: false, animation: false,
       scales: {{
         x: {{ ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }} }},
-        y: {{ title: {{ display: true, text: 'ms', color: '#888' }},
-              ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }} }},
+        y: {{
+          type: logScale ? 'logarithmic' : 'linear',
+          title: {{ display: true, text: axisLabel, color: '#888' }},
+          ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }},
+        }},
       }},
       plugins: {{ legend: {{ labels: {{ color: '#ddd' }} }} }},
     }},
   }};
 }}
 
-function buildBarsAtSweep(metric, sweepIdx) {{
-  // Build a static-style bar payload from the swept metric, picking
-  // out the value at the chosen sweep index for each run.
+function buildBarsAtSweep(metric, sweepIdx, scale, axisLabel, logScale) {{
   const points = metric.runs.map(r => ({{
     x: r.run,
     min: r.min[sweepIdx],
     mean: r.mean[sweepIdx],
     max: r.max[sweepIdx],
   }}));
-  return buildBars({{ points }});
+  return buildBars({{ points }}, scale, axisLabel, logScale);
 }}
 
-function buildLines(metric) {{
+function buildLines(metric, scale, axisLabel, logScale) {{
   const labels = metric.sweep_values;
   const palette = {palette_json};
+  const apply = v => (v == null ? null : v * scale);
   const datasets = metric.runs.map((r, i) => {{
     const c = palette[i % palette.length];
     return {{
       label: r.run,
-      data: r.mean,
+      data: r.mean.map(apply),
       borderColor: c,
       backgroundColor: c,
       fill: false,
@@ -155,8 +206,11 @@ function buildLines(metric) {{
       scales: {{
         x: {{ title: {{ display: true, text: metric.sweep_axis, color: '#888' }},
               ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }} }},
-        y: {{ title: {{ display: true, text: 'ms (mean)', color: '#888' }},
-              ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }} }},
+        y: {{
+          type: logScale ? 'logarithmic' : 'linear',
+          title: {{ display: true, text: axisLabel, color: '#888' }},
+          ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }},
+        }},
       }},
       plugins: {{ legend: {{ labels: {{ color: '#ddd' }} }} }},
     }},
@@ -165,6 +219,14 @@ function buildLines(metric) {{
 
 const ACTIVE = {{}};
 const DRILL = {{}};
+const LOG_STATE = {{}};
+
+function toggleLog(caseId) {{
+  LOG_STATE[caseId] = !LOG_STATE[caseId];
+  const btn = document.getElementById('log_' + caseId);
+  btn.classList.toggle('on', LOG_STATE[caseId]);
+  renderMetric(caseId);
+}}
 
 function renderMetric(caseId) {{
   const c = CASES[caseId];
@@ -172,11 +234,19 @@ function renderMetric(caseId) {{
   const m = c.metrics[sel.value];
   const ctx = document.getElementById('chart_' + caseId);
   if (ACTIVE[caseId]) ACTIVE[caseId].destroy();
-  document.getElementById('src_' + caseId).className =
-    'src ' + (m.source === 'gpu' ? 'src-gpu' : 'src-cpu');
-  document.getElementById('src_' + caseId).textContent = m.source;
+  const srcEl = document.getElementById('src_' + caseId);
+  srcEl.className = 'src ' +
+    (m.source === 'gpu' ? 'src-gpu' :
+     m.source === 'user' ? 'src-user' : 'src-cpu');
+  srcEl.textContent = m.source;
+  const u = pickUnit(m.unit, collectAll(m));
+  const stat = c.view === 'lines' ? '(mean)' : '';
+  const axisLabel = `${{u.label}} ${{stat}}`.trim();
+  const log = !!LOG_STATE[caseId];
   ACTIVE[caseId] = new Chart(ctx.getContext('2d'),
-    c.view === 'lines' ? buildLines(m) : buildBars(m));
+    c.view === 'lines'
+      ? buildLines(m, u.scale, axisLabel, log)
+      : buildBars(m, u.scale, axisLabel, log));
   if (c.view === 'lines') renderDrill(caseId);
 }}
 
@@ -192,8 +262,10 @@ function renderDrill(caseId) {{
     `${{m.sweep_axis}} = ${{v}}`;
   const ctx = document.getElementById('drillChart_' + caseId);
   if (DRILL[caseId]) DRILL[caseId].destroy();
+  const u = pickUnit(m.unit, collectAll(m));
+  const log = !!LOG_STATE[caseId];
   DRILL[caseId] = new Chart(ctx.getContext('2d'),
-    buildBarsAtSweep(m, idx));
+    buildBarsAtSweep(m, idx, u.scale, u.label, log));
 }}
 
 for (const id of Object.keys(CASES)) renderMetric(id);
@@ -214,23 +286,24 @@ def _build_static_metric(metric_name: str,
     """Bar layout. One bar group per (run, args)."""
     out_pts = []
     src = "cpu"
+    unit = "ns"
     for p in points:
         m = p["metrics"].get(metric_name)
         if m is None:
             continue
-        if m.get("source") == "gpu":
-            src = "gpu"
-        stats = m.get("stats_ns", {})
+        src = m.get("source", src)
+        unit = m.get("unit", unit)
+        stats = m.get("stats") or m.get("stats_ns", {})
         x = p["run"]
         if p["args"]:
             x = f"{p['run']} [{_composite_arg_label(p['args'])}]"
         out_pts.append({
             "x": x,
-            "min": stats.get("min", 0) / 1e6,
-            "mean": stats.get("mean", 0) / 1e6,
-            "max": stats.get("max", 0) / 1e6,
+            "min": stats.get("min", 0),
+            "mean": stats.get("mean", 0),
+            "max": stats.get("max", 0),
         })
-    return {"source": src, "points": out_pts}
+    return {"source": src, "unit": unit, "points": out_pts}
 
 
 def _build_swept_metric(metric_name: str, points: list[dict],
@@ -239,20 +312,21 @@ def _build_swept_metric(metric_name: str, points: list[dict],
                         run_order: list[str]) -> dict:
     """Line layout. One mean-line per run; min/max fill band."""
     src = "cpu"
+    unit = "ns"
     # Group by run.
     per_run: dict[str, dict[object, dict]] = {}
     for p in points:
         m = p["metrics"].get(metric_name)
         if m is None:
             continue
-        if m.get("source") == "gpu":
-            src = "gpu"
-        stats = m.get("stats_ns", {})
+        src = m.get("source", src)
+        unit = m.get("unit", unit)
+        stats = m.get("stats") or m.get("stats_ns", {})
         v = p["args"].get(sweep_axis)
         per_run.setdefault(p["run"], {})[v] = {
-            "min": stats.get("min", 0) / 1e6,
-            "mean": stats.get("mean", 0) / 1e6,
-            "max": stats.get("max", 0) / 1e6,
+            "min": stats.get("min", 0),
+            "mean": stats.get("mean", 0),
+            "max": stats.get("max", 0),
         }
     runs_out = []
     for run in run_order:
@@ -267,6 +341,7 @@ def _build_swept_metric(metric_name: str, points: list[dict],
         })
     return {
         "source": src,
+        "unit": unit,
         "sweep_axis": sweep_axis,
         "sweep_values": sweep_values,
         "runs": runs_out,
@@ -381,6 +456,7 @@ def main(argv: list[str] | None = None) -> int:
             f"<label for='sel_{cid}'>metric:</label>"
             f"<select id='sel_{cid}' onchange=\"renderMetric('{cid}')\">{opts}</select>"
             f"<span id='src_{cid}' class='src {src_class}'>{first_src}</span>"
+            f"<button id='log_{cid}' onclick=\"toggleLog('{cid}')\">log</button>"
             f"<span style='margin-left:auto;color:#666'>{view}</span>"
             f"</div>")
         body_parts.append(

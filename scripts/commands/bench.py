@@ -102,6 +102,12 @@ def register(subparsers) -> None:
                      help="Override measured iteration count.")
     run.add_argument("--warmup", type=int, default=None,
                      help="Override warmup iteration count.")
+    run.add_argument("--snapshot", action="append", default=None,
+                     metavar="FILE",
+                     help="Snapshot a working_dir file next to the JSON "
+                          "after the run (default: log.txt). Repeat to "
+                          "snapshot multiple files. Pass empty string "
+                          "to disable.")
     run.set_defaults(handler=_run)
 
     lst = sub.add_parser(
@@ -179,28 +185,44 @@ def _run(args) -> int:
     rel = out_path.relative_to(_REPO_ROOT)
     print(f"Running {exe.name} -> {rel}")
 
-    # Bench logs append to working_dir/log.txt across every gk run /
-    # bench / example invocation. Snapshot the byte offset BEFORE the
-    # bench runs so we can capture only this run's tail afterwards.
-    src_log = Path(_REPO_ROOT) / "working_dir" / "log.txt"
-    log_offset = src_log.stat().st_size if src_log.is_file() else 0
+    # Default snapshot: log.txt. Files are append-only across
+    # gk runs (bench / example / etc.), so we record the byte offset
+    # BEFORE the run and copy only the new tail afterwards. Pass
+    # `--snapshot ""` to disable; pass multiple `--snapshot <name>`
+    # to capture additional working_dir artefacts.
+    if args.snapshot is None:
+        snapshot_files = ["log.txt"]
+    elif args.snapshot == [""]:
+        snapshot_files = []
+    else:
+        snapshot_files = [s for s in args.snapshot if s]
+    work_dir = Path(_REPO_ROOT) / "working_dir"
+    pre_sizes: dict[str, int] = {}
+    for name in snapshot_files:
+        p = work_dir / name
+        pre_sizes[name] = p.stat().st_size if p.is_file() else 0
 
     rc = subprocess.run(
-        cmd, cwd=str(Path(_REPO_ROOT) / "working_dir"), check=False,
+        cmd, cwd=str(work_dir), check=False,
     ).returncode
 
-    # Snapshot the new tail of log.txt next to the JSON. Useful for
-    # catching warnings / errors that surface during a bench
-    # (e.g. buffer-overflow warnings) without having them clobbered
-    # by the next run.
-    if src_log.is_file():
+    # Snapshot the new tail of each tracked file next to the JSON.
+    # Naming: <run>.<basename-of-file>. For log.txt the basename is
+    # 'log' (drop the .txt) so the canonical default lands on
+    # <run>.log; everything else keeps its original extension chain
+    # (e.g. run_a.gecko_trace.json).
+    for name in snapshot_files:
+        src = work_dir / name
+        if not src.is_file():
+            continue
         try:
-            dst_log = out_path.with_suffix(".log")
-            with src_log.open("rb") as f:
-                f.seek(log_offset)
-                dst_log.write_bytes(f.read())
+            tail = name[:-4] if name.endswith(".txt") else name
+            dst = out_path.parent / f"{out_path.stem}.{tail}"
+            with src.open("rb") as f:
+                f.seek(pre_sizes[name])
+                dst.write_bytes(f.read())
         except OSError as e:
-            print(f"warning: failed to snapshot log.txt: {e}")
+            print(f"warning: failed to snapshot {name}: {e}")
     return rc
 
 
@@ -243,7 +265,13 @@ def _results(args) -> int:
               f"`gk bench run {args.program}` first.")
         return 1
 
-    runs = sorted(bench_results.glob("*.json"))
+    # Result files have a single suffix (run_a.json), snapshot files
+    # have a compound suffix (run_a.gecko_trace.json). Filter to only
+    # the former.
+    runs = sorted(
+        p for p in bench_results.glob("*.json")
+        if "." not in p.stem
+    )
     if not runs:
         print(f"No JSON files in {bench_results}.")
         return 1
