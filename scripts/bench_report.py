@@ -101,6 +101,32 @@ function rgba(hex, a) {{
   return `rgba(${{r}},${{g}},${{b}},${{a}})`;
 }}
 
+// Stable per-run color: hash the run name -> palette index.
+// Same run name always picks the same color regardless of which
+// other runs are in view, or what alphabetical position it has.
+function hashStr(s) {{
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; ++i) {{
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }}
+  return h;
+}}
+function colorForRun(name, palette) {{
+  return palette[hashStr(name) % palette.length];
+}}
+
+// Format a value with a unit suffix for tooltip display.
+function fmtVal(v, unit) {{
+  if (v == null || !isFinite(v)) return '—';
+  const abs = Math.abs(v);
+  let digits = 0;
+  if (abs < 1) digits = 3;
+  else if (abs < 10) digits = 2;
+  else if (abs < 100) digits = 1;
+  return v.toFixed(digits) + ' ' + (unit || '');
+}}
+
 // Pick a presentation unit + scale factor from a metric's raw unit
 // and the geometric mean of its values. Returns {{label, scale}}
 // such that displayValue = rawValue * scale.
@@ -146,7 +172,7 @@ function collectAll(metric) {{
   return out;
 }}
 
-function buildBars(metric, scale, axisLabel, logScale) {{
+function buildBars(metric, scale, axisLabel, logScale, unitLabel) {{
   const labels = metric.points.map(p => p.x);
   const apply = v => (v == null ? null : v * scale);
   const ds = ['min','mean','max'].map(k => ({{
@@ -167,27 +193,34 @@ function buildBars(metric, scale, axisLabel, logScale) {{
           ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }},
         }},
       }},
-      plugins: {{ legend: {{ labels: {{ color: '#ddd' }} }} }},
+      plugins: {{
+        legend: {{ labels: {{ color: '#ddd' }} }},
+        tooltip: {{
+          callbacks: {{
+            label: (ctx) => `${{ctx.dataset.label}}: ${{fmtVal(ctx.parsed.y, unitLabel)}}`,
+          }},
+        }},
+      }},
     }},
   }};
 }}
 
-function buildBarsAtSweep(metric, sweepIdx, scale, axisLabel, logScale) {{
+function buildBarsAtSweep(metric, sweepIdx, scale, axisLabel, logScale, unitLabel) {{
   const points = metric.runs.map(r => ({{
     x: r.run,
     min: r.min[sweepIdx],
     mean: r.mean[sweepIdx],
     max: r.max[sweepIdx],
   }}));
-  return buildBars({{ points }}, scale, axisLabel, logScale);
+  return buildBars({{ points }}, scale, axisLabel, logScale, unitLabel);
 }}
 
-function buildLines(metric, scale, axisLabel, logScale) {{
+function buildLines(metric, scale, axisLabel, logScale, unitLabel) {{
   const labels = metric.sweep_values;
   const palette = {palette_json};
   const apply = v => (v == null ? null : v * scale);
-  const datasets = metric.runs.map((r, i) => {{
-    const c = palette[i % palette.length];
+  const datasets = metric.runs.map((r) => {{
+    const c = colorForRun(r.run, palette);
     return {{
       label: r.run,
       data: r.mean.map(apply),
@@ -212,7 +245,14 @@ function buildLines(metric, scale, axisLabel, logScale) {{
           ticks: {{ color: '#aaa' }}, grid: {{ color: '#252525' }},
         }},
       }},
-      plugins: {{ legend: {{ labels: {{ color: '#ddd' }} }} }},
+      plugins: {{
+        legend: {{ labels: {{ color: '#ddd' }} }},
+        tooltip: {{
+          callbacks: {{
+            label: (ctx) => `${{ctx.dataset.label}}: ${{fmtVal(ctx.parsed.y, unitLabel)}}`,
+          }},
+        }},
+      }},
     }},
   }};
 }}
@@ -245,8 +285,8 @@ function renderMetric(caseId) {{
   const log = !!LOG_STATE[caseId];
   ACTIVE[caseId] = new Chart(ctx.getContext('2d'),
     c.view === 'lines'
-      ? buildLines(m, u.scale, axisLabel, log)
-      : buildBars(m, u.scale, axisLabel, log));
+      ? buildLines(m, u.scale, axisLabel, log, u.label)
+      : buildBars(m, u.scale, axisLabel, log, u.label));
   if (c.view === 'lines') renderDrill(caseId);
 }}
 
@@ -265,7 +305,7 @@ function renderDrill(caseId) {{
   const u = pickUnit(m.unit, collectAll(m));
   const log = !!LOG_STATE[caseId];
   DRILL[caseId] = new Chart(ctx.getContext('2d'),
-    buildBarsAtSweep(m, idx, u.scale, u.label, log));
+    buildBarsAtSweep(m, idx, u.scale, u.label, log, u.label));
 }}
 
 for (const id of Object.keys(CASES)) renderMetric(id);
