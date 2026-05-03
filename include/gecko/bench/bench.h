@@ -102,9 +102,9 @@ public:
   /// Use this for metrics that aren't a time interval (FPS, counts,
   /// throughputs). One call per iteration is the intended usage;
   /// multiple calls in the same iteration overwrite. The harness
-  /// already auto-emits `iters_per_second` (Hz) from the iteration
-  /// wall-clock, so explicit `Record(..., Unit::Hz)` is only needed
-  /// when measuring a sub-rate (not the whole iter).
+  /// auto-emits `frame_total` (ns); switching the HTML report to
+  /// Rate mode displays it as Hz, so explicit `Record(..., Unit::Hz)`
+  /// is only needed when measuring a sub-rate (not the whole iter).
   GECKO_API void Record(const char* name, double value, Unit unit) noexcept;
 
   // Internals: harness uses these. User code should not.

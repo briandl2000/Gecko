@@ -667,19 +667,16 @@ void RunOneInvocation(Case& c,
   }
 
   // Build per-iter metrics. Always emit synthetic 'frame_total' from
-  // the harness's own timing (CPU), and an 'iters_per_second' rate
-  // metric (Hz) derived from the same wall-clock. FPS isn't a derived
-  // lie -- iter wall-clock is exactly what bounds throughput.
+  // the harness's own timing (CPU). The HTML report's Time/Rate mode
+  // toggle derives Hz from frame_total on demand, so we no longer
+  // emit a separate 'iters_per_second' (which was just 1/frame_total).
   PerIterMetrics metrics = BinZones(impl);
   ::std::vector<double> frameTotal;
-  ::std::vector<double> itersPerSec;
   frameTotal.reserve(impl.IterStartNs.size());
-  itersPerSec.reserve(impl.IterStartNs.size());
   for (size_t i = 0; i < impl.IterStartNs.size(); ++i)
   {
     const ::gecko::u64 dur = impl.IterEndNs[i] - impl.IterStartNs[i];
     frameTotal.push_back(static_cast<double>(dur));
-    itersPerSec.push_back(dur > 0 ? 1.0e9 / static_cast<double>(dur) : 0.0);
   }
 
   if (!firstInvocation)
@@ -711,8 +708,6 @@ void RunOneInvocation(Case& c,
   json << ",\n      \"metrics\": {";
   bool firstM = true;
   EmitMetric(json, firstM, "frame_total", "cpu", Unit::Ns, frameTotal, nullptr);
-  EmitMetric(json, firstM, "iters_per_second", "cpu", Unit::Hz, itersPerSec,
-             nullptr);
   for (auto& [name, entry] : metrics.Metrics)
   {
     ::std::vector<double> samples(entry.Samples.begin(), entry.Samples.end());

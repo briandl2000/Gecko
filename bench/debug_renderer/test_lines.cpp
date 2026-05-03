@@ -107,8 +107,8 @@ void RunDebugLines(::gecko::bench::State& s)
 
   auto* device = fx.Device();
   auto* sampler = fx.GpuSampler();
-  // Size the per-frame line buffer for the max sweep we expect (256k).
-  ::gecko::debug_renderer::DebugRendererContext ctx {512u * 1024u};
+  // Size the per-frame line buffer for the max sweep we expect (32k).
+  ::gecko::debug_renderer::DebugRendererContext ctx {64u * 1024u};
   if (!ctx.IsValid())
   {
     s.Abort("DebugRendererContext setup failed");
@@ -195,7 +195,7 @@ static void lines_sweep(::gecko::bench::State& s)
 GECKO_BENCH(lines_sweep)
     .Iterations(30)
     .Warmup(100)
-    .Sweep("lines", {1000, 4000, 16000, 64000, 256000})
+    .Sweep("lines", {500, 2000, 8000, 32000})
     .MetricLabel(kLabel)
     .Description("Same deterministic scene at varying line counts. "
                  "Renders a line chart (mean per run) with min/max band; "

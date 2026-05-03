@@ -98,7 +98,7 @@ HTML = """<!doctype html>
 <div class="runs">{runs_html}</div>
 <div class="modebar">
   <span style="color:#888">display:</span>
-  <label><input type="radio" name="mode" value="time" checked onchange="setMode('time')"> time (ns / us / ms / s)</label>
+  <label><input type="radio" name="mode" value="time" checked onchange="setMode('time')"> time (ms / s)</label>
   <label><input type="radio" name="mode" value="rate" onchange="setMode('rate')"> rate (Hz)</label>
   <span style="color:#666;margin-left:auto;font-size:11px">time metrics flip to 1/value when in Rate mode</span>
 </div>
@@ -159,9 +159,12 @@ function pickUnit(rawUnit, samples) {{
       return {{ label: 'Hz',
                transform: v => (v == null || v === 0) ? null : 1e9 / v }};
     }}
+    // Prefer ms broadly: ergonomic for cross-platform comparison
+    // (Linux numbers in fractions of a ms, pi numbers in tens of ms).
+    // Only escape ms when the metric is microscopic (< 1us median)
+    // or huge (>= 1s median).
     if (mag >= 1e9)  return {{ label: 's',  transform: v => v == null ? null : v * 1e-9 }};
-    if (mag >= 1e6)  return {{ label: 'ms', transform: v => v == null ? null : v * 1e-6 }};
-    if (mag >= 1e3)  return {{ label: 'us', transform: v => v == null ? null : v * 1e-3 }};
+    if (mag >= 1e3)  return {{ label: 'ms', transform: v => v == null ? null : v * 1e-6 }};
     return {{ label: 'ns', transform: v => v }};
   }}
   if (rawUnit === 'hz') {{
