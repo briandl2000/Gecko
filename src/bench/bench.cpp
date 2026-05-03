@@ -710,11 +710,19 @@ void RunOneInvocation(Case& c,
   // Metrics map.
   json << ",\n      \"metrics\": {";
   bool firstM = true;
-  EmitMetric(json, firstM, "frame_total", ::gecko::ProfSource::CPU, frameTotal,
+  EmitMetric(json, firstM, "frame_total", "cpu", Unit::Ns, frameTotal, nullptr);
+  EmitMetric(json, firstM, "iters_per_second", "cpu", Unit::Hz, itersPerSec,
              nullptr);
   for (auto& [name, entry] : metrics.Metrics)
   {
-    EmitMetric(json, firstM, name, entry.Source, entry.Samples, &entry.Present);
+    ::std::vector<double> samples(entry.Samples.begin(), entry.Samples.end());
+    EmitMetric(json, firstM, name, SourceStr(entry.Source), Unit::Ns, samples,
+               &entry.Present);
+  }
+  for (auto& [name, cm] : impl.Customs)
+  {
+    EmitMetric(json, firstM, name, "user", cm.MetricUnit, cm.Samples,
+               &cm.Present);
   }
   json << "\n      }";
 
