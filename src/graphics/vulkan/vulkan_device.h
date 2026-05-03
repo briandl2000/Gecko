@@ -187,6 +187,43 @@ private:
   void ReapPending() noexcept;
   void DrainPending() noexcept;
 
+  // Pool of mapped host-visible staging buffers reused across UploadBufferData
+  // calls. Avoids vmaCreateBuffer/vmaDestroyBuffer churn every frame.
+  // Buffers are returned to the free list once their tracker fence signals.
+  struct StagingBuffer
+  {
+    VkBuffer Buffer {VK_NULL_HANDLE};
+    VmaAllocation Alloc {nullptr};
+    void* Mapped {nullptr};
+    VkDeviceSize Size {0};
+  };
+  ::std::mutex m_StagingMutex;
+  ::std::vector<StagingBuffer> m_FreeStagings;
+
+  [[nodiscard]] StagingBuffer AcquireStaging(VkDeviceSize size) noexcept;
+  void ReleaseStaging(StagingBuffer staging) noexcept;
+  void DestroyAllStagings() noexcept;
+
+  // Async upload submissions waiting for their fence to signal. Each entry
+  // owns a staging buffer + command buffer that can only be recycled once
+  // the GPU is done copying. Reaped lazily by ReapPending() each frame.
+  struct PendingStagingUpload
+  {
+    VkFence Fence {VK_NULL_HANDLE};
+    StagingBuffer Staging {};
+    VkCommandBuffer Cmd {VK_NULL_HANDLE};
+  };
+  ::std::vector<PendingStagingUpload> m_PendingUploads;  // under m_PendingMutex
+
+  // Dedicated, mutex-protected command pool for buffer uploads. Decouples
+  // upload cmd buffers from per-thread pools so deferred reaping is safe
+  // regardless of which thread issued the upload.
+  VkCommandPool m_UploadPool {VK_NULL_HANDLE};
+  ::std::mutex m_UploadPoolMutex;
+
+  void ReapPendingUploads() noexcept;
+  void DrainPendingUploads() noexcept;
+
   VmaAllocator m_Allocator {VK_NULL_HANDLE};
 
   VkDescriptorPool m_DescriptorPool {VK_NULL_HANDLE};

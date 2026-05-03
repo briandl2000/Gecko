@@ -342,6 +342,16 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
                                      &m_GraphicsCommandPool));
   }
 
+  // Dedicated upload pool: TRANSIENT (short-lived cmd bufs) + RESET so cmds
+  // can be individually freed when their tracker fence signals.
+  VkCommandPoolCreateInfo uploadPoolInfo {};
+  uploadPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  uploadPoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
+                         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  uploadPoolInfo.queueFamilyIndex = m_GraphicsQueueFamily;
+  VULKAN_CHECK(
+      vkCreateCommandPool(m_Device, &uploadPoolInfo, nullptr, &m_UploadPool));
+
   // -- VMA allocator ---------------------------------------------
 
   VmaVulkanFunctions vulkanFunctions {};
@@ -389,8 +399,10 @@ VulkanDevice::~VulkanDevice()
   if (m_Device != VK_NULL_HANDLE)
     vkDeviceWaitIdle(m_Device);
 
-  // GPU is idle -- drain deferred command lists and the tracker-fence pool.
+  // GPU is idle -- drain deferred command lists, async uploads, and the
+  // tracker-fence pool.
   DrainPending();
+  DrainPendingUploads();
   for (VkFence f : m_FreeFences)
   {
     if (f != VK_NULL_HANDLE)
@@ -401,8 +413,14 @@ VulkanDevice::~VulkanDevice()
   if (m_DescriptorPool != VK_NULL_HANDLE)
     vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
 
+  // Destroy pooled staging buffers (GPU is idle from vkDeviceWaitIdle above).
+  DestroyAllStagings();
+
   if (m_Allocator != VK_NULL_HANDLE)
     vmaDestroyAllocator(m_Allocator);
+
+  if (m_UploadPool != VK_NULL_HANDLE)
+    vkDestroyCommandPool(m_Device, m_UploadPool, nullptr);
 
   if (m_GraphicsCommandPool != VK_NULL_HANDLE)
     vkDestroyCommandPool(m_Device, m_GraphicsCommandPool, nullptr);
@@ -866,6 +884,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   // Reclaim completed command lists from previous submits before doing
   // anything else this frame.
   ReapPending();
+  ReapPendingUploads();
 
   FrameContext ctx {};
   if (!swapchain.Data)
@@ -2315,10 +2334,128 @@ void VulkanDevice::UploadBufferData(Buffer& buffer,
     return;
   auto* bufferData = static_cast<VulkanBufferData*>(buffer.Data.get());
 
-  // Create a staging buffer
+  // Acquire a pooled staging buffer (allocates only when the pool is dry or
+  // when the existing free buffers are too small for this upload).
+  StagingBuffer staging = AcquireStaging(data.size());
+  if (staging.Buffer == VK_NULL_HANDLE)
+  {
+    GECKO_ERROR(labels::Vulkan,
+                "VulkanDevice::UploadBufferData staging allocation failed");
+    return;
+  }
+
+  ::std::memcpy(staging.Mapped, data.data(), data.size());
+
+  // Allocate a command buffer from the dedicated upload pool. Recording is
+  // single-threaded under m_UploadPoolMutex.
+  VkCommandBuffer cmd = VK_NULL_HANDLE;
+  {
+    ::std::lock_guard<::std::mutex> poolLock(m_UploadPoolMutex);
+    VkCommandBufferAllocateInfo cmdAlloc {};
+    cmdAlloc.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdAlloc.commandPool = m_UploadPool;
+    cmdAlloc.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAlloc.commandBufferCount = 1;
+    if (vkAllocateCommandBuffers(m_Device, &cmdAlloc, &cmd) != VK_SUCCESS)
+    {
+      GECKO_ERROR(labels::Vulkan,
+                  "VulkanDevice::UploadBufferData: vkAllocateCommandBuffers "
+                  "failed");
+      ReleaseStaging(staging);
+      return;
+    }
+
+    VkCommandBufferBeginInfo begin {};
+    begin.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmd, &begin);
+
+    VkBufferCopy copyRegion {};
+    copyRegion.dstOffset = offset;
+    copyRegion.size = data.size();
+    vkCmdCopyBuffer(cmd, staging.Buffer, bufferData->Buffer, 1, &copyRegion);
+
+    // Make the upload visible to subsequent draws on the same queue. Same-
+    // queue submission order gives execution ordering; this barrier provides
+    // memory ordering across pipeline stages that may consume the buffer.
+    VkBufferMemoryBarrier bb {};
+    bb.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    bb.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    bb.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                       VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+                       VK_ACCESS_SHADER_READ_BIT;
+    bb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    bb.buffer = bufferData->Buffer;
+    bb.offset = offset;
+    bb.size = data.size();
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 0, nullptr, 1, &bb, 0, nullptr);
+
+    vkEndCommandBuffer(cmd);
+  }
+
+  // Submit asynchronously: tracker fence will signal when the GPU is done,
+  // at which point ReapPendingUploads() will reclaim the staging buffer and
+  // free the command buffer. No vkQueueWaitIdle here -- this is the whole
+  // point of the change, since WaitIdle drains the entire queue (including
+  // the previous frame's render).
+  VkFence fence = AcquireTrackerFence();
+
+  VkSubmitInfo submitInfo {};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &cmd;
+  {
+    ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, fence);
+  }
+
+  {
+    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    m_PendingUploads.push_back({fence, staging, cmd});
+  }
+}
+
+VulkanDevice::StagingBuffer VulkanDevice::AcquireStaging(
+    VkDeviceSize size) noexcept
+{
+  // Round up requested size to reduce fragmentation across slightly-different
+  // upload sizes (e.g. line buffer growing/shrinking by a handful of entries).
+  constexpr VkDeviceSize kGranularity = 4096;
+  const VkDeviceSize rounded =
+      ((size + kGranularity - 1) / kGranularity) * kGranularity;
+
+  {
+    ::std::lock_guard<::std::mutex> lock(m_StagingMutex);
+    // Pick the smallest free buffer that fits.
+    usize bestIdx = m_FreeStagings.size();
+    VkDeviceSize bestSize = 0;
+    for (usize i = 0; i < m_FreeStagings.size(); ++i)
+    {
+      VkDeviceSize s = m_FreeStagings[i].Size;
+      if (s >= rounded && (bestIdx == m_FreeStagings.size() || s < bestSize))
+      {
+        bestIdx = i;
+        bestSize = s;
+      }
+    }
+    if (bestIdx < m_FreeStagings.size())
+    {
+      StagingBuffer out = m_FreeStagings[bestIdx];
+      m_FreeStagings[bestIdx] = m_FreeStagings.back();
+      m_FreeStagings.pop_back();
+      return out;
+    }
+  }
+
+  // Pool miss: create a new staging buffer at the rounded size.
   VkBufferCreateInfo bufferCreateInfo {};
   bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  bufferCreateInfo.size = data.size();
+  bufferCreateInfo.size = rounded;
   bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -2328,38 +2465,87 @@ void VulkanDevice::UploadBufferData(Buffer& buffer,
       VMA_ALLOCATION_CREATE_MAPPED_BIT |
       VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
-  VkBuffer staging = VK_NULL_HANDLE;
-  VmaAllocation stagingAlloc = nullptr;
+  StagingBuffer out {};
   VmaAllocationInfo info {};
   if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &staging, &stagingAlloc, &info) != VK_SUCCESS)
+                      &out.Buffer, &out.Alloc, &info) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::UploadBufferData staging allocation failed");
-    return;
+    return {};
   }
+  out.Mapped = info.pMappedData;
+  out.Size = rounded;
+  return out;
+}
 
-  ::std::memcpy(info.pMappedData, data.data(), data.size());
+void VulkanDevice::ReleaseStaging(StagingBuffer staging) noexcept
+{
+  if (staging.Buffer == VK_NULL_HANDLE)
+    return;
+  ::std::lock_guard<::std::mutex> lock(m_StagingMutex);
+  m_FreeStagings.push_back(staging);
+}
 
-  struct Ctx
+void VulkanDevice::DestroyAllStagings() noexcept
+{
+  ::std::lock_guard<::std::mutex> lock(m_StagingMutex);
+  for (auto& s : m_FreeStagings)
   {
-    VkBuffer src;
-    VkBuffer dst;
-    VkDeviceSize size;
-    u32 dstOffset;
-  } ctx {staging, bufferData->Buffer, data.size(), offset};
+    if (s.Buffer != VK_NULL_HANDLE)
+      vmaDestroyBuffer(m_Allocator, s.Buffer, s.Alloc);
+  }
+  m_FreeStagings.clear();
+}
 
-  OneTimeSubmit(
-      [](VkCommandBuffer cmdBuf, void* c) {
-        auto* x = static_cast<Ctx*>(c);
-        VkBufferCopy copyRegion {};
-        copyRegion.dstOffset = x->dstOffset;
-        copyRegion.size = x->size;
-        vkCmdCopyBuffer(cmdBuf, x->src, x->dst, 1, &copyRegion);
-      },
-      &ctx);
+void VulkanDevice::ReapPendingUploads() noexcept
+{
+  ::std::vector<PendingStagingUpload> completed;
+  {
+    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    for (auto it = m_PendingUploads.begin(); it != m_PendingUploads.end();)
+    {
+      if (it->Fence != VK_NULL_HANDLE &&
+          vkGetFenceStatus(m_Device, it->Fence) == VK_SUCCESS)
+      {
+        completed.emplace_back(::std::move(*it));
+        it = m_PendingUploads.erase(it);
+      }
+      else
+      {
+        ++it;
+      }
+    }
+  }
+  for (auto& entry : completed)
+  {
+    {
+      ::std::lock_guard<::std::mutex> poolLock(m_UploadPoolMutex);
+      vkFreeCommandBuffers(m_Device, m_UploadPool, 1, &entry.Cmd);
+    }
+    ReleaseStaging(entry.Staging);
+    ReleaseTrackerFence(entry.Fence);
+  }
+}
 
-  vmaDestroyBuffer(m_Allocator, staging, stagingAlloc);
+void VulkanDevice::DrainPendingUploads() noexcept
+{
+  // Caller must have already ensured the GPU is idle (vkDeviceWaitIdle).
+  ::std::vector<PendingStagingUpload> pending;
+  {
+    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    pending.swap(m_PendingUploads);
+  }
+  for (auto& entry : pending)
+  {
+    if (entry.Cmd != VK_NULL_HANDLE)
+    {
+      ::std::lock_guard<::std::mutex> poolLock(m_UploadPoolMutex);
+      vkFreeCommandBuffers(m_Device, m_UploadPool, 1, &entry.Cmd);
+    }
+    if (entry.Staging.Buffer != VK_NULL_HANDLE)
+      vmaDestroyBuffer(m_Allocator, entry.Staging.Buffer, entry.Staging.Alloc);
+    if (entry.Fence != VK_NULL_HANDLE)
+      vkDestroyFence(m_Device, entry.Fence, nullptr);
+  }
 }
 
 }  // namespace gecko::graphics
