@@ -178,9 +178,30 @@ def _run(args) -> int:
 
     rel = out_path.relative_to(_REPO_ROOT)
     print(f"Running {exe.name} -> {rel}")
-    return subprocess.run(
+
+    # Bench logs append to working_dir/log.txt across every gk run /
+    # bench / example invocation. Snapshot the byte offset BEFORE the
+    # bench runs so we can capture only this run's tail afterwards.
+    src_log = Path(_REPO_ROOT) / "working_dir" / "log.txt"
+    log_offset = src_log.stat().st_size if src_log.is_file() else 0
+
+    rc = subprocess.run(
         cmd, cwd=str(Path(_REPO_ROOT) / "working_dir"), check=False,
     ).returncode
+
+    # Snapshot the new tail of log.txt next to the JSON. Useful for
+    # catching warnings / errors that surface during a bench
+    # (e.g. buffer-overflow warnings) without having them clobbered
+    # by the next run.
+    if src_log.is_file():
+        try:
+            dst_log = out_path.with_suffix(".log")
+            with src_log.open("rb") as f:
+                f.seek(log_offset)
+                dst_log.write_bytes(f.read())
+        except OSError as e:
+            print(f"warning: failed to snapshot log.txt: {e}")
+    return rc
 
 
 def _list(args) -> int:

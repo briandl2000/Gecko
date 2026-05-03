@@ -22,6 +22,7 @@
 #include <gecko/core/services/profiler.h>
 #include <gecko/core/utility/time.h>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -47,9 +48,10 @@ public:
   ::std::string Description;
   CaseFn Fn {nullptr};
   ::gecko::u32 Iterations {100};
-  ::gecko::u32 Warmup {5};
+  ::gecko::u32 Warmup {100};
   ::std::vector<ArgAxis> Sweeps;
-  View ViewHint {View::Auto};
+  ::gecko::Label MetricLabel {};  ///< If non-empty, sink filters by label.
+  bool HasMetricLabel {false};
 };
 
 namespace {
@@ -131,6 +133,11 @@ public:
         ev.Kind != ::gecko::ProfEventKind::ZoneEnd)
       return;
 
+    // Optional label filter -- drop engine-internal zones when the
+    // case opted in via Builder::MetricLabel.
+    if (m_FilterLabel.has_value() && !(ev.EventLabel == *m_FilterLabel))
+      return;
+
     const ::gecko::u64 key = (static_cast<::gecko::u64>(ev.ThreadId) << 1) |
                              static_cast<::gecko::u64>(ev.Source);
 
@@ -171,8 +178,14 @@ public:
   void Flush() noexcept override
   {}
 
+  void SetFilterLabel(::std::optional<::gecko::Label> label) noexcept
+  {
+    m_FilterLabel = label;
+  }
+
 private:
   State::Impl& m_Impl;
+  ::std::optional<::gecko::Label> m_FilterLabel;
 };
 
 }  // namespace
@@ -208,9 +221,10 @@ Builder& Builder::Sweep(const char* name,
   m_Case->Sweeps.push_back(::std::move(axis));
   return *this;
 }
-Builder& Builder::ViewHint(View v) noexcept
+Builder& Builder::MetricLabel(::gecko::Label label) noexcept
 {
-  m_Case->ViewHint = v;
+  m_Case->MetricLabel = label;
+  m_Case->HasMetricLabel = true;
   return *this;
 }
 
@@ -284,6 +298,8 @@ State::Iterator State::begin() noexcept
         prof->SetDetailedSampleRate(1);
         prof->Flush();
         auto* sink = new BenchSink(*m_Impl);
+        if (m_Impl->Owner && m_Impl->Owner->HasMetricLabel)
+          sink->SetFilterLabel(m_Impl->Owner->MetricLabel);
         m_Impl->Sink = sink;
         prof->AddSink(sink);
         m_Impl->ProfInstalled = true;
@@ -457,30 +473,20 @@ const char* SourceStr(::gecko::ProfSource s)
   return s == ::gecko::ProfSource::GPU ? "gpu" : "cpu";
 }
 
-const char* ViewStr(View v, bool hasSweep)
-{
-  switch (v)
-  {
-  case View::Lines:
-    return "lines";
-  case View::Bars:
-    return "bars";
-  case View::Auto:
-  default:
-    return hasSweep ? "bars" : "lines";
-  }
-}
-
 /// Bin captured zones by iteration. Each iter gets a map of
-/// metric name -> list of durations summed per iter (multiple events
-/// with same name in one iter are summed).
+/// metric name -> (source, samples_ns, present_flags). Iterations
+/// that produced no event for a metric are marked absent (typical
+/// for the last few iters of a GPU metric, since the sampler
+/// resolves frames `FramesInFlight` ago).
 struct PerIterMetrics
 {
-  // metricKey = "name|source"; samples[iter] = total ns for that metric
-  // in that iter (0 if no event).
-  ::std::map<::std::string,
-             ::std::pair<::gecko::ProfSource, ::std::vector<::gecko::u64>>>
-      Metrics;
+  struct Entry
+  {
+    ::gecko::ProfSource Source {::gecko::ProfSource::CPU};
+    ::std::vector<::gecko::u64> Samples;
+    ::std::vector<::gecko::u8> Present;  // 1 = real sample, 0 = missing
+  };
+  ::std::map<::std::string, Entry> Metrics;
 };
 
 PerIterMetrics BinZones(const State::Impl& impl)
@@ -496,7 +502,6 @@ PerIterMetrics BinZones(const State::Impl& impl)
   // we still attribute by Begin -- close enough.
   for (const auto& z : impl.Zones)
   {
-    // find iter window that contains z.BeginNs
     auto it = ::std::upper_bound(impl.IterStartNs.begin(),
                                  impl.IterStartNs.end(), z.BeginNs);
     if (it == impl.IterStartNs.begin())
@@ -504,29 +509,41 @@ PerIterMetrics BinZones(const State::Impl& impl)
     size_t i = static_cast<size_t>(it - impl.IterStartNs.begin() - 1);
     if (i >= N)
       continue;
-    if (z.BeginNs > impl.IterEndNs[i])
-    {
-      // GPU event resolved after the iter ended but before the next
-      // iter started -- still attribute to iter i.
-      // No-op; fall through.
-    }
     auto& entry = out.Metrics[z.Name];
-    entry.first = z.Source;
-    if (entry.second.size() < N)
-      entry.second.resize(N, 0);
-    entry.second[i] += z.DurationNs;
+    entry.Source = z.Source;
+    if (entry.Samples.size() < N)
+    {
+      entry.Samples.resize(N, 0);
+      entry.Present.resize(N, 0);
+    }
+    entry.Samples[i] += z.DurationNs;
+    entry.Present[i] = 1;
   }
   return out;
 }
 
 void EmitMetric(::std::ostream& json, bool& first, const ::std::string& name,
                 ::gecko::ProfSource source,
-                const ::std::vector<::gecko::u64>& samples)
+                const ::std::vector<::gecko::u64>& samples,
+                const ::std::vector<::gecko::u8>* present)
 {
   if (!first)
     json << ",";
   first = false;
-  Stats st = ComputeStats(samples);
+  // Compact to only present samples for stats.
+  ::std::vector<::gecko::u64> compact;
+  compact.reserve(samples.size());
+  if (present)
+  {
+    for (size_t i = 0; i < samples.size(); ++i)
+      if ((*present)[i])
+        compact.push_back(samples[i]);
+  }
+  else
+  {
+    compact = samples;
+  }
+  Stats st = ComputeStats(compact);
   json << "\n        \"" << EscapeJson(name) << "\": {";
   json << "\"source\": \"" << SourceStr(source) << "\"";
   json << ", \"stats_ns\": {";
@@ -539,9 +556,15 @@ void EmitMetric(::std::ostream& json, bool& first, const ::std::string& name,
   {
     if (i)
       json << ",";
-    json << samples[i];
+    if (present && !(*present)[i])
+      json << "null";
+    else
+      json << samples[i];
   }
-  json << "]}";
+  json << "]";
+  if (present && compact.size() != samples.size())
+    json << ", \"sample_count\": " << compact.size();
+  json << "}";
 }
 
 void RunOneInvocation(Case& c,
@@ -606,16 +629,17 @@ void RunOneInvocation(Case& c,
   json << "}";
 
   json << ",\n      \"iterations\": " << impl.IterStartNs.size();
-  json << ",\n      \"view\": \"" << ViewStr(c.ViewHint, !c.Sweeps.empty())
+  json << ",\n      \"view\": \"" << (c.Sweeps.empty() ? "bars" : "lines")
        << "\"";
 
   // Metrics map.
   json << ",\n      \"metrics\": {";
   bool firstM = true;
-  EmitMetric(json, firstM, "frame_total", ::gecko::ProfSource::CPU, frameTotal);
+  EmitMetric(json, firstM, "frame_total", ::gecko::ProfSource::CPU, frameTotal,
+             nullptr);
   for (auto& [name, entry] : metrics.Metrics)
   {
-    EmitMetric(json, firstM, name, entry.first, entry.second);
+    EmitMetric(json, firstM, name, entry.Source, entry.Samples, &entry.Present);
   }
   json << "\n      }";
 
@@ -754,8 +778,14 @@ int Main(int argc, char** argv) noexcept
     any = true;
     if (iterOverride > 0)
       c->Iterations = static_cast<::gecko::u32>(iterOverride);
-    if (warmupOverride >= 0)
-      c->Warmup = static_cast<::gecko::u32>(warmupOverride);
+    // Warmup override is a *floor* in normal use (case authors set
+    // a minimum that's known to be enough), but allow lowering with
+    // an explicit 0 for fast smoke runs.
+    if (warmupOverride > 0)
+      c->Warmup =
+          ::std::max(c->Warmup, static_cast<::gecko::u32>(warmupOverride));
+    else if (warmupOverride == 0)
+      c->Warmup = 0;
     RunCase(*c, json, first);
   }
 
@@ -769,8 +799,6 @@ int Main(int argc, char** argv) noexcept
   json << "\n}\n";
 
   ::std::string js = json.str();
-  ::std::fputs(js.c_str(), stdout);
-  ::std::fflush(stdout);
 
   if (outPath)
   {
@@ -785,6 +813,12 @@ int Main(int argc, char** argv) noexcept
     }
     f << js;
     GECKO_INFO(kBenchLabel, "wrote {}", outPath);
+  }
+  else
+  {
+    // No --out given: print to stdout for piping.
+    ::std::fputs(js.c_str(), stdout);
+    ::std::fflush(stdout);
   }
 
   return 0;

@@ -46,6 +46,7 @@
 /// @endcode
 
 #include <gecko/core/api.h>
+#include <gecko/core/labels.h>
 #include <gecko/core/types.h>
 #include <initializer_list>
 
@@ -95,14 +96,6 @@ public:
 
 using CaseFn = void (*)(State&);
 
-/// View hint for the report generator.
-enum class View : ::gecko::u8
-{
-  Auto = 0,   ///< Lines if no sweep, bars if sweep present.
-  Lines = 1,  ///< Force per-iteration line chart.
-  Bars = 2,   ///< Force per-sweep-value bar chart.
-};
-
 /// Fluent configuration returned by `GECKO_BENCH(fn)`.
 class GECKO_API Builder
 {
@@ -115,8 +108,10 @@ public:
   /// Cartesian product. Body queries values via `s.Arg(name)`.
   Builder& Sweep(const char* name,
                  ::std::initializer_list<::gecko::i64> values) noexcept;
-  /// Override view hint (default Auto).
-  Builder& ViewHint(View v) noexcept;
+  /// Filter captured profiler zones to only those whose Label matches.
+  /// When set, engine-internal zones (Vulkan, runtime, ...) are
+  /// dropped from the report. Default: capture all zones.
+  Builder& MetricLabel(::gecko::Label label) noexcept;
 
 private:
   friend GECKO_API Builder Register(const char* fnName, CaseFn fn) noexcept;

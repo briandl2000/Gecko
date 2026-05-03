@@ -1,6 +1,6 @@
 /// @file
-/// Bench: debug-renderer throughput swept over circle count, ->
-/// static / bar-chart view in the report.
+/// Bench: debug-renderer line throughput. Fixed-seed scene; bar
+/// chart compares min/mean/max across runs.
 
 #include <gecko/bench/bench.h>
 #include <gecko/bench/graphics_fixture.h>
@@ -8,8 +8,8 @@
 #include <gecko/core/scope.h>
 #include <gecko/core/utility/random.h>
 #include <gecko/debug_renderer/debug_renderer_context.h>
-#include <gecko/graphics/graphics_device.h>
 #include <gecko/graphics/gpu_profiler.h>
+#include <gecko/graphics/graphics_device.h>
 
 #include <cmath>
 
@@ -17,6 +17,7 @@ namespace {
 
 constexpr ::gecko::Label kLabel = ::gecko::MakeLabel("bench.debug_renderer");
 constexpr ::gecko::u32 kSegments = 32;
+constexpr ::gecko::u64 kSeed = 0xC0FFEEULL;
 
 void DrawCircle(::gecko::debug_renderer::DebugRendererContext& ctx,
                 ::gecko::math::float2 center, ::gecko::f32 radius,
@@ -36,14 +37,13 @@ void DrawCircle(::gecko::debug_renderer::DebugRendererContext& ctx,
   }
 }
 
-}  // namespace
-
-/// Sweep circle count -> per-sweep-value bar chart of min/mean/p95.
-static void debug_lines_sweep(::gecko::bench::State& s)
+/// Shared driver. Reads `circles` from sweep args (default 4000).
+void RunDebugLines(::gecko::bench::State& s)
 {
-  const ::gecko::u32 circles = static_cast<::gecko::u32>(s.Arg("circles"));
-
-  ::gecko::bench::GraphicsFixture fx({.Title = "bench/debug_lines_sweep",
+  const ::gecko::u32 numCircles =
+      static_cast<::gecko::u32>(s.Arg("circles"));
+  const ::gecko::u32 circles = numCircles == 0 ? 4000U : numCircles;
+  ::gecko::bench::GraphicsFixture fx({.Title = "bench/debug_lines",
                                       .Width = 1280,
                                       .Height = 720,
                                       .VSync = false});
@@ -55,7 +55,10 @@ static void debug_lines_sweep(::gecko::bench::State& s)
 
   auto* device = fx.Device();
   auto* sampler = fx.GpuSampler();
-  ::gecko::debug_renderer::DebugRendererContext ctx;
+  // Size the per-frame line buffer for the max sweep we expect
+  // (8000 circles * 32 segments = 256k). This avoids the per-AddLine
+  // overflow warning that would otherwise dominate log.txt.
+  ::gecko::debug_renderer::DebugRendererContext ctx {512u * 1024u};
   if (!ctx.IsValid())
   {
     s.Abort("DebugRendererContext setup failed");
@@ -64,6 +67,10 @@ static void debug_lines_sweep(::gecko::bench::State& s)
 
   for (auto _ : s)
   {
+    // Re-seed every iteration so each frame draws the same scene.
+    // This is what makes runs comparable across changes.
+    ::gecko::SeedRandom(kSeed);
+
     fx.PumpEvents();
     auto frame = fx.BeginFrame();
     if (!frame.Valid)
@@ -123,9 +130,34 @@ static void debug_lines_sweep(::gecko::bench::State& s)
   }
 }
 
-GECKO_BENCH(debug_lines_sweep)
+}  // namespace
+
+/// Static comparison: 60 iters, default bar-chart view.
+static void lines_static(::gecko::bench::State& s)
+{
+  RunDebugLines(s);
+}
+
+GECKO_BENCH(lines_static)
     .Iterations(60)
-    .Warmup(10)
+    .Warmup(100)
+    .MetricLabel(kLabel)
+    .Description("Fixed-seed scene; min/mean/max bar chart for "
+                 "frame_total + cpu_record / cmd_submit / cmd_execute / "
+                 "gpu_draw_lines. Compare across runs to see the impact "
+                 "of a change.");
+
+/// Sweep: how does timing scale with the number of circles drawn?
+static void lines_circle_sweep(::gecko::bench::State& s)
+{
+  RunDebugLines(s);
+}
+
+GECKO_BENCH(lines_circle_sweep)
+    .Iterations(30)
+    .Warmup(100)
     .Sweep("circles", {500, 1000, 2000, 4000, 8000})
-    .Description("Sweep circle count; bar chart of min/mean/p95 per "
-                 "circle count for each metric.");
+    .MetricLabel(kLabel)
+    .Description("Same scene, swept across circle counts. Renders a "
+                 "line chart (mean per run) with a min/max band; the "
+                 "slider below scrubs to a bar view at one count.");
