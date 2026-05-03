@@ -187,7 +187,6 @@ void DebugRendererContext::EndFrame()
     auto& slot = m_FrameSlots[m_CurrentSlot];
     const auto* raw = reinterpret_cast<const ::gecko::byte*>(slot.CPU.data());
     device->UploadBufferData(slot.GPU, {raw, sizeof(Line2D) * m_LineCursor});
-    // device->UploadBufferData(slot.GPU, {raw, sizeof(Line2D) * slot.CPU.size()});
   }
 
   m_FrameUploaded = true;
