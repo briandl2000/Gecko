@@ -74,6 +74,12 @@ HTML = """<!doctype html>
       border: 1px solid #333; padding: 4px 6px; border-radius: 3px;
       font: inherit; cursor: pointer; }}
   .toolbar button.on {{ background: #345; border-color: #456; }}
+  .modebar {{ display: flex; gap: 16px; align-items: center;
+              font-size: 12px; color: #aaa; margin-bottom: 14px;
+              padding: 8px 12px; background: #1a1a1a;
+              border: 1px solid #2a2a2a; border-radius: 4px; }}
+  .modebar label {{ cursor: pointer; user-select: none; }}
+  .modebar input[type=radio] {{ vertical-align: middle; margin-right: 4px; }}
   .src {{ font-size: 11px; padding: 1px 6px; border-radius: 3px; }}
   .src-cpu {{ color: #aaf; background: #1a1a2a; }}
   .src-gpu {{ color: #faa; background: #2a1a1a; }}
@@ -90,6 +96,12 @@ HTML = """<!doctype html>
 <body>
 <h1>{title}</h1>
 <div class="runs">{runs_html}</div>
+<div class="modebar">
+  <span style="color:#888">display:</span>
+  <label><input type="radio" name="mode" value="time" checked onchange="setMode('time')"> time (ns / us / ms / s)</label>
+  <label><input type="radio" name="mode" value="rate" onchange="setMode('rate')"> rate (Hz)</label>
+  <span style="color:#666;margin-left:auto;font-size:11px">time metrics flip to 1/value when in Rate mode</span>
+</div>
 {body}
 <script>
 const CASES = {cases_json};
@@ -130,6 +142,10 @@ function fmtVal(v, unit) {{
 // Pick a presentation unit + scale factor from a metric's raw unit
 // and the geometric mean of its values. Returns {{label, scale}}
 // such that displayValue = rawValue * scale.
+// Returns {{label, transform}} where transform: (rawValue) -> displayValue.
+// Honors the global Time / Rate mode for time-domain metrics (ns).
+// Hz metrics are always shown as Hz (no kHz / MHz auto-scaling, which
+// people find unintuitive when comparing runs).
 function pickUnit(rawUnit, samples) {{
   const xs = samples.filter(v => v != null && isFinite(v) && v > 0);
   let mag = 0;
@@ -139,17 +155,23 @@ function pickUnit(rawUnit, samples) {{
     mag = Math.exp(s / xs.length);
   }}
   if (rawUnit === 'ns') {{
-    if (mag >= 1e9)  return {{ label: 's',  scale: 1e-9 }};
-    if (mag >= 1e6)  return {{ label: 'ms', scale: 1e-6 }};
-    if (mag >= 1e3)  return {{ label: 'us', scale: 1e-3 }};
-    return {{ label: 'ns', scale: 1.0 }};
+    if (MODE.current === 'rate') {{
+      return {{ label: 'Hz',
+               transform: v => (v == null || v === 0) ? null : 1e9 / v }};
+    }}
+    if (mag >= 1e9)  return {{ label: 's',  transform: v => v == null ? null : v * 1e-9 }};
+    if (mag >= 1e6)  return {{ label: 'ms', transform: v => v == null ? null : v * 1e-6 }};
+    if (mag >= 1e3)  return {{ label: 'us', transform: v => v == null ? null : v * 1e-3 }};
+    return {{ label: 'ns', transform: v => v }};
   }}
   if (rawUnit === 'hz') {{
-    if (mag >= 1e6) return {{ label: 'MHz', scale: 1e-6 }};
-    if (mag >= 1e3) return {{ label: 'kHz', scale: 1e-3 }};
-    return {{ label: 'Hz', scale: 1.0 }};
+    if (MODE.current === 'rate') {{
+      return {{ label: 'Hz', transform: v => v }};
+    }}
+    // In Time mode, an Hz metric becomes its period.
+    return {{ label: 'ms', transform: v => (v == null || v === 0) ? null : 1000 / v }};
   }}
-  return {{ label: rawUnit || '', scale: 1.0 }};
+  return {{ label: rawUnit || '', transform: v => v }};
 }}
 
 function collectAll(metric) {{
@@ -172,9 +194,9 @@ function collectAll(metric) {{
   return out;
 }}
 
-function buildBars(metric, scale, axisLabel, logScale, unitLabel) {{
+function buildBars(metric, transform, axisLabel, logScale, unitLabel) {{
   const labels = metric.points.map(p => p.x);
-  const apply = v => (v == null ? null : v * scale);
+  const apply = transform;
   const ds = ['min','mean','max'].map(k => ({{
     label: k,
     data: metric.points.map(p => apply(p[k])),
@@ -205,20 +227,20 @@ function buildBars(metric, scale, axisLabel, logScale, unitLabel) {{
   }};
 }}
 
-function buildBarsAtSweep(metric, sweepIdx, scale, axisLabel, logScale, unitLabel) {{
+function buildBarsAtSweep(metric, sweepIdx, transform, axisLabel, logScale, unitLabel) {{
   const points = metric.runs.map(r => ({{
     x: r.run,
     min: r.min[sweepIdx],
     mean: r.mean[sweepIdx],
     max: r.max[sweepIdx],
   }}));
-  return buildBars({{ points }}, scale, axisLabel, logScale, unitLabel);
+  return buildBars({{ points }}, transform, axisLabel, logScale, unitLabel);
 }}
 
-function buildLines(metric, scale, axisLabel, logScale, unitLabel) {{
+function buildLines(metric, transform, axisLabel, logScale, unitLabel) {{
   const labels = metric.sweep_values;
   const palette = {palette_json};
-  const apply = v => (v == null ? null : v * scale);
+  const apply = transform;
   const datasets = metric.runs.map((r) => {{
     const c = colorForRun(r.run, palette);
     return {{
@@ -260,6 +282,12 @@ function buildLines(metric, scale, axisLabel, logScale, unitLabel) {{
 const ACTIVE = {{}};
 const DRILL = {{}};
 const LOG_STATE = {{}};
+const MODE = {{ current: 'time' }};
+
+function setMode(m) {{
+  MODE.current = m;
+  for (const id of Object.keys(CASES)) renderMetric(id);
+}}
 
 function toggleLog(caseId) {{
   LOG_STATE[caseId] = !LOG_STATE[caseId];
@@ -285,8 +313,8 @@ function renderMetric(caseId) {{
   const log = !!LOG_STATE[caseId];
   ACTIVE[caseId] = new Chart(ctx.getContext('2d'),
     c.view === 'lines'
-      ? buildLines(m, u.scale, axisLabel, log, u.label)
-      : buildBars(m, u.scale, axisLabel, log, u.label));
+      ? buildLines(m, u.transform, axisLabel, log, u.label)
+      : buildBars(m, u.transform, axisLabel, log, u.label));
   if (c.view === 'lines') renderDrill(caseId);
 }}
 
@@ -305,7 +333,7 @@ function renderDrill(caseId) {{
   const u = pickUnit(m.unit, collectAll(m));
   const log = !!LOG_STATE[caseId];
   DRILL[caseId] = new Chart(ctx.getContext('2d'),
-    buildBarsAtSweep(m, idx, u.scale, u.label, log, u.label));
+    buildBarsAtSweep(m, idx, u.transform, u.label, log, u.label));
 }}
 
 for (const id of Object.keys(CASES)) renderMetric(id);
