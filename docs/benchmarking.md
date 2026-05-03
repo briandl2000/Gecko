@@ -400,6 +400,96 @@ metric dropdown that switches the Y axis between linear and
 logarithmic -- useful when sweep values span orders of magnitude
 (e.g. 0.8 ms at 500 circles vs 5.3 ms at 8000).
 
+## Workflow: using a bench during development
+
+The harness is built around a "pin a baseline, then iterate" loop. The
+typical session looks like:
+
+1. **Pin a baseline before you start.** Get the current code into a
+   state you trust (visually correct, tests pass), then capture it:
+
+   ```bash
+   gk bench run debug_renderer -o baseline
+   ```
+
+   `bench_results/<program>/` is gitignored, so if you want a
+   long-lived baseline (e.g. the numbers a doc/PR refers to), copy
+   it next to the bench source or into a `line_renderer/` style
+   subfolder under `bench_results/<program>/`.
+
+2. **Make your change.** Verify visually first -- a "faster" result
+   that draws the wrong thing isn't faster (see the cautionary tale
+   below).
+
+3. **Run the change under the same name scheme:**
+
+   ```bash
+   gk bench run debug_renderer -o my_change
+   gk bench results debug_renderer        # opens HTML report
+   ```
+
+   The report stacks every run side-by-side. Use the metric dropdown
+   to flip between `frame_total`, `cmd_submit`, GPU timers, and your
+   custom counters; toggle `log` for sweep cases that span orders of
+   magnitude.
+
+4. **Promote when it sticks.** If the win holds up across a couple of
+   runs, overwrite the pinned baseline:
+
+   ```bash
+   gk bench run debug_renderer -o baseline
+   ```
+
+   If it doesn't hold up, revert the change and the pinned baseline
+   is still there to compare the next attempt against.
+
+### Reading the numbers (and noise)
+
+Real measurements on a desktop OS are noisy. Trust **`mean`** and
+**`p50`** for trend; treat **`max`** as worst-case-observed, not a
+regression signal -- a single page fault, IRQ, or compositor wakeup
+will spike the max without changing the underlying perf.
+
+Rough expectations on a normal desktop:
+
+| metric class                  | typical CV (stddev/mean) |
+|-------------------------------|--------------------------|
+| GPU timer scopes              | < 5 % (very tight)       |
+| `frame_total`, `cmd_submit`   | 5 - 15 %                 |
+| Small CPU scopes (~10s of µs) | 15 - 35 % (noise-bound)  |
+
+Small CPU scopes look bad as a percentage but the absolute swing is
+tens of microseconds -- a few cache misses or a scheduler hiccup. A
+real regression shows up as a shift in **`mean`** *and* **`p50`**
+together across multiple runs, not as a one-off `max` spike.
+
+If you ever need tighter numbers (regression hunt, paper-quality
+comparison):
+
+- Pin the bench to a single core: `taskset -c 3 gk bench run ...`.
+- Set the CPU governor to `performance` and disable turbo so the
+  clock doesn't wander.
+- Run on a TTY or with the compositor off so Wayland/X11 wakeups
+  don't sneak in.
+- Bump `--iters` so jitter averages out.
+
+For day-to-day "did my change help?" the defaults are fine.
+
+### Cautionary tale: always look at the picture
+
+The bench will happily report that broken code is faster than correct
+code. While developing the line renderer's `EndFrame` upload, the
+"baseline" passed `slot.CPU.size()` (a `std::vector<Line2D>::size()`,
+i.e. **elements**) as the byte count of an `UploadBufferData` span.
+That made the "baseline" upload a fixed `lineCapacity` *bytes*
+regardless of how many lines were recorded -- truncated geometry on
+screen, but a smaller copy on the wire. The "fix" (`sizeof(Line2D) *
+m_LineCursor`) uploaded the correct byte range and looked *slower* in
+the bench at every non-trivial scene size.
+
+The lesson: before comparing two runs, confirm both produce the same
+visual output. The bench measures what you ran, not what you meant.
+
 ## What's NOT here
 
 - **Memory tracking**: `IAllocator` and `gecko::TrackingAllocator`
