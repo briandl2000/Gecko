@@ -81,6 +81,8 @@ GraphicsFixture::GraphicsFixture(const GraphicsFixtureConfig& cfg) noexcept
     return;
   }
 
+  m_GpuSampler = ::gecko::graphics::GetGpuSampler();
+
   m_Valid = true;
 }
 

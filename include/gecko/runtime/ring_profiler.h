@@ -78,7 +78,7 @@ public:
   using IProfiler::WatchScope;
 
   /// Drain all pending events to sinks synchronously.
-  void Flush() noexcept;
+  void Flush() noexcept override;
 
   /// When `false`, `Emit()` will not auto-schedule the consumer drain;
   /// callers must invoke `Flush()` explicitly (or rely on `Shutdown`'s

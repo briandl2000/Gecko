@@ -5,7 +5,11 @@ if(NOT GECKO_GLSLC)
   return()
 endif()
 
-add_executable(bench_debug_renderer bench_debug_renderer.cpp)
+# Glob all test_*.cpp files so adding a new variation only requires
+# dropping a new file alongside the others.
+file(GLOB _BENCH_SRCS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp")
+
+add_executable(bench_debug_renderer ${_BENCH_SRCS})
 
 target_link_libraries(bench_debug_renderer
   PRIVATE

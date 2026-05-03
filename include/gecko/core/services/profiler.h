@@ -139,6 +139,12 @@ struct IProfiler
   virtual bool Init() noexcept = 0;
   virtual void Shutdown() noexcept = 0;
 
+  /// Drain all pending events to registered sinks synchronously and
+  /// flush each sink. Implementations with no async ring may no-op.
+  /// Used by tests / benchmarks that need deterministic delivery.
+  virtual void Flush() noexcept
+  {}
+
   // Trace output gate. When false, sinks receive nothing (file/network
   // writes pause), but the in-process aggregator keeps tracking -- query
   // GetStats() to read live timings. Default: true.

@@ -1,8 +1,14 @@
 /// @file
 /// `gecko::bench` harness implementation.
+///
+/// Per-iteration metrics come from the profiler. The harness installs
+/// an `IProfilerSink` that captures every ZoneBegin/ZoneEnd event, and
+/// after the iteration loop ends, bins each matched zone by its begin
+/// timestamp into the iteration window it belongs to. This means any
+/// `GECKO_PROFILE_*` or `GECKO_GPU_PROF_SCOPE` opened inside an
+/// iteration becomes a metric in the JSON output.
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -13,6 +19,7 @@
 #include <gecko/bench/bench.h>
 #include <gecko/core/labels.h>
 #include <gecko/core/services/log.h>
+#include <gecko/core/services/profiler.h>
 #include <gecko/core/utility/time.h>
 #include <map>
 #include <sstream>
@@ -24,12 +31,6 @@ namespace gecko::bench {
 namespace {
 
 constexpr ::gecko::Label kBenchLabel = ::gecko::MakeLabel("gecko.bench");
-
-struct SectionAgg
-{
-  ::gecko::u64 TotalNs {0};
-  ::gecko::u32 Count {0};
-};
 
 struct ArgAxis
 {
@@ -48,16 +49,65 @@ public:
   ::gecko::u32 Iterations {100};
   ::gecko::u32 Warmup {5};
   ::std::vector<ArgAxis> Sweeps;
+  View ViewHint {View::Auto};
 };
+
+namespace {
+
+/// One zone matched from a ZoneBegin/ZoneEnd pair.
+struct CapturedZone
+{
+  ::std::string Name;  ///< Stable copy of event name.
+  ::gecko::ProfSource Source {::gecko::ProfSource::CPU};
+  ::gecko::u64 BeginNs {0};  ///< Begin timestamp (used for iter binning).
+  ::gecko::u64 DurationNs {0};
+  ::gecko::u32 ThreadId {0};
+};
+
+/// Open zone tracked between ZoneBegin and ZoneEnd, keyed by
+/// (ThreadId, Source). LIFO match.
+struct OpenZone
+{
+  ::std::string Name;
+  ::gecko::u32 ThreadId {0};
+  ::gecko::ProfSource Source {::gecko::ProfSource::CPU};
+  ::gecko::u64 BeginNs {0};
+};
+
+}  // namespace
 
 struct State::Impl
 {
   Case* Owner {nullptr};
-  ::std::vector<::gecko::u64> SampleNs;  ///< Per-iteration totals.
-  ::std::map<::std::string, SectionAgg> Sections;
-  ::std::map<::std::string, ::gecko::i64> Counters;
+  // Sweep args active for this point.
   ::std::map<::std::string, ::gecko::i64> ArgValues;
+
+  // Iteration windows: for each measured iteration, the [start, end]
+  // monotonic timestamp range. Used to bin profiler events.
+  ::std::vector<::gecko::u64> IterStartNs;
+  ::std::vector<::gecko::u64> IterEndNs;
+
+  // Profiler-captured zones during the iteration loop. Filled by sink.
+  ::std::vector<CapturedZone> Zones;
+
+  // Stack of open zones, keyed by (ThreadId<<1 | source).
+  ::std::map<::gecko::u64, ::std::vector<OpenZone>> OpenStacks;
+
   ::std::string AbortReason;
+  bool Aborted {false};
+  bool Started {false};
+  ::gecko::u32 Index {0};       ///< Current iteration (incl. warmup).
+  ::gecko::u32 TotalIters {0};  ///< Iterations + Warmup.
+  ::gecko::u32 WarmupIters {0};
+  ::gecko::u64 CurIterStartNs {0};
+
+  // Profiler hookup -- installed lazily when the user enters the
+  // for-loop (by which time the Engine/Profiler is up).
+  ::gecko::IProfiler* Prof {nullptr};
+  void* Sink {nullptr};  ///< type-erased BenchSink*
+  ::gecko::ProfLevel SavedLevel {::gecko::ProfLevel::Normal};
+  ::gecko::u32 SavedSampleRate {1};
+  bool ProfInstalled {false};
 };
 
 namespace {
@@ -67,6 +117,63 @@ namespace {
   static ::std::vector<Case*> r;
   return r;
 }
+
+/// Sink that captures ZoneBegin/ZoneEnd pairs into the active state.
+class BenchSink final : public ::gecko::IProfilerSink
+{
+public:
+  explicit BenchSink(State::Impl& impl) noexcept : m_Impl(impl)
+  {}
+
+  void Write(const ::gecko::ProfEvent& ev) noexcept override
+  {
+    if (ev.Kind != ::gecko::ProfEventKind::ZoneBegin &&
+        ev.Kind != ::gecko::ProfEventKind::ZoneEnd)
+      return;
+
+    const ::gecko::u64 key = (static_cast<::gecko::u64>(ev.ThreadId) << 1) |
+                             static_cast<::gecko::u64>(ev.Source);
+
+    if (ev.Kind == ::gecko::ProfEventKind::ZoneBegin)
+    {
+      auto& stack = m_Impl.OpenStacks[key];
+      OpenZone z;
+      z.Name = ev.Name ? ev.Name : "";
+      z.ThreadId = ev.ThreadId;
+      z.Source = ev.Source;
+      z.BeginNs = ev.TimestampNs;
+      stack.push_back(::std::move(z));
+    }
+    else  // ZoneEnd
+    {
+      auto it = m_Impl.OpenStacks.find(key);
+      if (it == m_Impl.OpenStacks.end() || it->second.empty())
+        return;
+      OpenZone z = ::std::move(it->second.back());
+      it->second.pop_back();
+
+      CapturedZone cz;
+      cz.Name = ::std::move(z.Name);
+      cz.Source = z.Source;
+      cz.BeginNs = z.BeginNs;
+      cz.DurationNs = ev.TimestampNs - z.BeginNs;
+      cz.ThreadId = z.ThreadId;
+      m_Impl.Zones.push_back(::std::move(cz));
+    }
+  }
+
+  void WriteBatch(::gecko::Span<const ::gecko::ProfEvent> evs) noexcept override
+  {
+    for (const auto& ev : evs)
+      Write(ev);
+  }
+
+  void Flush() noexcept override
+  {}
+
+private:
+  State::Impl& m_Impl;
+};
 
 }  // namespace
 
@@ -101,6 +208,11 @@ Builder& Builder::Sweep(const char* name,
   m_Case->Sweeps.push_back(::std::move(axis));
   return *this;
 }
+Builder& Builder::ViewHint(View v) noexcept
+{
+  m_Case->ViewHint = v;
+  return *this;
+}
 
 Builder Register(const char* fnName, CaseFn fn) noexcept
 {
@@ -112,16 +224,6 @@ Builder Register(const char* fnName, CaseFn fn) noexcept
 }
 
 // ---- State -----------------------------------------------------------------
-
-State::Iterator State::begin() noexcept
-{
-  StartFirstIter();
-  return Iterator {this};
-}
-State::Iterator State::end() noexcept
-{
-  return Iterator {nullptr};
-}
 
 ::gecko::i64 State::Arg(const char* name) const noexcept
 {
@@ -138,50 +240,111 @@ State::Iterator State::end() noexcept
 
 void State::Abort(const char* reason) noexcept
 {
-  m_Aborted = true;
-  if (m_Impl && reason)
+  if (!m_Impl)
+    return;
+  m_Impl->Aborted = true;
+  if (reason)
     m_Impl->AbortReason = reason;
 }
 
-void State::Counter(const char* name, ::gecko::i64 value) noexcept
+::gecko::u32 State::Index() const noexcept
 {
-  if (m_Impl && name)
-    m_Impl->Counters[name] = value;
+  if (!m_Impl)
+    return 0;
+  return m_Impl->Index >= m_Impl->WarmupIters
+             ? m_Impl->Index - m_Impl->WarmupIters
+             : 0;
 }
 
-void State::StartFirstIter() noexcept
+::gecko::u32 State::Iterations() const noexcept
 {
-  m_Started = true;
-  m_Index = 0;
-  m_IterStartNs = ::gecko::HighResTimeNs();
+  return m_Impl ? (m_Impl->TotalIters - m_Impl->WarmupIters) : 0;
 }
 
-void State::NextIter() noexcept
+bool State::IsWarmup() const noexcept
 {
-  const ::gecko::u64 endNs = ::gecko::HighResTimeNs();
-  if (m_Started && m_Impl && !m_Aborted)
+  return m_Impl && m_Impl->Index < m_Impl->WarmupIters;
+}
+
+State::Iterator State::begin() noexcept
+{
+  if (m_Impl)
   {
-    if (m_Index >= m_Warmup)
-      m_Impl->SampleNs.push_back(endNs - m_IterStartNs);
+    // Lazy profiler hookup: by the time we hit begin(), the user fn
+    // has constructed any Engine/Module dependencies it needs.
+    if (!m_Impl->ProfInstalled)
+    {
+      auto* prof = ::gecko::GetProfiler();
+      if (prof)
+      {
+        m_Impl->Prof = prof;
+        m_Impl->SavedLevel = prof->GetMinLevel();
+        m_Impl->SavedSampleRate = prof->GetDetailedSampleRate();
+        prof->SetMinLevel(::gecko::ProfLevel::Detailed);
+        prof->SetDetailedSampleRate(1);
+        prof->Flush();
+        auto* sink = new BenchSink(*m_Impl);
+        m_Impl->Sink = sink;
+        prof->AddSink(sink);
+        m_Impl->ProfInstalled = true;
+      }
+    }
+    m_Impl->Started = true;
+    m_Impl->Index = 0;
+    m_Impl->CurIterStartNs = ::gecko::MonotonicTimeNs();
   }
-  ++m_Index;
-  m_IterStartNs = ::gecko::HighResTimeNs();
+  return Iterator {this};
 }
 
-State::ScopedSection::ScopedSection(State& s, const char* name) noexcept
-    : m_State(s), m_Name(name), m_StartNs(::gecko::HighResTimeNs())
-{}
-State::ScopedSection::~ScopedSection() noexcept
+State::Iterator State::end() noexcept
 {
-  if (!m_State.m_Impl || !m_Name)
-    return;
-  // Skip warmup iterations.
-  if (m_State.m_Index < m_State.m_Warmup)
-    return;
-  const ::gecko::u64 endNs = ::gecko::HighResTimeNs();
-  auto& agg = m_State.m_Impl->Sections[m_Name];
-  agg.TotalNs += (endNs - m_StartNs);
-  agg.Count += 1;
+  return Iterator {nullptr};
+}
+
+State::Iterator& State::Iterator::operator++() noexcept
+{
+  if (!S || !S->m_Impl)
+    return *this;
+  auto* impl = S->m_Impl;
+  const ::gecko::u64 endNs = ::gecko::MonotonicTimeNs();
+
+  if (impl->Started && !impl->Aborted)
+  {
+    if (impl->Index >= impl->WarmupIters)
+    {
+      impl->IterStartNs.push_back(impl->CurIterStartNs);
+      impl->IterEndNs.push_back(endNs);
+    }
+  }
+  ++impl->Index;
+  impl->CurIterStartNs = ::gecko::MonotonicTimeNs();
+  return *this;
+}
+
+bool State::Iterator::operator!=(const Iterator& other) const noexcept
+{
+  if (!S)
+    return false;  // we're 'end' sentinel
+  if (!S->m_Impl)
+    return false;
+  auto* impl = S->m_Impl;
+  const bool more =
+      !impl->Aborted && impl->Index < impl->TotalIters && other.S == nullptr;
+  if (!more && impl->ProfInstalled && impl->Prof)
+  {
+    // Loop is exiting: drain & detach sink while the profiler/engine
+    // are still alive (the fixture goes out of scope right after).
+    impl->Prof->Flush();
+    auto* sink = static_cast<BenchSink*>(impl->Sink);
+    impl->Prof->RemoveSink(sink);
+    impl->Prof->SetMinLevel(impl->SavedLevel);
+    impl->Prof->SetDetailedSampleRate(impl->SavedSampleRate);
+    delete sink;
+    impl->Sink = nullptr;
+    impl->Prof = nullptr;
+    impl->ProfInstalled = false;  // already torn down
+  }
+  return more;
 }
 
 // ---- Stats / runner --------------------------------------------------------
@@ -213,7 +376,6 @@ Stats ComputeStats(const ::std::vector<::gecko::u64>& samples)
   s.Mean = sum / sorted.size();
   s.P50 = sorted[sorted.size() / 2];
   s.P95 = sorted[(sorted.size() * 95) / 100];
-  // Stddev:
   double meanD = static_cast<double>(s.Mean);
   double acc = 0.0;
   for (auto v : sorted)
@@ -290,6 +452,98 @@ Stats ComputeStats(const ::std::vector<::gecko::u64>& samples)
 #endif
 }
 
+const char* SourceStr(::gecko::ProfSource s)
+{
+  return s == ::gecko::ProfSource::GPU ? "gpu" : "cpu";
+}
+
+const char* ViewStr(View v, bool hasSweep)
+{
+  switch (v)
+  {
+  case View::Lines:
+    return "lines";
+  case View::Bars:
+    return "bars";
+  case View::Auto:
+  default:
+    return hasSweep ? "bars" : "lines";
+  }
+}
+
+/// Bin captured zones by iteration. Each iter gets a map of
+/// metric name -> list of durations summed per iter (multiple events
+/// with same name in one iter are summed).
+struct PerIterMetrics
+{
+  // metricKey = "name|source"; samples[iter] = total ns for that metric
+  // in that iter (0 if no event).
+  ::std::map<::std::string,
+             ::std::pair<::gecko::ProfSource, ::std::vector<::gecko::u64>>>
+      Metrics;
+};
+
+PerIterMetrics BinZones(const State::Impl& impl)
+{
+  PerIterMetrics out;
+  const size_t N = impl.IterStartNs.size();
+  if (N == 0)
+    return out;
+
+  // Find the iter index a timestamp belongs to via binary search on
+  // IterStartNs. The window is [IterStartNs[i], IterEndNs[i]]. For
+  // GPU events whose Begin TS may slip slightly into the next iter,
+  // we still attribute by Begin -- close enough.
+  for (const auto& z : impl.Zones)
+  {
+    // find iter window that contains z.BeginNs
+    auto it = ::std::upper_bound(impl.IterStartNs.begin(),
+                                 impl.IterStartNs.end(), z.BeginNs);
+    if (it == impl.IterStartNs.begin())
+      continue;
+    size_t i = static_cast<size_t>(it - impl.IterStartNs.begin() - 1);
+    if (i >= N)
+      continue;
+    if (z.BeginNs > impl.IterEndNs[i])
+    {
+      // GPU event resolved after the iter ended but before the next
+      // iter started -- still attribute to iter i.
+      // No-op; fall through.
+    }
+    auto& entry = out.Metrics[z.Name];
+    entry.first = z.Source;
+    if (entry.second.size() < N)
+      entry.second.resize(N, 0);
+    entry.second[i] += z.DurationNs;
+  }
+  return out;
+}
+
+void EmitMetric(::std::ostream& json, bool& first, const ::std::string& name,
+                ::gecko::ProfSource source,
+                const ::std::vector<::gecko::u64>& samples)
+{
+  if (!first)
+    json << ",";
+  first = false;
+  Stats st = ComputeStats(samples);
+  json << "\n        \"" << EscapeJson(name) << "\": {";
+  json << "\"source\": \"" << SourceStr(source) << "\"";
+  json << ", \"stats_ns\": {";
+  json << "\"min\": " << st.Min << ", \"max\": " << st.Max
+       << ", \"mean\": " << st.Mean << ", \"p50\": " << st.P50
+       << ", \"p95\": " << st.P95
+       << ", \"stddev\": " << static_cast<::gecko::u64>(st.Stddev) << "}";
+  json << ", \"samples_ns\": [";
+  for (size_t i = 0; i < samples.size(); ++i)
+  {
+    if (i)
+      json << ",";
+    json << samples[i];
+  }
+  json << "]}";
+}
+
 void RunOneInvocation(Case& c,
                       const ::std::map<::std::string, ::gecko::i64>& args,
                       ::std::ostream& json, bool& firstInvocation)
@@ -297,22 +551,38 @@ void RunOneInvocation(Case& c,
   State::Impl impl;
   impl.Owner = &c;
   impl.ArgValues = args;
+  impl.TotalIters = c.Iterations + c.Warmup;
+  impl.WarmupIters = c.Warmup;
 
   State s;
   s.m_Impl = &impl;
-  s.m_Total = c.Iterations + c.Warmup;
-  s.m_Warmup = c.Warmup;
 
   GECKO_INFO(kBenchLabel, "  running '{}' ({} warmup + {} iter)", c.Name,
              c.Warmup, c.Iterations);
 
   c.Fn(s);
 
-  // If the user used the for-range, NextIter() runs after each iteration
-  // and the last sample is captured. If the user didn't use the for-range
-  // at all, sample list will be empty -- record that as an aborted case.
+  // Belt-and-suspenders: if the loop never ran (no iterations), tear
+  // the sink down here. Normal path: cleanup already happened inside
+  // the iterator when the for-loop exited.
+  if (impl.ProfInstalled && impl.Prof)
+  {
+    impl.Prof->Flush();
+    auto* sink = static_cast<BenchSink*>(impl.Sink);
+    impl.Prof->RemoveSink(sink);
+    impl.Prof->SetMinLevel(impl.SavedLevel);
+    impl.Prof->SetDetailedSampleRate(impl.SavedSampleRate);
+    delete sink;
+    impl.Sink = nullptr;
+  }
 
-  Stats st = ComputeStats(impl.SampleNs);
+  // Build per-iter metrics. Always emit synthetic 'frame_total' from
+  // the harness's own timing (CPU).
+  PerIterMetrics metrics = BinZones(impl);
+  ::std::vector<::gecko::u64> frameTotal;
+  frameTotal.reserve(impl.IterStartNs.size());
+  for (size_t i = 0; i < impl.IterStartNs.size(); ++i)
+    frameTotal.push_back(impl.IterEndNs[i] - impl.IterStartNs[i]);
 
   if (!firstInvocation)
     json << ",";
@@ -335,58 +605,22 @@ void RunOneInvocation(Case& c,
   }
   json << "}";
 
-  // Stats (ns)
-  json << ",\n      \"iterations\": " << impl.SampleNs.size();
-  json << ",\n      \"stats_ns\": {";
-  json << "\"min\": " << st.Min << ", \"max\": " << st.Max;
-  json << ", \"mean\": " << st.Mean << ", \"p50\": " << st.P50;
-  json << ", \"p95\": " << st.P95
-       << ", \"stddev\": " << static_cast<::gecko::u64>(st.Stddev);
-  json << "}";
+  json << ",\n      \"iterations\": " << impl.IterStartNs.size();
+  json << ",\n      \"view\": \"" << ViewStr(c.ViewHint, !c.Sweeps.empty())
+       << "\"";
 
-  // Sections
-  json << ",\n      \"sections\": {";
-  bool firstS = true;
-  for (auto& [k, agg] : impl.Sections)
+  // Metrics map.
+  json << ",\n      \"metrics\": {";
+  bool firstM = true;
+  EmitMetric(json, firstM, "frame_total", ::gecko::ProfSource::CPU, frameTotal);
+  for (auto& [name, entry] : metrics.Metrics)
   {
-    if (!firstS)
-      json << ", ";
-    firstS = false;
-    ::gecko::u64 mean = agg.Count ? (agg.TotalNs / agg.Count) : 0;
-    json << "\"" << EscapeJson(k) << "\": {";
-    json << "\"count\": " << agg.Count;
-    json << ", \"total_ns\": " << agg.TotalNs;
-    json << ", \"mean_ns\": " << mean;
-    json << "}";
+    EmitMetric(json, firstM, name, entry.first, entry.second);
   }
-  json << "}";
-
-  // Counters
-  json << ",\n      \"counters\": {";
-  bool firstC = true;
-  for (auto& [k, v] : impl.Counters)
-  {
-    if (!firstC)
-      json << ", ";
-    firstC = false;
-    json << "\"" << EscapeJson(k) << "\": " << v;
-  }
-  json << "}";
-
-  // Samples (raw, optional but useful for graphs)
-  json << ",\n      \"samples_ns\": [";
-  for (size_t i = 0; i < impl.SampleNs.size(); ++i)
-  {
-    if (i)
-      json << ",";
-    json << impl.SampleNs[i];
-  }
-  json << "]";
+  json << "\n      }";
 
   if (!impl.AbortReason.empty())
-  {
     json << ",\n      \"aborted\": \"" << EscapeJson(impl.AbortReason) << "\"";
-  }
 
   json << "\n    }";
 }
@@ -398,7 +632,6 @@ void RunCase(Case& c, ::std::ostream& json, bool& firstInvocation)
     RunOneInvocation(c, {}, json, firstInvocation);
     return;
   }
-  // Cartesian product of sweep axes.
   ::std::vector<size_t> idx(c.Sweeps.size(), 0);
   for (;;)
   {
@@ -407,7 +640,6 @@ void RunCase(Case& c, ::std::ostream& json, bool& firstInvocation)
       args[c.Sweeps[a].Name] = c.Sweeps[a].Values[idx[a]];
     RunOneInvocation(c, args, json, firstInvocation);
 
-    // Advance.
     size_t a = 0;
     for (; a < c.Sweeps.size(); ++a)
     {
@@ -426,12 +658,12 @@ void PrintHelp(const char* prog)
       "Usage: %s [options]\n"
       "  --case <name>   Run only the case with this name (default: all)\n"
       "  --list          List registered cases and exit\n"
-      "  --out <path>    Write JSON results to <path> (default: stdout only)\n"
+      "  --out <path>    Write JSON results to <path>\n"
       "  --iters <n>     Override measured iteration count for all cases\n"
       "  --warmup <n>    Override warmup iteration count for all cases\n"
-      "  --program <id>  Program identifier recorded in JSON meta (default: "
-      "exe basename)\n"
-      "  --git <hash>    Git hash recorded in JSON meta (default: \"\")\n"
+      "  --program <id>  Program identifier in JSON meta (default: exe "
+      "basename)\n"
+      "  --git <hash>    Git hash recorded in JSON meta\n"
       "  --help          Show this help and exit\n",
       prog);
 }
@@ -490,14 +722,12 @@ int Main(int argc, char** argv) noexcept
     return 0;
   }
 
-  // Default program id = exe basename.
   ::std::string defaultProg;
   if (!programId)
   {
     ::std::string exe = argv[0] ? argv[0] : "bench";
     auto slash = exe.find_last_of("/\\");
     defaultProg = (slash == ::std::string::npos) ? exe : exe.substr(slash + 1);
-    // Strip .exe if present.
     if (defaultProg.size() >= 4 &&
         defaultProg.compare(defaultProg.size() - 4, 4, ".exe") == 0)
       defaultProg.resize(defaultProg.size() - 4);

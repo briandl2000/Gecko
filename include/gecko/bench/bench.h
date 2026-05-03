@@ -3,38 +3,46 @@
 /// @file
 /// `gecko::bench` -- minimal benchmark harness for Gecko.
 ///
-/// Each benchmark binary links `Gecko::Bench` (the harness lib) and
-/// `Gecko::BenchMain` (which provides `main()`). Cases are registered
-/// at static-init time via `GECKO_BENCH(fn)`:
+/// Each benchmark binary links `Gecko::Bench` and `Gecko::BenchMain`.
+/// Cases register at static-init via `GECKO_BENCH(fn)`:
 ///
 /// @code
 ///   #include <gecko/bench/bench.h>
+///   #include <gecko/core/scope.h>
 ///
-///   static void DebugLines(::gecko::bench::State& s)
+///   static void DrawLines(::gecko::bench::State& s)
 ///   {
-///       // Setup runs once (excluded from timing).
-///       MyContext ctx;
+///       MyCtx ctx;          // setup runs once (not timed)
 ///       ctx.Init();
 ///
-///       for (auto _ : s)              // Each iteration is timed.
+///       for (auto _ : s)    // each loop = one timed iteration
 ///       {
-///           ctx.DoWork();
+///           {
+///               GECKO_PROFILE_NORMAL_NAMED(::gecko::Label{}, "cpu_record");
+///               ctx.RecordWork();
+///           }
+///           {
+///               GECKO_PROFILE_NORMAL_NAMED(::gecko::Label{}, "cmd_submit");
+///               ctx.SubmitWork();
+///           }
 ///       }
-///       // Teardown runs once after the loop.
 ///   }
-///   GECKO_BENCH(DebugLines)
-///       .Iterations(100)
-///       .Warmup(5);
+///   GECKO_BENCH(DrawLines).Iterations(100).Warmup(5);
 /// @endcode
 ///
-/// Multi-axis sweeps:
+/// Sub-timings come from the profiler. ANY scope opened with
+/// `GECKO_PROFILE_*` (cpu) or `GECKO_GPU_PROF_SCOPE` (gpu) inside an
+/// iteration becomes its own metric in the JSON output. The harness
+/// also auto-records `frame_total` per iteration.
+///
+/// Multi-axis sweeps (Cartesian product):
 /// @code
-///   static void ManyLines(::gecko::bench::State& s)
-///   {
-///       const ::gecko::i64 count = s.Arg("count");
-///       for (auto _ : s) { /* draw `count` lines */ }
+///   static void BvhRotate(::gecko::bench::State& s) {
+///       const i64 angle = s.Arg("angle");
+///       MyBvh bvh; bvh.SetCameraAngle(angle);
+///       for (auto _ : s) bvh.Render();
 ///   }
-///   GECKO_BENCH(ManyLines).Sweep("count", {100, 1000, 10000, 100000});
+///   GECKO_BENCH(BvhRotate).Sweep("angle", {0, 45, 90, 135, 180});
 /// @endcode
 
 #include <gecko/core/api.h>
@@ -43,23 +51,12 @@
 
 namespace gecko::bench {
 
-/// One sub-timing slice recorded inside an iteration via
-/// `ScopedSection` (e.g. "cmd_record", "draw_dispatch"). Aggregated
-/// per-section across iterations and reported alongside the total.
-struct Section
-{
-  const char* Name {nullptr};
-  ::gecko::u64 TotalNs {0};
-  ::gecko::u32 Count {0};
-};
+class Case;  // opaque, defined in .cpp
 
-/// Per-case state object passed to bench functions. Driven by the
-/// harness; not constructible by users.
+/// Per-case state passed to bench functions.
 class State
 {
 public:
-  /// Range-for support: `for (auto _ : s) { ... }` iterates one
-  /// timed iteration per loop body, auto-tracking start/stop.
   struct Iterator
   {
     State* S {nullptr};
@@ -67,127 +64,76 @@ public:
     {
       return 0;
     }
-    Iterator& operator++() noexcept
-    {
-      S->NextIter();
-      return *this;
-    }
-    bool operator!=(const Iterator& other) const noexcept
-    {
-      return S != nullptr && S->m_Index < S->m_Total && !S->m_Aborted &&
-             other.S == nullptr;
-    }
+    Iterator& operator++() noexcept;
+    bool operator!=(const Iterator& other) const noexcept;
   };
 
   GECKO_API Iterator begin() noexcept;
   GECKO_API Iterator end() noexcept;
 
-  /// Lookup a sweep argument by name. Aborts the case with a warning
-  /// if the name was not registered via `.Sweep(...)`.
+  /// Sweep value for the current point. Aborts case if `name` was not
+  /// registered via `.Sweep(...)` on the builder.
   [[nodiscard]] GECKO_API ::gecko::i64 Arg(const char* name) const noexcept;
 
-  /// Iteration index in `[0, Iterations())` (only meaningful inside
-  /// the loop body).
-  [[nodiscard]] ::gecko::u32 Index() const noexcept
-  {
-    return m_Index;
-  }
+  /// Current measured iteration index in `[0, Iterations())`.
+  [[nodiscard]] GECKO_API ::gecko::u32 Index() const noexcept;
 
-  /// Total iterations the harness is going to run for this case
-  /// (warmup excluded).
-  [[nodiscard]] ::gecko::u32 Iterations() const noexcept
-  {
-    return m_Total;
-  }
+  /// Total measured iterations (warmup excluded).
+  [[nodiscard]] GECKO_API ::gecko::u32 Iterations() const noexcept;
 
   /// Abort the case from inside the loop. Remaining iterations are
-  /// skipped; no result is recorded.
+  /// skipped; no result is recorded for the current point.
   GECKO_API void Abort(const char* reason) noexcept;
 
-  /// Record a custom counter value sampled at the current iteration
-  /// (e.g. lines submitted, MB uploaded). Reported in the JSON.
-  GECKO_API void Counter(const char* name, ::gecko::i64 value) noexcept;
+  /// True if the harness is in a warmup iteration (samples discarded).
+  [[nodiscard]] GECKO_API bool IsWarmup() const noexcept;
 
-  /// RAII helper: time a sub-section of the iteration. The section
-  /// total is reported as a separate stat. Does not stop or replace
-  /// the per-iteration timer.
-  class GECKO_API ScopedSection
-  {
-  public:
-    ScopedSection(State& s, const char* name) noexcept;
-    ~ScopedSection() noexcept;
-    ScopedSection(const ScopedSection&) = delete;
-    ScopedSection& operator=(const ScopedSection&) = delete;
-
-  private:
-    State& m_State;
-    const char* m_Name;
-    ::gecko::u64 m_StartNs;
-  };
-
-  // Internal -- driven by the harness. Stable across translation units.
-  GECKO_API void NextIter() noexcept;
-  GECKO_API void StartFirstIter() noexcept;
-
-  // Internals exposed through opaque pimpl in bench.cpp; keep struct
-  // POD-light here so user code can pass `State&` cheaply.
+  // Internals: harness uses these. User code should not.
   struct Impl;
   Impl* m_Impl {nullptr};
-  ::gecko::u32 m_Index {0};
-  ::gecko::u32 m_Total {0};
-  ::gecko::u32 m_Warmup {0};
-  bool m_Started {false};
-  bool m_Aborted {false};
-  ::gecko::u64 m_IterStartNs {0};
 };
 
-/// Function signature of a bench case.
 using CaseFn = void (*)(State&);
 
-/// Builder returned by `GECKO_BENCH(fn)` for fluent configuration.
-/// All setters return `*this` so they can be chained.
+/// View hint for the report generator.
+enum class View : ::gecko::u8
+{
+  Auto = 0,   ///< Lines if no sweep, bars if sweep present.
+  Lines = 1,  ///< Force per-iteration line chart.
+  Bars = 2,   ///< Force per-sweep-value bar chart.
+};
+
+/// Fluent configuration returned by `GECKO_BENCH(fn)`.
 class GECKO_API Builder
 {
 public:
-  /// Override the case's display name (default: stringified function
-  /// name). Useful when a bench function is reused across cases.
   Builder& Name(const char* name) noexcept;
-
-  /// Set the number of measured iterations. Default: 100.
   Builder& Iterations(::gecko::u32 n) noexcept;
-
-  /// Set the number of warmup iterations (not measured). Default: 5.
   Builder& Warmup(::gecko::u32 n) noexcept;
-
-  /// Free-text description recorded in the JSON output.
   Builder& Description(const char* desc) noexcept;
-
-  /// Add an argument axis: the case is run once per value, and the
-  /// case body queries the value via `s.Arg(name)`. Stack multiple
-  /// `.Sweep(...)` calls for a Cartesian product.
+  /// Add an argument axis. Stack multiple `.Sweep` calls for a
+  /// Cartesian product. Body queries values via `s.Arg(name)`.
   Builder& Sweep(const char* name,
                  ::std::initializer_list<::gecko::i64> values) noexcept;
+  /// Override view hint (default Auto).
+  Builder& ViewHint(View v) noexcept;
 
 private:
   friend GECKO_API Builder Register(const char* fnName, CaseFn fn) noexcept;
-  explicit Builder(class Case* c) noexcept : m_Case(c)
+  explicit Builder(Case* c) noexcept : m_Case(c)
   {}
-  class Case* m_Case;
+  Case* m_Case;
 };
 
-/// Register a case with the harness. Returns a `Builder` for chaining.
-/// Use the `GECKO_BENCH(fn)` macro instead of calling this directly.
+/// Register a case. Use the `GECKO_BENCH(fn)` macro instead.
 GECKO_API Builder Register(const char* fnName, CaseFn fn) noexcept;
 
-/// Harness entry point. Default-linked via `Gecko::BenchMain`; bench
-/// binaries can call this from a custom `main()` if they need
-/// pre-`main` work that the linkable main() doesn't allow.
+/// Harness entry point. Default-linked via `Gecko::BenchMain`.
 GECKO_API int Main(int argc, char** argv) noexcept;
 
 }  // namespace gecko::bench
 
-/// Register a bench case. The function name doubles as the case's
-/// display name; override with `.Name("display_name")` on the builder.
+/// Register a bench case at static-init time.
 #define GECKO_BENCH(fn)                                           \
   static ::gecko::bench::Builder _gecko_bench_##fn = /* NOLINT */ \
       ::gecko::bench::Register(#fn, &fn)

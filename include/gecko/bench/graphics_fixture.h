@@ -35,6 +35,7 @@
 #include <gecko/core/scope.h>
 #include <gecko/core/types.h>
 #include <gecko/debug_renderer/debug_renderer_module.h>
+#include <gecko/graphics/gpu_profiler.h>
 #include <gecko/graphics/graphics_device.h>
 #include <gecko/graphics/graphics_module.h>
 #include <gecko/graphics/graphics_types.h>
@@ -93,6 +94,13 @@ public:
     return m_Window;
   }
 
+  /// Live GPU sampler (for `GECKO_GPU_PROF_SCOPE`). Null if the
+  /// graphics backend doesn't publish one.
+  [[nodiscard]] ::gecko::graphics::IGpuSampler* GpuSampler() const noexcept
+  {
+    return m_GpuSampler;
+  }
+
   /// Run one tick of OS event pumping + Gecko event dispatch. Call
   /// once per iteration before `BeginFrame`.
   GECKO_API void PumpEvents() noexcept;
@@ -116,6 +124,7 @@ private:
   ::std::optional<::gecko::runtime::StandardLogSinks> m_LogSinks;
 
   ::gecko::graphics::GraphicsDevice* m_Device {nullptr};
+  ::gecko::graphics::IGpuSampler* m_GpuSampler {nullptr};
   ::gecko::platform::WindowHandle m_Window {};
   ::gecko::graphics::Swapchain m_Swapchain {};
   bool m_Valid {false};
