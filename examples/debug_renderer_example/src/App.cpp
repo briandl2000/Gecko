@@ -207,13 +207,13 @@ void App::RenderFrame()
   auto DrawCircle = [this](::gecko::math::float2 center, ::gecko::f32 radius,
                            ::gecko::math::float3 color,
                            ::gecko::f32 thickness) {
-    constexpr ::gecko::u32 kSegments = 32;
-    for (::gecko::u32 i = 0; i < kSegments; ++i)
+    constexpr ::gecko::u32 Segments = 32;
+    for (::gecko::u32 i = 0; i < Segments; ++i)
     {
       const ::gecko::f32 a1 =
-          (static_cast<::gecko::f32>(i) / kSegments) * ::gecko::math::TwoPi;
+          (static_cast<::gecko::f32>(i) / Segments) * ::gecko::math::TwoPi;
       const ::gecko::f32 a2 =
-          (static_cast<::gecko::f32>(i + 1) / kSegments) * ::gecko::math::TwoPi;
+          (static_cast<::gecko::f32>(i + 1) / Segments) * ::gecko::math::TwoPi;
       const ::gecko::math::float2 p1 {center.X + radius * ::std::cos(a1),
                                       center.Y + radius * ::std::sin(a1)};
       const ::gecko::math::float2 p2 {center.X + radius * ::std::cos(a2),

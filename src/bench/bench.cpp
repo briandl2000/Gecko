@@ -31,7 +31,7 @@ namespace gecko::bench {
 
 namespace {
 
-constexpr ::gecko::Label kBenchLabel = ::gecko::MakeLabel("gecko.bench");
+constexpr ::gecko::Label BenchLabel = ::gecko::MakeLabel("gecko.bench");
 
 struct ArgAxis
 {
@@ -257,7 +257,7 @@ Builder Register(const char* fnName, CaseFn fn) noexcept
   auto it = m_Impl->ArgValues.find(name);
   if (it == m_Impl->ArgValues.end())
   {
-    GECKO_WARN(kBenchLabel, "State::Arg(\"{}\"): no such sweep axis", name);
+    GECKO_WARN(BenchLabel, "State::Arg(\"{}\"): no such sweep axis", name);
     return 0;
   }
   return it->second;
@@ -647,7 +647,7 @@ void RunOneInvocation(Case& c,
   State s;
   s.m_Impl = &impl;
 
-  GECKO_INFO(kBenchLabel, "  running '{}' ({} warmup + {} iter)", c.Name,
+  GECKO_INFO(BenchLabel, "  running '{}' ({} warmup + {} iter)", c.Name,
              c.Warmup, c.Iterations);
 
   c.Fn(s);
@@ -869,7 +869,7 @@ int Main(int argc, char** argv) noexcept
 
   if (!any && filter)
   {
-    GECKO_ERROR(kBenchLabel, "No case matched filter '{}'", filter);
+    GECKO_ERROR(BenchLabel, "No case matched filter '{}'", filter);
     return 1;
   }
 
@@ -886,11 +886,11 @@ int Main(int argc, char** argv) noexcept
     ::std::ofstream f(p, ::std::ios::out | ::std::ios::trunc);
     if (!f)
     {
-      GECKO_ERROR(kBenchLabel, "Failed to open output: {}", outPath);
+      GECKO_ERROR(BenchLabel, "Failed to open output: {}", outPath);
       return 1;
     }
     f << js;
-    GECKO_INFO(kBenchLabel, "wrote {}", outPath);
+    GECKO_INFO(BenchLabel, "wrote {}", outPath);
   }
   else
   {

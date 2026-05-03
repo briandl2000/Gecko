@@ -10,7 +10,7 @@ namespace gecko::bench {
 
 namespace {
 
-constexpr ::gecko::Label kFixtureLabel =
+constexpr ::gecko::Label FixtureLabel =
     ::gecko::MakeLabel("gecko.bench.fixture");
 
 ::gecko::graphics::GraphicsConfig MakeGraphicsConfig(
@@ -36,7 +36,7 @@ GraphicsFixture::GraphicsFixture(const GraphicsFixtureConfig& cfg) noexcept
                                &m_GraphicsModule, &m_DebugRendererModule});
   if (!m_Engine)
   {
-    GECKO_ERROR(kFixtureLabel, "Engine::Create failed");
+    GECKO_ERROR(FixtureLabel, "Engine::Create failed");
     return;
   }
 
@@ -45,7 +45,7 @@ GraphicsFixture::GraphicsFixture(const GraphicsFixtureConfig& cfg) noexcept
   m_Device = ::gecko::graphics::GetGraphicsDevice();
   if (!m_Device)
   {
-    GECKO_ERROR(kFixtureLabel, "GraphicsModule did not publish a device");
+    GECKO_ERROR(FixtureLabel, "GraphicsModule did not publish a device");
     return;
   }
 
@@ -59,7 +59,7 @@ GraphicsFixture::GraphicsFixture(const GraphicsFixtureConfig& cfg) noexcept
   m_Window = ::gecko::platform::GetWindows()->CreateWindow(wd);
   if (!m_Window.IsValid())
   {
-    GECKO_ERROR(kFixtureLabel, "Failed to create window");
+    GECKO_ERROR(FixtureLabel, "Failed to create window");
     return;
   }
 
@@ -77,7 +77,7 @@ GraphicsFixture::GraphicsFixture(const GraphicsFixtureConfig& cfg) noexcept
   m_Swapchain = m_Device->CreateSwapchain(native, scDesc);
   if (!m_Swapchain.IsValid())
   {
-    GECKO_ERROR(kFixtureLabel, "Failed to create swapchain");
+    GECKO_ERROR(FixtureLabel, "Failed to create swapchain");
     return;
   }
 

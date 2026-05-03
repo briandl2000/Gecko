@@ -21,23 +21,23 @@
 
 namespace {
 
-constexpr ::gecko::Label kLabel = ::gecko::MakeLabel("bench.debug_renderer");
+constexpr ::gecko::Label BenchLabel = ::gecko::MakeLabel("bench.debug_renderer");
 
 // Trig table: 1024 entries on the unit circle. Indexed by an integer
 // step so the inner loop has no std::cos/std::sin.
-constexpr ::gecko::u32 kTrigSize = 1024;
-constexpr ::gecko::u32 kTrigMask = kTrigSize - 1;
+constexpr ::gecko::u32 TrigSize = 1024;
+constexpr ::gecko::u32 TrigMask = TrigSize - 1;
 
 struct TrigTable
 {
-  ::gecko::f32 C[kTrigSize];
-  ::gecko::f32 S[kTrigSize];
+  ::gecko::f32 C[TrigSize];
+  ::gecko::f32 S[TrigSize];
   TrigTable() noexcept
   {
-    for (::gecko::u32 i = 0; i < kTrigSize; ++i)
+    for (::gecko::u32 i = 0; i < TrigSize; ++i)
     {
       const ::gecko::f32 a =
-          static_cast<::gecko::f32>(i) / kTrigSize * 6.2831853F;
+          static_cast<::gecko::f32>(i) / TrigSize * 6.2831853F;
       C[i] = ::std::cos(a);
       S[i] = ::std::sin(a);
     }
@@ -50,8 +50,8 @@ const TrigTable& Trig() noexcept
   return t;
 }
 
-constexpr ::gecko::u32 kPaletteSize = 8;
-constexpr ::gecko::math::float3 kPalette[kPaletteSize] = {
+constexpr ::gecko::u32 PaletteSize = 8;
+constexpr ::gecko::math::float3 Palette[PaletteSize] = {
     {1.00F, 0.20F, 0.20F}, {1.00F, 0.55F, 0.10F}, {1.00F, 0.95F, 0.10F},
     {0.30F, 1.00F, 0.30F}, {0.20F, 0.85F, 1.00F}, {0.40F, 0.40F, 1.00F},
     {0.85F, 0.30F, 1.00F}, {1.00F, 0.40F, 0.85F},
@@ -70,31 +70,31 @@ void BuildSpiral(::gecko::debug_renderer::DebugRendererContext& ctx,
   const ::gecko::f32 invN = 1.0F / static_cast<::gecko::f32>(numLines);
   // 7 turns over the whole sweep, stepping the angle by a coprime so
   // chord coverage is dense.
-  constexpr ::gecko::u32 kAngleStep = 17u;
-  constexpr ::gecko::u32 kChordSpan = 263u;  // prime, gives nice cross weave
+  constexpr ::gecko::u32 AngleStep = 17u;
+  constexpr ::gecko::u32 ChordSpan = 263u;  // prime, gives nice cross weave
 
   for (::gecko::u32 i = 0; i < numLines; ++i)
   {
-    const ::gecko::u32 ia = (i * kAngleStep) & kTrigMask;
-    const ::gecko::u32 ib = ((i + kChordSpan) * kAngleStep) & kTrigMask;
+    const ::gecko::u32 ia = (i * AngleStep) & TrigMask;
+    const ::gecko::u32 ib = ((i + ChordSpan) * AngleStep) & TrigMask;
     const ::gecko::f32 r1 =
         maxR * (0.05F + 0.95F * static_cast<::gecko::f32>(i) * invN);
     const ::gecko::f32 r2 =
         maxR * (0.05F + 0.95F *
-                            static_cast<::gecko::f32>(i + kChordSpan) * invN);
+                            static_cast<::gecko::f32>(i + ChordSpan) * invN);
     const ::gecko::math::float2 p1 {cx + r1 * tr.C[ia], cy + r1 * tr.S[ia]};
     const ::gecko::math::float2 p2 {cx + r2 * tr.C[ib], cy + r2 * tr.S[ib]};
-    ctx.DrawLine(p1, p2, kPalette[i & (kPaletteSize - 1)], 2.0F);
+    ctx.DrawLine(p1, p2, Palette[i & (PaletteSize - 1)], 2.0F);
   }
 }
 
-constexpr ::gecko::u32 kStaticLines = 4000;
+constexpr ::gecko::u32 StaticLines = 4000;
 
-/// Shared driver. Reads `lines` from sweep args (default kStaticLines).
+/// Shared driver. Reads `lines` from sweep args (default StaticLines).
 void RunDebugLines(::gecko::bench::State& s)
 {
   const ::gecko::u32 argLines = static_cast<::gecko::u32>(s.Arg("lines"));
-  const ::gecko::u32 numLines = argLines == 0 ? kStaticLines : argLines;
+  const ::gecko::u32 numLines = argLines == 0 ? StaticLines : argLines;
   ::gecko::bench::GraphicsFixture fx({.Title = "bench/debug_lines",
                                       .Width = 1280,
                                       .Height = 720,
@@ -128,7 +128,7 @@ void RunDebugLines(::gecko::bench::State& s)
       sampler->BeginFrame(*cmd);
 
     {
-      GECKO_PROFILE_NORMAL_NAMED(kLabel, "cpu_record");
+      GECKO_PROFILE_NORMAL_NAMED(BenchLabel, "cpu_record");
       ctx.NewFrame();
       const auto fbW = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Width);
       const auto fbH = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height);
@@ -143,10 +143,10 @@ void RunDebugLines(::gecko::bench::State& s)
     }
 
     {
-      GECKO_PROFILE_NORMAL_NAMED(kLabel, "cmd_submit");
+      GECKO_PROFILE_NORMAL_NAMED(BenchLabel, "cmd_submit");
       if (sampler)
       {
-        GECKO_GPU_PROF_SCOPE(*sampler, *cmd, kLabel, "gpu_draw_lines");
+        GECKO_GPU_PROF_SCOPE(*sampler, *cmd, BenchLabel, "gpu_draw_lines");
         ctx.Submit(cmd.get());
       }
       else
@@ -162,7 +162,7 @@ void RunDebugLines(::gecko::bench::State& s)
     cmd->End();
 
     {
-      GECKO_PROFILE_NORMAL_NAMED(kLabel, "cmd_execute");
+      GECKO_PROFILE_NORMAL_NAMED(BenchLabel, "cmd_execute");
       device->ExecuteGraphicsCommandList(::std::move(cmd));
     }
 
@@ -172,7 +172,7 @@ void RunDebugLines(::gecko::bench::State& s)
 
 }  // namespace
 
-/// Static comparison: 60 iters at kStaticLines lines, default bar chart.
+/// Static comparison: 60 iters at StaticLines lines, default bar chart.
 static void lines_static(::gecko::bench::State& s)
 {
   RunDebugLines(s);
@@ -181,7 +181,7 @@ static void lines_static(::gecko::bench::State& s)
 GECKO_BENCH(lines_static)
     .Iterations(60)
     .Warmup(100)
-    .MetricLabel(kLabel)
+    .MetricLabel(BenchLabel)
     .Description("Deterministic spiral scene at 4000 lines. Bar chart "
                  "compares min/mean/max for frame_total + cpu_record / "
                  "cmd_submit / cmd_execute / gpu_draw_lines across runs.");
@@ -196,7 +196,7 @@ GECKO_BENCH(lines_sweep)
     .Iterations(30)
     .Warmup(100)
     .Sweep("lines", {500, 2000, 8000, 32000})
-    .MetricLabel(kLabel)
+    .MetricLabel(BenchLabel)
     .Description("Same deterministic scene at varying line counts. "
                  "Renders a line chart (mean per run) with min/max band; "
                  "the slider scrubs to a bar view at one count.");

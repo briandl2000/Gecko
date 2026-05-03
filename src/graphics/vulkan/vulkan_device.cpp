@@ -2425,9 +2425,9 @@ VulkanDevice::StagingBuffer VulkanDevice::AcquireStaging(
 {
   // Round up requested size to reduce fragmentation across slightly-different
   // upload sizes (e.g. line buffer growing/shrinking by a handful of entries).
-  constexpr VkDeviceSize kGranularity = 4096;
+  constexpr VkDeviceSize Granularity = 4096;
   const VkDeviceSize rounded =
-      ((size + kGranularity - 1) / kGranularity) * kGranularity;
+      ((size + Granularity - 1) / Granularity) * Granularity;
 
   {
     ::std::lock_guard<::std::mutex> lock(m_StagingMutex);
