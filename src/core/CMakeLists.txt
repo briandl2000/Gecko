@@ -28,9 +28,23 @@ add_library(CoreServices SHARED)
 add_library(Gecko::CoreServices ALIAS CoreServices)
 set_target_properties(CoreServices PROPERTIES OUTPUT_NAME "GeckoCoreServices")
 
-# Export all symbols on Windows to create the .lib import library
+# Export all symbols on Windows to create the .lib import library.
+# WINDOWS_EXPORT_ALL_SYMBOLS is incompatible with MSVC /LTCG: LTCG-compiled
+# .obj files contain MS IL rather than native COFF, so `cmake -E __create_def`
+# cannot enumerate symbols and produces an empty exports.def, breaking the
+# link of GeckoCoreServices.dll. Disable IPO on Core + CoreServices so their
+# objects stay native and the auto-export scanner works. Both targets are
+# small; losing LTO on them has negligible impact on shipped artefacts.
 set_target_properties(CoreServices PROPERTIES
   WINDOWS_EXPORT_ALL_SYMBOLS ON
+  INTERPROCEDURAL_OPTIMIZATION FALSE
+  INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+  INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO FALSE
+)
+set_target_properties(Core PROPERTIES
+  INTERPROCEDURAL_OPTIMIZATION FALSE
+  INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
+  INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO FALSE
 )
 
 if(GECKO_OVERRIDE_NEW)
