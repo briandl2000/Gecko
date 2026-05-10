@@ -39,28 +39,24 @@ void ConsoleLogSink::Write(const LogMessage& message) noexcept
 {
   GECKO_ASSERT(message.Text && "Log message text cannot be null");
 
-  const char* label =
-      message.MessageLabel.Name ? message.MessageLabel.Name : "label";
+  const char* label = message.MessageLabel.Name ? message.MessageLabel.Name : "label";
   const char* text = message.Text ? message.Text : "";
 
-  const auto stream = (message.Level >= LogLevel::Warn)
-                          ? ::gecko::platform::TermStream::Stderr
-                          : ::gecko::platform::TermStream::Stdout;
+  const auto stream =
+      (message.Level >= LogLevel::Warn) ? ::gecko::platform::TermStream::Stderr : ::gecko::platform::TermStream::Stdout;
 
   // Format prefix + body into a small buffer, then push as one
   // colored payload. Using a stack scratch and falling back to
   // heap when the message overflows.
   ::std::array<char, 1024> stackBuf {};
   const int needed =
-      ::std::snprintf(stackBuf.data(), stackBuf.size(), "[%s][%s] %s",
-                      LevelName(message.Level), label, text);
+      ::std::snprintf(stackBuf.data(), stackBuf.size(), "[%s][%s] %s", LevelName(message.Level), label, text);
 
   ::std::string_view payload;
   ::std::string heap;
   if (needed > 0 && static_cast<::std::size_t>(needed) < stackBuf.size())
   {
-    payload =
-        ::std::string_view(stackBuf.data(), static_cast<::std::size_t>(needed));
+    payload = ::std::string_view(stackBuf.data(), static_cast<::std::size_t>(needed));
   }
   else if (needed > 0)
   {
@@ -68,8 +64,7 @@ void ConsoleLogSink::Write(const LogMessage& message) noexcept
     // payload string_view excludes it.
     const ::std::size_t len = static_cast<::std::size_t>(needed);
     heap.resize(len + 1);
-    ::std::snprintf(heap.data(), heap.size(), "[%s][%s] %s",
-                    LevelName(message.Level), label, text);
+    ::std::snprintf(heap.data(), heap.size(), "[%s][%s] %s", LevelName(message.Level), label, text);
     heap.resize(len);
     payload = heap;
   }

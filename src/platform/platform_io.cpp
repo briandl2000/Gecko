@@ -6,12 +6,10 @@ namespace gecko::platform {
 
 // -- ReadResult ------------------------------------------------------
 
-ReadResult::ReadResult(::std::vector<::std::byte> bytes) noexcept
-    : m_Bytes(::std::move(bytes)), m_Ok(true)
+ReadResult::ReadResult(::std::vector<::std::byte> bytes) noexcept : m_Bytes(::std::move(bytes)), m_Ok(true)
 {}
 
-ReadResult::ReadResult(ReadResult&& other) noexcept
-    : m_Bytes(::std::move(other.m_Bytes)), m_Ok(other.m_Ok)
+ReadResult::ReadResult(ReadResult&& other) noexcept : m_Bytes(::std::move(other.m_Bytes)), m_Ok(other.m_Ok)
 {
   other.m_Ok = false;
 }
@@ -37,14 +35,12 @@ ReadResult::~ReadResult() noexcept = default;
 
 // -- MappedFile ------------------------------------------------------
 
-MappedFile::MappedFile(const ::std::byte* data, ::std::size_t size,
-                       void* handle, Deleter deleter) noexcept
+MappedFile::MappedFile(const ::std::byte* data, ::std::size_t size, void* handle, Deleter deleter) noexcept
     : m_Data(data), m_Size(size), m_Handle(handle), m_Deleter(deleter)
 {}
 
 MappedFile::MappedFile(MappedFile&& other) noexcept
-    : m_Data(other.m_Data), m_Size(other.m_Size), m_Handle(other.m_Handle),
-      m_Deleter(other.m_Deleter)
+    : m_Data(other.m_Data), m_Size(other.m_Size), m_Handle(other.m_Handle), m_Deleter(other.m_Deleter)
 {
   other.m_Data = nullptr;
   other.m_Size = 0;
@@ -90,8 +86,7 @@ DirIter::DirIter(void* handle, NextFn nextFn, CloseFn closeFn) noexcept
     : m_Handle(handle), m_Next(nextFn), m_Close(closeFn)
 {}
 
-DirIter::DirIter(DirIter&& other) noexcept
-    : m_Handle(other.m_Handle), m_Next(other.m_Next), m_Close(other.m_Close)
+DirIter::DirIter(DirIter&& other) noexcept : m_Handle(other.m_Handle), m_Next(other.m_Next), m_Close(other.m_Close)
 {
   other.m_Handle = nullptr;
   other.m_Next = nullptr;
@@ -141,8 +136,7 @@ void DirIter::Close() noexcept
 
 bool FileWriter::WriteString(::std::string_view text) noexcept
 {
-  return Write(
-      {reinterpret_cast<const ::std::byte*>(text.data()), text.size()});
+  return Write({reinterpret_cast<const ::std::byte*>(text.data()), text.size()});
 }
 
 }  // namespace gecko::platform

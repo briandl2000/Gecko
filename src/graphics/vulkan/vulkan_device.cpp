@@ -57,10 +57,10 @@ static void FreeObject(T* obj) noexcept
 
 // -- Debug messenger callback ---------------------------------------------
 
-static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-    VkDebugUtilsMessageTypeFlagsEXT /*types*/,
-    const VkDebugUtilsMessengerCallbackDataEXT* data, void* /*userdata*/)
+static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+                                                    VkDebugUtilsMessageTypeFlagsEXT /*types*/,
+                                                    const VkDebugUtilsMessengerCallbackDataEXT* data,
+                                                    void* /*userdata*/)
 {
   if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
     GECKO_ERROR(labels::Vulkan, "%s", data->pMessage);
@@ -92,8 +92,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   // -- Enumerate available layers / extensions (for graceful fallback) --
   ::std::vector<VkExtensionProperties> availableExts;
   {
-    GECKO_PROFILE_NAMED(labels::Vulkan,
-                        "vkEnumerateInstanceExtensionProperties");
+    GECKO_PROFILE_NAMED(labels::Vulkan, "vkEnumerateInstanceExtensionProperties");
     u32 n = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &n, nullptr);
     availableExts.resize(n);
@@ -112,8 +111,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     if (hasExt(e))
       instanceExts.push_back(e);
     else
-      GECKO_WARN(labels::Vulkan,
-                 "VulkanDevice: instance extension '%s' unavailable", e);
+      GECKO_WARN(labels::Vulkan, "VulkanDevice: instance extension '%s' unavailable", e);
   }
 
   ::std::vector<VkLayerProperties> availableLayers;
@@ -135,38 +133,33 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   if (haveDebugUtils)
     instanceExts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   else if (desc.Debug)
-    GECKO_WARN(labels::Vulkan,
-               "VulkanDevice: VK_EXT_debug_utils not available; "
-               "debug messenger disabled");
+    GECKO_WARN(labels::Vulkan, "VulkanDevice: VK_EXT_debug_utils not available; "
+                               "debug messenger disabled");
 
   ::std::vector<const char*> layers;
   if (desc.Debug && hasLayer("VK_LAYER_KHRONOS_validation"))
     layers.push_back("VK_LAYER_KHRONOS_validation");
   else if (desc.Debug)
-    GECKO_WARN(labels::Vulkan,
-               "VulkanDevice: VK_LAYER_KHRONOS_validation not available; "
-               "validation disabled");
+    GECKO_WARN(labels::Vulkan, "VulkanDevice: VK_LAYER_KHRONOS_validation not available; "
+                               "validation disabled");
 
   VkInstanceCreateInfo instanceCreateInfo {};
   instanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   instanceCreateInfo.pApplicationInfo = &appInfo;
-  instanceCreateInfo.enabledExtensionCount =
-      static_cast<u32>(instanceExts.size());
+  instanceCreateInfo.enabledExtensionCount = static_cast<u32>(instanceExts.size());
   instanceCreateInfo.ppEnabledExtensionNames = instanceExts.data();
   instanceCreateInfo.enabledLayerCount = static_cast<u32>(layers.size());
   instanceCreateInfo.ppEnabledLayerNames = layers.data();
 
   if ([&]() noexcept {
         GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateInstance");
-        return vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance) !=
-               VK_SUCCESS;
+        return vkCreateInstance(&instanceCreateInfo, nullptr, &m_Instance) != VK_SUCCESS;
       }())
   {
     GECKO_ERROR(labels::Vulkan,
                 "VulkanDevice: vkCreateInstance failed "
                 "(requested %u extensions, %u layers)",
-                instanceCreateInfo.enabledExtensionCount,
-                instanceCreateInfo.enabledLayerCount);
+                instanceCreateInfo.enabledExtensionCount, instanceCreateInfo.enabledLayerCount);
     for (u32 i = 0; i < instanceCreateInfo.enabledExtensionCount; ++i)
       GECKO_ERROR(labels::Vulkan, "  ext: %s", instanceExts[i]);
     for (u32 i = 0; i < instanceCreateInfo.enabledLayerCount; ++i)
@@ -178,21 +171,17 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   if (haveDebugUtils)
   {
     VkDebugUtilsMessengerCreateInfoEXT debugMessengerCreateInfo {};
-    debugMessengerCreateInfo.sType =
-        VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    debugMessengerCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     debugMessengerCreateInfo.messageSeverity =
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    debugMessengerCreateInfo.messageType =
-        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debugMessengerCreateInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                           VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                           VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     debugMessengerCreateInfo.pfnUserCallback = DebugCallback;
     auto createFn = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
         vkGetInstanceProcAddr(m_Instance, "vkCreateDebugUtilsMessengerEXT"));
     if (createFn != nullptr)
-      createFn(m_Instance, &debugMessengerCreateInfo, nullptr,
-               &m_DebugMessenger);
+      createFn(m_Instance, &debugMessengerCreateInfo, nullptr, &m_DebugMessenger);
   }
 
   m_HasDebugUtils = haveDebugUtils;
@@ -210,8 +199,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     return;
   }
   ::std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
-  vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount,
-                             physicalDevices.data());
+  vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, physicalDevices.data());
 
   // Prefer discrete GPU
   m_PhysicalDevice = physicalDevices[0];
@@ -228,18 +216,15 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   VkPhysicalDeviceProperties physicalDeviceProps {};
   vkGetPhysicalDeviceProperties(m_PhysicalDevice, &physicalDeviceProps);
-  GECKO_INFO(labels::Vulkan, "VulkanDevice: using GPU '%s'",
-             physicalDeviceProps.deviceName);
+  GECKO_INFO(labels::Vulkan, "VulkanDevice: using GPU '%s'", physicalDeviceProps.deviceName);
 
   m_TimestampPeriodNs = physicalDeviceProps.limits.timestampPeriod;
 
   // Find graphics queue family
   u32 queueFamilyCount = 0;
-  vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount,
-                                           nullptr);
+  vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, nullptr);
   ::std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-  vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount,
-                                           queueFamilies.data());
+  vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, queueFamilies.data());
   m_GraphicsQueueFamily = UINT32_MAX;
   for (u32 i = 0; i < queueFamilyCount; ++i)
   {
@@ -282,8 +267,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     vkGetPhysicalDeviceFeatures2(m_PhysicalDevice, &supported2);
   }
 
-  if (supported13.dynamicRendering != VK_TRUE ||
-      supported13.synchronization2 != VK_TRUE)
+  if (supported13.dynamicRendering != VK_TRUE || supported13.synchronization2 != VK_TRUE)
   {
     GECKO_ERROR(labels::Vulkan,
                 "VulkanDevice: required features missing (dynamicRendering=%d, "
@@ -319,8 +303,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   if ([&]() noexcept {
         GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateDevice");
-        return vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr,
-                              &m_Device);
+        return vkCreateDevice(m_PhysicalDevice, &deviceCreateInfo, nullptr, &m_Device);
       }() != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateDevice failed");
@@ -338,8 +321,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateCommandPool");
-    VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr,
-                                     &m_GraphicsCommandPool));
+    VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &m_GraphicsCommandPool));
   }
 
   // -- VMA allocator ---------------------------------------------
@@ -370,14 +352,12 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
     VkDescriptorPoolCreateInfo descPoolCreateInfo {};
     descPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    descPoolCreateInfo.flags =
-        VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    descPoolCreateInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     descPoolCreateInfo.maxSets = 4096;
     descPoolCreateInfo.poolSizeCount = 1;
     descPoolCreateInfo.pPoolSizes = poolSizes;
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateDescriptorPool");
-    VULKAN_CHECK(vkCreateDescriptorPool(m_Device, &descPoolCreateInfo, nullptr,
-                                        &m_DescriptorPool));
+    VULKAN_CHECK(vkCreateDescriptorPool(m_Device, &descPoolCreateInfo, nullptr, &m_DescriptorPool));
   }
 
   m_Valid = true;
@@ -449,12 +429,10 @@ VkCommandPool VulkanDevice::AcquireThreadCommandPool() noexcept
   cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
 
   VkCommandPool pool = VK_NULL_HANDLE;
-  if (vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &pool) !=
-      VK_SUCCESS)
+  if (vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &pool) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::AcquireThreadCommandPool: vkCreateCommandPool "
-                "failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::AcquireThreadCommandPool: vkCreateCommandPool "
+                                "failed");
     return VK_NULL_HANDLE;
   }
 
@@ -488,8 +466,7 @@ VkFence VulkanDevice::AcquireTrackerFence() noexcept
   VkFence f = VK_NULL_HANDLE;
   if (vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &f) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::AcquireTrackerFence: vkCreateFence failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::AcquireTrackerFence: vkCreateFence failed");
     return VK_NULL_HANDLE;
   }
   return f;
@@ -510,8 +487,7 @@ void VulkanDevice::ReapPending() noexcept
     ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
     for (auto it = m_Pending.begin(); it != m_Pending.end();)
     {
-      if (it->Fence != VK_NULL_HANDLE &&
-          vkGetFenceStatus(m_Device, it->Fence) == VK_SUCCESS)
+      if (it->Fence != VK_NULL_HANDLE && vkGetFenceStatus(m_Device, it->Fence) == VK_SUCCESS)
       {
         completed.emplace_back(::std::move(*it));
         it = m_Pending.erase(it);
@@ -551,13 +527,11 @@ void VulkanDevice::DrainPending() noexcept
 // Swapchain
 // ------------------------------------------------------------
 
-bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
-                                           VkSwapchainKHR oldSC) noexcept
+bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchainKHR oldSC) noexcept
 {
   // Query surface caps
   VkSurfaceCapabilitiesKHR surfaceCaps {};
-  VULKAN_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(
-      m_PhysicalDevice, data.Surface, &surfaceCaps));
+  VULKAN_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, data.Surface, &surfaceCaps));
 
   // Extent
   VkExtent2D extent {};
@@ -572,32 +546,27 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
   }
   if (extent.width == 0 || extent.height == 0)
   {
-    GECKO_WARN(labels::Vulkan,
-               "VulkanDevice: zero-size surface, deferring swapchain build");
+    GECKO_WARN(labels::Vulkan, "VulkanDevice: zero-size surface, deferring swapchain build");
     return false;
   }
   data.Extent = extent;
 
   // Format
   u32 formatCount = 0;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface,
-                                       &formatCount, nullptr);
+  vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface, &formatCount, nullptr);
   if (formatCount == 0)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice: surface reports zero supported formats");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: surface reports zero supported formats");
     return false;
   }
   ::std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface,
-                                       &formatCount, surfaceFormats.data());
+  vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface, &formatCount, surfaceFormats.data());
 
   VkFormat wanted = ToVkFormat(data.Desc.Format);
   VkSurfaceFormatKHR chosenFormat = surfaceFormats[0];
   for (auto& candidate : surfaceFormats)
   {
-    if (candidate.format == wanted &&
-        candidate.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
+    if (candidate.format == wanted && candidate.colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR)
     {
       chosenFormat = candidate;
       break;
@@ -610,11 +579,9 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
   if (!data.Desc.VSync)
   {
     u32 presentModeCount = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface,
-                                              &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount, nullptr);
     ::std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(
-        m_PhysicalDevice, data.Surface, &presentModeCount, presentModes.data());
+    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount, presentModes.data());
     for (VkPresentModeKHR m : presentModes)
     {
       if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
@@ -642,8 +609,7 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
   swapchainCreateInfo.imageColorSpace = chosenFormat.colorSpace;
   swapchainCreateInfo.imageExtent = extent;
   swapchainCreateInfo.imageArrayLayers = 1;
-  swapchainCreateInfo.imageUsage =
-      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   swapchainCreateInfo.preTransform = surfaceCaps.currentTransform;
   swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -651,8 +617,7 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
   swapchainCreateInfo.clipped = VK_TRUE;
   swapchainCreateInfo.oldSwapchain = oldSC;
 
-  if (vkCreateSwapchainKHR(m_Device, &swapchainCreateInfo, nullptr,
-                           &data.Swapchain) != VK_SUCCESS)
+  if (vkCreateSwapchainKHR(m_Device, &swapchainCreateInfo, nullptr, &data.Swapchain) != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateSwapchainKHR failed");
     return false;
@@ -677,8 +642,7 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
     viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewCreateInfo.subresourceRange.levelCount = 1;
     viewCreateInfo.subresourceRange.layerCount = 1;
-    VULKAN_CHECK(vkCreateImageView(m_Device, &viewCreateInfo, nullptr,
-                                   &data.ImageViews[i]));
+    VULKAN_CHECK(vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &data.ImageViews[i]));
   }
 
   // Sync objects.
@@ -694,10 +658,8 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
     fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     for (u32 i = 0; i < MaxFramesInFlight; ++i)
     {
-      VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr,
-                                     &data.ImageAvailable[i]));
-      VULKAN_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr,
-                                 &data.InFlight[i]));
+      VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr, &data.ImageAvailable[i]));
+      VULKAN_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &data.InFlight[i]));
     }
   }
   {
@@ -706,16 +668,14 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data,
     for (u32 i = 0; i < data.ImageCount; ++i)
     {
       if (data.RenderFinished[i] == VK_NULL_HANDLE)
-        VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr,
-                                       &data.RenderFinished[i]));
+        VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr, &data.RenderFinished[i]));
     }
   }
 
   return true;
 }
 
-void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data,
-                                             bool destroySurface) noexcept
+void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data, bool destroySurface) noexcept
 {
   for (u32 i = 0; i < data.ImageCount; ++i)
   {
@@ -760,9 +720,8 @@ void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data,
   }
 }
 
-Swapchain VulkanDevice::CreateSwapchain(
-    const ::gecko::platform::NativeWindowHandle& native,
-    const SwapchainDesc& desc) noexcept
+Swapchain VulkanDevice::CreateSwapchain(const ::gecko::platform::NativeWindowHandle& native,
+                                        const SwapchainDesc& desc) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateSwapchain");
 
@@ -772,8 +731,7 @@ Swapchain VulkanDevice::CreateSwapchain(
   VulkanSwapchainData* data = AllocObject<VulkanSwapchainData>();
   if (data == nullptr)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateSwapchain: allocation failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateSwapchain: allocation failed");
     return Swapchain {};
   }
   data->Native = native;
@@ -787,12 +745,10 @@ Swapchain VulkanDevice::CreateSwapchain(
   }
 
   VkBool32 support = VK_FALSE;
-  vkGetPhysicalDeviceSurfaceSupportKHR(m_PhysicalDevice, m_GraphicsQueueFamily,
-                                       data->Surface, &support);
+  vkGetPhysicalDeviceSurfaceSupportKHR(m_PhysicalDevice, m_GraphicsQueueFamily, data->Surface, &support);
   if (support == VK_FALSE)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice: queue family cannot present to surface");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: queue family cannot present to surface");
     DestroySwapchainResources(*data, true);
     FreeObject(data);
     return Swapchain {};
@@ -884,8 +840,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   VkResult ar = VK_SUCCESS;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkAcquireNextImageKHR");
-    ar = vkAcquireNextImageKHR(m_Device, data->Swapchain, UINT64_MAX,
-                               data->ImageAvailable[frame], VK_NULL_HANDLE,
+    ar = vkAcquireNextImageKHR(m_Device, data->Swapchain, UINT64_MAX, data->ImageAvailable[frame], VK_NULL_HANDLE,
                                &imageIndex);
   }
   if (ar == VK_ERROR_OUT_OF_DATE_KHR)
@@ -895,8 +850,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   }
   if (ar != VK_SUCCESS && ar != VK_SUBOPTIMAL_KHR)
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice: acquire failed (%d)",
-                static_cast<i32>(ar));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: acquire failed (%d)", static_cast<i32>(ar));
     return ctx;
   }
 
@@ -923,8 +877,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   rt.Desc.Height = data->Extent.height;
   rt.Desc.NumRenderTargets = 1;
   rt.Desc.RenderTargetFormats[0] = FromVkFormat(data->Format);
-  rt.Data = Shared<void>(
-      rtd, [](void* p) noexcept { FreeObject(static_cast<VulkanRTData*>(p)); });
+  rt.Data = Shared<void>(rtd, [](void* p) noexcept { FreeObject(static_cast<VulkanRTData*>(p)); });
 
   ctx.SC = &swapchain;
   ctx.FrameIndex = frame;
@@ -952,9 +905,7 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
       continue;
     if (count >= MaxSwapchainsPerSubmit)
     {
-      GECKO_WARN(labels::Vulkan,
-                 "VulkanDevice::Present: more than %u swapchains, truncated",
-                 MaxSwapchainsPerSubmit);
+      GECKO_WARN(labels::Vulkan, "VulkanDevice::Present: more than %u swapchains, truncated", MaxSwapchainsPerSubmit);
       break;
     }
     auto* data = static_cast<VulkanSwapchainData*>(f.SC->Data.get());
@@ -982,8 +933,7 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueuePresentKHR");
     presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
   }
-  if (presentResult == VK_ERROR_OUT_OF_DATE_KHR ||
-      presentResult == VK_SUBOPTIMAL_KHR)
+  if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_KHR)
   {
     for (const auto& f : frames)
       if (f.Valid && f.SC != nullptr)
@@ -1014,11 +964,9 @@ Unique<ICommandList> VulkanDevice::CreateComputeCommandList() noexcept
   return CreateUnique<VulkanCommandList>(*this, /*compute*/ true);
 }
 
-void VulkanDevice::ExecuteGraphicsCommandList(
-    Unique<ICommandList> commandList) noexcept
+void VulkanDevice::ExecuteGraphicsCommandList(Unique<ICommandList> commandList) noexcept
 {
-  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan,
-                             "VulkanDevice::ExecuteGraphicsCommandList");
+  GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan, "VulkanDevice::ExecuteGraphicsCommandList");
 
   auto* cl = static_cast<VulkanCommandList*>(commandList.get());
   if (cl == nullptr || !cl->IsValid())
@@ -1090,8 +1038,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(
         if (auto* p = ::gecko::GetProfiler(); p != nullptr)
           sampler->OnSubmit(p->NowNs());
       }
-      VULKAN_CHECK(
-          vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
+      VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
     }
 
     for (u32 i = 1; i < touched.Count; ++i)
@@ -1120,8 +1067,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(
   }
 }
 
-void VulkanDevice::ExecuteComputeCommandList(
-    Unique<ICommandList> commandList) noexcept
+void VulkanDevice::ExecuteComputeCommandList(Unique<ICommandList> commandList) noexcept
 {
   ExecuteGraphicsCommandList(::std::move(commandList));
 }
@@ -1130,8 +1076,7 @@ void VulkanDevice::ExecuteComputeCommandList(
 // Resource creation (stubs for now -- triangle path doesn't need most)
 // ------------------------------------------------------------
 
-RenderTarget VulkanDevice::CreateRenderTarget(
-    const RenderTargetDesc& desc) noexcept
+RenderTarget VulkanDevice::CreateRenderTarget(const RenderTargetDesc& desc) noexcept
 {
   if (!desc.IsValid() || !m_Valid)
     return RenderTarget {};
@@ -1160,9 +1105,7 @@ RenderTarget VulkanDevice::CreateRenderTarget(
     Texture t = CreateTexture(td);
     if (!t.IsValid())
     {
-      GECKO_ERROR(labels::Vulkan,
-                  "VulkanDevice::CreateRenderTarget: colour texture %u failed",
-                  i);
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateRenderTarget: colour texture %u failed", i);
       FreeObject(rtd);
       return RenderTarget {};
     }
@@ -1201,8 +1144,7 @@ RenderTarget VulkanDevice::CreateRenderTarget(
     }
   }
 
-  rt.Data = Shared<void>(
-      rtd, [](void* p) noexcept { FreeObject(static_cast<VulkanRTData*>(p)); });
+  rt.Data = Shared<void>(rtd, [](void* p) noexcept { FreeObject(static_cast<VulkanRTData*>(p)); });
   return rt;
 }
 
@@ -1216,22 +1158,17 @@ Buffer VulkanDevice::CreateVertexBuffer(const VertexBufferDesc& desc) noexcept
   VkBufferCreateInfo bufferCreateInfo {};
   bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferCreateInfo.size = size;
-  bufferCreateInfo.usage =
-      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared)
-                              ? VMA_MEMORY_USAGE_CPU_TO_GPU
-                              : VMA_MEMORY_USAGE_GPU_ONLY;
+  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
 
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &bufferData->Buffer, &bufferData->Allocation,
+  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
                       nullptr) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateVertexBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateVertexBuffer vmaCreateBuffer failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1259,22 +1196,17 @@ Buffer VulkanDevice::CreateIndexBuffer(const IndexBufferDesc& desc) noexcept
   VkBufferCreateInfo bufferCreateInfo {};
   bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferCreateInfo.size = size;
-  bufferCreateInfo.usage =
-      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  bufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared)
-                              ? VMA_MEMORY_USAGE_CPU_TO_GPU
-                              : VMA_MEMORY_USAGE_GPU_ONLY;
+  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
 
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &bufferData->Buffer, &bufferData->Allocation,
+  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
                       nullptr) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateIndexBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateIndexBuffer vmaCreateBuffer failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1292,8 +1224,7 @@ Buffer VulkanDevice::CreateIndexBuffer(const IndexBufferDesc& desc) noexcept
   return b;
 }
 
-Buffer VulkanDevice::CreateConstantBuffer(
-    const ConstantBufferDesc& desc) noexcept
+Buffer VulkanDevice::CreateConstantBuffer(const ConstantBufferDesc& desc) noexcept
 {
   if (!desc.IsValid() || !m_Valid)
     return Buffer {};
@@ -1301,26 +1232,19 @@ Buffer VulkanDevice::CreateConstantBuffer(
   VkBufferCreateInfo bufferCreateInfo {};
   bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferCreateInfo.size = desc.SizeInBytes;
-  bufferCreateInfo.usage =
-      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared)
-                              ? VMA_MEMORY_USAGE_CPU_TO_GPU
-                              : VMA_MEMORY_USAGE_GPU_ONLY;
+  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
   if (desc.Memory == MemoryType::Shared)
-    allocCreateInfo.flags =
-        VMA_ALLOCATION_CREATE_MAPPED_BIT |
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &bufferData->Buffer, &bufferData->Allocation,
+  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
                       nullptr) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateConstantBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateConstantBuffer vmaCreateBuffer failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1338,39 +1262,30 @@ Buffer VulkanDevice::CreateConstantBuffer(
   return b;
 }
 
-Buffer VulkanDevice::CreateStructuredBuffer(
-    const StructuredBufferDesc& desc) noexcept
+Buffer VulkanDevice::CreateStructuredBuffer(const StructuredBufferDesc& desc) noexcept
 {
   if (!desc.IsValid() || !m_Valid)
     return Buffer {};
 
-  const VkDeviceSize size =
-      static_cast<VkDeviceSize>(desc.NumElements) * desc.ElementSize;
+  const VkDeviceSize size = static_cast<VkDeviceSize>(desc.NumElements) * desc.ElementSize;
 
   VkBufferCreateInfo bufferCreateInfo {};
   bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferCreateInfo.size = size;
-  bufferCreateInfo.usage =
-      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-      VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+  bufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                           VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
   VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared)
-                              ? VMA_MEMORY_USAGE_CPU_TO_GPU
-                              : VMA_MEMORY_USAGE_GPU_ONLY;
+  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
   if (desc.Memory == MemoryType::Shared)
-    allocCreateInfo.flags =
-        VMA_ALLOCATION_CREATE_MAPPED_BIT |
-        VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &bufferData->Buffer, &bufferData->Allocation,
+  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
                       nullptr) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateStructuredBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateStructuredBuffer vmaCreateBuffer failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1402,13 +1317,11 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   imageCreateInfo.format = fmt;
   imageCreateInfo.extent = {desc.Width, desc.Height, 1};
   imageCreateInfo.mipLevels = desc.NumMips > 0 ? desc.NumMips : 1;
-  imageCreateInfo.arrayLayers =
-      desc.NumArraySlices > 0 ? desc.NumArraySlices : 1;
+  imageCreateInfo.arrayLayers = desc.NumArraySlices > 0 ? desc.NumArraySlices : 1;
   imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
   imageCreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-  imageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT |
-                          VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                          VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+  imageCreateInfo.usage =
+      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
   if (desc.IsRenderTarget)
     imageCreateInfo.usage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   if (desc.IsDepthStencil || isDepth)
@@ -1437,11 +1350,10 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
     td->Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
   }
 
-  if (vmaCreateImage(m_Allocator, &imageCreateInfo, &allocCreateInfo,
-                     &td->Image, &td->Allocation, nullptr) != VK_SUCCESS)
+  if (vmaCreateImage(m_Allocator, &imageCreateInfo, &allocCreateInfo, &td->Image, &td->Allocation, nullptr) !=
+      VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateTexture vmaCreateImage failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateTexture vmaCreateImage failed");
     FreeObject(td);
     return Texture {};
   }
@@ -1454,11 +1366,9 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   viewCreateInfo.subresourceRange.aspectMask = td->Aspect;
   viewCreateInfo.subresourceRange.levelCount = imageCreateInfo.mipLevels;
   viewCreateInfo.subresourceRange.layerCount = imageCreateInfo.arrayLayers;
-  if (vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &td->ImageView) !=
-      VK_SUCCESS)
+  if (vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &td->ImageView) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateTexture vkCreateImageView failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateTexture vkCreateImageView failed");
     vmaDestroyImage(m_Allocator, td->Image, td->Allocation);
     FreeObject(td);
     return Texture {};
@@ -1476,8 +1386,7 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
     FreeObject(d);
   });
   if (desc.DebugName != nullptr)
-    SetObjectName(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<u64>(td->Image),
-                  desc.DebugName);
+    SetObjectName(VK_OBJECT_TYPE_IMAGE, reinterpret_cast<u64>(td->Image), desc.DebugName);
   return t;
 }
 
@@ -1491,9 +1400,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
     return VK_NULL_HANDLE;
   if (code.Format != ShaderFormat::SPIRV)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice: only SPIRV shaders accepted (format=%d)",
-                static_cast<i32>(code.Format));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: only SPIRV shaders accepted (format=%d)", static_cast<i32>(code.Format));
     return VK_NULL_HANDLE;
   }
 
@@ -1503,10 +1410,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
   const auto* rawBytes = code.Bytes.data();
   if (byteCount == 0 || (byteCount % 4) != 0)
   {
-    GECKO_ERROR(
-        labels::Vulkan,
-        "VulkanDevice: SPIRV blob size %zu is not a multiple of 4 bytes",
-        byteCount);
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: SPIRV blob size %zu is not a multiple of 4 bytes", byteCount);
     return VK_NULL_HANDLE;
   }
 
@@ -1515,8 +1419,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
   shaderModuleCreateInfo.codeSize = byteCount;
 
   ::std::vector<u32> alignedCopy;
-  const bool isAligned =
-      (reinterpret_cast<::std::uintptr_t>(rawBytes) % alignof(u32)) == 0;
+  const bool isAligned = (reinterpret_cast<::std::uintptr_t>(rawBytes) % alignof(u32)) == 0;
   if (isAligned)
   {
     shaderModuleCreateInfo.pCode = reinterpret_cast<const u32*>(rawBytes);
@@ -1529,8 +1432,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
   }
 
   VkShaderModule m = VK_NULL_HANDLE;
-  if (vkCreateShaderModule(m_Device, &shaderModuleCreateInfo, nullptr, &m) !=
-      VK_SUCCESS)
+  if (vkCreateShaderModule(m_Device, &shaderModuleCreateInfo, nullptr, &m) != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: CreateShaderModule failed");
     return VK_NULL_HANDLE;
@@ -1538,8 +1440,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
   return m;
 }
 
-GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
-    const GraphicsPipelineDesc& desc) noexcept
+GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateGraphicsPipeline");
 
@@ -1554,8 +1455,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   VkPipelineShaderStageCreateInfo stages[2] {};
   u32 stageCount = 0;
 
-  stages[stageCount].sType =
-      VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   stages[stageCount].stage = VK_SHADER_STAGE_VERTEX_BIT;
   stages[stageCount].module = vs;
   stages[stageCount].pName = desc.VertexShader.Entry;
@@ -1563,8 +1463,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
 
   if (ps != VK_NULL_HANDLE)
   {
-    stages[stageCount].sType =
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stages[stageCount].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[stageCount].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
     stages[stageCount].module = ps;
     stages[stageCount].pName = desc.PixelShader.Entry;
@@ -1582,8 +1481,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   {
     vertexAttrs[i].location = i;
     vertexAttrs[i].binding = 0;
-    vertexAttrs[i].format =
-        ToVkFormat(desc.Layout.Attributes[i].AttributeFormat);
+    vertexAttrs[i].format = ToVkFormat(desc.Layout.Attributes[i].AttributeFormat);
     vertexAttrs[i].offset = desc.Layout.Attributes[i].Offset;
   }
 
@@ -1598,11 +1496,9 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   }
 
   VkPipelineInputAssemblyStateCreateInfo inputAssembly {};
-  inputAssembly.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-  inputAssembly.topology = (desc.Primitive == PrimitiveType::Lines)
-                               ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST
-                               : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  inputAssembly.topology =
+      (desc.Primitive == PrimitiveType::Lines) ? VK_PRIMITIVE_TOPOLOGY_LINE_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 
   VkPipelineViewportStateCreateInfo viewportState {};
   viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -1612,21 +1508,18 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   VkPipelineRasterizationStateCreateInfo rasterizer {};
   rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
   rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterizer.cullMode = (desc.Culling == CullMode::Back) ? VK_CULL_MODE_BACK_BIT
-                        : (desc.Culling == CullMode::Front)
-                            ? VK_CULL_MODE_FRONT_BIT
-                            : VK_CULL_MODE_NONE;
-  rasterizer.frontFace = (desc.Winding == WindingOrder::ClockWise)
-                             ? VK_FRONT_FACE_CLOCKWISE
-                             : VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  rasterizer.cullMode = (desc.Culling == CullMode::Back)    ? VK_CULL_MODE_BACK_BIT
+                        : (desc.Culling == CullMode::Front) ? VK_CULL_MODE_FRONT_BIT
+                                                            : VK_CULL_MODE_NONE;
+  rasterizer.frontFace =
+      (desc.Winding == WindingOrder::ClockWise) ? VK_FRONT_FACE_CLOCKWISE : VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterizer.lineWidth = 1.0F;
 
   VkPipelineMultisampleStateCreateInfo multisample {};
   multisample.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
   multisample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-  VkPipelineColorBlendAttachmentState
-      blendAttachments[RenderTargetDesc::MaxRenderTargets] {};
+  VkPipelineColorBlendAttachmentState blendAttachments[RenderTargetDesc::MaxRenderTargets] {};
   for (u32 i = 0; i < desc.NumRenderTargets; ++i)
   {
     const auto& bs = desc.BlendStates[i];
@@ -1645,17 +1538,14 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   colorBlend.attachmentCount = desc.NumRenderTargets;
   colorBlend.pAttachments = blendAttachments;
 
-  VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT,
-                                    VK_DYNAMIC_STATE_SCISSOR};
+  VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
   VkPipelineDynamicStateCreateInfo dynamicState {};
   dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-  dynamicState.dynamicStateCount =
-      sizeof(dynamicStates) / sizeof(dynamicStates[0]);
+  dynamicState.dynamicStateCount = sizeof(dynamicStates) / sizeof(dynamicStates[0]);
   dynamicState.pDynamicStates = dynamicStates;
 
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {};
-  pipelineLayoutCreateInfo.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
   // -- Descriptor set layout -------------------------------------
   // Resources are laid out as consecutive bindings in the order they
@@ -1670,22 +1560,18 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   for (u32 r = 0; r < desc.NumPipelineResources; ++r)
   {
     const auto& resource = desc.PipelineResources[r];
-    const VkDescriptorType dtype =
-        ToVkDescriptorType(resource.Type, /*isCompute*/ false);
+    const VkDescriptorType dtype = ToVkDescriptorType(resource.Type, /*isCompute*/ false);
     if (dtype == VK_DESCRIPTOR_TYPE_MAX_ENUM)
       continue;
-    for (u32 n = 0; n < resource.NumResources &&
-                    numBindings < VulkanPipelineData::MaxBindings;
-         ++n)
+    for (u32 n = 0; n < resource.NumResources && numBindings < VulkanPipelineData::MaxBindings; ++n)
     {
       const u32 slot = numBindings;
       bindings[slot].binding = slot;
       bindings[slot].descriptorType = dtype;
       bindings[slot].descriptorCount = 1;
-      bindings[slot].stageFlags =
-          (resource.ShaderVisibility == ShaderType::All)
-              ? VkShaderStageFlags {VK_SHADER_STAGE_ALL_GRAPHICS}
-              : ToVkShaderStage(resource.ShaderVisibility);
+      bindings[slot].stageFlags = (resource.ShaderVisibility == ShaderType::All)
+                                      ? VkShaderStageFlags {VK_SHADER_STAGE_ALL_GRAPHICS}
+                                      : ToVkShaderStage(resource.ShaderVisibility);
       bindingTypes[slot] = dtype;
       ++numBindings;
     }
@@ -1694,12 +1580,10 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   if (numBindings > 0)
   {
     VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo {};
-    descSetLayoutCreateInfo.sType =
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descSetLayoutCreateInfo.bindingCount = numBindings;
     descSetLayoutCreateInfo.pBindings = bindings;
-    VULKAN_CHECK(vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo,
-                                             nullptr, &dsl));
+    VULKAN_CHECK(vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo, nullptr, &dsl));
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &dsl;
   }
@@ -1715,8 +1599,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   }
 
   VkPipelineLayout layout = VK_NULL_HANDLE;
-  VULKAN_CHECK(vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo,
-                                      nullptr, &layout));
+  VULKAN_CHECK(vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo, nullptr, &layout));
 
   // Dynamic rendering info (VK_KHR_dynamic_rendering core in 1.3)
   VkFormat colorFormats[RenderTargetDesc::MaxRenderTargets] {};
@@ -1727,19 +1610,14 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   renderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
   renderingCreateInfo.colorAttachmentCount = desc.NumRenderTargets;
   renderingCreateInfo.pColorAttachmentFormats = colorFormats;
-  renderingCreateInfo.depthAttachmentFormat =
-      ToVkFormat(desc.DepthStencilFormat);
+  renderingCreateInfo.depthAttachmentFormat = ToVkFormat(desc.DepthStencilFormat);
 
   VkPipelineDepthStencilStateCreateInfo depthStencil {};
-  depthStencil.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-  depthStencil.depthTestEnable =
-      desc.DepthStencil.DepthTestEnable ? VK_TRUE : VK_FALSE;
-  depthStencil.depthWriteEnable =
-      desc.DepthStencil.DepthWriteEnable ? VK_TRUE : VK_FALSE;
+  depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  depthStencil.depthTestEnable = desc.DepthStencil.DepthTestEnable ? VK_TRUE : VK_FALSE;
+  depthStencil.depthWriteEnable = desc.DepthStencil.DepthWriteEnable ? VK_TRUE : VK_FALSE;
   depthStencil.depthCompareOp = ToVkCompareOp(desc.DepthStencil.DepthCompare);
-  depthStencil.stencilTestEnable =
-      desc.DepthStencil.StencilEnable ? VK_TRUE : VK_FALSE;
+  depthStencil.stencilTestEnable = desc.DepthStencil.StencilEnable ? VK_TRUE : VK_FALSE;
   auto fillStencil = [&](const StencilOpDesc& s) {
     VkStencilOpState o {};
     o.failOp = ToVkStencilOp(s.Fail);
@@ -1754,8 +1632,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   depthStencil.back = fillStencil(desc.DepthStencil.StencilBack);
 
   VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {};
-  graphicsPipelineCreateInfo.sType =
-      VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   graphicsPipelineCreateInfo.pNext = &renderingCreateInfo;
   graphicsPipelineCreateInfo.stageCount = stageCount;
   graphicsPipelineCreateInfo.pStages = stages;
@@ -1771,9 +1648,8 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   graphicsPipelineCreateInfo.layout = layout;
 
   VkPipeline pipeline = VK_NULL_HANDLE;
-  VkResult res = vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1,
-                                           &graphicsPipelineCreateInfo, nullptr,
-                                           &pipeline);
+  VkResult res =
+      vkCreateGraphicsPipelines(m_Device, VK_NULL_HANDLE, 1, &graphicsPipelineCreateInfo, nullptr, &pipeline);
   vkDestroyShaderModule(m_Device, vs, nullptr);
   if (ps != VK_NULL_HANDLE)
     vkDestroyShaderModule(m_Device, ps, nullptr);
@@ -1783,9 +1659,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
     vkDestroyPipelineLayout(m_Device, layout, nullptr);
     if (dsl != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice: vkCreateGraphicsPipelines failed (%d)",
-                static_cast<i32>(res));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateGraphicsPipelines failed (%d)", static_cast<i32>(res));
     return GraphicsPipeline {};
   }
 
@@ -1800,8 +1674,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
     pd->BindingTypes[i] = bindingTypes[i];
 
   if (desc.DebugName != nullptr)
-    SetObjectName(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<u64>(pipeline),
-                  desc.DebugName);
+    SetObjectName(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<u64>(pipeline), desc.DebugName);
 
   GraphicsPipeline gp;
   gp.Desc = desc;
@@ -1819,8 +1692,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(
   return gp;
 }
 
-ComputePipeline VulkanDevice::CreateComputePipeline(
-    const ComputePipelineDesc& desc) noexcept
+ComputePipeline VulkanDevice::CreateComputePipeline(const ComputePipelineDesc& desc) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateComputePipeline");
 
@@ -1839,13 +1711,10 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   for (u32 r = 0; r < desc.NumPipelineResources; ++r)
   {
     const auto& resource = desc.PipelineResources[r];
-    const VkDescriptorType dtype =
-        ToVkDescriptorType(resource.Type, /*isCompute*/ true);
+    const VkDescriptorType dtype = ToVkDescriptorType(resource.Type, /*isCompute*/ true);
     if (dtype == VK_DESCRIPTOR_TYPE_MAX_ENUM)
       continue;
-    for (u32 n = 0; n < resource.NumResources &&
-                    numBindings < VulkanPipelineData::MaxBindings;
-         ++n)
+    for (u32 n = 0; n < resource.NumResources && numBindings < VulkanPipelineData::MaxBindings; ++n)
     {
       const u32 slot = numBindings;
       bindings[slot].binding = slot;
@@ -1859,17 +1728,14 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
 
   VkDescriptorSetLayout dsl = VK_NULL_HANDLE;
   VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo {};
-  pipelineLayoutCreateInfo.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   if (numBindings > 0)
   {
     VkDescriptorSetLayoutCreateInfo descSetLayoutCreateInfo {};
-    descSetLayoutCreateInfo.sType =
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descSetLayoutCreateInfo.bindingCount = numBindings;
     descSetLayoutCreateInfo.pBindings = bindings;
-    VULKAN_CHECK(vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo,
-                                             nullptr, &dsl));
+    VULKAN_CHECK(vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo, nullptr, &dsl));
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &dsl;
   }
@@ -1885,8 +1751,7 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   }
 
   VkPipelineLayout layout = VK_NULL_HANDLE;
-  VULKAN_CHECK(vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo,
-                                      nullptr, &layout));
+  VULKAN_CHECK(vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo, nullptr, &layout));
 
   VkPipelineShaderStageCreateInfo stage {};
   stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1895,15 +1760,12 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
   stage.pName = desc.ComputeShader.Entry;
 
   VkComputePipelineCreateInfo computePipelineCreateInfo {};
-  computePipelineCreateInfo.sType =
-      VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  computePipelineCreateInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
   computePipelineCreateInfo.stage = stage;
   computePipelineCreateInfo.layout = layout;
 
   VkPipeline pipeline = VK_NULL_HANDLE;
-  VkResult res =
-      vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1,
-                               &computePipelineCreateInfo, nullptr, &pipeline);
+  VkResult res = vkCreateComputePipelines(m_Device, VK_NULL_HANDLE, 1, &computePipelineCreateInfo, nullptr, &pipeline);
   vkDestroyShaderModule(m_Device, cs, nullptr);
 
   if (res != VK_SUCCESS)
@@ -1911,9 +1773,7 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
     vkDestroyPipelineLayout(m_Device, layout, nullptr);
     if (dsl != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice: vkCreateComputePipelines failed (%d)",
-                static_cast<i32>(res));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateComputePipelines failed (%d)", static_cast<i32>(res));
     return ComputePipeline {};
   }
 
@@ -1928,8 +1788,7 @@ ComputePipeline VulkanDevice::CreateComputePipeline(
     pd->BindingTypes[i] = bindingTypes[i];
 
   if (desc.DebugName != nullptr)
-    SetObjectName(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<u64>(pipeline),
-                  desc.DebugName);
+    SetObjectName(VK_OBJECT_TYPE_PIPELINE, reinterpret_cast<u64>(pipeline), desc.DebugName);
 
   ComputePipeline cp;
   cp.Desc = desc;
@@ -1958,25 +1817,19 @@ Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
 
   VkSamplerCreateInfo samplerCreateInfo {};
   samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-  samplerCreateInfo.magFilter = desc.Filter == SamplerFilter::Linear
-                                    ? VK_FILTER_LINEAR
-                                    : VK_FILTER_NEAREST;
+  samplerCreateInfo.magFilter = desc.Filter == SamplerFilter::Linear ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
   samplerCreateInfo.minFilter = samplerCreateInfo.magFilter;
-  samplerCreateInfo.mipmapMode = desc.Filter == SamplerFilter::Linear
-                                     ? VK_SAMPLER_MIPMAP_MODE_LINEAR
-                                     : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+  samplerCreateInfo.mipmapMode =
+      desc.Filter == SamplerFilter::Linear ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
   const VkSamplerAddressMode addressMode =
-      desc.WrapMode == SamplerWrapMode::Wrap
-          ? VK_SAMPLER_ADDRESS_MODE_REPEAT
-          : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+      desc.WrapMode == SamplerWrapMode::Wrap ? VK_SAMPLER_ADDRESS_MODE_REPEAT : VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
   samplerCreateInfo.addressModeU = addressMode;
   samplerCreateInfo.addressModeV = addressMode;
   samplerCreateInfo.addressModeW = addressMode;
   samplerCreateInfo.maxLod = VK_LOD_CLAMP_NONE;
 
   VkSampler vkSampler = VK_NULL_HANDLE;
-  if (vkCreateSampler(m_Device, &samplerCreateInfo, nullptr, &vkSampler) !=
-      VK_SUCCESS)
+  if (vkCreateSampler(m_Device, &samplerCreateInfo, nullptr, &vkSampler) != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateSampler failed");
     return Sampler {};
@@ -1986,8 +1839,7 @@ Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
   sd->Sampler = vkSampler;
 
   if (desc.DebugName != nullptr)
-    SetObjectName(VK_OBJECT_TYPE_SAMPLER, reinterpret_cast<u64>(vkSampler),
-                  desc.DebugName);
+    SetObjectName(VK_OBJECT_TYPE_SAMPLER, reinterpret_cast<u64>(vkSampler), desc.DebugName);
 
   Sampler s;
   s.Desc = desc;
@@ -2005,8 +1857,7 @@ Sampler VulkanDevice::CreateSampler(const SamplerDesc& desc) noexcept
 // Timestamp query pool
 // ------------------------------------------------------------
 
-QueryPool VulkanDevice::CreateTimestampQueryPool(
-    const QueryPoolDesc& desc) noexcept
+QueryPool VulkanDevice::CreateTimestampQueryPool(const QueryPoolDesc& desc) noexcept
 {
   if (!m_Valid || !desc.IsValid())
     return QueryPool {};
@@ -2017,11 +1868,9 @@ QueryPool VulkanDevice::CreateTimestampQueryPool(
   queryPoolCreateInfo.queryCount = desc.Count;
 
   VkQueryPool vkPool = VK_NULL_HANDLE;
-  if (vkCreateQueryPool(m_Device, &queryPoolCreateInfo, nullptr, &vkPool) !=
-      VK_SUCCESS)
+  if (vkCreateQueryPool(m_Device, &queryPoolCreateInfo, nullptr, &vkPool) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::CreateTimestampQueryPool failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateTimestampQueryPool failed");
     return QueryPool {};
   }
 
@@ -2053,8 +1902,7 @@ QueryPool VulkanDevice::CreateTimestampQueryPool(
   qd->TimestampPeriodNs = m_TimestampPeriodNs;
 
   if (desc.DebugName != nullptr)
-    SetObjectName(VK_OBJECT_TYPE_QUERY_POOL, reinterpret_cast<u64>(vkPool),
-                  desc.DebugName);
+    SetObjectName(VK_OBJECT_TYPE_QUERY_POOL, reinterpret_cast<u64>(vkPool), desc.DebugName);
 
   QueryPool q;
   q.Desc = desc;
@@ -2068,16 +1916,14 @@ QueryPool VulkanDevice::CreateTimestampQueryPool(
   return q;
 }
 
-u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
-                                 ::std::span<u64> out) noexcept
+u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept
 {
   if (!pool.IsValid() || out.empty())
     return 0;
   auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
   if (firstQuery >= qd->Count)
     return 0;
-  const u32 count = static_cast<u32>(
-      ::std::min<::std::size_t>(out.size(), qd->Count - firstQuery));
+  const u32 count = static_cast<u32>(::std::min<::std::size_t>(out.size(), qd->Count - firstQuery));
 
   ::std::size_t stagingCount = count;
   u64 staging[64];
@@ -2089,16 +1935,14 @@ u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
     ticks = heapStaging.data();
   }
 
-  VkResult res = vkGetQueryPoolResults(
-      m_Device, qd->QueryPool, firstQuery, count, sizeof(u64) * count, ticks,
-      sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+  VkResult res = vkGetQueryPoolResults(m_Device, qd->QueryPool, firstQuery, count, sizeof(u64) * count, ticks,
+                                       sizeof(u64), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
   if (res != VK_SUCCESS)
     return 0;
 
   const f32 periodNs = qd->TimestampPeriodNs;
   for (u32 i = 0; i < count; ++i)
-    out[i] = static_cast<u64>(static_cast<f64>(ticks[i]) *
-                              static_cast<f64>(periodNs));
+    out[i] = static_cast<u64>(static_cast<f64>(ticks[i]) * static_cast<f64>(periodNs));
   return count;
 }
 
@@ -2106,8 +1950,7 @@ u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery,
 // GPU profiler
 // ------------------------------------------------------------
 
-void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
-                                      u32 count) noexcept
+void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery, u32 count) noexcept
 {
   if (!pool.IsValid() || count == 0)
     return;
@@ -2136,8 +1979,7 @@ void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
   }
 }
 
-::gecko::Unique<IGpuSampler> VulkanDevice::CreateGpuSampler(
-    const GpuSamplerDesc& desc) noexcept
+::gecko::Unique<IGpuSampler> VulkanDevice::CreateGpuSampler(const GpuSamplerDesc& desc) noexcept
 {
   if (!m_Valid)
     return nullptr;
@@ -2151,8 +1993,7 @@ void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
 // Debug naming
 // ------------------------------------------------------------
 
-void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
-                                 const char* name) const noexcept
+void VulkanDevice::SetObjectName(VkObjectType type, u64 handle, const char* name) const noexcept
 {
   if (!m_HasDebugUtils || name == nullptr || handle == 0)
     return;
@@ -2172,8 +2013,7 @@ void VulkanDevice::SetObjectName(VkObjectType type, u64 handle,
 // Uploads
 // ------------------------------------------------------------
 
-void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
-                                 void* ctx) noexcept
+void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*), void* ctx) noexcept
 {
   // Use the caller's per-thread pool so this can be invoked from any
   // thread (texture/buffer uploads may happen off the main thread).
@@ -2207,9 +2047,8 @@ void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
   vkFreeCommandBuffers(m_Device, pool, 1, &cmdBuf);
 }
 
-void VulkanDevice::UploadTextureData(Texture& texture,
-                                     ::std::span<const ::gecko::byte> data,
-                                     u32 mip, u32 slice) noexcept
+void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip,
+                                     u32 slice) noexcept
 {
   if (!texture.IsValid() || data.empty())
     return;
@@ -2224,18 +2063,14 @@ void VulkanDevice::UploadTextureData(Texture& texture,
 
   VmaAllocationCreateInfo allocCreateInfo {};
   allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-  allocCreateInfo.flags =
-      VMA_ALLOCATION_CREATE_MAPPED_BIT |
-      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+  allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
   VkBuffer staging = VK_NULL_HANDLE;
   VmaAllocation stagingAlloc = nullptr;
   VmaAllocationInfo info {};
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &staging, &stagingAlloc, &info) != VK_SUCCESS)
+  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &staging, &stagingAlloc, &info) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::UploadTextureData staging allocation failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::UploadTextureData staging allocation failed");
     return;
   }
   ::std::memcpy(info.pMappedData, data.data(), data.size());
@@ -2253,10 +2088,8 @@ void VulkanDevice::UploadTextureData(Texture& texture,
       [](VkCommandBuffer cmdBuf, void* c) {
         auto* x = static_cast<Ctx*>(c);
 
-        auto transition = [&](VkImageLayout oldL, VkImageLayout newL,
-                              VkAccessFlags srcA, VkAccessFlags dstA,
-                              VkPipelineStageFlags srcS,
-                              VkPipelineStageFlags dstS) {
+        auto transition = [&](VkImageLayout oldL, VkImageLayout newL, VkAccessFlags srcA, VkAccessFlags dstA,
+                              VkPipelineStageFlags srcS, VkPipelineStageFlags dstS) {
           VkImageMemoryBarrier barrier {};
           barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
           barrier.oldLayout = oldL;
@@ -2271,19 +2104,14 @@ void VulkanDevice::UploadTextureData(Texture& texture,
           barrier.subresourceRange.layerCount = 1;
           barrier.srcAccessMask = srcA;
           barrier.dstAccessMask = dstA;
-          vkCmdPipelineBarrier(cmdBuf, srcS, dstS, 0, 0, nullptr, 0, nullptr, 1,
-                               &barrier);
+          vkCmdPipelineBarrier(cmdBuf, srcS, dstS, 0, 0, nullptr, 0, nullptr, 1, &barrier);
         };
 
-        transition(x->OldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0,
-                   VK_ACCESS_TRANSFER_WRITE_BIT,
-                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT);
+        transition(x->OldLayout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
+                   VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT);
 
-        const u32 mipW =
-            (x->TD->Width >> x->Mip) > 0 ? (x->TD->Width >> x->Mip) : 1;
-        const u32 mipH =
-            (x->TD->Height >> x->Mip) > 0 ? (x->TD->Height >> x->Mip) : 1;
+        const u32 mipW = (x->TD->Width >> x->Mip) > 0 ? (x->TD->Width >> x->Mip) : 1;
+        const u32 mipH = (x->TD->Height >> x->Mip) > 0 ? (x->TD->Height >> x->Mip) : 1;
 
         VkBufferImageCopy copyRegion {};
         copyRegion.imageSubresource.aspectMask = x->TD->Aspect;
@@ -2291,14 +2119,10 @@ void VulkanDevice::UploadTextureData(Texture& texture,
         copyRegion.imageSubresource.baseArrayLayer = x->Slice;
         copyRegion.imageSubresource.layerCount = 1;
         copyRegion.imageExtent = {mipW, mipH, 1};
-        vkCmdCopyBufferToImage(cmdBuf, x->Src, x->TD->Image,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                               &copyRegion);
+        vkCmdCopyBufferToImage(cmdBuf, x->Src, x->TD->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 
-        transition(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                   VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-                   VK_PIPELINE_STAGE_TRANSFER_BIT,
+        transition(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                   VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                    VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
       },
       &ctx);
@@ -2307,9 +2131,7 @@ void VulkanDevice::UploadTextureData(Texture& texture,
   vmaDestroyBuffer(m_Allocator, staging, stagingAlloc);
 }
 
-void VulkanDevice::UploadBufferData(Buffer& buffer,
-                                    ::std::span<const ::gecko::byte> data,
-                                    u32 offset) noexcept
+void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data, u32 offset) noexcept
 {
   if (!buffer.IsValid() || data.empty())
     return;
@@ -2324,18 +2146,14 @@ void VulkanDevice::UploadBufferData(Buffer& buffer,
 
   VmaAllocationCreateInfo allocCreateInfo {};
   allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-  allocCreateInfo.flags =
-      VMA_ALLOCATION_CREATE_MAPPED_BIT |
-      VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+  allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
 
   VkBuffer staging = VK_NULL_HANDLE;
   VmaAllocation stagingAlloc = nullptr;
   VmaAllocationInfo info {};
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &staging, &stagingAlloc, &info) != VK_SUCCESS)
+  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &staging, &stagingAlloc, &info) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::UploadBufferData staging allocation failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::UploadBufferData staging allocation failed");
     return;
   }
 

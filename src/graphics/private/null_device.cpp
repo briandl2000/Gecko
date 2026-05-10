@@ -2,8 +2,7 @@
 
 namespace gecko::graphics {
 
-Swapchain NullDevice::CreateSwapchain(
-    const ::gecko::platform::NativeWindowHandle&, const SwapchainDesc&) noexcept
+Swapchain NullDevice::CreateSwapchain(const ::gecko::platform::NativeWindowHandle&, const SwapchainDesc&) noexcept
 {
   return Swapchain {};
 }
@@ -74,14 +73,12 @@ Sampler NullDevice::CreateSampler(const SamplerDesc&) noexcept
   return Sampler {};
 }
 
-GraphicsPipeline NullDevice::CreateGraphicsPipeline(
-    const GraphicsPipelineDesc&) noexcept
+GraphicsPipeline NullDevice::CreateGraphicsPipeline(const GraphicsPipelineDesc&) noexcept
 {
   return GraphicsPipeline {};
 }
 
-ComputePipeline NullDevice::CreateComputePipeline(
-    const ComputePipelineDesc&) noexcept
+ComputePipeline NullDevice::CreateComputePipeline(const ComputePipelineDesc&) noexcept
 {
   return ComputePipeline {};
 }
@@ -96,12 +93,10 @@ u32 NullDevice::ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept
   return 0;
 }
 
-void NullDevice::UploadTextureData(Texture&, ::std::span<const ::gecko::byte>,
-                                   u32, u32) noexcept
+void NullDevice::UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32, u32) noexcept
 {}
 
-void NullDevice::UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>,
-                                  u32) noexcept
+void NullDevice::UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>, u32) noexcept
 {}
 
 }  // namespace gecko::graphics

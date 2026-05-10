@@ -4,9 +4,7 @@
 
 namespace gecko::runtime {
 
-StandardLogSinks::StandardLogSinks(const char* logFilePath,
-                                   LogLevel level) noexcept
-    : m_File(logFilePath)
+StandardLogSinks::StandardLogSinks(const char* logFilePath, LogLevel level) noexcept : m_File(logFilePath)
 {
   // Detect a *real* published logger via the registry. `GetLogger()`
   // would never return null (it falls back to a process-wide null

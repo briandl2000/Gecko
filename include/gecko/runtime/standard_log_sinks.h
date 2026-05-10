@@ -33,8 +33,7 @@ class StandardLogSinks
 public:
   /// @param logFilePath Path to the log file, opened for append.
   /// @param level Logger level set after attaching the sinks.
-  explicit StandardLogSinks(const char* logFilePath = "log.txt",
-                            LogLevel level = LogLevel::Info) noexcept;
+  explicit StandardLogSinks(const char* logFilePath = "log.txt", LogLevel level = LogLevel::Info) noexcept;
   ~StandardLogSinks() noexcept;
 
   StandardLogSinks(const StandardLogSinks&) = delete;

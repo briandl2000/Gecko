@@ -168,8 +168,7 @@ TEST_CASE("ModuleRegistry unregister module", "[runtime][modules]")
   REQUIRE(found == nullptr);
 }
 
-TEST_CASE("ModuleRegistry StartupAllModules calls Startup",
-          "[runtime][modules]")
+TEST_CASE("ModuleRegistry StartupAllModules calls Startup", "[runtime][modules]")
 {
   TestServiceScope scope;
 
@@ -188,8 +187,7 @@ TEST_CASE("ModuleRegistry StartupAllModules calls Startup",
   scope.modules().ShutdownAllModules();
 }
 
-TEST_CASE("ModuleRegistry ShutdownAllModules calls Shutdown",
-          "[runtime][modules]")
+TEST_CASE("ModuleRegistry ShutdownAllModules calls Shutdown", "[runtime][modules]")
 {
   TestServiceScope scope;
 
@@ -202,8 +200,7 @@ TEST_CASE("ModuleRegistry ShutdownAllModules calls Shutdown",
   REQUIRE(mod.m_ShutdownCalled);
 }
 
-TEST_CASE("ModuleRegistry GetModule returns null for unknown",
-          "[runtime][modules]")
+TEST_CASE("ModuleRegistry GetModule returns null for unknown", "[runtime][modules]")
 {
   TestServiceScope scope;
 
@@ -211,8 +208,7 @@ TEST_CASE("ModuleRegistry GetModule returns null for unknown",
   REQUIRE(scope.modules().GetModule(unknown) == nullptr);
 }
 
-TEST_CASE("ModuleRegistry ForEachModule visits all modules",
-          "[runtime][modules]")
+TEST_CASE("ModuleRegistry ForEachModule visits all modules", "[runtime][modules]")
 {
   TestServiceScope scope;
 
@@ -222,11 +218,8 @@ TEST_CASE("ModuleRegistry ForEachModule visits all modules",
   auto reg2 = scope.modules().RegisterStatic(mod2);
 
   int visitCount = 0;
-  scope.modules().ForEachModule(
-      [](IModule&, bool, void* user) noexcept {
-        *static_cast<int*>(user) += 1;
-      },
-      &visitCount);
+  scope.modules().ForEachModule([](IModule&, bool, void* user) noexcept { *static_cast<int*>(user) += 1; },
+                                &visitCount);
 
   // Engine starts the test scope with a RuntimeModule already
   // registered; the two MockModules registered above bring the total to three.
@@ -235,10 +228,9 @@ TEST_CASE("ModuleRegistry ForEachModule visits all modules",
   scope.modules().ShutdownAllModules();
 }
 
-TEST_CASE(
-    "Topological sort starts services-publisher before a Requires()-declaring "
-    "module so its Startup observes live, non-null service implementations",
-    "[runtime][modules][topo]")
+TEST_CASE("Topological sort starts services-publisher before a Requires()-declaring "
+          "module so its Startup observes live, non-null service implementations",
+          "[runtime][modules][topo]")
 {
   // Build the engine ourselves so we can register the spy module up
   // front and observe the topological start order. The spy is
@@ -276,8 +268,7 @@ TEST_CASE(
   ResetAllocator();
 }
 
-TEST_CASE("Topological sort orders Platform and Graphics after Runtime",
-          "[runtime][modules][topo]")
+TEST_CASE("Topological sort orders Platform and Graphics after Runtime", "[runtime][modules][topo]")
 {
   SystemAllocator alloc;
   REQUIRE(SetAllocator(&alloc));
@@ -297,8 +288,7 @@ TEST_CASE("Topological sort orders Platform and Graphics after Runtime",
 
   // All published services must be visible after Startup.
   REQUIRE(engine->Modules().Service<IJobSystem>() == &jobs);
-  REQUIRE(engine->Modules().Service<::gecko::graphics::GraphicsDevice>() !=
-          nullptr);
+  REQUIRE(engine->Modules().Service<::gecko::graphics::GraphicsDevice>() != nullptr);
   REQUIRE(::gecko::platform::GetWindows() != nullptr);
   REQUIRE(::gecko::graphics::GetGraphicsDevice() != nullptr);
 

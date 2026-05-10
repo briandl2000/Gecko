@@ -33,9 +33,7 @@ struct TestServiceScope
     return cfg;
   }
 
-  TestServiceScope()
-      : runtimeMod(jobs, profiler, logger, events),
-        platformMod(MakeNullConfig())
+  TestServiceScope() : runtimeMod(jobs, profiler, logger, events), platformMod(MakeNullConfig())
   {
     REQUIRE(SetAllocator(&alloc));
     engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
@@ -98,10 +96,7 @@ TEST_CASE("Null backend: request close enqueues event", "[platform][context]")
   int received = 0;
   auto sub = gecko::SubscribeEvent(
       events::WindowCloseRequested,
-      [](void* user, const gecko::EventMeta&, gecko::EventView) {
-        (*static_cast<int*>(user))++;
-      },
-      &received);
+      [](void* user, const gecko::EventMeta&, gecko::EventView) { (*static_cast<int*>(user))++; }, &received);
 
   PumpEvents();
   (void)gecko::DispatchEvents();
@@ -158,8 +153,7 @@ TEST_CASE("Null backend: PumpEvents doesn't crash", "[platform][context]")
   PumpEvents();
 }
 
-TEST_CASE("Null backend: invalid window operations are safe",
-          "[platform][context]")
+TEST_CASE("Null backend: invalid window operations are safe", "[platform][context]")
 {
   TestServiceScope scope;
 
@@ -214,8 +208,7 @@ TEST_CASE("Null backend: set and get position", "[platform][context]")
   GetWindows()->DestroyWindow(win);
 }
 
-TEST_CASE("Null backend: set position fires WindowMoved event",
-          "[platform][context]")
+TEST_CASE("Null backend: set position fires WindowMoved event", "[platform][context]")
 {
   TestServiceScope scope;
 
@@ -223,10 +216,7 @@ TEST_CASE("Null backend: set position fires WindowMoved event",
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
-      events::WindowMoved,
-      [](void* user, const gecko::EventMeta&, gecko::EventView) {
-        (*static_cast<int*>(user))++;
-      },
+      events::WindowMoved, [](void* user, const gecko::EventMeta&, gecko::EventView) { (*static_cast<int*>(user))++; },
       &received);
 
   GetWindows()->SetPosition(win, {50, 75});
@@ -255,8 +245,7 @@ TEST_CASE("Null backend: set and get window state", "[platform][context]")
   GetWindows()->DestroyWindow(win);
 }
 
-TEST_CASE("Null backend: set state fires WindowStateChanged event",
-          "[platform][context]")
+TEST_CASE("Null backend: set state fires WindowStateChanged event", "[platform][context]")
 {
   TestServiceScope scope;
 
@@ -265,10 +254,7 @@ TEST_CASE("Null backend: set state fires WindowStateChanged event",
   int received = 0;
   auto sub = gecko::SubscribeEvent(
       events::WindowStateChanged,
-      [](void* user, const gecko::EventMeta&, gecko::EventView) {
-        (*static_cast<int*>(user))++;
-      },
-      &received);
+      [](void* user, const gecko::EventMeta&, gecko::EventView) { (*static_cast<int*>(user))++; }, &received);
 
   GetWindows()->SetWindowState(win, WindowState::Hidden);
   PumpEvents();
@@ -339,8 +325,7 @@ TEST_CASE("Null backend: hidden window has Hidden state", "[platform][context]")
 
 // ── Monitor backend tests ──────────────────────────────────────────────
 
-TEST_CASE("Null monitor backend: enumerates one virtual monitor",
-          "[platform][context]")
+TEST_CASE("Null monitor backend: enumerates one virtual monitor", "[platform][context]")
 {
   TestServiceScope scope;
 
@@ -366,8 +351,7 @@ TEST_CASE("Null monitor backend: get handle by index", "[platform][context]")
   REQUIRE_FALSE(invalid.IsValid());
 }
 
-TEST_CASE("Null monitor backend: monitor properties are valid",
-          "[platform][context]")
+TEST_CASE("Null monitor backend: monitor properties are valid", "[platform][context]")
 {
   TestServiceScope scope;
 
@@ -391,8 +375,7 @@ TEST_CASE("Null monitor backend: bounds and work area", "[platform][context]")
   REQUIRE_FALSE(mb.WorkArea.IsEmpty());
 }
 
-TEST_CASE("Null monitor backend: invalid handle returns false",
-          "[platform][context]")
+TEST_CASE("Null monitor backend: invalid handle returns false", "[platform][context]")
 {
   TestServiceScope scope;
 
@@ -407,8 +390,7 @@ TEST_CASE("Null monitor backend: invalid handle returns false",
 
 // ── Event delivery tests ───────────────────────────────────────────────
 
-TEST_CASE("Null backend: destroy window enqueues WindowClosed event",
-          "[platform][context]")
+TEST_CASE("Null backend: destroy window enqueues WindowClosed event", "[platform][context]")
 {
   TestServiceScope scope;
 
@@ -416,10 +398,7 @@ TEST_CASE("Null backend: destroy window enqueues WindowClosed event",
 
   int received = 0;
   auto sub = gecko::SubscribeEvent(
-      events::WindowClosed,
-      [](void* user, const gecko::EventMeta&, gecko::EventView) {
-        (*static_cast<int*>(user))++;
-      },
+      events::WindowClosed, [](void* user, const gecko::EventMeta&, gecko::EventView) { (*static_cast<int*>(user))++; },
       &received);
 
   GetWindows()->DestroyWindow(win);
@@ -465,8 +444,7 @@ TEST_CASE("PlatformModule stores resolved config", "[platform][context]")
 // the service, instead of constructing its own default. Verifies the
 // "user owns the memory" rule documented in MODULE_API_SHAPING.md.
 
-TEST_CASE("PlatformModule publishes injected backends",
-          "[platform][context][injection]")
+TEST_CASE("PlatformModule publishes injected backends", "[platform][context][injection]")
 {
   PlatformConfig cfg;
   cfg.Backend = DisplayBackendKind::Null;

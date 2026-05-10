@@ -65,8 +65,7 @@ bool DirIterNext(void* handle, DirEntry* out) noexcept
     struct dirent* e = ::readdir(d);
     if (!e)
       return false;
-    if (e->d_name[0] == '.' &&
-        (e->d_name[1] == '\0' || (e->d_name[1] == '.' && e->d_name[2] == '\0')))
+    if (e->d_name[0] == '.' && (e->d_name[1] == '\0' || (e->d_name[1] == '.' && e->d_name[2] == '\0')))
       continue;
     try
     {
@@ -127,8 +126,7 @@ public:
   {
     if (m_Fd < 0)
       return static_cast<::gecko::u64>(-1);
-    off_t r = ::lseek(m_Fd, static_cast<off_t>(offset),
-                      fromEnd ? SEEK_END : SEEK_SET);
+    off_t r = ::lseek(m_Fd, static_cast<off_t>(offset), fromEnd ? SEEK_END : SEEK_SET);
     if (r < 0)
       return static_cast<::gecko::u64>(-1);
     return static_cast<::gecko::u64>(r);
@@ -243,12 +241,10 @@ MappedFile Map(PathView path) noexcept
     ::close(fd);
     return {};
   }
-  return MappedFile {static_cast<const ::std::byte*>(addr), size, h,
-                     &UnmapLinux};
+  return MappedFile {static_cast<const ::std::byte*>(addr), size, h, &UnmapLinux};
 }
 
-WriteResult Write(PathView path, ::std::span<const ::std::byte> data,
-                  WriteMode mode) noexcept
+WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode mode) noexcept
 {
   auto p = ToCString(path);
   int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
@@ -272,8 +268,7 @@ WriteResult Write(PathView path, ::std::span<const ::std::byte> data,
     total += static_cast<::std::size_t>(n);
   }
   ::close(fd);
-  return WriteResult {.Ok = true,
-                      .BytesWritten = static_cast<::gecko::u64>(total)};
+  return WriteResult {.Ok = true, .BytesWritten = static_cast<::gecko::u64>(total)};
 }
 
 bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept

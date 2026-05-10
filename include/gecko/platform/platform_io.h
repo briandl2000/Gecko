@@ -101,8 +101,7 @@ public:
   using Deleter = void (*)(void* handle) noexcept;
 
   MappedFile() noexcept = default;
-  MappedFile(const ::std::byte* data, ::std::size_t size, void* handle,
-             Deleter deleter) noexcept;
+  MappedFile(const ::std::byte* data, ::std::size_t size, void* handle, Deleter deleter) noexcept;
 
   MappedFile(const MappedFile&) = delete;
   MappedFile& operator=(const MappedFile&) = delete;
@@ -211,19 +210,16 @@ public:
 [[nodiscard]] GECKO_API MappedFile Map(PathView path) noexcept;
 
 // Whole-file write (truncate or append)
-GECKO_API WriteResult Write(PathView path, ::std::span<const ::std::byte> data,
-                            WriteMode mode) noexcept;
+GECKO_API WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode mode) noexcept;
 
 // Atomic replace via tmp+rename (with fsync on Linux, MOVEFILE_REPLACE
 // on Win32). Returns false on any step failure.
-[[nodiscard]] GECKO_API bool AtomicWrite(
-    PathView path, ::std::span<const ::std::byte> data) noexcept;
+[[nodiscard]] GECKO_API bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept;
 
 // Streaming write handle. Append mode positions cursor at EOF but does
 // NOT enable POSIX O_APPEND; subsequent Seek+Write may overwrite
 // anywhere. Returns null on failure.
-[[nodiscard]] GECKO_API ::gecko::Unique<FileWriter> OpenWrite(
-    PathView path, WriteMode mode) noexcept;
+[[nodiscard]] GECKO_API ::gecko::Unique<FileWriter> OpenWrite(PathView path, WriteMode mode) noexcept;
 
 // Directory operations
 GECKO_API bool CreateDir(PathView path, bool recursive) noexcept;
@@ -234,7 +230,6 @@ GECKO_API bool Remove(PathView path) noexcept;
 // ExePath includes the executable name; WorkingDir does not.
 [[nodiscard]] GECKO_API ::std::string ExePath() noexcept;
 [[nodiscard]] GECKO_API ::std::string WorkingDir() noexcept;
-[[nodiscard]] GECKO_API ::std::string UserDataDir(
-    ::std::string_view appName) noexcept;
+[[nodiscard]] GECKO_API ::std::string UserDataDir(::std::string_view appName) noexcept;
 
 }  // namespace gecko::platform

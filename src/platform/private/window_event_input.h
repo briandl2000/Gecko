@@ -39,16 +39,12 @@ public:
   [[nodiscard]] bool WasKeyPressed(KeyCode key) const noexcept override;
   [[nodiscard]] bool WasKeyReleased(KeyCode key) const noexcept override;
 
-  [[nodiscard]] bool IsMouseButtonDown(
-      MouseButton button) const noexcept override;
-  [[nodiscard]] bool WasMouseButtonPressed(
-      MouseButton button) const noexcept override;
-  [[nodiscard]] bool WasMouseButtonReleased(
-      MouseButton button) const noexcept override;
+  [[nodiscard]] bool IsMouseButtonDown(MouseButton button) const noexcept override;
+  [[nodiscard]] bool WasMouseButtonPressed(MouseButton button) const noexcept override;
+  [[nodiscard]] bool WasMouseButtonReleased(MouseButton button) const noexcept override;
 
   [[nodiscard]] MousePosition GetMousePosition() const noexcept override;
-  [[nodiscard]] MousePosition GetMousePosition(
-      WindowHandle window) const noexcept override;
+  [[nodiscard]] MousePosition GetMousePosition(WindowHandle window) const noexcept override;
   [[nodiscard]] MousePosition GetMouseDelta() const noexcept override;
   [[nodiscard]] float GetMouseScrollX() const noexcept override;
   [[nodiscard]] float GetMouseScrollY() const noexcept override;
@@ -60,22 +56,14 @@ public:
 
 private:
   // Event handlers (registered as static C-style callbacks).
-  static void OnKey(void* user, const ::gecko::EventMeta& meta,
-                    ::gecko::EventView view) noexcept;
-  static void OnChar(void* user, const ::gecko::EventMeta& meta,
-                     ::gecko::EventView view) noexcept;
-  static void OnMouseMove(void* user, const ::gecko::EventMeta& meta,
-                          ::gecko::EventView view) noexcept;
-  static void OnMouseButton(void* user, const ::gecko::EventMeta& meta,
-                            ::gecko::EventView view) noexcept;
-  static void OnMouseWheel(void* user, const ::gecko::EventMeta& meta,
-                           ::gecko::EventView view) noexcept;
-  static void OnFocusChanged(void* user, const ::gecko::EventMeta& meta,
-                             ::gecko::EventView view) noexcept;
-  static void OnMouseEntered(void* user, const ::gecko::EventMeta& meta,
-                             ::gecko::EventView view) noexcept;
-  static void OnMouseExited(void* user, const ::gecko::EventMeta& meta,
-                            ::gecko::EventView view) noexcept;
+  static void OnKey(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnChar(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnMouseMove(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnMouseButton(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnMouseWheel(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnFocusChanged(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnMouseEntered(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnMouseExited(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
 
   // -- State ----------------------------------------------------
   ::std::array<bool, KeyCount> m_KeyDown {};

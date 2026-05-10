@@ -19,8 +19,7 @@
 
 namespace gecko::graphics {
 
-VkResult CreateXlibSurface(VkInstance instance,
-                           const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateXlibSurface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
                            VkSurfaceKHR* out) noexcept
 {
   VkXlibSurfaceCreateInfoKHR sci {};
@@ -28,12 +27,10 @@ VkResult CreateXlibSurface(VkInstance instance,
   sci.dpy = static_cast<Display*>(native.Display);
   sci.window = reinterpret_cast<Window>(native.Handle);
 
-  auto fn = reinterpret_cast<PFN_vkCreateXlibSurfaceKHR>(
-      vkGetInstanceProcAddr(instance, "vkCreateXlibSurfaceKHR"));
+  auto fn = reinterpret_cast<PFN_vkCreateXlibSurfaceKHR>(vkGetInstanceProcAddr(instance, "vkCreateXlibSurfaceKHR"));
   if (fn == nullptr)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanSurface: vkCreateXlibSurfaceKHR not available");
+    GECKO_ERROR(labels::Vulkan, "VulkanSurface: vkCreateXlibSurfaceKHR not available");
     return VK_ERROR_EXTENSION_NOT_PRESENT;
   }
   return fn(instance, &sci, nullptr, out);

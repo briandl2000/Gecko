@@ -152,8 +152,7 @@ void Print(TermStream stream, TermColor fg, ::std::string_view text) noexcept
   ::std::fflush(f);
 }
 
-void PrintLine(TermStream stream, TermColor fg,
-               ::std::string_view text) noexcept
+void PrintLine(TermStream stream, TermColor fg, ::std::string_view text) noexcept
 {
   Print(stream, fg, text);
   ::std::fputc('\n', StreamFile(stream));

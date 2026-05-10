@@ -100,14 +100,14 @@ struct DpiInfo
 /// Description of a window to be created via `IWindows::Create`.
 struct WindowDesc
 {
-  const char* Title {"Gecko"};             ///< UTF-8 title.
-  math::Int2 Size {1280, 720};             ///< Initial client size in pixels.
-  WindowMode Mode {WindowMode::Windowed};  ///< Initial presentation mode.
+  const char* Title {"Gecko"};                 ///< UTF-8 title.
+  math::Int2 Size {1280, 720};                 ///< Initial client size in pixels.
+  WindowMode Mode {WindowMode::Windowed};      ///< Initial presentation mode.
   WindowButtons Buttons {WindowButtons::All};  ///< Visible titlebar buttons.
   bool Resizable {true};                       ///< User may resize the frame.
   bool Visible {true};                         ///< Show the window on creation.
-  bool Decorated {true};  ///< Draw native chrome (title, border).
-  bool HighDpi {true};    ///< Opt into per-monitor DPI awareness.
+  bool Decorated {true};                       ///< Draw native chrome (title, border).
+  bool HighDpi {true};                         ///< Opt into per-monitor DPI awareness.
 };
 
 /// Opaque native window pointers, useful for handing off to a graphics
@@ -115,12 +115,11 @@ struct WindowDesc
 /// `Display` depends on `Backend`.
 struct NativeWindowHandle
 {
-  DisplayBackendKind Backend {
-      DisplayBackendKind::Unknown};  ///< Active backend.
-  void* Handle {nullptr};   ///< Native window handle (HWND, xcb_window_t,
-                            ///< wl_surface*, ...).
-  void* Display {nullptr};  ///< Native display/connection (X Display*,
-                            ///< wl_display*, nullptr on Win32).
+  DisplayBackendKind Backend {DisplayBackendKind::Unknown};  ///< Active backend.
+  void* Handle {nullptr};                                    ///< Native window handle (HWND, xcb_window_t,
+                                                             ///< wl_surface*, ...).
+  void* Display {nullptr};                                   ///< Native display/connection (X Display*,
+                                                             ///< wl_display*, nullptr on Win32).
 };
 
 }  // namespace gecko::platform

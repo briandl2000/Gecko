@@ -40,26 +40,21 @@ IInput* g_Input = nullptr;
 
 }  // namespace
 
-PlatformModule::PlatformModule(const PlatformConfig& config) noexcept
-    : m_Config(Resolve(config))
+PlatformModule::PlatformModule(const PlatformConfig& config) noexcept : m_Config(Resolve(config))
 {}
 
-PlatformModule::PlatformModule(const PlatformConfig& config,
-                               Backends backends) noexcept
-    : m_Config(Resolve(config)), m_Windows(backends.Windows),
-      m_Monitors(backends.Monitors)
+PlatformModule::PlatformModule(const PlatformConfig& config, Backends backends) noexcept
+    : m_Config(Resolve(config)), m_Windows(backends.Windows), m_Monitors(backends.Monitors)
 {}
 
 PlatformModule::~PlatformModule() noexcept = default;
 
-::gecko::Span<const ::gecko::ServiceId> PlatformModule::Requires()
-    const noexcept
+::gecko::Span<const ::gecko::ServiceId> PlatformModule::Requires() const noexcept
 {
   return ::gecko::Span<const ::gecko::ServiceId> {RequiredServices};
 }
 
-::gecko::Span<const ::gecko::ServiceId> PlatformModule::Publishes()
-    const noexcept
+::gecko::Span<const ::gecko::ServiceId> PlatformModule::Publishes() const noexcept
 {
   return ::gecko::Span<const ::gecko::ServiceId> {PublishedServices};
 }
@@ -184,8 +179,7 @@ void PumpEvents() noexcept
   g_Monitors->PumpEvents(*g_Emitter);
 }
 
-void SetModalFrameCallback(IWindowsBackend::ModalFrameFn callback,
-                           void* userData) noexcept
+void SetModalFrameCallback(IWindowsBackend::ModalFrameFn callback, void* userData) noexcept
 {
   if (g_Windows)
     g_Windows->SetModalFrameCallback(callback, userData);

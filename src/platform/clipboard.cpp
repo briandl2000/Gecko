@@ -26,14 +26,12 @@ namespace gecko::platform {
     auto* wide = static_cast<const wchar_t*>(::GlobalLock(handle));
     if (wide != nullptr)
     {
-      const int needed = ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0,
-                                               nullptr, nullptr);
+      const int needed = ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
       if (needed > 1)
       {
         // -1 to drop the null terminator from std::string size.
         out.resize(static_cast<::std::size_t>(needed - 1));
-        ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, out.data(), needed, nullptr,
-                              nullptr);
+        ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, out.data(), needed, nullptr, nullptr);
       }
       ::GlobalUnlock(handle);
     }
@@ -49,8 +47,7 @@ bool SetClipboardText(::std::string_view utf8) noexcept
 
   bool ok = false;
   // +1 source byte so terminating-null path works even with empty input.
-  const int wideLen = ::MultiByteToWideChar(
-      CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
+  const int wideLen = ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
   // wideLen is the count of wchars NOT including any terminator; we add
   // one for our own null.
   const ::SIZE_T bytes = (static_cast<::SIZE_T>(wideLen) + 1) * sizeof(wchar_t);
@@ -62,8 +59,7 @@ bool SetClipboardText(::std::string_view utf8) noexcept
     {
       if (wideLen > 0)
       {
-        ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(),
-                              static_cast<int>(utf8.size()), dst, wideLen);
+        ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), dst, wideLen);
       }
       dst[wideLen] = L'\0';
       ::GlobalUnlock(mem);
@@ -129,8 +125,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
   // DefaultScreen / RootWindow are X11 macros, not real symbols, so
   // they cannot be reached through `::` qualification.
   const int screen = DefaultScreen(display);
-  s.OwnerWindow = ::XCreateSimpleWindow(display, RootWindow(display, screen), 0,
-                                        0, 1, 1, 0, 0, 0);
+  s.OwnerWindow = ::XCreateSimpleWindow(display, RootWindow(display, screen), 0, 0, 1, 1, 0, 0, 0);
   return s.OwnerWindow;
 }
 
@@ -179,9 +174,8 @@ X11ClipboardOwnerState& OwnerState() noexcept
   unsigned long nItems = 0;
   unsigned long bytesAfter = 0;
   unsigned char* data = nullptr;
-  if (::XGetWindowProperty(display, window, prop, 0, ~0L, True, AnyPropertyType,
-                           &actualType, &actualFormat, &nItems, &bytesAfter,
-                           &data) != Success)
+  if (::XGetWindowProperty(display, window, prop, 0, ~0L, True, AnyPropertyType, &actualType, &actualFormat, &nItems,
+                           &bytesAfter, &data) != Success)
     return {};
 
   ::std::string out;
@@ -227,15 +221,13 @@ namespace gecko::platform {
 
 ::std::string GetClipboardText() noexcept
 {
-  GECKO_WARN("gecko.platform.clipboard",
-             "GetClipboardText: Wayland clipboard not yet implemented");
+  GECKO_WARN("gecko.platform.clipboard", "GetClipboardText: Wayland clipboard not yet implemented");
   return {};
 }
 
 bool SetClipboardText(::std::string_view) noexcept
 {
-  GECKO_WARN("gecko.platform.clipboard",
-             "SetClipboardText: Wayland clipboard not yet implemented");
+  GECKO_WARN("gecko.platform.clipboard", "SetClipboardText: Wayland clipboard not yet implemented");
   return false;
 }
 

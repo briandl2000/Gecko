@@ -35,17 +35,15 @@ struct WindowConfig
 /// Monitor-subsystem configuration.
 struct MonitorConfig
 {
-  bool EnableHotplugEvents {
-      true};  ///< Emit monitor add/remove events at runtime.
+  bool EnableHotplugEvents {true};  ///< Emit monitor add/remove events at runtime.
 };
 
 /// Top-level platform-module configuration.
 struct PlatformConfig
 {
-  DisplayBackendKind Backend {
-      DisplayBackendKind::Auto};  ///< Selected display backend.
-  WindowConfig Window;            ///< Window-subsystem options.
-  MonitorConfig Monitor;          ///< Monitor-subsystem options.
+  DisplayBackendKind Backend {DisplayBackendKind::Auto};  ///< Selected display backend.
+  WindowConfig Window;                                    ///< Window-subsystem options.
+  MonitorConfig Monitor;                                  ///< Monitor-subsystem options.
 };
 
 // Config resolution -------------------------------------------------

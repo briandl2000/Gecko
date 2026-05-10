@@ -30,8 +30,7 @@ bool ThreadPoolJobSystem::Init() noexcept
     m_WorkerThreads.reserve(workerCount);
     for (u32 i = 0; i < workerCount; ++i)
     {
-      m_WorkerThreads.emplace_back(&ThreadPoolJobSystem::WorkerThreadFunction,
-                                   this, i);
+      m_WorkerThreads.emplace_back(&ThreadPoolJobSystem::WorkerThreadFunction, this, i);
     }
 
     m_Initialized = true;
@@ -40,9 +39,7 @@ bool ThreadPoolJobSystem::Init() noexcept
   catch (...)
   {
     // Use direct fprintf during Init() since Logger may not be available yet
-    std::fprintf(
-        stderr,
-        "[Gecko] Failed to create worker threads for ThreadPoolJobSystem\n");
+    std::fprintf(stderr, "[Gecko] Failed to create worker threads for ThreadPoolJobSystem\n");
     Shutdown();
     return false;
   }
@@ -74,8 +71,7 @@ void ThreadPoolJobSystem::Shutdown() noexcept
   m_Initialized = false;
 }
 
-JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, JobPriority priority,
-                                         Label label) noexcept
+JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, JobPriority priority, Label label) noexcept
 {
   // Profiler/logger may not exist yet at very early startup; the macros
   // route through GetProfiler()/GetLogger() which fall back to Null impls.
@@ -101,11 +97,8 @@ JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, JobPriority priority,
   return handle;
 }
 
-JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job,
-                                         const JobHandle* dependencies,
-                                         u32 dependencyCount,
-                                         JobPriority priority,
-                                         Label label) noexcept
+JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, const JobHandle* dependencies, u32 dependencyCount,
+                                         JobPriority priority, Label label) noexcept
 {
   GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit(deps)");
 
@@ -151,8 +144,7 @@ void ThreadPoolJobSystem::Wait(JobHandle handle) noexcept
   std::unique_lock<std::mutex> lock(m_Mutex);
   m_JobCompleted.wait(lock, [this, handle]() {
     auto it = m_ActiveJobs.find(handle.Id);
-    return it == m_ActiveJobs.end() ||
-           it->second->Completed.load(std::memory_order_acquire);
+    return it == m_ActiveJobs.end() || it->second->Completed.load(std::memory_order_acquire);
   });
 }
 
@@ -170,8 +162,7 @@ void ThreadPoolJobSystem::WaitAll(const JobHandle* handles, u32 count) noexcept
         continue;
 
       auto it = m_ActiveJobs.find(handles[i].Id);
-      if (it != m_ActiveJobs.end() &&
-          !it->second->Completed.load(std::memory_order_acquire))
+      if (it != m_ActiveJobs.end() && !it->second->Completed.load(std::memory_order_acquire))
       {
         return false;
       }
@@ -249,15 +240,12 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
   // pointer in a process-global table) and lets trace sinks emit
   // chrome-trace `thread_name` records for these workers.
   static constexpr const char* WorkerNames[] = {
-      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",
-      "job-worker-4",  "job-worker-5",  "job-worker-6",  "job-worker-7",
-      "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
+      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",  "job-worker-4",  "job-worker-5",
+      "job-worker-6",  "job-worker-7",  "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
       "job-worker-12", "job-worker-13", "job-worker-14", "job-worker-15",
   };
   const char* name =
-      (workerIndex < (sizeof(WorkerNames) / sizeof(WorkerNames[0])))
-          ? WorkerNames[workerIndex]
-          : "job-worker-N";
+      (workerIndex < (sizeof(WorkerNames) / sizeof(WorkerNames[0]))) ? WorkerNames[workerIndex] : "job-worker-N";
   ::gecko::SetThreadProfilerName(name);
 
   while (!m_Shutdown.load(std::memory_order_acquire))
@@ -268,10 +256,8 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
       // No jobs available, wait for notification
       GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::WorkerIdle");
       std::unique_lock<std::mutex> lock(m_Mutex);
-      m_JobAvailable.wait_for(lock, std::chrono::milliseconds(100), [this]() {
-        return m_Shutdown.load(std::memory_order_acquire) ||
-               !m_JobQueue.empty();
-      });
+      m_JobAvailable.wait_for(lock, std::chrono::milliseconds(100),
+                              [this]() { return m_Shutdown.load(std::memory_order_acquire) || !m_JobQueue.empty(); });
       continue;
     }
 
@@ -313,9 +299,7 @@ std::shared_ptr<Job> ThreadPoolJobSystem::GetNextReadyJob() noexcept
     return nullptr;
 
   // Find a job whose dependencies are complete
-  std::priority_queue<std::shared_ptr<Job>, std::vector<std::shared_ptr<Job>>,
-                      JobCompare>
-      tempQueue;
+  std::priority_queue<std::shared_ptr<Job>, std::vector<std::shared_ptr<Job>>, JobCompare> tempQueue;
   std::shared_ptr<Job> candidateJob = nullptr;
 
   while (!m_JobQueue.empty() && !candidateJob)
@@ -343,14 +327,12 @@ std::shared_ptr<Job> ThreadPoolJobSystem::GetNextReadyJob() noexcept
   return candidateJob;
 }
 
-bool ThreadPoolJobSystem::AreJobDependenciesComplete(
-    const std::shared_ptr<Job>& job) noexcept
+bool ThreadPoolJobSystem::AreJobDependenciesComplete(const std::shared_ptr<Job>& job) noexcept
 {
   for (const auto& dependency : job->Dependencies)
   {
     auto it = m_ActiveJobs.find(dependency.Id);
-    if (it != m_ActiveJobs.end() &&
-        !it->second->Completed.load(std::memory_order_acquire))
+    if (it != m_ActiveJobs.end() && !it->second->Completed.load(std::memory_order_acquire))
     {
       return false;
     }

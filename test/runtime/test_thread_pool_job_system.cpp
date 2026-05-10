@@ -63,8 +63,7 @@ TEST_CASE("ThreadPoolJobSystem job with dependencies", "[runtime][jobs]")
   int step = 0;
   JobHandle first = jobs.Submit([&step]() { step = 1; });
 
-  JobHandle second =
-      jobs.Submit([&step]() { step = step * 10 + 2; }, &first, 1);
+  JobHandle second = jobs.Submit([&step]() { step = step * 10 + 2; }, &first, 1);
 
   jobs.Wait(second);
   REQUIRE(step == 12);
@@ -125,8 +124,7 @@ TEST_CASE("ThreadPoolJobSystem labeled jobs", "[runtime][jobs]")
 
   Label label = MakeLabel("test.job");
   bool ran = false;
-  JobHandle h =
-      jobs.Submit([&ran]() { ran = true; }, JobPriority::Normal, label);
+  JobHandle h = jobs.Submit([&ran]() { ran = true; }, JobPriority::Normal, label);
   jobs.Wait(h);
   REQUIRE(ran);
 

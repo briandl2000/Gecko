@@ -10,17 +10,16 @@ using ::gecko::examples::app_skeleton::AppConfig;
 
 void PrintUsage(const char* exe)
 {
-  ::std::fprintf(
-      stderr,
-      "Usage: %s [options]\n\n"
-      "Options:\n"
-      "  --no-window           Run without creating a window\n"
-      "  --frames=N            Run N frames then exit (windowed only)\n"
-      "  --title=TEXT          Window title (windowed only)\n"
-      "  --backend=auto|null|xlib  Window backend (Linux only supports "
-      "xlib/auto today)\n"
-      "  --help                Show this help\n",
-      exe ? exe : "app_skeleton");
+  ::std::fprintf(stderr,
+                 "Usage: %s [options]\n\n"
+                 "Options:\n"
+                 "  --no-window           Run without creating a window\n"
+                 "  --frames=N            Run N frames then exit (windowed only)\n"
+                 "  --title=TEXT          Window title (windowed only)\n"
+                 "  --backend=auto|null|xlib  Window backend (Linux only supports "
+                 "xlib/auto today)\n"
+                 "  --help                Show this help\n",
+                 exe ? exe : "app_skeleton");
 }
 
 bool StartsWith(::std::string_view s, ::std::string_view prefix)
@@ -66,8 +65,7 @@ bool ParseArgs(int argc, char** argv, AppConfig& cfg)
       auto value = arg.substr(::std::strlen("--frames="));
       if (!ParseU32(value, cfg.maxFrames))
       {
-        ::std::fprintf(stderr, "Invalid --frames value: %.*s\n",
-                       static_cast<int>(value.size()), value.data());
+        ::std::fprintf(stderr, "Invalid --frames value: %.*s\n", static_cast<int>(value.size()), value.data());
         return false;
       }
       continue;
@@ -89,15 +87,13 @@ bool ParseArgs(int argc, char** argv, AppConfig& cfg)
         cfg.backend = DisplayBackendKind::Xlib;
       else
       {
-        ::std::fprintf(stderr, "Invalid --backend value: %.*s\n",
-                       static_cast<int>(value.size()), value.data());
+        ::std::fprintf(stderr, "Invalid --backend value: %.*s\n", static_cast<int>(value.size()), value.data());
         return false;
       }
       continue;
     }
 
-    ::std::fprintf(stderr, "Unknown arg: %.*s\n", static_cast<int>(arg.size()),
-                   arg.data());
+    ::std::fprintf(stderr, "Unknown arg: %.*s\n", static_cast<int>(arg.size()), arg.data());
     PrintUsage(argv[0]);
     return false;
   }

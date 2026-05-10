@@ -26,8 +26,7 @@ public:
   /// Construct the backend selected by `cfg`. Returns `nullptr` on failure.
   /// @param cfg  Platform configuration.
   [[nodiscard]]
-  GECKO_API static Unique<IMonitorsBackend> Create(
-      const PlatformConfig& cfg) noexcept;
+  GECKO_API static Unique<IMonitorsBackend> Create(const PlatformConfig& cfg) noexcept;
 
   // Discovery -------------------------------------------------------
 
@@ -40,16 +39,14 @@ public:
   /// Stable handle for the monitor at `index` (`0 <= index <
   /// GetMonitorCount()`).
   [[nodiscard]]
-  GECKO_API virtual MonitorHandle GetMonitorHandle(
-      u32 index) const noexcept = 0;
+  GECKO_API virtual MonitorHandle GetMonitorHandle(u32 index) const noexcept = 0;
 
   // Properties ------------------------------------------------------
 
   /// Snapshot of `handle`'s properties. Returns a default-constructed
   /// `MonitorInfo` if `handle` is invalid.
   [[nodiscard]]
-  GECKO_API virtual MonitorInfo GetMonitorProperties(
-      MonitorHandle handle) const noexcept = 0;
+  GECKO_API virtual MonitorInfo GetMonitorProperties(MonitorHandle handle) const noexcept = 0;
 
   /// Handle of the system's primary monitor, or an invalid handle when
   /// no monitors are connected.
@@ -59,16 +56,14 @@ public:
   /// Bounds + work area of `handle`. Cheaper than fetching the full
   /// `MonitorInfo` when only geometry is needed.
   [[nodiscard]]
-  GECKO_API virtual MonitorBounds GetMonitorBounds(
-      MonitorHandle handle) const noexcept = 0;
+  GECKO_API virtual MonitorBounds GetMonitorBounds(MonitorHandle handle) const noexcept = 0;
 
   // Event pump ------------------------------------------------------
 
   /// Process pending monitor-related OS events and emit them on the
   /// global event bus via `emitter`.
   /// @param emitter  Event-bus emitter representing the platform module.
-  GECKO_API virtual void PumpEvents(
-      const gecko::EventEmitter& emitter) noexcept = 0;
+  GECKO_API virtual void PumpEvents(const gecko::EventEmitter& emitter) noexcept = 0;
 };
 
 }  // namespace gecko::platform

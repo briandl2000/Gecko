@@ -14,8 +14,7 @@ namespace gecko::platform::win32_io {
 [[nodiscard]] ::std::wstring ToWide(PathView path) noexcept;
 
 // Convert a UTF-16 path back to UTF-8 with forward slashes.
-[[nodiscard]] ::std::string FromWide(const wchar_t* wide,
-                                     ::std::size_t wLen) noexcept;
+[[nodiscard]] ::std::string FromWide(const wchar_t* wide, ::std::size_t wLen) noexcept;
 
 }  // namespace gecko::platform::win32_io
 

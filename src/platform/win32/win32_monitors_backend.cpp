@@ -25,11 +25,9 @@ void Win32MonitorsBackend::EnumerateMonitors() noexcept
 {
   GECKO_SCOPE(labels::General);
   m_Monitors.clear();
-  ::EnumDisplayMonitors(nullptr, nullptr, EnumProc,
-                        reinterpret_cast<::LPARAM>(this));
+  ::EnumDisplayMonitors(nullptr, nullptr, EnumProc, reinterpret_cast<::LPARAM>(this));
 
-  GECKO_INFO(labels::General, "Win32MonitorsBackend: enumerated %u monitor(s)",
-             static_cast<u32>(m_Monitors.size()));
+  GECKO_INFO(labels::General, "Win32MonitorsBackend: enumerated %u monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
 
 u32 Win32MonitorsBackend::GetMonitorCount() const noexcept
@@ -44,8 +42,7 @@ MonitorHandle Win32MonitorsBackend::GetMonitorHandle(u32 index) const noexcept
   return m_Monitors[index].Handle;
 }
 
-MonitorInfo Win32MonitorsBackend::GetMonitorProperties(
-    MonitorHandle handle) const noexcept
+MonitorInfo Win32MonitorsBackend::GetMonitorProperties(MonitorHandle handle) const noexcept
 {
   if (!handle.IsValid())
     return {};
@@ -69,15 +66,13 @@ MonitorHandle Win32MonitorsBackend::GetPrimaryMonitor() const noexcept
   return {};
 }
 
-MonitorBounds Win32MonitorsBackend::GetMonitorBounds(
-    MonitorHandle handle) const noexcept
+MonitorBounds Win32MonitorsBackend::GetMonitorBounds(MonitorHandle handle) const noexcept
 {
   MonitorInfo info = GetMonitorProperties(handle);
   return {info.Bounds, info.WorkArea};
 }
 
-void Win32MonitorsBackend::PumpEvents(
-    const gecko::EventEmitter& emitter) noexcept
+void Win32MonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 {
   // Win32 monitor change detection: re-enumerate and diff.
   // In a real scenario, WM_DISPLAYCHANGE is delivered to a window message
@@ -86,8 +81,7 @@ void Win32MonitorsBackend::PumpEvents(
   (void)emitter;
 }
 
-::BOOL CALLBACK Win32MonitorsBackend::EnumProc(::HMONITOR hMonitor,
-                                               ::HDC /*hdc*/, LPRECT /*lpRect*/,
+::BOOL CALLBACK Win32MonitorsBackend::EnumProc(::HMONITOR hMonitor, ::HDC /*hdc*/, LPRECT /*lpRect*/,
                                                ::LPARAM lParam) noexcept
 {
   auto* self = reinterpret_cast<Win32MonitorsBackend*>(lParam);
@@ -99,22 +93,19 @@ void Win32MonitorsBackend::PumpEvents(
 
   MonitorEntry entry;
   entry.HMonitor = hMonitor;
-  entry.Handle =
-      MonitorHandle {static_cast<u64>(reinterpret_cast<uintptr_t>(hMonitor))};
+  entry.Handle = MonitorHandle {static_cast<u64>(reinterpret_cast<uintptr_t>(hMonitor))};
 
   MonitorInfo& info = entry.Info;
   info.SetName(mi.szDevice);
   info.IsPrimary = (mi.dwFlags & MONITORINFOF_PRIMARY) != 0;
 
-  info.Bounds = math::Rect2D {
-      static_cast<i32>(mi.rcMonitor.left), static_cast<i32>(mi.rcMonitor.top),
-      static_cast<i32>(mi.rcMonitor.right - mi.rcMonitor.left),
-      static_cast<i32>(mi.rcMonitor.bottom - mi.rcMonitor.top)};
+  info.Bounds = math::Rect2D {static_cast<i32>(mi.rcMonitor.left), static_cast<i32>(mi.rcMonitor.top),
+                              static_cast<i32>(mi.rcMonitor.right - mi.rcMonitor.left),
+                              static_cast<i32>(mi.rcMonitor.bottom - mi.rcMonitor.top)};
 
-  info.WorkArea = math::Rect2D {
-      static_cast<i32>(mi.rcWork.left), static_cast<i32>(mi.rcWork.top),
-      static_cast<i32>(mi.rcWork.right - mi.rcWork.left),
-      static_cast<i32>(mi.rcWork.bottom - mi.rcWork.top)};
+  info.WorkArea = math::Rect2D {static_cast<i32>(mi.rcWork.left), static_cast<i32>(mi.rcWork.top),
+                                static_cast<i32>(mi.rcWork.right - mi.rcWork.left),
+                                static_cast<i32>(mi.rcWork.bottom - mi.rcWork.top)};
 
   // DPI via Shcore
   ::UINT dpiX = 96;

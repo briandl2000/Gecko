@@ -156,23 +156,17 @@ struct IProfiler
   // Returns a default-constructed ScopeStats if unseen since the last reset.
   // The (const char*) overload hashes once per call -- cache the hash
   // yourself if you query in a hot loop.
-  virtual ScopeStats GetStats(
-      u32 nameHash, ProfSource source = ProfSource::CPU) const noexcept = 0;
-  ScopeStats GetStats(const char* name,
-                      ProfSource source = ProfSource::CPU) const noexcept;
+  virtual ScopeStats GetStats(u32 nameHash, ProfSource source = ProfSource::CPU) const noexcept = 0;
+  ScopeStats GetStats(const char* name, ProfSource source = ProfSource::CPU) const noexcept;
 
   // Watch a scope for rolling-average tracking. AvgNs in the returned
   // ScopeStats becomes the mean of the last `windowSize` samples. Calling
   // again with a different window resizes. Use sparingly -- each watched
   // scope owns a ring of `windowSize * 8` bytes.
-  virtual void WatchScope(u32 nameHash, u32 windowSize = 256,
-                          ProfSource source = ProfSource::CPU) noexcept = 0;
-  void WatchScope(const char* name, u32 windowSize = 256,
-                  ProfSource source = ProfSource::CPU) noexcept;
-  virtual void UnwatchScope(u32 nameHash,
-                            ProfSource source = ProfSource::CPU) noexcept = 0;
-  void UnwatchScope(const char* name,
-                    ProfSource source = ProfSource::CPU) noexcept;
+  virtual void WatchScope(u32 nameHash, u32 windowSize = 256, ProfSource source = ProfSource::CPU) noexcept = 0;
+  void WatchScope(const char* name, u32 windowSize = 256, ProfSource source = ProfSource::CPU) noexcept;
+  virtual void UnwatchScope(u32 nameHash, ProfSource source = ProfSource::CPU) noexcept = 0;
+  void UnwatchScope(const char* name, ProfSource source = ProfSource::CPU) noexcept;
 
   // Reset all aggregator stats. Called automatically on a configurable
   // timer (see SetStatsResetIntervalMs). Set interval to 0 to disable
@@ -184,8 +178,7 @@ struct IProfiler
   // Iterate every scope currently in the aggregator. Callback shape:
   //   void(*)(const char* name, u32 nameHash, ProfSource source,
   //           const ScopeStats& stats, void* user)
-  using ForEachScopeFn = void (*)(const char* name, u32 nameHash,
-                                  ProfSource source, const ScopeStats& stats,
+  using ForEachScopeFn = void (*)(const char* name, u32 nameHash, ProfSource source, const ScopeStats& stats,
                                   void* user);
   virtual void ForEachScope(ForEachScopeFn fn, void* user) const noexcept = 0;
 
@@ -223,12 +216,9 @@ GECKO_API const char* LookupThreadProfilerName(u32 threadId) noexcept;
 // SetThreadProfilerName this does NOT touch TLS -- use it for non-OS-thread
 // rows in the trace (e.g. GPU queues, async I/O lanes). Pass nullptr to
 // remove a previously registered name.
-GECKO_API void RegisterThreadProfilerName(u32 threadId,
-                                          const char* name) noexcept;
+GECKO_API void RegisterThreadProfilerName(u32 threadId, const char* name) noexcept;
 
-struct [[nodiscard(
-    "ProfScope is a RAII guard - name the variable, e.g. via GECKO_PROFILE")]]
-ProfScope
+struct [[nodiscard("ProfScope is a RAII guard - name the variable, e.g. via GECKO_PROFILE")]] ProfScope
 {
   Label ScopeLabel {};                  // 16 bytes
   u64 Time0 {0};                        // 8 bytes
@@ -240,8 +230,7 @@ ProfScope
   bool Enabled {false};                 // 1 byte
   // 5 bytes padding -> 48 bytes total
 
-  ProfScope(Label label, u32 hash, const char* name, ProfLevel lvl,
-            u8 cat = 0) noexcept;
+  ProfScope(Label label, u32 hash, const char* name, ProfLevel lvl, u8 cat = 0) noexcept;
   ~ProfScope() noexcept;
   ProfScope(const ProfScope&) = delete;
   ProfScope& operator=(const ProfScope&) = delete;
@@ -283,11 +272,10 @@ ProfScope
   {                                                                          \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Detailed \
   }
-#define GECKO_PROFILE_CAT(label, name, cat)                                   \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                    \
-  {                                                                           \
-    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Detailed, \
-        (::gecko::u8)(cat)                                                    \
+#define GECKO_PROFILE_CAT(label, name, cat)                                                      \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                                       \
+  {                                                                                              \
+    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Detailed, (::gecko::u8)(cat) \
   }
 #else
 #define GECKO_PROFILE(label) (void)0
@@ -306,11 +294,10 @@ ProfScope
   {                                                                        \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal \
   }
-#define GECKO_PROFILE_NORMAL_CAT(label, name, cat)                          \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
-  {                                                                         \
-    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal, \
-        (::gecko::u8)(cat)                                                  \
+#define GECKO_PROFILE_NORMAL_CAT(label, name, cat)                                             \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                                     \
+  {                                                                                            \
+    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Normal, (::gecko::u8)(cat) \
   }
 #else
 #define GECKO_PROFILE_NORMAL(label) (void)0
@@ -328,11 +315,10 @@ ProfScope
   {                                                                        \
     (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Always \
   }
-#define GECKO_PROFILE_ALWAYS_CAT(label, name, cat)                          \
-  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                  \
-  {                                                                         \
-    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Always, \
-        (::gecko::u8)(cat)                                                  \
+#define GECKO_PROFILE_ALWAYS_CAT(label, name, cat)                                             \
+  ::gecko::ProfScope GECKO_PROF_CONCAT(_g_prof_, __LINE__)                                     \
+  {                                                                                            \
+    (label), ::gecko::FNV1aLiteral(name), name, ::gecko::ProfLevel::Always, (::gecko::u8)(cat) \
   }
 
 #define GECKO_COUNTER(label, name, val)                                \
@@ -384,13 +370,10 @@ ProfScope
 
 namespace gecko {
 
-inline ProfScope::ProfScope(Label label, u32 hash, const char* name,
-                            ProfLevel lvl, u8 cat) noexcept
-    : ScopeLabel(label), Name(name), NameHash(hash), ThreadId(ThisThreadId()),
-      Level(lvl), Category(cat)
+inline ProfScope::ProfScope(Label label, u32 hash, const char* name, ProfLevel lvl, u8 cat) noexcept
+    : ScopeLabel(label), Name(name), NameHash(hash), ThreadId(ThisThreadId()), Level(lvl), Category(cat)
 {
-  if (auto* prof = GetProfiler();
-      prof && prof->IsLevelEnabled(Level) && prof->IsCategoryEnabled(Category))
+  if (auto* prof = GetProfiler(); prof && prof->IsLevelEnabled(Level) && prof->IsCategoryEnabled(Category))
   {
     Enabled = true;
     Time0 = prof->NowNs();
@@ -511,19 +494,16 @@ struct NullProfiler final : IProfiler
 };
 
 // String-overload helpers (inline; hash on the fly).
-inline ScopeStats IProfiler::GetStats(const char* name,
-                                      ProfSource source) const noexcept
+inline ScopeStats IProfiler::GetStats(const char* name, ProfSource source) const noexcept
 {
   return GetStats(name ? FNV1a(name) : 0u, source);
 }
-inline void IProfiler::WatchScope(const char* name, u32 windowSize,
-                                  ProfSource source) noexcept
+inline void IProfiler::WatchScope(const char* name, u32 windowSize, ProfSource source) noexcept
 {
   if (name)
     WatchScope(FNV1a(name), windowSize, source);
 }
-inline void IProfiler::UnwatchScope(const char* name,
-                                    ProfSource source) noexcept
+inline void IProfiler::UnwatchScope(const char* name, ProfSource source) noexcept
 {
   if (name)
     UnwatchScope(FNV1a(name), source);

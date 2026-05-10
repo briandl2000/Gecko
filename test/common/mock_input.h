@@ -51,19 +51,16 @@ public:
     return !m_KeyDown[i] && m_KeyDownPrev[i];
   }
 
-  [[nodiscard]] bool IsMouseButtonDown(
-      MouseButton button) const noexcept override
+  [[nodiscard]] bool IsMouseButtonDown(MouseButton button) const noexcept override
   {
     return m_MouseDown[ButtonIdx(button)];
   }
-  [[nodiscard]] bool WasMouseButtonPressed(
-      MouseButton button) const noexcept override
+  [[nodiscard]] bool WasMouseButtonPressed(MouseButton button) const noexcept override
   {
     const auto i = ButtonIdx(button);
     return m_MouseDown[i] && !m_MouseDownPrev[i];
   }
-  [[nodiscard]] bool WasMouseButtonReleased(
-      MouseButton button) const noexcept override
+  [[nodiscard]] bool WasMouseButtonReleased(MouseButton button) const noexcept override
   {
     const auto i = ButtonIdx(button);
     return !m_MouseDown[i] && m_MouseDownPrev[i];
@@ -73,8 +70,7 @@ public:
   {
     return m_MousePos;
   }
-  [[nodiscard]] MousePosition GetMousePosition(
-      WindowHandle window) const noexcept override
+  [[nodiscard]] MousePosition GetMousePosition(WindowHandle window) const noexcept override
   {
     if (window.IsValid() && window == m_MouseWindow)
       return m_MousePos;
@@ -82,8 +78,7 @@ public:
   }
   [[nodiscard]] MousePosition GetMouseDelta() const noexcept override
   {
-    return MousePosition {m_MousePos.X - m_MousePosPrev.X,
-                          m_MousePos.Y - m_MousePosPrev.Y};
+    return MousePosition {m_MousePos.X - m_MousePosPrev.X, m_MousePos.Y - m_MousePosPrev.Y};
   }
   [[nodiscard]] float GetMouseScrollX() const noexcept override
   {

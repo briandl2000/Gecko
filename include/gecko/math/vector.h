@@ -366,14 +366,12 @@ constexpr Float2 operator/(const Float2& v, f32 s) noexcept
   return {Max(a.X, b.X), Max(a.Y, b.Y)};
 }
 
-[[nodiscard]] constexpr Float2 Clamp(const Float2& v, const Float2& min,
-                                     const Float2& max) noexcept
+[[nodiscard]] constexpr Float2 Clamp(const Float2& v, const Float2& min, const Float2& max) noexcept
 {
   return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y)};
 }
 
-[[nodiscard]] constexpr Float2 Lerp(const Float2& a, const Float2& b,
-                                    f32 t) noexcept
+[[nodiscard]] constexpr Float2 Lerp(const Float2& a, const Float2& b, f32 t) noexcept
 {
   return {Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t)};
 }
@@ -456,15 +454,12 @@ constexpr Float3 operator/(const Float3& v, f32 s) noexcept
   return {Max(a.X, b.X), Max(a.Y, b.Y), Max(a.Z, b.Z)};
 }
 
-[[nodiscard]] constexpr Float3 Clamp(const Float3& v, const Float3& min,
-                                     const Float3& max) noexcept
+[[nodiscard]] constexpr Float3 Clamp(const Float3& v, const Float3& min, const Float3& max) noexcept
 {
-  return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y),
-          Clamp(v.Z, min.Z, max.Z)};
+  return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y), Clamp(v.Z, min.Z, max.Z)};
 }
 
-[[nodiscard]] constexpr Float3 Lerp(const Float3& a, const Float3& b,
-                                    f32 t) noexcept
+[[nodiscard]] constexpr Float3 Lerp(const Float3& a, const Float3& b, f32 t) noexcept
 {
   return {Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t), Lerp(a.Z, b.Z, t)};
 }
@@ -541,18 +536,14 @@ constexpr Float4 operator/(const Float4& v, f32 s) noexcept
   return {Max(a.X, b.X), Max(a.Y, b.Y), Max(a.Z, b.Z), Max(a.W, b.W)};
 }
 
-[[nodiscard]] constexpr Float4 Clamp(const Float4& v, const Float4& min,
-                                     const Float4& max) noexcept
+[[nodiscard]] constexpr Float4 Clamp(const Float4& v, const Float4& min, const Float4& max) noexcept
 {
-  return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y),
-          Clamp(v.Z, min.Z, max.Z), Clamp(v.W, min.W, max.W)};
+  return {Clamp(v.X, min.X, max.X), Clamp(v.Y, min.Y, max.Y), Clamp(v.Z, min.Z, max.Z), Clamp(v.W, min.W, max.W)};
 }
 
-[[nodiscard]] constexpr Float4 Lerp(const Float4& a, const Float4& b,
-                                    f32 t) noexcept
+[[nodiscard]] constexpr Float4 Lerp(const Float4& a, const Float4& b, f32 t) noexcept
 {
-  return {Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t), Lerp(a.Z, b.Z, t),
-          Lerp(a.W, b.W, t)};
+  return {Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t), Lerp(a.Z, b.Z, t), Lerp(a.W, b.W, t)};
 }
 
 [[nodiscard]] constexpr Float4 Abs(const Float4& v) noexcept
@@ -606,11 +597,9 @@ constexpr Int2 operator/(const Int2& v, i32 s) noexcept
   return {a.X > b.X ? a.X : b.X, a.Y > b.Y ? a.Y : b.Y};
 }
 
-[[nodiscard]] constexpr Int2 Clamp(const Int2& v, const Int2& min,
-                                   const Int2& max) noexcept
+[[nodiscard]] constexpr Int2 Clamp(const Int2& v, const Int2& min, const Int2& max) noexcept
 {
-  return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X),
-          v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y)};
+  return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X), v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y)};
 }
 
 // Int3 operations
@@ -659,11 +648,9 @@ constexpr Int3 operator/(const Int3& v, i32 s) noexcept
   return {a.X > b.X ? a.X : b.X, a.Y > b.Y ? a.Y : b.Y, a.Z > b.Z ? a.Z : b.Z};
 }
 
-[[nodiscard]] constexpr Int3 Clamp(const Int3& v, const Int3& min,
-                                   const Int3& max) noexcept
+[[nodiscard]] constexpr Int3 Clamp(const Int3& v, const Int3& min, const Int3& max) noexcept
 {
-  return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X),
-          v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y),
+  return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X), v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y),
           v.Z < min.Z ? min.Z : (v.Z > max.Z ? max.Z : v.Z)};
 }
 

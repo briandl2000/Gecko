@@ -64,8 +64,7 @@ AsyncTraceProfilerSink::AsyncTraceProfilerSink(const char* path)
   if (!path || path[0] == '\0')
     return;
 
-  m_Writer = ::gecko::platform::OpenWrite(
-      path, ::gecko::platform::WriteMode::Truncate);
+  m_Writer = ::gecko::platform::OpenWrite(path, ::gecko::platform::WriteMode::Truncate);
 
   if (!m_Writer)
     return;
@@ -115,8 +114,7 @@ void AsyncTraceProfilerSink::Write(const ProfEvent& event) noexcept
     return;
   // Always allow Counter / Mark events through regardless of min-level --
   // these are typically per-frame summaries the user explicitly opted into.
-  if (event.Kind == ProfEventKind::ZoneBegin ||
-      event.Kind == ProfEventKind::ZoneEnd)
+  if (event.Kind == ProfEventKind::ZoneBegin || event.Kind == ProfEventKind::ZoneEnd)
   {
     if (event.Level > m_MinLevel.load(::std::memory_order_relaxed))
       return;
@@ -128,8 +126,7 @@ void AsyncTraceProfilerSink::Write(const ProfEvent& event) noexcept
   m_Cv.notify_one();
 }
 
-void AsyncTraceProfilerSink::WriteBatch(
-    ::gecko::Span<const ProfEvent> events) noexcept
+void AsyncTraceProfilerSink::WriteBatch(::gecko::Span<const ProfEvent> events) noexcept
 {
   if (!m_Writer || events.empty())
     return;
@@ -139,8 +136,7 @@ void AsyncTraceProfilerSink::WriteBatch(
     m_Pending.reserve(m_Pending.size() + events.size());
     for (const ProfEvent& e : events)
     {
-      const bool isZone = (e.Kind == ProfEventKind::ZoneBegin ||
-                           e.Kind == ProfEventKind::ZoneEnd);
+      const bool isZone = (e.Kind == ProfEventKind::ZoneBegin || e.Kind == ProfEventKind::ZoneEnd);
       if (isZone && e.Level > minLevel)
         continue;
       m_Pending.push_back(e);
@@ -176,9 +172,8 @@ void AsyncTraceProfilerSink::WorkerLoop() noexcept
   {
     {
       ::std::unique_lock<::std::mutex> lk(m_Mu);
-      m_Cv.wait_for(lk, c_DrainTickInterval, [this]() {
-        return !m_Run.load(::std::memory_order_acquire) || !m_Pending.empty();
-      });
+      m_Cv.wait_for(lk, c_DrainTickInterval,
+                    [this]() { return !m_Run.load(::std::memory_order_acquire) || !m_Pending.empty(); });
       batch.swap(m_Pending);
     }
 
@@ -216,8 +211,7 @@ void AsyncTraceProfilerSink::WorkerLoop() noexcept
   }
 }
 
-void AsyncTraceProfilerSink::DrainAndWrite(
-    ::std::vector<ProfEvent>& batch) noexcept
+void AsyncTraceProfilerSink::DrainAndWrite(::std::vector<ProfEvent>& batch) noexcept
 {
   if (!m_Writer)
   {
@@ -234,11 +228,9 @@ void AsyncTraceProfilerSink::DrainAndWrite(
     if (m_Time0Ns == 0)
       m_Time0Ns = ev.TimestampNs;
 
-    if (const char* tname = LookupThreadProfilerName(ev.ThreadId);
-        tname != nullptr)
+    if (const char* tname = LookupThreadProfilerName(ev.ThreadId); tname != nullptr)
     {
-      if (::std::find(m_NamedThreads.begin(), m_NamedThreads.end(),
-                      ev.ThreadId) == m_NamedThreads.end())
+      if (::std::find(m_NamedThreads.begin(), m_NamedThreads.end(), ev.ThreadId) == m_NamedThreads.end())
       {
         m_NamedThreads.push_back(ev.ThreadId);
         if (!m_First)
@@ -260,13 +252,11 @@ void AsyncTraceProfilerSink::DrainAndWrite(
   batch.clear();
 }
 
-void AsyncTraceProfilerSink::EmitThreadNameOnce(u32 tid,
-                                                const char* name) noexcept
+void AsyncTraceProfilerSink::EmitThreadNameOnce(u32 tid, const char* name) noexcept
 {
   if (!name)
     return;
-  if (::std::find(m_NamedThreads.begin(), m_NamedThreads.end(), tid) !=
-      m_NamedThreads.end())
+  if (::std::find(m_NamedThreads.begin(), m_NamedThreads.end(), tid) != m_NamedThreads.end())
     return;
   m_NamedThreads.push_back(tid);
 

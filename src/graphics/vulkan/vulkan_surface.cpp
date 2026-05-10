@@ -10,21 +10,15 @@ namespace gecko::graphics {
 // -- Per-OS backends (defined in vulkan/<os>/vulkan_*_surface.cpp) ---------
 
 #if defined(GECKO_GRAPHICS_VULKAN_XLIB)
-VkResult CreateXlibSurface(VkInstance,
-                           const ::gecko::platform::NativeWindowHandle&,
-                           VkSurfaceKHR*) noexcept;
+VkResult CreateXlibSurface(VkInstance, const ::gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
 #endif
 
 #if defined(GECKO_GRAPHICS_VULKAN_WAYLAND)
-VkResult CreateWaylandSurface(VkInstance,
-                              const ::gecko::platform::NativeWindowHandle&,
-                              VkSurfaceKHR*) noexcept;
+VkResult CreateWaylandSurface(VkInstance, const ::gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
 #endif
 
 #if defined(GECKO_GRAPHICS_VULKAN_WIN32)
-VkResult CreateWin32Surface(VkInstance,
-                            const ::gecko::platform::NativeWindowHandle&,
-                            VkSurfaceKHR*) noexcept;
+VkResult CreateWin32Surface(VkInstance, const ::gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
 #endif
 
 // -- Public API ------------------------------------------------------------
@@ -46,8 +40,7 @@ VkResult CreateWin32Surface(VkInstance,
   return {Extensions, sizeof(Extensions) / sizeof(Extensions[0])};
 }
 
-VkResult CreateSurface(VkInstance instance,
-                       const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateSurface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
                        VkSurfaceKHR* out) noexcept
 {
   using ::gecko::platform::DisplayBackendKind;
@@ -67,8 +60,7 @@ VkResult CreateSurface(VkInstance instance,
     return CreateWin32Surface(instance, native, out);
 #endif
   default:
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanSurface: no surface backend for display kind %d",
+    GECKO_ERROR(labels::Vulkan, "VulkanSurface: no surface backend for display kind %d",
                 static_cast<i32>(native.Backend));
     return VK_ERROR_EXTENSION_NOT_PRESENT;
   }

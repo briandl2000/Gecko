@@ -12,8 +12,7 @@ TEST_CASE("CreateGraphicsDevice returns a device", "[graphics][device]")
   REQUIRE(device != nullptr);
 }
 
-TEST_CASE("CreateSwapchain returns invalid swapchain for NullDevice",
-          "[graphics][device]")
+TEST_CASE("CreateSwapchain returns invalid swapchain for NullDevice", "[graphics][device]")
 {
   auto device = CreateGraphicsDevice();
 
@@ -24,8 +23,7 @@ TEST_CASE("CreateSwapchain returns invalid swapchain for NullDevice",
   REQUIRE_FALSE(sc.IsValid());
 }
 
-TEST_CASE("CreateGraphicsCommandList returns valid command list",
-          "[graphics][device]")
+TEST_CASE("CreateGraphicsCommandList returns valid command list", "[graphics][device]")
 {
   auto device = CreateGraphicsDevice();
   auto cmdList = device->CreateGraphicsCommandList();
@@ -33,8 +31,7 @@ TEST_CASE("CreateGraphicsCommandList returns valid command list",
   REQUIRE(cmdList->IsValid());
 }
 
-TEST_CASE("CreateComputeCommandList returns valid command list",
-          "[graphics][device]")
+TEST_CASE("CreateComputeCommandList returns valid command list", "[graphics][device]")
 {
   auto device = CreateGraphicsDevice();
   auto cmdList = device->CreateComputeCommandList();
@@ -42,8 +39,7 @@ TEST_CASE("CreateComputeCommandList returns valid command list",
   REQUIRE(cmdList->IsValid());
 }
 
-TEST_CASE("NullDevice resource creation returns invalid objects",
-          "[graphics][device]")
+TEST_CASE("NullDevice resource creation returns invalid objects", "[graphics][device]")
 {
   auto device = CreateGraphicsDevice();
 
@@ -83,8 +79,7 @@ TEST_CASE("NullDevice resource creation returns invalid objects",
   }
 }
 
-TEST_CASE("BeginFrame returns invalid FrameContext for NullDevice",
-          "[graphics][device]")
+TEST_CASE("BeginFrame returns invalid FrameContext for NullDevice", "[graphics][device]")
 {
   auto device = CreateGraphicsDevice();
   Swapchain sc {};

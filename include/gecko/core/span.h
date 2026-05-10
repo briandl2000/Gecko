@@ -41,10 +41,8 @@ public:
 
   /// Implicit conversion from `Span<T>` to `Span<const T>`.
   template <typename U,
-            typename = ::std::enable_if_t<::std::is_same_v<
-                ::std::remove_const_t<T>, U>&& ::std::is_const_v<T>>>
-  constexpr Span(const Span<U>& other) noexcept
-      : m_Data(other.Data()), m_Count(other.Count())
+            typename = ::std::enable_if_t<::std::is_same_v<::std::remove_const_t<T>, U>&& ::std::is_const_v<T>>>
+  constexpr Span(const Span<U>& other) noexcept : m_Data(other.Data()), m_Count(other.Count())
   {}
 
   /// @returns Pointer to the first element, or `nullptr` if `Empty()`.
@@ -102,7 +100,6 @@ private:
   usize m_Count {0};
 };
 
-static_assert(::std::is_trivially_copyable_v<Span<const int>>,
-              "Span<T> must be trivially copyable to be ABI-stable.");
+static_assert(::std::is_trivially_copyable_v<Span<const int>>, "Span<T> must be trivially copyable to be ABI-stable.");
 
 }  // namespace gecko

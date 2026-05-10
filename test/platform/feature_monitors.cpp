@@ -7,8 +7,7 @@
 using namespace gecko;
 using namespace gecko::platform;
 
-TEST_CASE("Live backend: enumerate monitors returns at least one",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: enumerate monitors returns at least one", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 
@@ -18,8 +17,7 @@ TEST_CASE("Live backend: enumerate monitors returns at least one",
   REQUIRE(count >= 1);
 }
 
-TEST_CASE("Live backend: primary monitor exists",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: primary monitor exists", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 
@@ -29,8 +27,7 @@ TEST_CASE("Live backend: primary monitor exists",
   REQUIRE(primary.IsValid());
 }
 
-TEST_CASE("Live backend: monitor handle by index is valid",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: monitor handle by index is valid", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 
@@ -43,13 +40,11 @@ TEST_CASE("Live backend: monitor handle by index is valid",
   REQUIRE(h.IsValid());
 
   // Out-of-range index fails cleanly
-  MonitorHandle invalid =
-      ::gecko::platform::GetMonitors()->GetMonitorHandle(count);
+  MonitorHandle invalid = ::gecko::platform::GetMonitors()->GetMonitorHandle(count);
   REQUIRE_FALSE(invalid.IsValid());
 }
 
-TEST_CASE("Live backend: monitor properties are populated",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: monitor properties are populated", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 
@@ -65,8 +60,7 @@ TEST_CASE("Live backend: monitor properties are populated",
   REQUIRE(info.RefreshRateMilliHz > 0);
 }
 
-TEST_CASE("Live backend: monitor name is non-empty",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: monitor name is non-empty", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 
@@ -78,8 +72,7 @@ TEST_CASE("Live backend: monitor name is non-empty",
   REQUIRE(info.Name[0] != '\0');
 }
 
-TEST_CASE("Live backend: monitor bounds and work area are valid",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: monitor bounds and work area are valid", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 
@@ -92,8 +85,7 @@ TEST_CASE("Live backend: monitor bounds and work area are valid",
   REQUIRE_FALSE(mb.WorkArea.IsEmpty());
 }
 
-TEST_CASE("Live backend: all monitors have consistent data",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: all monitors have consistent data", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 
@@ -107,8 +99,7 @@ TEST_CASE("Live backend: all monitors have consistent data",
     MonitorHandle h = ::gecko::platform::GetMonitors()->GetMonitorHandle(i);
     REQUIRE(h.IsValid());
 
-    MonitorInfo info =
-        ::gecko::platform::GetMonitors()->GetMonitorProperties(h);
+    MonitorInfo info = ::gecko::platform::GetMonitors()->GetMonitorProperties(h);
     REQUIRE(info.Bounds.Width() > 0);
     REQUIRE(info.Bounds.Height() > 0);
     REQUIRE(info.Dpi > 0);
@@ -120,8 +111,7 @@ TEST_CASE("Live backend: all monitors have consistent data",
   REQUIRE(foundPrimary);
 }
 
-TEST_CASE("Live backend: pump monitor events does not crash",
-          "[feature][platform][monitor]")
+TEST_CASE("Live backend: pump monitor events does not crash", "[feature][platform][monitor]")
 {
   test::FeaturePlatformScope scope;
 

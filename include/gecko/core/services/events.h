@@ -90,8 +90,8 @@ struct EventMeta
 /// Obtain via `IEventBus::CreateEmitter` / `CreateEmitterForModule`.
 struct EventEmitter
 {
-  u64 moduleId {0};  ///< Module that owns this emitter.
-  u64 sender {0};    ///< Caller-supplied sender id (forwarded to subscribers).
+  u64 moduleId {0};    ///< Module that owns this emitter.
+  u64 sender {0};      ///< Caller-supplied sender id (forwarded to subscribers).
   u64 capability {0};  ///< Opaque token validated by the bus on `Send`.
 };
 
@@ -120,8 +120,7 @@ public:
   EventSubscription(const EventSubscription&) = delete;
   EventSubscription& operator=(const EventSubscription&) = delete;
 
-  EventSubscription(EventSubscription&& other) noexcept
-      : m_Bus(other.m_Bus), m_Id(other.m_Id)
+  EventSubscription(EventSubscription&& other) noexcept : m_Bus(other.m_Bus), m_Id(other.m_Id)
   {
     other.m_Bus = nullptr;
     other.m_Id = 0;
@@ -165,8 +164,7 @@ class IEventBus
 {
 public:
   /// Subscriber callback signature.
-  using CallbackFn = void (*)(void* user, const EventMeta& meta,
-                              EventView payload);
+  using CallbackFn = void (*)(void* user, const EventMeta& meta, EventView payload);
 
   GECKO_API virtual ~IEventBus() = default;
 
@@ -183,9 +181,8 @@ public:
   /// @param options  Delivery options (queued vs. immediate).
   /// @return RAII handle that unsubscribes on destruction.
   [[nodiscard]]
-  GECKO_API virtual EventSubscription Subscribe(
-      EventCode code, CallbackFn fn, void* user,
-      SubscriptionOptions options = {}) = 0;
+  GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn, void* user,
+                                                SubscriptionOptions options = {}) = 0;
 
   /// Publish an event. Immediate subscribers run inline; queued
   /// subscribers run on the next `Dispatch`.
@@ -193,8 +190,7 @@ public:
   /// @param emitter  Capability minted via `CreateEmitter`.
   /// @param code     Event code.
   /// @param payload  Untyped view over the payload bytes.
-  GECKO_API virtual void Send(const EventEmitter& emitter, EventCode code,
-                              EventView payload) = 0;
+  GECKO_API virtual void Send(const EventEmitter& emitter, EventCode code, EventView payload) = 0;
 
   /// Convenience overload that views `payload` as raw bytes.
   template <class T>
@@ -222,8 +218,7 @@ public:
   /// @param moduleId  Owning module id.
   /// @param sender    Optional caller-supplied sender id, forwarded
   ///                  verbatim to subscribers.
-  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId,
-                                               u64 sender = 0) = 0;
+  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId, u64 sender = 0) = 0;
 
   /// Validate an emitter capability.
   ///
@@ -231,8 +226,7 @@ public:
   /// @param expectedModuleId   Module id the caller expects to own it.
   /// @return `true` if `emitter` is a valid capability for
   ///         `expectedModuleId`.
-  GECKO_API virtual bool ValidateEmitter(const EventEmitter& emitter,
-                                         u64 expectedModuleId) const = 0;
+  GECKO_API virtual bool ValidateEmitter(const EventEmitter& emitter, u64 expectedModuleId) const = 0;
 
 protected:
   friend class EventSubscription;
@@ -243,8 +237,7 @@ protected:
 IEventBus* GetEventBus() noexcept;
 
 /// Convenience wrapper around `IEventBus::CreateEmitter`.
-[[nodiscard]] GECKO_API inline EventEmitter CreateEmitter(u64 moduleId,
-                                                          u64 sender = 0)
+[[nodiscard]] GECKO_API inline EventEmitter CreateEmitter(u64 moduleId, u64 sender = 0)
 {
   if (auto* eventBus = GetEventBus())
     return eventBus->CreateEmitter(moduleId, sender);
@@ -253,14 +246,12 @@ IEventBus* GetEventBus() noexcept;
 }
 
 /// Look up a module by its `Label` and create an emitter for it.
-[[nodiscard]] GECKO_API EventEmitter CreateEmitterForModule(Label moduleLabel,
-                                                            u64 sender = 0);
+[[nodiscard]] GECKO_API EventEmitter CreateEmitterForModule(Label moduleLabel, u64 sender = 0);
 
 /// Convenience wrapper around `IEventBus::Subscribe`.
 [[nodiscard]]
-GECKO_API inline EventSubscription SubscribeEvent(
-    EventCode code, IEventBus::CallbackFn fn, void* user,
-    SubscriptionOptions options = {})
+GECKO_API inline EventSubscription SubscribeEvent(EventCode code, IEventBus::CallbackFn fn, void* user,
+                                                  SubscriptionOptions options = {})
 {
   if (auto* eventBus = GetEventBus())
     return eventBus->Subscribe(code, fn, user, options);
@@ -269,8 +260,7 @@ GECKO_API inline EventSubscription SubscribeEvent(
 }
 
 /// Convenience wrapper around `IEventBus::Send`.
-GECKO_API inline void SendEvent(const EventEmitter& emitter, EventCode code,
-                                EventView payload)
+GECKO_API inline void SendEvent(const EventEmitter& emitter, EventCode code, EventView payload)
 {
   if (auto* eventBus = GetEventBus())
     eventBus->Send(emitter, code, payload);
@@ -280,8 +270,7 @@ GECKO_API inline void SendEvent(const EventEmitter& emitter, EventCode code,
 
 /// Convenience overload that views `payload` as raw bytes.
 template <class T>
-inline void SendEvent(const EventEmitter& emitter, EventCode code,
-                      const T& payload)
+inline void SendEvent(const EventEmitter& emitter, EventCode code, const T& payload)
 {
   SendEvent(emitter, code, EventView {&payload, static_cast<u32>(sizeof(T))});
 }
@@ -298,20 +287,15 @@ GECKO_API inline usize DispatchEvents(usize maxCount = static_cast<usize>(-1))
 
 struct NullEventBus final : IEventBus
 {
-  GECKO_API virtual EventSubscription Subscribe(
-      EventCode code, CallbackFn fn, void* user,
-      SubscriptionOptions options = {}) noexcept override;
-  GECKO_API virtual void Send(const EventEmitter& emitter, EventCode code,
-                              EventView payload) noexcept override;
+  GECKO_API virtual EventSubscription Subscribe(EventCode code, CallbackFn fn, void* user,
+                                                SubscriptionOptions options = {}) noexcept override;
+  GECKO_API virtual void Send(const EventEmitter& emitter, EventCode code, EventView payload) noexcept override;
   GECKO_API virtual usize Dispatch(usize maxCount) noexcept override;
 
   GECKO_API virtual bool RegisterModule(u64 moduleId) noexcept override;
   GECKO_API virtual void UnregisterModule(u64 moduleId) noexcept override;
-  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId,
-                                               u64 sender) noexcept override;
-  GECKO_API virtual bool ValidateEmitter(
-      const EventEmitter& emitter,
-      u64 expectedModuleId) const noexcept override;
+  GECKO_API virtual EventEmitter CreateEmitter(u64 moduleId, u64 sender) noexcept override;
+  GECKO_API virtual bool ValidateEmitter(const EventEmitter& emitter, u64 expectedModuleId) const noexcept override;
 
   GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;

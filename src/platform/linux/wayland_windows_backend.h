@@ -111,13 +111,10 @@ public:
   void SetPosition(WindowHandle window, math::Int2 pos) noexcept override;
   math::Int2 GetPosition(WindowHandle window) const noexcept override;
   DpiInfo GetDpi(WindowHandle window) const noexcept override;
-  NativeWindowHandle GetNativeWindowHandle(
-      WindowHandle window) const noexcept override;
+  NativeWindowHandle GetNativeWindowHandle(WindowHandle window) const noexcept override;
 
-  void SetWindowState(WindowHandle window,
-                      platform::WindowState state) noexcept override;
-  platform::WindowState GetWindowState(
-      WindowHandle window) const noexcept override;
+  void SetWindowState(WindowHandle window, platform::WindowState state) noexcept override;
+  platform::WindowState GetWindowState(WindowHandle window) const noexcept override;
   void SetDecorated(WindowHandle window, bool decorated) noexcept override;
   bool IsDecorated(WindowHandle window) const noexcept override;
   void RequestFocus(WindowHandle window) noexcept override;
@@ -126,8 +123,7 @@ public:
   bool IsResizable(WindowHandle window) const noexcept override;
   void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override;
   WindowMode GetWindowMode(WindowHandle window) const noexcept override;
-  void SetWindowButtons(WindowHandle window,
-                        WindowButtons buttons) noexcept override;
+  void SetWindowButtons(WindowHandle window, WindowButtons buttons) noexcept override;
   WindowButtons GetWindowButtons(WindowHandle window) const noexcept override;
   void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
   void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
@@ -140,40 +136,29 @@ public:
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
 
   // Wayland callbacks need access to internals.
-  void OnRegistryGlobal(::wl_registry* registry, u32 name,
-                        const char* interface, u32 version) noexcept;
+  void OnRegistryGlobal(::wl_registry* registry, u32 name, const char* interface, u32 version) noexcept;
   void OnRegistryGlobalRemove(::wl_registry* registry, u32 name) noexcept;
 
   void OnXdgSurfaceConfigure(WaylandWindowState* ws, u32 serial) noexcept;
-  void OnToplevelConfigure(WaylandWindowState* ws, i32 width, i32 height,
-                           wl_array* states) noexcept;
+  void OnToplevelConfigure(WaylandWindowState* ws, i32 width, i32 height, wl_array* states) noexcept;
   void OnToplevelClose(WaylandWindowState* ws) noexcept;
 
   void OnSeatCapabilities(::wl_seat* seat, u32 caps) noexcept;
 
   // Keyboard callbacks
-  void OnKeyboardKeymap(::wl_keyboard* kb, u32 format, i32 fd,
-                        u32 size) noexcept;
-  void OnKeyboardEnter(::wl_keyboard* kb, u32 serial, ::wl_surface* surface,
-                       wl_array* keys) noexcept;
-  void OnKeyboardLeave(::wl_keyboard* kb, u32 serial,
-                       ::wl_surface* surface) noexcept;
-  void OnKeyboardKey(::wl_keyboard* kb, u32 serial, u32 time, u32 key,
-                     u32 state) noexcept;
-  void OnKeyboardModifiers(::wl_keyboard* kb, u32 serial, u32 modsDepressed,
-                           u32 modsLatched, u32 modsLocked, u32 group) noexcept;
+  void OnKeyboardKeymap(::wl_keyboard* kb, u32 format, i32 fd, u32 size) noexcept;
+  void OnKeyboardEnter(::wl_keyboard* kb, u32 serial, ::wl_surface* surface, wl_array* keys) noexcept;
+  void OnKeyboardLeave(::wl_keyboard* kb, u32 serial, ::wl_surface* surface) noexcept;
+  void OnKeyboardKey(::wl_keyboard* kb, u32 serial, u32 time, u32 key, u32 state) noexcept;
+  void OnKeyboardModifiers(::wl_keyboard* kb, u32 serial, u32 modsDepressed, u32 modsLatched, u32 modsLocked,
+                           u32 group) noexcept;
 
   // Pointer callbacks
-  void OnPointerEnter(::wl_pointer* pointer, u32 serial, ::wl_surface* surface,
-                      wl_fixed_t sx, wl_fixed_t sy) noexcept;
-  void OnPointerLeave(::wl_pointer* pointer, u32 serial,
-                      ::wl_surface* surface) noexcept;
-  void OnPointerMotion(::wl_pointer* pointer, u32 time, wl_fixed_t sx,
-                       wl_fixed_t sy) noexcept;
-  void OnPointerButton(::wl_pointer* pointer, u32 serial, u32 time, u32 button,
-                       u32 state) noexcept;
-  void OnPointerAxis(::wl_pointer* pointer, u32 time, u32 axis,
-                     wl_fixed_t value) noexcept;
+  void OnPointerEnter(::wl_pointer* pointer, u32 serial, ::wl_surface* surface, wl_fixed_t sx, wl_fixed_t sy) noexcept;
+  void OnPointerLeave(::wl_pointer* pointer, u32 serial, ::wl_surface* surface) noexcept;
+  void OnPointerMotion(::wl_pointer* pointer, u32 time, wl_fixed_t sx, wl_fixed_t sy) noexcept;
+  void OnPointerButton(::wl_pointer* pointer, u32 serial, u32 time, u32 button, u32 state) noexcept;
+  void OnPointerAxis(::wl_pointer* pointer, u32 time, u32 axis, wl_fixed_t value) noexcept;
 
 private:
   u64 FindWindowBySurface(::wl_surface* surface) const noexcept;

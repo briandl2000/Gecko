@@ -41,15 +41,12 @@ public:
     return m_CmdBuffer != VK_NULL_HANDLE;
   }
 
-  void BeginRendering(const RenderTarget& color,
-                      const ClearValue* clear) noexcept override;
-  void BeginRendering(::std::span<const RenderTarget* const> colors,
-                      const RenderTarget* depth,
+  void BeginRendering(const RenderTarget& color, const ClearValue* clear) noexcept override;
+  void BeginRendering(::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
                       ::std::span<const ClearValue> clears) noexcept override;
   void EndRendering() noexcept override;
 
-  void SetViewport(f32 x, f32 y, f32 w, f32 h, f32 minD,
-                   f32 maxD) noexcept override;
+  void SetViewport(f32 x, f32 y, f32 w, f32 h, f32 minD, f32 maxD) noexcept override;
   void SetScissor(i32 x, i32 y, u32 w, u32 h) noexcept override;
 
   void BindPipeline(const GraphicsPipeline& pipeline) noexcept override;
@@ -63,35 +60,26 @@ public:
   void BindTexture(u32 slot, const Texture& texture) noexcept override;
   void BindRWTexture(u32 slot, const Texture& texture) noexcept override;
   void BindSampler(u32 slot, const Sampler& sampler) noexcept override;
-  void SetConstants(u32 offset,
-                    ::std::span<const ::gecko::byte> bytes) noexcept override;
+  void SetConstants(u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept override;
 
-  void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex,
-            u32 firstInstance) noexcept override;
-  void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex,
-                   i32 vertexOffset, u32 firstInstance) noexcept override;
-  void DrawIndirect(const Buffer& buffer, u64 offset, u32 drawCount,
-                    u32 stride) noexcept override;
-  void DrawIndexedIndirect(const Buffer& buffer, u64 offset, u32 drawCount,
-                           u32 stride) noexcept override;
+  void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) noexcept override;
+  void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset,
+                   u32 firstInstance) noexcept override;
+  void DrawIndirect(const Buffer& buffer, u64 offset, u32 drawCount, u32 stride) noexcept override;
+  void DrawIndexedIndirect(const Buffer& buffer, u64 offset, u32 drawCount, u32 stride) noexcept override;
   void Dispatch(u32 x, u32 y, u32 z) noexcept override;
   void DispatchIndirect(const Buffer& buffer, u64 offset) noexcept override;
 
   void TransitionTextureForRead(const Texture& texture) noexcept override;
 
-  void CopyBuffer(const Buffer& dst, u64 dstOffset, const Buffer& src,
-                  u64 srcOffset, u64 size) noexcept override;
-  void CopyBufferToTexture(const Texture& dst, u32 mip, u32 slice,
-                           const Buffer& src, u64 srcOffset) noexcept override;
-  void CopyTextureToBuffer(const Buffer& dst, u64 dstOffset, const Texture& src,
-                           u32 mip, u32 slice) noexcept override;
+  void CopyBuffer(const Buffer& dst, u64 dstOffset, const Buffer& src, u64 srcOffset, u64 size) noexcept override;
+  void CopyBufferToTexture(const Texture& dst, u32 mip, u32 slice, const Buffer& src, u64 srcOffset) noexcept override;
+  void CopyTextureToBuffer(const Buffer& dst, u64 dstOffset, const Texture& src, u32 mip, u32 slice) noexcept override;
 
-  void ResetTimestamps(const QueryPool& pool, u32 first,
-                       u32 count) noexcept override;
+  void ResetTimestamps(const QueryPool& pool, u32 first, u32 count) noexcept override;
   void WriteTimestamp(const QueryPool& pool, u32 index) noexcept override;
 
-  void AttachGpuSampler(IGpuSampler* sampler,
-                        ::gecko::Label autoZoneLabel) noexcept override;
+  void AttachGpuSampler(IGpuSampler* sampler, ::gecko::Label autoZoneLabel) noexcept override;
 
   IGpuSampler* GetAttachedGpuSampler() const noexcept override
   {
@@ -111,13 +99,10 @@ public:
 
 private:
   void MaybeRecordSwapchain(const RenderTarget& rt) noexcept;
-  void TransitionToColorAttachment(VulkanSwapchainData* data,
-                                   u32 imageIndex) noexcept;
+  void TransitionToColorAttachment(VulkanSwapchainData* data, u32 imageIndex) noexcept;
   void TransitionToPresent(VulkanSwapchainData* data, u32 imageIndex) noexcept;
-  void TransitionImage(VkImage image, VkImageAspectFlags aspect,
-                       VkImageLayout oldLayout, VkImageLayout newLayout,
-                       u32 baseMip = 0, u32 mipCount = VK_REMAINING_MIP_LEVELS,
-                       u32 baseLayer = 0,
+  void TransitionImage(VkImage image, VkImageAspectFlags aspect, VkImageLayout oldLayout, VkImageLayout newLayout,
+                       u32 baseMip = 0, u32 mipCount = VK_REMAINING_MIP_LEVELS, u32 baseLayer = 0,
                        u32 layerCount = VK_REMAINING_ARRAY_LAYERS) noexcept;
 
   VulkanDevice* m_Device {nullptr};

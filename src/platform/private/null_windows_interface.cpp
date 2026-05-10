@@ -19,21 +19,18 @@ WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   entry.Desc = desc;
   entry.TitleStorage = desc.Title ? desc.Title : "";
   entry.Desc.Title = entry.TitleStorage.c_str();
-  entry.ClientSize = {static_cast<u32>(desc.Size.X),
-                      static_cast<u32>(desc.Size.Y)};
+  entry.ClientSize = {static_cast<u32>(desc.Size.X), static_cast<u32>(desc.Size.Y)};
   entry.Decorated = desc.Decorated;
   entry.Resizable = desc.Resizable;
   entry.Mode = desc.Mode;
   entry.Buttons = desc.Buttons;
-  entry.State = desc.Visible ? platform::WindowState::Normal
-                             : platform::WindowState::Hidden;
+  entry.State = desc.Visible ? platform::WindowState::Normal : platform::WindowState::Hidden;
   entry.Alive = true;
 
   auto [it, ok] = m_Windows.emplace(id, ::std::move(entry));
   it->second.Desc.Title = it->second.TitleStorage.c_str();
 
-  GECKO_INFO(labels::General, "Created null window id=%llu",
-             static_cast<unsigned long long>(id));
+  GECKO_INFO(labels::General, "Created null window id=%llu", static_cast<unsigned long long>(id));
   return WindowHandle {id};
 }
 
@@ -74,8 +71,7 @@ bool NullWindowsBackend::RequestClose(WindowHandle window) noexcept
   StagedEvent ev;
   ev.Code = events::WindowCloseRequested;
   ev.Data.CloseRequested = {window, NowNsSafe()};
-  ev.PayloadSize =
-      static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
+  ev.PayloadSize = static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
   m_Staged.push_back(ev);
   return true;
 }
@@ -83,8 +79,7 @@ bool NullWindowsBackend::RequestClose(WindowHandle window) noexcept
 void NullWindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 {
   for (const auto& ev : m_Staged)
-    gecko::SendEvent(emitter, ev.Code,
-                     gecko::EventView {&ev.Data, ev.PayloadSize});
+    gecko::SendEvent(emitter, ev.Code, gecko::EventView {&ev.Data, ev.PayloadSize});
   m_Staged.clear();
 }
 
@@ -96,8 +91,7 @@ Extent2D NullWindowsBackend::GetClientSize(WindowHandle window) const noexcept
   return it->second.ClientSize;
 }
 
-void NullWindowsBackend::SetTitle(WindowHandle window,
-                                  const char* title) noexcept
+void NullWindowsBackend::SetTitle(WindowHandle window, const char* title) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -112,15 +106,13 @@ DpiInfo NullWindowsBackend::GetDpi(WindowHandle window) const noexcept
   return DpiInfo {};
 }
 
-NativeWindowHandle NullWindowsBackend::GetNativeWindowHandle(
-    WindowHandle window) const noexcept
+NativeWindowHandle NullWindowsBackend::GetNativeWindowHandle(WindowHandle window) const noexcept
 {
   (void)window;
   return NativeWindowHandle {};
 }
 
-void NullWindowsBackend::SetClientSize(WindowHandle window,
-                                       Extent2D size) noexcept
+void NullWindowsBackend::SetClientSize(WindowHandle window, Extent2D size) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -136,8 +128,7 @@ const char* NullWindowsBackend::GetTitle(WindowHandle window) const noexcept
   return it->second.TitleStorage.c_str();
 }
 
-void NullWindowsBackend::SetPosition(WindowHandle window,
-                                     math::Int2 pos) noexcept
+void NullWindowsBackend::SetPosition(WindowHandle window, math::Int2 pos) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -164,8 +155,7 @@ math::Int2 NullWindowsBackend::GetPosition(WindowHandle window) const noexcept
   return it->second.Position;
 }
 
-void NullWindowsBackend::SetWindowState(WindowHandle window,
-                                        platform::WindowState state) noexcept
+void NullWindowsBackend::SetWindowState(WindowHandle window, platform::WindowState state) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -179,14 +169,12 @@ void NullWindowsBackend::SetWindowState(WindowHandle window,
     StagedEvent ev;
     ev.Code = events::WindowStateChanged;
     ev.Data.StateChanged = {window, NowNsSafe(), oldState, state};
-    ev.PayloadSize =
-        static_cast<u32>(sizeof(events::WindowStateChangedPayload));
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowStateChangedPayload));
     m_Staged.push_back(ev);
   }
 }
 
-platform::WindowState NullWindowsBackend::GetWindowState(
-    WindowHandle window) const noexcept
+platform::WindowState NullWindowsBackend::GetWindowState(WindowHandle window) const noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -194,8 +182,7 @@ platform::WindowState NullWindowsBackend::GetWindowState(
   return it->second.State;
 }
 
-void NullWindowsBackend::SetDecorated(WindowHandle window,
-                                      bool decorated) noexcept
+void NullWindowsBackend::SetDecorated(WindowHandle window, bool decorated) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -217,8 +204,7 @@ void NullWindowsBackend::RequestFocus(WindowHandle window) noexcept
   // Null backend: no-op, focus is not meaningful without a display.
 }
 
-void NullWindowsBackend::SetResizable(WindowHandle window,
-                                      bool resizable) noexcept
+void NullWindowsBackend::SetResizable(WindowHandle window, bool resizable) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -234,8 +220,7 @@ bool NullWindowsBackend::IsResizable(WindowHandle window) const noexcept
   return it->second.Resizable;
 }
 
-void NullWindowsBackend::SetWindowMode(WindowHandle window,
-                                       WindowMode mode) noexcept
+void NullWindowsBackend::SetWindowMode(WindowHandle window, WindowMode mode) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -251,8 +236,7 @@ WindowMode NullWindowsBackend::GetWindowMode(WindowHandle window) const noexcept
   return it->second.Mode;
 }
 
-void NullWindowsBackend::SetWindowButtons(WindowHandle window,
-                                          WindowButtons buttons) noexcept
+void NullWindowsBackend::SetWindowButtons(WindowHandle window, WindowButtons buttons) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -260,8 +244,7 @@ void NullWindowsBackend::SetWindowButtons(WindowHandle window,
   it->second.Buttons = buttons;
 }
 
-WindowButtons NullWindowsBackend::GetWindowButtons(
-    WindowHandle window) const noexcept
+WindowButtons NullWindowsBackend::GetWindowButtons(WindowHandle window) const noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -285,8 +268,7 @@ void NullWindowsBackend::SetMaxSize(WindowHandle window, Extent2D size) noexcept
   it->second.MaxSize = size;
 }
 
-void NullWindowsBackend::SetAlwaysOnTop(WindowHandle window,
-                                        bool topmost) noexcept
+void NullWindowsBackend::SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -302,8 +284,7 @@ bool NullWindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
   return it->second.AlwaysOnTop;
 }
 
-void NullWindowsBackend::SetCursorMode(WindowHandle window,
-                                       CursorMode mode) noexcept
+void NullWindowsBackend::SetCursorMode(WindowHandle window, CursorMode mode) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())

@@ -76,8 +76,7 @@ MemLabelStats& TrackingAllocator::EnsureLabelLocked(Label label)
 void* TrackingAllocator::Alloc(u64 size, u32 alignment) noexcept
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
-  GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
-               "Alignment must be power of 2");
+  GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
 
   const Label label = CurrentLabel();
   const u32 effAlign = EffectiveAlignment(alignment);
@@ -87,8 +86,7 @@ void* TrackingAllocator::Alloc(u64 size, u32 alignment) noexcept
   if (!rawPtr)
     return nullptr;
 
-  void* userPtr =
-      PlaceAllocHeader(rawPtr, size, alignment, TrackingAllocMagic, label);
+  void* userPtr = PlaceAllocHeader(rawPtr, size, alignment, TrackingAllocMagic, label);
 
   m_TotalLive.fetch_add(size, std::memory_order_relaxed);
 
@@ -142,8 +140,7 @@ void TrackingAllocator::Free(void* ptr) noexcept
   }
   else
   {
-    GECKO_ASSERT(false &&
-                 "TrackingAllocator::Free: unknown allocation or double-free");
+    GECKO_ASSERT(false && "TrackingAllocator::Free: unknown allocation or double-free");
   }
 }
 
@@ -155,18 +152,14 @@ bool TrackingAllocator::StatsFor(Label label, MemLabelStats& outStats) const
     return false;
 
   outStats.StatsLabel = it->second.StatsLabel;
-  outStats.LiveBytes.store(it->second.LiveBytes.load(std::memory_order_relaxed),
-                           std::memory_order_relaxed);
-  outStats.Allocs.store(it->second.Allocs.load(std::memory_order_relaxed),
-                        std::memory_order_relaxed);
-  outStats.Frees.store(it->second.Frees.load(std::memory_order_relaxed),
-                       std::memory_order_relaxed);
+  outStats.LiveBytes.store(it->second.LiveBytes.load(std::memory_order_relaxed), std::memory_order_relaxed);
+  outStats.Allocs.store(it->second.Allocs.load(std::memory_order_relaxed), std::memory_order_relaxed);
+  outStats.Frees.store(it->second.Frees.load(std::memory_order_relaxed), std::memory_order_relaxed);
 
   return true;
 }
 
-void TrackingAllocator::Snapshot(
-    std::unordered_map<u64, MemLabelStats>& out) const
+void TrackingAllocator::Snapshot(std::unordered_map<u64, MemLabelStats>& out) const
 {
   std::lock_guard<std::mutex> lk(m_Mutex);
   out.clear();
@@ -176,12 +169,9 @@ void TrackingAllocator::Snapshot(
     auto result = out.try_emplace(id);
     auto& snap = result.first->second;
     snap.StatsLabel = st.StatsLabel;
-    snap.LiveBytes.store(st.LiveBytes.load(std::memory_order_relaxed),
-                         std::memory_order_relaxed);
-    snap.Allocs.store(st.Allocs.load(std::memory_order_relaxed),
-                      std::memory_order_relaxed);
-    snap.Frees.store(st.Frees.load(std::memory_order_relaxed),
-                     std::memory_order_relaxed);
+    snap.LiveBytes.store(st.LiveBytes.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    snap.Allocs.store(st.Allocs.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    snap.Frees.store(st.Frees.load(std::memory_order_relaxed), std::memory_order_relaxed);
   }
 }
 

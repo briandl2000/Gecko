@@ -21,8 +21,7 @@ Unique<IMonitorsBackend> CreateWaylandMonitorsBackend() noexcept;
 Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept;
 #endif
 
-Unique<IMonitorsBackend> IMonitorsBackend::Create(
-    const PlatformConfig& config) noexcept
+Unique<IMonitorsBackend> IMonitorsBackend::Create(const PlatformConfig& config) noexcept
 {
   switch (config.Backend)
   {
@@ -34,8 +33,7 @@ Unique<IMonitorsBackend> IMonitorsBackend::Create(
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
     return CreateXlibMonitorsBackend();
 #else
-    GECKO_WARN(labels::General,
-               "Xlib monitor backend not available in this build; using Null");
+    GECKO_WARN(labels::General, "Xlib monitor backend not available in this build; using Null");
     return CreateNullMonitorsBackend();
 #endif
 
@@ -43,9 +41,7 @@ Unique<IMonitorsBackend> IMonitorsBackend::Create(
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
     return CreateWaylandMonitorsBackend();
 #else
-    GECKO_WARN(
-        labels::General,
-        "Wayland monitor backend not available in this build; using Null");
+    GECKO_WARN(labels::General, "Wayland monitor backend not available in this build; using Null");
     return CreateNullMonitorsBackend();
 #endif
 
@@ -53,14 +49,12 @@ Unique<IMonitorsBackend> IMonitorsBackend::Create(
 #if defined(GECKO_PLATFORM_WINDOWS)
     return CreateWin32MonitorsBackend();
 #else
-    GECKO_WARN(labels::General,
-               "Win32 monitor backend not available in this build; using Null");
+    GECKO_WARN(labels::General, "Win32 monitor backend not available in this build; using Null");
     return CreateNullMonitorsBackend();
 #endif
 
   case DisplayBackendKind::Cocoa:
-    GECKO_WARN(labels::General,
-               "Cocoa monitor backend not available; using Null");
+    GECKO_WARN(labels::General, "Cocoa monitor backend not available; using Null");
     return CreateNullMonitorsBackend();
 
   default:

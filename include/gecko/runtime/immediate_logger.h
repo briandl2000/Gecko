@@ -20,8 +20,7 @@ public:
   ImmediateLogger() = default;
   virtual ~ImmediateLogger() = default;
 
-  virtual void LogV(LogLevel level, Label label, const char* fmt,
-                    va_list ap) noexcept override;
+  virtual void LogV(LogLevel level, Label label, const char* fmt, va_list ap) noexcept override;
   virtual bool Init() noexcept override;
   virtual void Shutdown() noexcept override;
 

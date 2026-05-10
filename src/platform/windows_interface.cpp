@@ -21,8 +21,7 @@ Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;
 Unique<IWindowsBackend> CreateWin32WindowsBackend() noexcept;
 #endif
 
-Unique<IWindowsBackend> IWindowsBackend::Create(
-    const PlatformConfig& config) noexcept
+Unique<IWindowsBackend> IWindowsBackend::Create(const PlatformConfig& config) noexcept
 {
   // config.Backend is guaranteed to be a concrete value;
   // PlatformContext calls Resolve() before passing the config here.
@@ -36,8 +35,7 @@ Unique<IWindowsBackend> IWindowsBackend::Create(
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
     return CreateXlibWindowsBackend();
 #else
-    GECKO_WARN(labels::General,
-               "Xlib window backend not available in this build; using Null");
+    GECKO_WARN(labels::General, "Xlib window backend not available in this build; using Null");
     return CreateUnique<NullWindowsBackend>();
 #endif
 
@@ -45,9 +43,7 @@ Unique<IWindowsBackend> IWindowsBackend::Create(
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
     return CreateWaylandWindowsBackend();
 #else
-    GECKO_WARN(
-        labels::General,
-        "Wayland window backend not available in this build; using Null");
+    GECKO_WARN(labels::General, "Wayland window backend not available in this build; using Null");
     return CreateUnique<NullWindowsBackend>();
 #endif
 
@@ -55,14 +51,12 @@ Unique<IWindowsBackend> IWindowsBackend::Create(
 #if defined(GECKO_PLATFORM_WINDOWS)
     return CreateWin32WindowsBackend();
 #else
-    GECKO_WARN(labels::General,
-               "Win32 window backend not available in this build; using Null");
+    GECKO_WARN(labels::General, "Win32 window backend not available in this build; using Null");
     return CreateUnique<NullWindowsBackend>();
 #endif
 
   case DisplayBackendKind::Cocoa:
-    GECKO_WARN(labels::General,
-               "Cocoa window backend not available; using Null");
+    GECKO_WARN(labels::General, "Cocoa window backend not available; using Null");
     return CreateUnique<NullWindowsBackend>();
 
   default:

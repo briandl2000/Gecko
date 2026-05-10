@@ -72,10 +72,8 @@ RuntimeModule::RuntimeModule(Backends backends) noexcept
   }
 }
 
-RuntimeModule::RuntimeModule(IJobSystem& jobs, IProfiler& profiler,
-                             ILogger& logger, IEventBus& eventBus) noexcept
-    : m_jobs {&jobs}, m_profiler {&profiler}, m_logger {&logger},
-      m_eventBus {&eventBus}
+RuntimeModule::RuntimeModule(IJobSystem& jobs, IProfiler& profiler, ILogger& logger, IEventBus& eventBus) noexcept
+    : m_jobs {&jobs}, m_profiler {&profiler}, m_logger {&logger}, m_eventBus {&eventBus}
 {}
 
 RuntimeModule::~RuntimeModule() noexcept = default;
@@ -85,8 +83,7 @@ RuntimeModule::~RuntimeModule() noexcept = default;
   return labels::Runtime;
 }
 
-::gecko::Span<const ::gecko::ServiceId> RuntimeModule::Publishes()
-    const noexcept
+::gecko::Span<const ::gecko::ServiceId> RuntimeModule::Publishes() const noexcept
 {
   return ::gecko::Span<const ::gecko::ServiceId> {Published};
 }

@@ -51,8 +51,8 @@ struct Quat
   /// Build a rotation of `angle` radians around `axis`.
   /// `axis` is **not** re-normalized; use `AxisAngle` if it might not be unit.
   Quat(const Float3& axis, f32 angle) noexcept
-      : X(axis.X * Sin(angle * 0.5f)), Y(axis.Y * Sin(angle * 0.5f)),
-        Z(axis.Z * Sin(angle * 0.5f)), W(Cos(angle * 0.5f))
+      : X(axis.X * Sin(angle * 0.5f)), Y(axis.Y * Sin(angle * 0.5f)), Z(axis.Z * Sin(angle * 0.5f)),
+        W(Cos(angle * 0.5f))
   {}
 
   [[nodiscard]] constexpr f32& operator[](usize index) noexcept
@@ -78,8 +78,7 @@ struct Quat
     const Float3 normalized = Normalized(axis);
     const f32 halfAngle = angle * 0.5f;
     const f32 s = Sin(halfAngle);
-    return {normalized.X * s, normalized.Y * s, normalized.Z * s,
-            Cos(halfAngle)};
+    return {normalized.X * s, normalized.Y * s, normalized.Z * s, Cos(halfAngle)};
   }
 
   /// Build the shortest-arc rotation that takes `from` to `to`.
@@ -131,8 +130,8 @@ struct Quat
     const f32 cr = Cos(roll * 0.5f);
     const f32 sr = Sin(roll * 0.5f);
 
-    return {sr * cp * cy - cr * sp * sy, cr * sp * cy + sr * cp * sy,
-            cr * cp * sy - sr * sp * cy, cr * cp * cy + sr * sp * sy};
+    return {sr * cp * cy - cr * sp * sy, cr * sp * cy + sr * cp * sy, cr * cp * sy - sr * sp * cy,
+            cr * cp * cy + sr * sp * sy};
   }
 
   // TODO: Implement when matrix conversions are needed
@@ -154,10 +153,8 @@ struct Quat
 /// Hamilton product. Composing rotations: `q2 * q1` applies `q1` first.
 [[nodiscard]] constexpr Quat operator*(const Quat& a, const Quat& b) noexcept
 {
-  return {a.W * b.X + a.X * b.W + a.Y * b.Z - a.Z * b.Y,
-          a.W * b.Y - a.X * b.Z + a.Y * b.W + a.Z * b.X,
-          a.W * b.Z + a.X * b.Y - a.Y * b.X + a.Z * b.W,
-          a.W * b.W - a.X * b.X - a.Y * b.Y - a.Z * b.Z};
+  return {a.W * b.X + a.X * b.W + a.Y * b.Z - a.Z * b.Y, a.W * b.Y - a.X * b.Z + a.Y * b.W + a.Z * b.X,
+          a.W * b.Z + a.X * b.Y - a.Y * b.X + a.Z * b.W, a.W * b.W - a.X * b.X - a.Y * b.Y - a.Z * b.Z};
 }
 
 // Scalar multiplication

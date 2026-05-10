@@ -57,8 +57,7 @@ struct FullStack
 
 }  // namespace
 
-TEST_CASE("Full stack: GraphicsModule comes up after Runtime + Platform",
-          "[feature][graphics][module]")
+TEST_CASE("Full stack: GraphicsModule comes up after Runtime + Platform", "[feature][graphics][module]")
 {
   FullStack stack;
 
@@ -70,12 +69,10 @@ TEST_CASE("Full stack: GraphicsModule comes up after Runtime + Platform",
 
   // GraphicsModule must publish a device.
   REQUIRE(GetGraphicsDevice() != nullptr);
-  REQUIRE(stack.engine->Modules().Service<GraphicsDevice>() ==
-          GetGraphicsDevice());
+  REQUIRE(stack.engine->Modules().Service<GraphicsDevice>() == GetGraphicsDevice());
 }
 
-TEST_CASE("Full stack: NullDevice does not publish a GPU sampler",
-          "[feature][graphics][module]")
+TEST_CASE("Full stack: NullDevice does not publish a GPU sampler", "[feature][graphics][module]")
 {
   FullStack stack;
 
@@ -84,8 +81,7 @@ TEST_CASE("Full stack: NullDevice does not publish a GPU sampler",
   REQUIRE(stack.engine->Modules().Service<IGpuSampler>() == nullptr);
 }
 
-TEST_CASE("Full stack: GraphicsModule shutdown order is clean",
-          "[feature][graphics][module]")
+TEST_CASE("Full stack: GraphicsModule shutdown order is clean", "[feature][graphics][module]")
 {
   FullStack stack;
   REQUIRE(GetGraphicsDevice() != nullptr);
@@ -97,8 +93,7 @@ TEST_CASE("Full stack: GraphicsModule shutdown order is clean",
   REQUIRE(GetGpuSampler() == nullptr);
 }
 
-TEST_CASE("Full stack: GraphicsModule honours Backends injection",
-          "[feature][graphics][module]")
+TEST_CASE("Full stack: GraphicsModule honours Backends injection", "[feature][graphics][module]")
 {
   SystemAllocator alloc;
   REQUIRE(SetAllocator(&alloc));
@@ -112,8 +107,7 @@ TEST_CASE("Full stack: GraphicsModule honours Backends injection",
 
   auto injected = CreateGraphicsDevice();  // NullDevice owned by the test.
   REQUIRE(injected != nullptr);
-  GraphicsModule graphics {GraphicsConfig {},
-                           GraphicsModule::Backends {injected.get()}};
+  GraphicsModule graphics {GraphicsConfig {}, GraphicsModule::Backends {injected.get()}};
 
   auto engine = Engine::Create({&runtime, &platform, &graphics});
   REQUIRE(engine.has_value());
@@ -142,10 +136,8 @@ TEST_CASE("Full stack: GraphicsModule honours Backends injection",
 #include <chrono>
 #include <thread>
 
-#if (defined(GECKO_PLATFORM_LINUX) || defined(GECKO_PLATFORM_WINDOWS)) && \
-    defined(GECKO_GRAPHICS_VULKAN)
-TEST_CASE("Visible: window + Vulkan device + swapchain bind",
-          "[.visible][feature][graphics][window]")
+#if (defined(GECKO_PLATFORM_LINUX) || defined(GECKO_PLATFORM_WINDOWS)) && defined(GECKO_GRAPHICS_VULKAN)
+TEST_CASE("Visible: window + Vulkan device + swapchain bind", "[.visible][feature][graphics][window]")
 {
   using namespace ::gecko::platform;
 

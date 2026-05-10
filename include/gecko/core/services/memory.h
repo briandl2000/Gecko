@@ -47,8 +47,7 @@ struct AllocHeader
 /// Recover the header for a user pointer returned by `IAllocator::Alloc`.
 inline AllocHeader* HeaderFromUserPtr(void* userPtr) noexcept
 {
-  return reinterpret_cast<AllocHeader*>(static_cast<u8*>(userPtr) -
-                                        sizeof(AllocHeader));
+  return reinterpret_cast<AllocHeader*>(static_cast<u8*>(userPtr) - sizeof(AllocHeader));
 }
 
 /// Recover the raw platform pointer that needs to be passed to `PlatformFree`.
@@ -62,8 +61,7 @@ inline void* RawPtrFromHeader(AllocHeader* header) noexcept
 /// @return `true` if the header carries a recognised allocator magic.
 inline bool IsAllocHeaderValid(const AllocHeader* header) noexcept
 {
-  return header && (header->Magic == SystemAllocMagic ||
-                    header->Magic == TrackingAllocMagic);
+  return header && (header->Magic == SystemAllocMagic || header->Magic == TrackingAllocMagic);
 }
 
 // ------------------------------------------------------------
@@ -86,9 +84,7 @@ GECKO_API void PlatformFree(void* ptr, u32 alignment) noexcept;
 /// Returns the user-alignment rounded up to at least `alignof(AllocHeader)`.
 inline u32 EffectiveAlignment(u32 userAlignment) noexcept
 {
-  return userAlignment > alignof(AllocHeader)
-             ? userAlignment
-             : static_cast<u32>(alignof(AllocHeader));
+  return userAlignment > alignof(AllocHeader) ? userAlignment : static_cast<u32>(alignof(AllocHeader));
 }
 
 /// Carve a header out of a raw platform allocation and return the
@@ -102,8 +98,7 @@ inline u32 EffectiveAlignment(u32 userAlignment) noexcept
 /// @param magic Allocator magic to record in the header.
 /// @param label Label active at the call site.
 /// @return Aligned user pointer immediately after the placed header.
-inline void* PlaceAllocHeader(void* rawPtr, u64 size, u32 userAlignment,
-                              u32 magic, Label label = {}) noexcept
+inline void* PlaceAllocHeader(void* rawPtr, u64 size, u32 userAlignment, u32 magic, Label label = {}) noexcept
 {
   const u32 effAlign = EffectiveAlignment(userAlignment);
   auto rawAddr = reinterpret_cast<uintptr_t>(rawPtr);
@@ -208,8 +203,7 @@ class AllocatorScope
 {
 public:
   /// Calls `SetAllocator(&allocator)`. Records whether init succeeded.
-  explicit AllocatorScope(IAllocator& allocator) noexcept
-      : m_Ok(SetAllocator(&allocator))
+  explicit AllocatorScope(IAllocator& allocator) noexcept : m_Ok(SetAllocator(&allocator))
   {}
   /// Calls `ResetAllocator()` if construction succeeded.
   ~AllocatorScope() noexcept
@@ -244,16 +238,13 @@ private:
 /// @param alignment Required alignment (power of two).
 /// @return Pointer to the new allocation; never null.
 [[nodiscard]]
-inline void* AllocBytes(
-    u64 size,
-    u32 alignment =
-        alignof(::std::max_align_t)) noexcept  // abi-ok: alignof() in default
-                                               // arg, evaluated at the call
-                                               // site as a u32 literal
+inline void* AllocBytes(u64 size,
+                        u32 alignment = alignof(::std::max_align_t)) noexcept  // abi-ok: alignof() in default
+                                                                               // arg, evaluated at the call
+                                                                               // site as a u32 literal
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
-  GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
-               "Alignment must be power of 2");
+  GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
   return Allocator().Alloc(size, alignment);
 }
 
