@@ -31,17 +31,14 @@ bool CreatePipeline()
   ::gecko::graphics::GraphicsPipelineDesc desc {};
   desc.VertexShader = ::gecko::graphics::ShaderCode {
       .Format = ::gecko::graphics::ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineVert),
-                sizeof(shaders::DebugLineVert)},
+      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineVert), sizeof(shaders::DebugLineVert)},
   };
   desc.PixelShader = ::gecko::graphics::ShaderCode {
       .Format = ::gecko::graphics::ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineFrag),
-                sizeof(shaders::DebugLineFrag)},
+      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::DebugLineFrag), sizeof(shaders::DebugLineFrag)},
   };
   desc.PipelineResources[0] =
-      ::gecko::graphics::PipelineResource::StructuredBufferBinding(
-          1, ::gecko::graphics::ShaderType::Vertex);
+      ::gecko::graphics::PipelineResource::StructuredBufferBinding(1, ::gecko::graphics::ShaderType::Vertex);
   desc.NumPipelineResources = 1;
   desc.PushConstantBytes = sizeof(DebugLinePushConstants);
   desc.NumRenderTargets = 1;
@@ -65,21 +62,18 @@ const ::gecko::graphics::GraphicsPipeline& GetDebugLinePipeline()
   return g_DebugLinePipeline;
 }
 
-::gecko::Span<const ::gecko::ServiceId> DebugRendererModule::Requires()
-    const noexcept
+::gecko::Span<const ::gecko::ServiceId> DebugRendererModule::Requires() const noexcept
 {
   return ::gecko::Span<const ::gecko::ServiceId> {RequiredServices};
 }
 
-bool DebugRendererModule::Startup(
-    ::gecko::IModuleRegistry& /*modules*/) noexcept
+bool DebugRendererModule::Startup(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_SCOPE(labels::DebugRenderer);
   return CreatePipeline();
 }
 
-void DebugRendererModule::Shutdown(
-    ::gecko::IModuleRegistry& /*modules*/) noexcept
+void DebugRendererModule::Shutdown(::gecko::IModuleRegistry& /*modules*/) noexcept
 {
   GECKO_SCOPE(labels::DebugRenderer);
   g_DebugLinePipeline = {};

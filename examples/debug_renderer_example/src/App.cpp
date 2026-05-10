@@ -19,10 +19,8 @@ using namespace ::gecko::platform;
 
 namespace {
 
-constexpr ::gecko::Label App_Label =
-    ::gecko::MakeLabel("app.debug_renderer_example");
-constexpr ::gecko::Label Main_Label =
-    ::gecko::MakeLabel("app.debug_renderer_example.main");
+constexpr ::gecko::Label App_Label = ::gecko::MakeLabel("app.debug_renderer_example");
+constexpr ::gecko::Label Main_Label = ::gecko::MakeLabel("app.debug_renderer_example.main");
 
 }  // namespace
 
@@ -53,9 +51,8 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
   if (!m_AllocScope)
     return;
 
-  m_Engine = ::gecko::Engine::Create({&m_RuntimeModule, &m_PlatformModule,
-                                      &m_GraphicsModule, &m_DebugRendererModule,
-                                      &m_AppModule});
+  m_Engine = ::gecko::Engine::Create(
+      {&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule, &m_DebugRendererModule, &m_AppModule});
   if (!m_Engine)
     return;
 
@@ -76,8 +73,7 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
     return;
   SubscribeEvents();
 
-  m_DebugRendererContext =
-      ::gecko::CreateShared<gecko::debug_renderer::DebugRendererContext>();
+  m_DebugRendererContext = ::gecko::CreateShared<gecko::debug_renderer::DebugRendererContext>();
   if (!m_DebugRendererContext || !m_DebugRendererContext->IsValid())
   {
     GECKO_ERROR(Main_Label, "Failed to create DebugRendererContext");
@@ -150,16 +146,13 @@ void App::SubscribeEvents()
 {
   m_CloseSub = ::gecko::SubscribeEvent(
       events::WindowCloseRequested,
-      [](void* user, const ::gecko::EventMeta&, ::gecko::EventView) {
-        static_cast<App*>(user)->m_Running = false;
-      },
+      [](void* user, const ::gecko::EventMeta&, ::gecko::EventView) { static_cast<App*>(user)->m_Running = false; },
       this);
 
   m_ResizeSub = ::gecko::SubscribeEvent(
       events::WindowResized,
       [](void* user, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowResizedPayload*>(view.Data());
+        const auto* p = static_cast<const events::WindowResizedPayload*>(view.Data());
         auto* self = static_cast<App*>(user);
         if (self->m_Window == p->Window)
         {
@@ -173,8 +166,7 @@ void App::SubscribeEvents()
   m_KeySub = ::gecko::SubscribeEvent(
       events::WindowKey,
       [](void* user, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowKeyPayload*>(view.Data());
+        const auto* p = static_cast<const events::WindowKeyPayload*>(view.Data());
         if (!p->Down || p->Repeat)
           return;
         if (p->Key == KeyCode::Escape)
@@ -204,20 +196,15 @@ void App::RenderFrame()
   if (!frame.Valid)
     return;
 
-  auto DrawCircle = [this](::gecko::math::float2 center, ::gecko::f32 radius,
-                           ::gecko::math::float3 color,
+  auto DrawCircle = [this](::gecko::math::float2 center, ::gecko::f32 radius, ::gecko::math::float3 color,
                            ::gecko::f32 thickness) {
     constexpr ::gecko::u32 kSegments = 32;
     for (::gecko::u32 i = 0; i < kSegments; ++i)
     {
-      const ::gecko::f32 a1 =
-          (static_cast<::gecko::f32>(i) / kSegments) * ::gecko::math::TwoPi;
-      const ::gecko::f32 a2 =
-          (static_cast<::gecko::f32>(i + 1) / kSegments) * ::gecko::math::TwoPi;
-      const ::gecko::math::float2 p1 {center.X + radius * ::std::cos(a1),
-                                      center.Y + radius * ::std::sin(a1)};
-      const ::gecko::math::float2 p2 {center.X + radius * ::std::cos(a2),
-                                      center.Y + radius * ::std::sin(a2)};
+      const ::gecko::f32 a1 = (static_cast<::gecko::f32>(i) / kSegments) * ::gecko::math::TwoPi;
+      const ::gecko::f32 a2 = (static_cast<::gecko::f32>(i + 1) / kSegments) * ::gecko::math::TwoPi;
+      const ::gecko::math::float2 p1 {center.X + radius * ::std::cos(a1), center.Y + radius * ::std::sin(a1)};
+      const ::gecko::math::float2 p2 {center.X + radius * ::std::cos(a2), center.Y + radius * ::std::sin(a2)};
       m_DebugRendererContext->DrawLine(p1, p2, color, thickness);
     }
   };
@@ -226,8 +213,7 @@ void App::RenderFrame()
   cmd->Begin();
   m_DebugRendererContext->NewFrame();
 
-  ::gecko::graphics::ClearValue clear =
-      ::gecko::graphics::ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
+  ::gecko::graphics::ClearValue clear = ::gecko::graphics::ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
   cmd->BeginRendering(frame.BackBuffer, &clear);
   m_DebugRendererContext->SetFrame(frame.BackBuffer);
 
@@ -235,15 +221,12 @@ void App::RenderFrame()
   const auto fbH = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height);
   for (::gecko::u32 i = 0; i < 4000; ++i)
   {
-    const ::gecko::math::float2 center {::gecko::RandomF32(0.0F, fbW),
-                                        ::gecko::RandomF32(0.0F, fbH)};
-    DrawCircle(center, ::gecko::RandomF32(20.0F, 100.0F), {1.0F, 0.0F, 0.0F},
-               2.0F);
+    const ::gecko::math::float2 center {::gecko::RandomF32(0.0F, fbW), ::gecko::RandomF32(0.0F, fbH)};
+    DrawCircle(center, ::gecko::RandomF32(20.0F, 100.0F), {1.0F, 0.0F, 0.0F}, 2.0F);
   }
 
   const auto mousePos = GetInput()->GetMousePosition(m_Window);
-  const ::gecko::math::float2 mousePosF {static_cast<::gecko::f32>(mousePos.X),
-                                         static_cast<::gecko::f32>(mousePos.Y)};
+  const ::gecko::math::float2 mousePosF {static_cast<::gecko::f32>(mousePos.X), static_cast<::gecko::f32>(mousePos.Y)};
   DrawCircle(mousePosF, 10.0F, {0.0F, 1.0F, 0.0F}, 4.0F);
 
   m_DebugRendererContext->Submit(cmd.get());
@@ -271,8 +254,7 @@ int App::Run()
 
   GECKO_INFO(Main_Label, "Entering frame loop - Escape or close to quit");
 
-  SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); },
-                        this);
+  SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); }, this);
 
   while (m_Running)
   {

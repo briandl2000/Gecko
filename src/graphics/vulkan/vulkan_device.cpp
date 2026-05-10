@@ -321,19 +321,16 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateCommandPool");
-    VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr,
-                                     &m_GraphicsCommandPool));
+    VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &m_GraphicsCommandPool));
   }
 
   // Dedicated upload pool: TRANSIENT (short-lived cmd bufs) + RESET so cmds
   // can be individually freed when their tracker fence signals.
   VkCommandPoolCreateInfo uploadPoolInfo {};
   uploadPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  uploadPoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |
-                         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  uploadPoolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   uploadPoolInfo.queueFamilyIndex = m_GraphicsQueueFamily;
-  VULKAN_CHECK(
-      vkCreateCommandPool(m_Device, &uploadPoolInfo, nullptr, &m_UploadPool));
+  VULKAN_CHECK(vkCreateCommandPool(m_Device, &uploadPoolInfo, nullptr, &m_UploadPool));
 
   // -- VMA allocator ---------------------------------------------
 
@@ -2162,8 +2159,7 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
   StagingBuffer staging = AcquireStaging(data.size());
   if (staging.Buffer == VK_NULL_HANDLE)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice::UploadBufferData staging allocation failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::UploadBufferData staging allocation failed");
     return;
   }
 
@@ -2181,9 +2177,8 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
     cmdAlloc.commandBufferCount = 1;
     if (vkAllocateCommandBuffers(m_Device, &cmdAlloc, &cmd) != VK_SUCCESS)
     {
-      GECKO_ERROR(labels::Vulkan,
-                  "VulkanDevice::UploadBufferData: vkAllocateCommandBuffers "
-                  "failed");
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice::UploadBufferData: vkAllocateCommandBuffers "
+                                  "failed");
       ReleaseStaging(staging);
       return;
     }
@@ -2204,8 +2199,7 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
     VkBufferMemoryBarrier bb {};
     bb.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
     bb.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    bb.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                       VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+    bb.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
                        VK_ACCESS_SHADER_READ_BIT;
     bb.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     bb.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -2213,8 +2207,7 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
     bb.offset = offset;
     bb.size = data.size();
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
-                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                         VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                          0, 0, nullptr, 1, &bb, 0, nullptr);
 
@@ -2243,14 +2236,12 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
   }
 }
 
-VulkanDevice::StagingBuffer VulkanDevice::AcquireStaging(
-    VkDeviceSize size) noexcept
+VulkanDevice::StagingBuffer VulkanDevice::AcquireStaging(VkDeviceSize size) noexcept
 {
   // Round up requested size to reduce fragmentation across slightly-different
   // upload sizes (e.g. line buffer growing/shrinking by a handful of entries).
   constexpr VkDeviceSize kGranularity = 4096;
-  const VkDeviceSize rounded =
-      ((size + kGranularity - 1) / kGranularity) * kGranularity;
+  const VkDeviceSize rounded = ((size + kGranularity - 1) / kGranularity) * kGranularity;
 
   {
     ::std::lock_guard<::std::mutex> lock(m_StagingMutex);
@@ -2288,8 +2279,7 @@ VulkanDevice::StagingBuffer VulkanDevice::AcquireStaging(
 
   StagingBuffer out {};
   VmaAllocationInfo info {};
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo,
-                      &out.Buffer, &out.Alloc, &info) != VK_SUCCESS)
+  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &out.Buffer, &out.Alloc, &info) != VK_SUCCESS)
   {
     return {};
   }
@@ -2324,8 +2314,7 @@ void VulkanDevice::ReapPendingUploads() noexcept
     ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
     for (auto it = m_PendingUploads.begin(); it != m_PendingUploads.end();)
     {
-      if (it->Fence != VK_NULL_HANDLE &&
-          vkGetFenceStatus(m_Device, it->Fence) == VK_SUCCESS)
+      if (it->Fence != VK_NULL_HANDLE && vkGetFenceStatus(m_Device, it->Fence) == VK_SUCCESS)
       {
         completed.emplace_back(::std::move(*it));
         it = m_PendingUploads.erase(it);

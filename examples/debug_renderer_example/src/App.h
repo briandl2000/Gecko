@@ -35,8 +35,7 @@ public:
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return m_Engine.has_value() && m_Device != nullptr && m_Window.IsValid() &&
-           m_DebugRendererContext != nullptr;
+    return m_Engine.has_value() && m_Device != nullptr && m_Window.IsValid() && m_DebugRendererContext != nullptr;
   }
 
   int Run();
@@ -81,8 +80,7 @@ private:
   ::gecko::platform::WindowHandle m_Window {};
   ::gecko::graphics::Swapchain m_Swapchain {};
 
-  gecko::Shared<gecko::debug_renderer::DebugRendererContext>
-      m_DebugRendererContext {};
+  gecko::Shared<gecko::debug_renderer::DebugRendererContext> m_DebugRendererContext {};
 
   ::gecko::EventSubscription m_CloseSub {};
   ::gecko::EventSubscription m_ResizeSub {};

@@ -59,9 +59,8 @@ public:
   /// @param framesInFlight  Ring size; should be at least the
   ///                        swapchain's frames-in-flight. Must be in
   ///                        `[1, MaxFramesInFlight]`.
-  explicit DebugRendererContext(
-      ::gecko::u32 lineCapacity = DefaultLineCapacity,
-      ::gecko::u32 framesInFlight = DefaultFramesInFlight);
+  explicit DebugRendererContext(::gecko::u32 lineCapacity = DefaultLineCapacity,
+                                ::gecko::u32 framesInFlight = DefaultFramesInFlight);
   ~DebugRendererContext() = default;
 
   DebugRendererContext(const DebugRendererContext&) = delete;
@@ -107,8 +106,7 @@ public:
   /// @param b          End point in pixels.
   /// @param color      Linear RGB in `[0, 1]`.
   /// @param thickness  Width in pixels.
-  void DrawLine(::gecko::math::float2 a, ::gecko::math::float2 b,
-                ::gecko::math::float3 color, ::gecko::f32 thickness);
+  void DrawLine(::gecko::math::float2 a, ::gecko::math::float2 b, ::gecko::math::float3 color, ::gecko::f32 thickness);
 
   /// Record a draw command for the lines added since the last
   /// `Submit` (or since `NewFrame` for the first call this frame).

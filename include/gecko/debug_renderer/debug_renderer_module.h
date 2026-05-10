@@ -13,8 +13,7 @@ namespace gecko::debug_renderer {
 
 namespace labels {
 /// Module label used by the debug renderer.
-inline constexpr ::gecko::Label DebugRenderer =
-    ::gecko::MakeLabel("gecko.debug_renderer");
+inline constexpr ::gecko::Label DebugRenderer = ::gecko::MakeLabel("gecko.debug_renderer");
 }  // namespace labels
 
 /// Engine module for the debug renderer library.
@@ -30,17 +29,14 @@ inline constexpr ::gecko::Label DebugRenderer =
 class DebugRendererModule final : public ::gecko::IModule
 {
 public:
-  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires()
-      const noexcept override;
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires() const noexcept override;
 
-  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
-      const noexcept override
+  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel() const noexcept override
   {
     return labels::DebugRenderer;
   }
 
-  [[nodiscard]] GECKO_API bool Startup(
-      ::gecko::IModuleRegistry& modules) noexcept override;
+  [[nodiscard]] GECKO_API bool Startup(::gecko::IModuleRegistry& modules) noexcept override;
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 };

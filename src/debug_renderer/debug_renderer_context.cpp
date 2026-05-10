@@ -7,8 +7,7 @@
 
 namespace gecko::debug_renderer {
 
-DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity,
-                                           ::gecko::u32 framesInFlight)
+DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity, ::gecko::u32 framesInFlight)
 {
   if (lineCapacity == 0)
   {
@@ -17,8 +16,7 @@ DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity,
   }
   if (framesInFlight == 0 || framesInFlight > MaxFramesInFlight)
   {
-    GECKO_ERROR(labels::Context, "framesInFlight ({}) must be in [1, {}]",
-                framesInFlight, MaxFramesInFlight);
+    GECKO_ERROR(labels::Context, "framesInFlight ({}) must be in [1, {}]", framesInFlight, MaxFramesInFlight);
     return;
   }
 
@@ -88,9 +86,7 @@ void DebugRendererContext::SetFrame(::gecko::graphics::RenderTarget target)
   m_FrameBound = true;
 }
 
-void DebugRendererContext::DrawLine(::gecko::math::float2 a,
-                                    ::gecko::math::float2 b,
-                                    ::gecko::math::float3 color,
+void DebugRendererContext::DrawLine(::gecko::math::float2 a, ::gecko::math::float2 b, ::gecko::math::float3 color,
                                     ::gecko::f32 thickness)
 {
   if (!m_Valid)
@@ -141,18 +137,14 @@ void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
 
   const ::gecko::u32 w = m_CurrentTarget.Desc.Width;
   const ::gecko::u32 h = m_CurrentTarget.Desc.Height;
-  cmd->SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(w),
-                   static_cast<::gecko::f32>(h));
+  cmd->SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(w), static_cast<::gecko::f32>(h));
   cmd->SetScissor(0, 0, w, h);
 
   DebugLinePushConstants pc {
-      .ViewportPx = {static_cast<::gecko::f32>(w),
-                     static_cast<::gecko::f32>(h)},
+      .ViewportPx = {static_cast<::gecko::f32>(w), static_cast<::gecko::f32>(h)},
       ._Pad = {0.0F, 0.0F},
   };
-  cmd->SetConstants(
-      0, ::gecko::Span<const ::gecko::byte> {
-             reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)});
+  cmd->SetConstants(0, ::gecko::Span<const ::gecko::byte> {reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)});
 
   // 6 vertices per line (2 triangles).
   cmd->Draw(batchSize * 6u, 1, m_BatchStart * 6u, 0);
