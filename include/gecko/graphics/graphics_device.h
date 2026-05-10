@@ -29,10 +29,9 @@ enum class GraphicsBackend : u8
 /// Parameters for `CreateGraphicsDevice`.
 struct GraphicsDeviceDesc
 {
-  GraphicsBackend Backend {
-      GraphicsBackend::Null};  ///< Which backend to instantiate.
-  bool Debug {false};          ///< Enable validation layers / GPU-side checks.
-  const char* AppName {"Gecko"};  ///< Identifier reported to the driver.
+  GraphicsBackend Backend {GraphicsBackend::Null};  ///< Which backend to instantiate.
+  bool Debug {false};                               ///< Enable validation layers / GPU-side checks.
+  const char* AppName {"Gecko"};                    ///< Identifier reported to the driver.
 };
 
 // -- Frame context ---------------------------------------------------------
@@ -74,9 +73,8 @@ public:
 
   /// Create a swapchain bound to `native` window with `desc`.
   [[nodiscard("Swapchain must be stored to present frames")]]
-  GECKO_API virtual Swapchain CreateSwapchain(
-      const ::gecko::platform::NativeWindowHandle& native,
-      const SwapchainDesc& desc) noexcept = 0;
+  GECKO_API virtual Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle& native,
+                                              const SwapchainDesc& desc) noexcept = 0;
 
   /// Destroy a swapchain. The handle is left in an invalid state.
   GECKO_API virtual void DestroySwapchain(Swapchain& swapchain) noexcept = 0;
@@ -91,8 +89,7 @@ public:
   GECKO_API virtual FrameContext BeginFrame(Swapchain& swapchain) noexcept = 0;
 
   /// Present one or more swapchains in a single driver call.
-  GECKO_API virtual void Present(
-      ::std::span<const FrameContext> frames) noexcept = 0;
+  GECKO_API virtual void Present(::std::span<const FrameContext> frames) noexcept = 0;
 
   /// Convenience overload for the common single-swapchain case.
   void Present(const FrameContext& frame) noexcept
@@ -105,77 +102,56 @@ public:
   /// Allocate a graphics command list. Caller fills it and submits via
   /// `ExecuteGraphicsCommandList`.
   [[nodiscard("Discarding a CommandList without executing it wastes work")]]
-  GECKO_API virtual Unique<ICommandList>
-  CreateGraphicsCommandList() noexcept = 0;
+  GECKO_API virtual Unique<ICommandList> CreateGraphicsCommandList() noexcept = 0;
 
   /// Allocate a compute command list.
   [[nodiscard("Discarding a CommandList without executing it wastes work")]]
-  GECKO_API virtual Unique<ICommandList>
-  CreateComputeCommandList() noexcept = 0;
+  GECKO_API virtual Unique<ICommandList> CreateComputeCommandList() noexcept = 0;
 
   /// Submit a graphics command list and reclaim its allocator.
-  GECKO_API virtual void ExecuteGraphicsCommandList(
-      Unique<ICommandList> commandList) noexcept = 0;
+  GECKO_API virtual void ExecuteGraphicsCommandList(Unique<ICommandList> commandList) noexcept = 0;
 
   /// Submit a compute command list and reclaim its allocator.
-  GECKO_API virtual void ExecuteComputeCommandList(
-      Unique<ICommandList> commandList) noexcept = 0;
+  GECKO_API virtual void ExecuteComputeCommandList(Unique<ICommandList> commandList) noexcept = 0;
 
   // Resource creation ------------------------------------------
 
-  [[nodiscard(
-      "Discarding a RenderTarget immediately releases the GPU resource")]]
-  GECKO_API virtual RenderTarget CreateRenderTarget(
-      const RenderTargetDesc& desc) noexcept = 0;
+  [[nodiscard("Discarding a RenderTarget immediately releases the GPU resource")]]
+  GECKO_API virtual RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) noexcept = 0;
 
-  [[nodiscard(
-      "Discarding a created Buffer immediately releases the GPU resource")]]
-  GECKO_API virtual Buffer CreateVertexBuffer(
-      const VertexBufferDesc& desc) noexcept = 0;
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
+  GECKO_API virtual Buffer CreateVertexBuffer(const VertexBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard(
-      "Discarding a created Buffer immediately releases the GPU resource")]]
-  GECKO_API virtual Buffer CreateIndexBuffer(
-      const IndexBufferDesc& desc) noexcept = 0;
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
+  GECKO_API virtual Buffer CreateIndexBuffer(const IndexBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard(
-      "Discarding a created Buffer immediately releases the GPU resource")]]
-  GECKO_API virtual Buffer CreateConstantBuffer(
-      const ConstantBufferDesc& desc) noexcept = 0;
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
+  GECKO_API virtual Buffer CreateConstantBuffer(const ConstantBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard(
-      "Discarding a created Buffer immediately releases the GPU resource")]]
-  GECKO_API virtual Buffer CreateStructuredBuffer(
-      const StructuredBufferDesc& desc) noexcept = 0;
+  [[nodiscard("Discarding a created Buffer immediately releases the GPU resource")]]
+  GECKO_API virtual Buffer CreateStructuredBuffer(const StructuredBufferDesc& desc) noexcept = 0;
 
-  [[nodiscard(
-      "Discarding a created Texture immediately releases the GPU resource")]]
+  [[nodiscard("Discarding a created Texture immediately releases the GPU resource")]]
   GECKO_API virtual Texture CreateTexture(const TextureDesc& desc) noexcept = 0;
 
-  [[nodiscard(
-      "Discarding a created Sampler immediately releases the GPU resource")]]
+  [[nodiscard("Discarding a created Sampler immediately releases the GPU resource")]]
   GECKO_API virtual Sampler CreateSampler(const SamplerDesc& desc) noexcept = 0;
 
   [[nodiscard("Discarding a created GraphicsPipeline immediately releases the "
               "GPU resource")]]
-  GECKO_API virtual GraphicsPipeline CreateGraphicsPipeline(
-      const GraphicsPipelineDesc& desc) noexcept = 0;
+  GECKO_API virtual GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) noexcept = 0;
 
   [[nodiscard("Discarding a created ComputePipeline immediately releases the "
               "GPU resource")]]
-  GECKO_API virtual ComputePipeline CreateComputePipeline(
-      const ComputePipelineDesc& desc) noexcept = 0;
+  GECKO_API virtual ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) noexcept = 0;
 
-  [[nodiscard(
-      "Discarding a created QueryPool immediately releases the GPU resource")]]
-  GECKO_API virtual QueryPool CreateTimestampQueryPool(
-      const QueryPoolDesc& desc) noexcept = 0;
+  [[nodiscard("Discarding a created QueryPool immediately releases the GPU resource")]]
+  GECKO_API virtual QueryPool CreateTimestampQueryPool(const QueryPoolDesc& desc) noexcept = 0;
 
   /// Read `count` timestamps starting at `firstQuery` from the pool into
   /// `out` as nanoseconds. Returns the number of timestamps written (0 on
   /// failure or if results are not yet available on the implementation).
-  GECKO_API virtual u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery,
-                                       ::std::span<u64> out) noexcept = 0;
+  GECKO_API virtual u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept = 0;
 
   // GPU profiler -----------------------------------------------
 
@@ -183,20 +159,17 @@ public:
   /// timestamp queries (NullDevice).
   [[nodiscard("Discarding the returned IGpuSampler immediately releases the "
               "GPU resources backing it")]]
-  GECKO_API virtual ::gecko::Unique<IGpuSampler> CreateGpuSampler(
-      const GpuSamplerDesc& desc) noexcept = 0;
+  GECKO_API virtual ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc& desc) noexcept = 0;
 
   // Data upload ------------------------------------------------
 
   /// Upload `data` into a mip+slice of `texture`. Stages through a
   /// CPU-visible buffer when the texture is `Dedicated`.
-  GECKO_API virtual void UploadTextureData(
-      Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip = 0,
-      u32 slice = 0) noexcept = 0;
+  GECKO_API virtual void UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip = 0,
+                                           u32 slice = 0) noexcept = 0;
 
   /// Upload `data` into `buffer` starting at `offset` bytes.
-  GECKO_API virtual void UploadBufferData(Buffer& buffer,
-                                          ::std::span<const ::gecko::byte> data,
+  GECKO_API virtual void UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data,
                                           u32 offset = 0) noexcept = 0;
 
 protected:
@@ -211,7 +184,6 @@ GECKO_API Unique<GraphicsDevice> CreateGraphicsDevice() noexcept;
 
 /// Create a graphics device with the specified backend and options.
 [[nodiscard]]
-GECKO_API Unique<GraphicsDevice> CreateGraphicsDevice(
-    const GraphicsDeviceDesc& desc) noexcept;
+GECKO_API Unique<GraphicsDevice> CreateGraphicsDevice(const GraphicsDeviceDesc& desc) noexcept;
 
 }  // namespace gecko::graphics

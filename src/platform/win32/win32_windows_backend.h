@@ -42,13 +42,10 @@ public:
   void SetPosition(WindowHandle window, math::Int2 pos) noexcept override;
   math::Int2 GetPosition(WindowHandle window) const noexcept override;
   DpiInfo GetDpi(WindowHandle window) const noexcept override;
-  NativeWindowHandle GetNativeWindowHandle(
-      WindowHandle window) const noexcept override;
+  NativeWindowHandle GetNativeWindowHandle(WindowHandle window) const noexcept override;
 
-  void SetWindowState(WindowHandle window,
-                      platform::WindowState state) noexcept override;
-  platform::WindowState GetWindowState(
-      WindowHandle window) const noexcept override;
+  void SetWindowState(WindowHandle window, platform::WindowState state) noexcept override;
+  platform::WindowState GetWindowState(WindowHandle window) const noexcept override;
   void SetDecorated(WindowHandle window, bool decorated) noexcept override;
   bool IsDecorated(WindowHandle window) const noexcept override;
   void RequestFocus(WindowHandle window) noexcept override;
@@ -57,8 +54,7 @@ public:
   bool IsResizable(WindowHandle window) const noexcept override;
   void SetWindowMode(WindowHandle window, WindowMode mode) noexcept override;
   WindowMode GetWindowMode(WindowHandle window) const noexcept override;
-  void SetWindowButtons(WindowHandle window,
-                        WindowButtons buttons) noexcept override;
+  void SetWindowButtons(WindowHandle window, WindowButtons buttons) noexcept override;
   WindowButtons GetWindowButtons(WindowHandle window) const noexcept override;
   void SetMinSize(WindowHandle window, Extent2D size) noexcept override;
   void SetMaxSize(WindowHandle window, Extent2D size) noexcept override;
@@ -69,8 +65,7 @@ public:
   CursorMode GetCursorMode(WindowHandle window) const noexcept override;
 
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
-  void SetModalFrameCallback(ModalFrameFn callback,
-                             void* userData) noexcept override;
+  void SetModalFrameCallback(ModalFrameFn callback, void* userData) noexcept override;
 
 private:
   struct Win32WindowEntry
@@ -131,8 +126,7 @@ private:
 
   void StageEvent(const StagedEvent& ev) noexcept;
   void FlushStagedEvents() noexcept;
-  static ::LRESULT CALLBACK WndProc(::HWND hwnd, ::UINT msg, ::WPARAM wParam,
-                                    ::LPARAM lParam);
+  static ::LRESULT CALLBACK WndProc(::HWND hwnd, ::UINT msg, ::WPARAM wParam, ::LPARAM lParam);
 
   void ApplyDecorations(::HWND hwnd, bool decorated, bool resizable) noexcept;
   ::DWORD MakeStyle(const WindowDesc& desc) const noexcept;

@@ -52,12 +52,9 @@ public:
   void SetDetailedSampleRate(u32 nthEvent) noexcept override;
   u32 GetDetailedSampleRate() const noexcept override;
 
-  ScopeStats GetStats(u32 nameHash, ProfSource source = ProfSource::CPU)
-      const noexcept override;
-  void WatchScope(u32 nameHash, u32 windowSize = 256,
-                  ProfSource source = ProfSource::CPU) noexcept override;
-  void UnwatchScope(u32 nameHash,
-                    ProfSource source = ProfSource::CPU) noexcept override;
+  ScopeStats GetStats(u32 nameHash, ProfSource source = ProfSource::CPU) const noexcept override;
+  void WatchScope(u32 nameHash, u32 windowSize = 256, ProfSource source = ProfSource::CPU) noexcept override;
+  void UnwatchScope(u32 nameHash, ProfSource source = ProfSource::CPU) noexcept override;
 
   void ResetStats() noexcept override;
   void SetStatsResetIntervalMs(u32 ms) noexcept override;

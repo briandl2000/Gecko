@@ -24,12 +24,10 @@ struct Rect2D
 
   constexpr Rect2D() noexcept = default;
 
-  constexpr Rect2D(Int2 position, Int2 size) noexcept
-      : Position(position), Size(size)
+  constexpr Rect2D(Int2 position, Int2 size) noexcept : Position(position), Size(size)
   {}
 
-  constexpr Rect2D(i32 x, i32 y, i32 width, i32 height) noexcept
-      : Position(x, y), Size(width, height)
+  constexpr Rect2D(i32 x, i32 y, i32 width, i32 height) noexcept : Position(x, y), Size(width, height)
   {}
 
   [[nodiscard]] constexpr i32 X() const noexcept
@@ -71,14 +69,13 @@ struct Rect2D
 
   [[nodiscard]] constexpr bool Contains(Int2 p) const noexcept
   {
-    return p.X >= Position.X && p.Y >= Position.Y && p.X < Right() &&
-           p.Y < Bottom();
+    return p.X >= Position.X && p.Y >= Position.Y && p.X < Right() && p.Y < Bottom();
   }
 
   [[nodiscard]] constexpr bool Intersects(const Rect2D& other) const noexcept
   {
-    return Position.X < other.Right() && Right() > other.Position.X &&
-           Position.Y < other.Bottom() && Bottom() > other.Position.Y;
+    return Position.X < other.Right() && Right() > other.Position.X && Position.Y < other.Bottom() &&
+           Bottom() > other.Position.Y;
   }
 
   [[nodiscard]] constexpr Aabb2i ToAabb2i() const noexcept

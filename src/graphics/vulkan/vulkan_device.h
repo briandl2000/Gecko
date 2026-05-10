@@ -41,34 +41,24 @@ public:
 
   // -- Resource creation -----------------------------------------
 
-  RenderTarget CreateRenderTarget(
-      const RenderTargetDesc& desc) noexcept override;
+  RenderTarget CreateRenderTarget(const RenderTargetDesc& desc) noexcept override;
   Buffer CreateVertexBuffer(const VertexBufferDesc& desc) noexcept override;
   Buffer CreateIndexBuffer(const IndexBufferDesc& desc) noexcept override;
   Buffer CreateConstantBuffer(const ConstantBufferDesc& desc) noexcept override;
-  Buffer CreateStructuredBuffer(
-      const StructuredBufferDesc& desc) noexcept override;
+  Buffer CreateStructuredBuffer(const StructuredBufferDesc& desc) noexcept override;
   Texture CreateTexture(const TextureDesc& desc) noexcept override;
   Sampler CreateSampler(const SamplerDesc& desc) noexcept override;
-  GraphicsPipeline CreateGraphicsPipeline(
-      const GraphicsPipelineDesc& desc) noexcept override;
-  ComputePipeline CreateComputePipeline(
-      const ComputePipelineDesc& desc) noexcept override;
-  QueryPool CreateTimestampQueryPool(
-      const QueryPoolDesc& desc) noexcept override;
-  u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery,
-                     ::std::span<u64> out) noexcept override;
+  GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) noexcept override;
+  ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) noexcept override;
+  QueryPool CreateTimestampQueryPool(const QueryPoolDesc& desc) noexcept override;
+  u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept override;
 
-  ::gecko::Unique<IGpuSampler> CreateGpuSampler(
-      const GpuSamplerDesc& desc) noexcept override;
+  ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc& desc) noexcept override;
 
   // -- Data upload ------------------------------------------------
 
-  void UploadTextureData(Texture& texture,
-                         ::std::span<const ::gecko::byte> data, u32 mip,
-                         u32 slice) noexcept override;
-  void UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data,
-                        u32 offset) noexcept override;
+  void UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip, u32 slice) noexcept override;
+  void UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data, u32 offset) noexcept override;
 
   // -- Internal accessors used by VulkanCommandList --------------
 
@@ -117,8 +107,7 @@ public:
   }
 
   /// Apply a VK_EXT_debug_utils object name if validation is enabled.
-  void SetObjectName(VkObjectType type, u64 handle,
-                     const char* name) const noexcept;
+  void SetObjectName(VkObjectType type, u64 handle, const char* name) const noexcept;
 
   /// Reset a range of timestamp queries in `pool` from the host. Uses
   /// VK_EXT_host_query_reset (Vulkan 1.2 core) when available, otherwise
@@ -126,25 +115,20 @@ public:
   /// VulkanGpuSampler so it doesn't need to embed a reset on a specific
   /// command list (would race with cmds submitted later in GPU-execution
   /// order than they were recorded).
-  void HostResetQueryPool(const QueryPool& pool, u32 firstQuery,
-                          u32 count) noexcept;
+  void HostResetQueryPool(const QueryPool& pool, u32 firstQuery, u32 count) noexcept;
 
 private:
   // -- Helpers ---------------------------------------------------
 
   /// Build the swapchain + image views + (re)create sync objects once.
   /// Used by CreateSwapchain and ResizeSwapchain.
-  [[nodiscard]] bool BuildSwapchainResources(
-      VulkanSwapchainData& data, VkSwapchainKHR oldSwapchain) noexcept;
+  [[nodiscard]] bool BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchainKHR oldSwapchain) noexcept;
 
-  void DestroySwapchainResources(VulkanSwapchainData& data,
-                                 bool destroySurface) noexcept;
+  void DestroySwapchainResources(VulkanSwapchainData& data, bool destroySurface) noexcept;
 
-  [[nodiscard]] VkShaderModule CreateShaderModule(
-      const ShaderCode& code) noexcept;
+  [[nodiscard]] VkShaderModule CreateShaderModule(const ShaderCode& code) noexcept;
 
-  void OneTimeSubmit(void (*record)(VkCommandBuffer, void*),
-                     void* ctx) noexcept;
+  void OneTimeSubmit(void (*record)(VkCommandBuffer, void*), void* ctx) noexcept;
 
   // -- Vulkan objects ---------------------------------------------
 

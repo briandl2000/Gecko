@@ -16,8 +16,7 @@ TraceFileSink::TraceFileSink(const char* path)
 {
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
-  m_Writer = ::gecko::platform::OpenWrite(
-      path, ::gecko::platform::WriteMode::Truncate);
+  m_Writer = ::gecko::platform::OpenWrite(path, ::gecko::platform::WriteMode::Truncate);
 
   if (m_Writer)
   {
@@ -91,15 +90,13 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent& event) noexcept
     WriteFmt(m_Writer.get(),
              "  {\"name\":\"%s\",\"cat\":\"%s "
              "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-             name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-             event.ThreadId);
+             name, label, (unsigned long long)event.EventLabel.Id, timeUs, event.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
     WriteFmt(m_Writer.get(),
              "  {\"name\":\"%s\",\"cat\":\"%s "
              "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-             name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-             event.ThreadId);
+             name, label, (unsigned long long)event.EventLabel.Id, timeUs, event.ThreadId);
     break;
   case ProfEventKind::FrameMark:
     WriteFmt(m_Writer.get(),
@@ -109,12 +106,10 @@ void TraceFileSink::WriteJsonEvent(const ProfEvent& event) noexcept
              name, timeUs, event.ThreadId);
     break;
   case ProfEventKind::Counter:
-    WriteFmt(
-        m_Writer.get(),
-        "  {\"name\":\"%s\",\"cat\":\"%s "
-        "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-        (unsigned long long)event.Value);
+    WriteFmt(m_Writer.get(),
+             "  {\"name\":\"%s\",\"cat\":\"%s "
+             "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
+             name, label, (unsigned long long)event.EventLabel.Id, timeUs, (unsigned long long)event.Value);
     break;
   }
 }

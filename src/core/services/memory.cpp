@@ -53,8 +53,7 @@ void PlatformFree(void* ptr, u32 alignment) noexcept
 void* SystemAllocator::Alloc(u64 size, u32 alignment) noexcept
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
-  GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 &&
-               "Alignment must be power of 2");
+  GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
 
   const u32 effAlign = EffectiveAlignment(alignment);
   const u64 totalSize = TotalAllocSize(size, alignment);

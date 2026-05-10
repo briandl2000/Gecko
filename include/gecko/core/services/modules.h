@@ -74,8 +74,7 @@ struct IModule
   /// publishes.
   ///
   /// @return `true` on success; `false` aborts engine boot.
-  [[nodiscard]] GECKO_API virtual bool Startup(
-      IModuleRegistry& modules) noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool Startup(IModuleRegistry& modules) noexcept = 0;
 
   /// Counterpart to `Startup`. Called in reverse topological order.
   GECKO_API virtual void Shutdown(IModuleRegistry& modules) noexcept = 0;
@@ -87,8 +86,7 @@ struct IModule
   /// Returned as `gecko::Span` rather than `std::span` because this
   /// is a virtual method on the `CoreServices` DLL boundary; see
   /// `gecko/core/span.h`.
-  [[nodiscard]] GECKO_API virtual Span<const ServiceId> Publishes()
-      const noexcept
+  [[nodiscard]] GECKO_API virtual Span<const ServiceId> Publishes() const noexcept
   {
     return {};
   }
@@ -100,8 +98,7 @@ struct IModule
   ///
   /// See `Publishes()` for why this is `gecko::Span` rather than
   /// `std::span`.
-  [[nodiscard]] GECKO_API virtual Span<const ServiceId> Requires()
-      const noexcept
+  [[nodiscard]] GECKO_API virtual Span<const ServiceId> Requires() const noexcept
   {
     return {};
   }
@@ -158,20 +155,15 @@ public:
   [[nodiscard]] GECKO_API virtual bool Init() noexcept = 0;
   GECKO_API virtual void Shutdown() noexcept = 0;
 
-  [[nodiscard]] GECKO_API virtual ModuleRegistration RegisterStatic(
-      IModule& module) noexcept = 0;
+  [[nodiscard]] GECKO_API virtual ModuleRegistration RegisterStatic(IModule& module) noexcept = 0;
 
-  [[nodiscard]] GECKO_API virtual ModuleResult Unregister(
-      Label module) noexcept = 0;
+  [[nodiscard]] GECKO_API virtual ModuleResult Unregister(Label module) noexcept = 0;
 
   [[nodiscard]] GECKO_API virtual IModule* GetModule(Label module) noexcept = 0;
-  [[nodiscard]] GECKO_API virtual const IModule* GetModule(
-      Label module) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual const IModule* GetModule(Label module) const noexcept = 0;
 
-  using ModuleVisitFn = void (*)(IModule& module, bool started,
-                                 void* user) noexcept;
-  GECKO_API virtual void ForEachModule(ModuleVisitFn fn,
-                                       void* user) noexcept = 0;
+  using ModuleVisitFn = void (*)(IModule& module, bool started, void* user) noexcept;
+  GECKO_API virtual void ForEachModule(ModuleVisitFn fn, void* user) noexcept = 0;
 
   [[nodiscard]] GECKO_API virtual bool StartupAllModules() noexcept = 0;
   GECKO_API virtual void ShutdownAllModules() noexcept = 0;
@@ -181,17 +173,14 @@ public:
   /// @param id    Service identifier from `ServiceIdOf<T>()`.
   /// @param impl  Pointer to the implementation; must not be null.
   /// @return `false` on null `impl` or duplicate publish.
-  [[nodiscard]] GECKO_API virtual bool PublishServiceImpl(
-      ServiceId id, void* impl) noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool PublishServiceImpl(ServiceId id, void* impl) noexcept = 0;
   /// Type-erased `Service`. Prefer the `Service<T>` helper.
   /// @param id  Service identifier from `ServiceIdOf<T>()`.
   /// @return Raw pointer to the published impl, or `nullptr`.
-  [[nodiscard]] GECKO_API virtual void* GetServiceImpl(
-      ServiceId id) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual void* GetServiceImpl(ServiceId id) const noexcept = 0;
   /// Type-erased `UnpublishService`. Prefer the `UnpublishService<T>` helper.
   /// @param id  Service identifier from `ServiceIdOf<T>()`.
-  [[nodiscard]] GECKO_API virtual bool UnpublishServiceImpl(
-      ServiceId id) noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool UnpublishServiceImpl(ServiceId id) noexcept = 0;
 
   /// Publish an interface implementation under the type `T`.
   /// Modules call this from `Startup`.
@@ -231,28 +220,20 @@ struct NullModuleRegistry final : IModuleRegistry
   [[nodiscard]] GECKO_API virtual bool Init() noexcept override;
   GECKO_API virtual void Shutdown() noexcept override;
 
-  [[nodiscard]] GECKO_API virtual ModuleRegistration RegisterStatic(
-      IModule& module) noexcept override;
-  [[nodiscard]] GECKO_API virtual ModuleResult Unregister(
-      Label module) noexcept override;
+  [[nodiscard]] GECKO_API virtual ModuleRegistration RegisterStatic(IModule& module) noexcept override;
+  [[nodiscard]] GECKO_API virtual ModuleResult Unregister(Label module) noexcept override;
 
-  [[nodiscard]] GECKO_API virtual IModule* GetModule(
-      Label module) noexcept override;
-  [[nodiscard]] GECKO_API virtual const IModule* GetModule(
-      Label module) const noexcept override;
+  [[nodiscard]] GECKO_API virtual IModule* GetModule(Label module) noexcept override;
+  [[nodiscard]] GECKO_API virtual const IModule* GetModule(Label module) const noexcept override;
 
-  GECKO_API virtual void ForEachModule(ModuleVisitFn fn,
-                                       void* user) noexcept override;
+  GECKO_API virtual void ForEachModule(ModuleVisitFn fn, void* user) noexcept override;
 
   [[nodiscard]] GECKO_API virtual bool StartupAllModules() noexcept override;
   GECKO_API virtual void ShutdownAllModules() noexcept override;
 
-  [[nodiscard]] GECKO_API virtual bool PublishServiceImpl(
-      ServiceId id, void* impl) noexcept override;
-  [[nodiscard]] GECKO_API virtual void* GetServiceImpl(
-      ServiceId id) const noexcept override;
-  [[nodiscard]] GECKO_API virtual bool UnpublishServiceImpl(
-      ServiceId id) noexcept override;
+  [[nodiscard]] GECKO_API virtual bool PublishServiceImpl(ServiceId id, void* impl) noexcept override;
+  [[nodiscard]] GECKO_API virtual void* GetServiceImpl(ServiceId id) const noexcept override;
+  [[nodiscard]] GECKO_API virtual bool UnpublishServiceImpl(ServiceId id) noexcept override;
 };
 
 }  // namespace gecko

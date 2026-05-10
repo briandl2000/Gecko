@@ -31,62 +31,45 @@ inline constexpr u64 PlatformModuleId = ::gecko::MakeLabel("gecko.platform").Id;
 
 /// Emitted after a window has been destroyed. The `Window` handle is no
 /// longer valid for new operations; the event is the last reference.
-inline constexpr gecko::EventCode WindowClosed =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0001);
+inline constexpr gecko::EventCode WindowClosed = gecko::MakeEventCode(detail::PlatformModuleId, 0x0001);
 /// Emitted when the user requests the window to close (X button, Alt-F4).
 /// The window is still alive; subscribers may veto by ignoring the event
 /// or schedule cleanup before destroying it.
-inline constexpr gecko::EventCode WindowCloseRequested =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0002);
+inline constexpr gecko::EventCode WindowCloseRequested = gecko::MakeEventCode(detail::PlatformModuleId, 0x0002);
 /// Emitted whenever the client area dimensions change.
-inline constexpr gecko::EventCode WindowResized =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0003);
+inline constexpr gecko::EventCode WindowResized = gecko::MakeEventCode(detail::PlatformModuleId, 0x0003);
 /// Emitted when the per-window DPI / content scale changes.
-inline constexpr gecko::EventCode WindowDpiChanged =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0004);
+inline constexpr gecko::EventCode WindowDpiChanged = gecko::MakeEventCode(detail::PlatformModuleId, 0x0004);
 /// Emitted on key press, release, and OS-driven auto-repeat.
-inline constexpr gecko::EventCode WindowKey =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0005);
+inline constexpr gecko::EventCode WindowKey = gecko::MakeEventCode(detail::PlatformModuleId, 0x0005);
 /// Emitted for translated text input (one Unicode codepoint per event).
-inline constexpr gecko::EventCode WindowChar =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0006);
+inline constexpr gecko::EventCode WindowChar = gecko::MakeEventCode(detail::PlatformModuleId, 0x0006);
 /// Emitted when the mouse moves over the window's client area.
-inline constexpr gecko::EventCode WindowMouseMove =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0007);
+inline constexpr gecko::EventCode WindowMouseMove = gecko::MakeEventCode(detail::PlatformModuleId, 0x0007);
 /// Emitted on mouse-button press and release.
-inline constexpr gecko::EventCode WindowMouseButton =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0008);
+inline constexpr gecko::EventCode WindowMouseButton = gecko::MakeEventCode(detail::PlatformModuleId, 0x0008);
 /// Emitted on scroll-wheel motion (vertical and horizontal).
-inline constexpr gecko::EventCode WindowMouseWheel =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0009);
+inline constexpr gecko::EventCode WindowMouseWheel = gecko::MakeEventCode(detail::PlatformModuleId, 0x0009);
 /// Emitted when the window gains or loses keyboard focus.
-inline constexpr gecko::EventCode WindowFocusChanged =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x000A);
+inline constexpr gecko::EventCode WindowFocusChanged = gecko::MakeEventCode(detail::PlatformModuleId, 0x000A);
 /// Emitted when the window's top-left position changes.
-inline constexpr gecko::EventCode WindowMoved =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x000B);
+inline constexpr gecko::EventCode WindowMoved = gecko::MakeEventCode(detail::PlatformModuleId, 0x000B);
 /// Emitted when `WindowState` transitions (Normal/Minimized/Maximized/...).
-inline constexpr gecko::EventCode WindowStateChanged =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x000C);
+inline constexpr gecko::EventCode WindowStateChanged = gecko::MakeEventCode(detail::PlatformModuleId, 0x000C);
 /// Emitted when the cursor enters the window's client area.
-inline constexpr gecko::EventCode WindowMouseEntered =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x000D);
+inline constexpr gecko::EventCode WindowMouseEntered = gecko::MakeEventCode(detail::PlatformModuleId, 0x000D);
 /// Emitted when the cursor leaves the window's client area.
-inline constexpr gecko::EventCode WindowMouseExited =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x000E);
+inline constexpr gecko::EventCode WindowMouseExited = gecko::MakeEventCode(detail::PlatformModuleId, 0x000E);
 
 // Monitor event codes ------------------------------------------------
 
 /// Emitted when a new monitor is attached to the system.
-inline constexpr gecko::EventCode MonitorConnected =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0100);
+inline constexpr gecko::EventCode MonitorConnected = gecko::MakeEventCode(detail::PlatformModuleId, 0x0100);
 /// Emitted when a monitor is detached. The handle is no longer valid.
-inline constexpr gecko::EventCode MonitorDisconnected =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0101);
+inline constexpr gecko::EventCode MonitorDisconnected = gecko::MakeEventCode(detail::PlatformModuleId, 0x0101);
 /// Emitted when an existing monitor's properties change (resolution,
 /// refresh rate, position, primary flag, ...).
-inline constexpr gecko::EventCode MonitorReconfigured =
-    gecko::MakeEventCode(detail::PlatformModuleId, 0x0102);
+inline constexpr gecko::EventCode MonitorReconfigured = gecko::MakeEventCode(detail::PlatformModuleId, 0x0102);
 
 // Window event payloads ----------------------------------------------
 

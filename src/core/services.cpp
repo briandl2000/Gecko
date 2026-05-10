@@ -137,8 +137,7 @@ void SetThreadProfilerName(const char* name) noexcept
 
 const char* GetThreadProfilerName() noexcept
 {
-  return tls_ThreadProfilerName.empty() ? nullptr
-                                        : tls_ThreadProfilerName.c_str();
+  return tls_ThreadProfilerName.empty() ? nullptr : tls_ThreadProfilerName.c_str();
 }
 
 const char* LookupThreadProfilerName(u32 threadId) noexcept

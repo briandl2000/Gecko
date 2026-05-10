@@ -14,9 +14,7 @@ void EventSubscription::Reset()
 
   if (m_Bus && m_Id != 0)
   {
-    GECKO_TRACE(core::labels::Events,
-                "Unsubscribing event subscription ID=%llu",
-                (unsigned long long)m_Id);
+    GECKO_TRACE(core::labels::Events, "Unsubscribing event subscription ID=%llu", (unsigned long long)m_Id);
     m_Bus->Unsubscribe(m_Id);
   }
   m_Bus = nullptr;
@@ -29,22 +27,18 @@ EventEmitter CreateEmitterForModule(Label moduleLabel, u64 sender)
 
   if (!moduleLabel.IsValid())
   {
-    GECKO_ERROR(core::labels::Events,
-                "CreateEmitterForModule: invalid module label");
+    GECKO_ERROR(core::labels::Events, "CreateEmitterForModule: invalid module label");
     GECKO_ASSERT(false && "Invalid module label!");
     return {};
   }
 
-  GECKO_TRACE(core::labels::Events,
-              "Creating emitter for module '%s' (sender=%llu)",
-              moduleLabel.Name ? moduleLabel.Name : "<unnamed>",
-              (unsigned long long)sender);
+  GECKO_TRACE(core::labels::Events, "Creating emitter for module '%s' (sender=%llu)",
+              moduleLabel.Name ? moduleLabel.Name : "<unnamed>", (unsigned long long)sender);
   return CreateEmitter(moduleLabel.Id, sender);
 }
 
 // NullEventBus - no profiling, these are no-ops
-EventSubscription NullEventBus::Subscribe(EventCode, CallbackFn, void*,
-                                          SubscriptionOptions) noexcept
+EventSubscription NullEventBus::Subscribe(EventCode, CallbackFn, void*, SubscriptionOptions) noexcept
 {
   return {};
 }

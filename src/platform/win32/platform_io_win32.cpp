@@ -31,8 +31,7 @@ namespace win32_io {
   if (path.Empty())
     return {};
   auto sv = path.View();
-  int wLen = ::MultiByteToWideChar(CP_UTF8, 0, sv.data(),
-                                   static_cast<int>(sv.size()), nullptr, 0);
+  int wLen = ::MultiByteToWideChar(CP_UTF8, 0, sv.data(), static_cast<int>(sv.size()), nullptr, 0);
   if (wLen <= 0)
     return {};
   ::std::wstring out;
@@ -44,8 +43,7 @@ namespace win32_io {
   {
     return {};
   }
-  ::MultiByteToWideChar(CP_UTF8, 0, sv.data(), static_cast<int>(sv.size()),
-                        out.data(), wLen);
+  ::MultiByteToWideChar(CP_UTF8, 0, sv.data(), static_cast<int>(sv.size()), out.data(), wLen);
   for (auto& c : out)
   {
     if (c == L'/')
@@ -58,8 +56,7 @@ namespace win32_io {
 {
   if (wide == nullptr || wLen == 0)
     return {};
-  int u8Len = ::WideCharToMultiByte(CP_UTF8, 0, wide, static_cast<int>(wLen),
-                                    nullptr, 0, nullptr, nullptr);
+  int u8Len = ::WideCharToMultiByte(CP_UTF8, 0, wide, static_cast<int>(wLen), nullptr, 0, nullptr, nullptr);
   if (u8Len <= 0)
     return {};
   ::std::string out;
@@ -71,8 +68,7 @@ namespace win32_io {
   {
     return {};
   }
-  ::WideCharToMultiByte(CP_UTF8, 0, wide, static_cast<int>(wLen), out.data(),
-                        u8Len, nullptr, nullptr);
+  ::WideCharToMultiByte(CP_UTF8, 0, wide, static_cast<int>(wLen), out.data(), u8Len, nullptr, nullptr);
   for (auto& c : out)
   {
     if (c == '\\')
@@ -107,8 +103,7 @@ public:
     ::std::size_t total = 0;
     while (total < data.size())
     {
-      DWORD chunk = static_cast<DWORD>(
-          ::std::min<::std::size_t>(data.size() - total, 1u << 24));
+      DWORD chunk = static_cast<DWORD>(::std::min<::std::size_t>(data.size() - total, 1u << 24));
       DWORD wrote = 0;
       if (!::WriteFile(m_Handle, data.data() + total, chunk, &wrote, nullptr))
         return false;
@@ -131,8 +126,7 @@ public:
     LARGE_INTEGER li {};
     li.QuadPart = offset;
     LARGE_INTEGER out {};
-    if (!::SetFilePointerEx(m_Handle, li, &out,
-                            fromEnd ? FILE_END : FILE_BEGIN))
+    if (!::SetFilePointerEx(m_Handle, li, &out, fromEnd ? FILE_END : FILE_BEGIN))
       return static_cast<::gecko::u64>(-1);
     return static_cast<::gecko::u64>(out.QuadPart);
   }
@@ -183,8 +177,7 @@ bool Exists(PathView path) noexcept
   ft.HighPart = data.ftLastWriteTime.dwHighDateTime;
   constexpr ::gecko::u64 FiletimeUnixDelta = 116444736000000000ULL;
   if (ft.QuadPart >= FiletimeUnixDelta)
-    fs.MTimeEpoch = static_cast<::gecko::i64>(
-        (ft.QuadPart - FiletimeUnixDelta) / 10000000ULL);
+    fs.MTimeEpoch = static_cast<::gecko::i64>((ft.QuadPart - FiletimeUnixDelta) / 10000000ULL);
   fs.IsDirectory = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
   return fs;
 }
@@ -194,8 +187,8 @@ ReadResult Read(PathView path) noexcept
   auto w = ToWide(path);
   if (w.empty())
     return {};
-  HANDLE h = ::CreateFileW(w.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE h =
+      ::CreateFileW(w.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (h == INVALID_HANDLE_VALUE)
     return {};
   LARGE_INTEGER size {};
@@ -217,8 +210,7 @@ ReadResult Read(PathView path) noexcept
   ::std::size_t total = 0;
   while (total < buf.size())
   {
-    DWORD chunk = static_cast<DWORD>(
-        ::std::min<::std::size_t>(buf.size() - total, 1u << 24));
+    DWORD chunk = static_cast<DWORD>(::std::min<::std::size_t>(buf.size() - total, 1u << 24));
     DWORD got = 0;
     if (!::ReadFile(h, buf.data() + total, chunk, &got, nullptr))
     {
@@ -241,8 +233,8 @@ MappedFile Map(PathView path) noexcept
   auto w = ToWide(path);
   if (w.empty())
     return {};
-  HANDLE file = ::CreateFileW(w.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE file =
+      ::CreateFileW(w.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE)
     return {};
   LARGE_INTEGER size {};
@@ -251,8 +243,7 @@ MappedFile Map(PathView path) noexcept
     ::CloseHandle(file);
     return {};
   }
-  HANDLE map =
-      ::CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr);
+  HANDLE map = ::CreateFileMappingW(file, nullptr, PAGE_READONLY, 0, 0, nullptr);
   if (map == nullptr)
   {
     ::CloseHandle(file);
@@ -289,19 +280,16 @@ MappedFile Map(PathView path) noexcept
     delete mapping;
   };
 
-  return MappedFile {static_cast<const ::std::byte*>(view),
-                     static_cast<::std::size_t>(size.QuadPart), m, deleter};
+  return MappedFile {static_cast<const ::std::byte*>(view), static_cast<::std::size_t>(size.QuadPart), m, deleter};
 }
 
-WriteResult Write(PathView path, ::std::span<const ::std::byte> data,
-                  WriteMode mode) noexcept
+WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode mode) noexcept
 {
   auto w = ToWide(path);
   if (w.empty())
     return {};
   DWORD disp = (mode == WriteMode::Truncate) ? CREATE_ALWAYS : OPEN_ALWAYS;
-  HANDLE h = ::CreateFileW(w.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
-                           disp, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE h = ::CreateFileW(w.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, disp, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (h == INVALID_HANDLE_VALUE)
     return {};
   if (mode == WriteMode::Append)
@@ -310,8 +298,7 @@ WriteResult Write(PathView path, ::std::span<const ::std::byte> data,
   ::std::size_t total = 0;
   while (total < data.size())
   {
-    DWORD chunk = static_cast<DWORD>(
-        ::std::min<::std::size_t>(data.size() - total, 1u << 24));
+    DWORD chunk = static_cast<DWORD>(::std::min<::std::size_t>(data.size() - total, 1u << 24));
     DWORD wrote = 0;
     if (!::WriteFile(h, data.data() + total, chunk, &wrote, nullptr))
     {
@@ -321,8 +308,7 @@ WriteResult Write(PathView path, ::std::span<const ::std::byte> data,
     total += wrote;
   }
   ::CloseHandle(h);
-  return WriteResult {.Ok = true,
-                      .BytesWritten = static_cast<::gecko::u64>(total)};
+  return WriteResult {.Ok = true, .BytesWritten = static_cast<::gecko::u64>(total)};
 }
 
 bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept
@@ -332,16 +318,14 @@ bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept
     return false;
   auto tmp = target + L".tmp";
 
-  HANDLE h = ::CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, nullptr,
-                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE h = ::CreateFileW(tmp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (h == INVALID_HANDLE_VALUE)
     return false;
 
   ::std::size_t total = 0;
   while (total < data.size())
   {
-    DWORD chunk = static_cast<DWORD>(
-        ::std::min<::std::size_t>(data.size() - total, 1u << 24));
+    DWORD chunk = static_cast<DWORD>(::std::min<::std::size_t>(data.size() - total, 1u << 24));
     DWORD wrote = 0;
     if (!::WriteFile(h, data.data() + total, chunk, &wrote, nullptr))
     {
@@ -354,8 +338,7 @@ bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept
   ::FlushFileBuffers(h);
   ::CloseHandle(h);
 
-  if (!::MoveFileExW(tmp.c_str(), target.c_str(),
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+  if (!::MoveFileExW(tmp.c_str(), target.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
   {
     ::DeleteFileW(tmp.c_str());
     return false;
@@ -369,8 +352,8 @@ bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept
   if (w.empty())
     return {};
   DWORD disposition = (mode == WriteMode::Append) ? OPEN_ALWAYS : CREATE_ALWAYS;
-  HANDLE h = ::CreateFileW(w.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr,
-                           disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE h =
+      ::CreateFileW(w.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, disposition, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (h == INVALID_HANDLE_VALUE)
     return {};
   if (mode == WriteMode::Append)
@@ -406,8 +389,7 @@ bool CreateDir(PathView path, bool recursive) noexcept
       ::std::wstring sub(w, 0, i);
       if (sub.empty())
         continue;
-      if (!::CreateDirectoryW(sub.c_str(), nullptr) &&
-          ::GetLastError() != ERROR_ALREADY_EXISTS)
+      if (!::CreateDirectoryW(sub.c_str(), nullptr) && ::GetLastError() != ERROR_ALREADY_EXISTS)
         return false;
     }
   }
@@ -466,8 +448,7 @@ DirIter IterateDir(PathView path) noexcept
       }
       st->HasFirst = false;
       if (st->Data.cFileName[0] == L'.' &&
-          (st->Data.cFileName[1] == L'\0' ||
-           (st->Data.cFileName[1] == L'.' && st->Data.cFileName[2] == L'\0')))
+          (st->Data.cFileName[1] == L'\0' || (st->Data.cFileName[1] == L'.' && st->Data.cFileName[2] == L'\0')))
         continue;
 
       ::std::size_t len = 0;
@@ -481,8 +462,7 @@ DirIter IterateDir(PathView path) noexcept
       {
         return false;
       }
-      out->IsDirectory =
-          (st->Data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+      out->IsDirectory = (st->Data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
       return true;
     }
   };
@@ -526,8 +506,7 @@ DirIter IterateDir(PathView path) noexcept
 ::std::string UserDataDir(::std::string_view appName) noexcept
 {
   PWSTR rawPath = nullptr;
-  HRESULT hr =
-      ::SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &rawPath);
+  HRESULT hr = ::SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &rawPath);
   if (FAILED(hr) || rawPath == nullptr)
   {
     if (rawPath != nullptr)

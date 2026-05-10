@@ -35,8 +35,7 @@ struct ServiceScope
 
 }  // namespace
 
-TEST_CASE("GraphicsModule reports its label and service contract",
-          "[graphics][module]")
+TEST_CASE("GraphicsModule reports its label and service contract", "[graphics][module]")
 {
   GraphicsModule module {};
   REQUIRE(module.RootLabel() == labels::Graphics);
@@ -72,8 +71,7 @@ TEST_CASE("GraphicsModule with default config publishes GraphicsDevice via "
   REQUIRE(GetGpuSampler() == nullptr);
 }
 
-TEST_CASE("GraphicsModule clears accessors after Shutdown",
-          "[graphics][module]")
+TEST_CASE("GraphicsModule clears accessors after Shutdown", "[graphics][module]")
 {
   GraphicsModule module {GraphicsConfig {}};
   ServiceScope scope;
@@ -92,8 +90,7 @@ TEST_CASE("GraphicsModule respects Backends injection", "[graphics][module]")
   auto injected = CreateGraphicsDevice();
   REQUIRE(injected != nullptr);
 
-  GraphicsModule module {GraphicsConfig {},
-                         GraphicsModule::Backends {injected.get()}};
+  GraphicsModule module {GraphicsConfig {}, GraphicsModule::Backends {injected.get()}};
   ServiceScope scope;
 
   scope.engine = Engine::Create({&scope.runtime, &module});

@@ -60,8 +60,7 @@ ProfEvent MakeEnd(u32 hash, const char* name, u64 ts, u32 tid = 0) noexcept
 u64 NowNs() noexcept
 {
   return static_cast<u64>(
-      ::std::chrono::duration_cast<::std::chrono::nanoseconds>(
-          ::std::chrono::steady_clock::now().time_since_epoch())
+      ::std::chrono::duration_cast<::std::chrono::nanoseconds>(::std::chrono::steady_clock::now().time_since_epoch())
           .count());
 }
 
@@ -75,8 +74,7 @@ u64 NowNs() noexcept
 
 ::std::string TempTracePath(const char* tag)
 {
-  auto p = ::std::filesystem::temp_directory_path() /
-           (::std::string("gecko_feature_trace_") + tag + ".json");
+  auto p = ::std::filesystem::temp_directory_path() / (::std::string("gecko_feature_trace_") + tag + ".json");
   ::std::error_code ec;
   ::std::filesystem::remove(p, ec);
   return p.string();
@@ -84,8 +82,7 @@ u64 NowNs() noexcept
 
 }  // namespace
 
-TEST_CASE("Profiler feature: high-contention multi-thread workload",
-          "[runtime][profiler][feature]")
+TEST_CASE("Profiler feature: high-contention multi-thread workload", "[runtime][profiler][feature]")
 {
   // Many threads pound the same set of NameHashes through a real ring of
   // moderate size. We expect every Begin/End pair to land in the
@@ -141,8 +138,7 @@ TEST_CASE("Profiler feature: high-contention multi-thread workload",
   prof.Shutdown();
 }
 
-TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer",
-          "[runtime][profiler][feature]")
+TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer", "[runtime][profiler][feature]")
 {
   // With a real job system installed via Engine, RingProfiler's
   // TryScheduleConsumerJob hands its consumer job off to a worker thread
@@ -173,8 +169,7 @@ TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer",
       }
       void WriteBatch(::gecko::Span<const ProfEvent> evs) noexcept override
       {
-        Count.fetch_add(static_cast<u32>(evs.size()),
-                        ::std::memory_order_relaxed);
+        Count.fetch_add(static_cast<u32>(evs.size()), ::std::memory_order_relaxed);
       }
       void Flush() noexcept override
       {}
@@ -212,8 +207,7 @@ TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer",
   ResetAllocator();
 }
 
-TEST_CASE("Profiler feature: AsyncTraceProfilerSink under multi-thread load",
-          "[runtime][profiler][feature][trace]")
+TEST_CASE("Profiler feature: AsyncTraceProfilerSink under multi-thread load", "[runtime][profiler][feature][trace]")
 {
   // End-to-end: write a chrome trace from many threads via the real sink,
   // then re-open and validate the produced JSON file is well-formed and

@@ -25,8 +25,7 @@ bool EventBus::Init() noexcept
   m_CapabilitySecret = RandomU64();
 
   // Allocate containers now that allocator service is installed
-  m_Subscribers = std::make_unique<
-      std::unordered_map<EventCode, std::vector<Subscriber>>>();
+  m_Subscribers = std::make_unique<std::unordered_map<EventCode, std::vector<Subscriber>>>();
   m_EventQueue = std::make_unique<std::deque<QueuedEvent>>();
   m_RegisteredModules = std::make_unique<std::unordered_set<u64>>();
 
@@ -78,16 +77,14 @@ void EventBus::UnregisterModule(u64 moduleId) noexcept
     m_RegisteredModules->erase(moduleId);
 }
 
-EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user,
-                                      SubscriptionOptions options) noexcept
+EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user, SubscriptionOptions options) noexcept
 {
   GECKO_SCOPE(runtime::labels::General);
   GECKO_ASSERT(fn && "Callback cannot be null");
 
   u64 id = m_NextSubscriptionId.fetch_add(1, std::memory_order_relaxed);
-  GECKO_TRACE(runtime::labels::General,
-              "Creating subscription ID=%llu for event code %u",
-              (unsigned long long)id, code);
+  GECKO_TRACE(runtime::labels::General, "Creating subscription ID=%llu for event code %u", (unsigned long long)id,
+              code);
 
   Subscriber sub {};
   sub.id = id;
@@ -117,8 +114,7 @@ void EventBus::Unsubscribe(u64 id) noexcept
 
   for (auto& [code, subscribers] : *m_Subscribers)
   {
-    auto it = std::find_if(subscribers.begin(), subscribers.end(),
-                           [id](const Subscriber& s) { return s.id == id; });
+    auto it = std::find_if(subscribers.begin(), subscribers.end(), [id](const Subscriber& s) { return s.id == id; });
     if (it != subscribers.end())
     {
       subscribers.erase(it);
@@ -127,23 +123,17 @@ void EventBus::Unsubscribe(u64 id) noexcept
   }
 }
 
-void EventBus::Send(const EventEmitter& emitter, EventCode code,
-                    EventView payload) noexcept
+void EventBus::Send(const EventEmitter& emitter, EventCode code, EventView payload) noexcept
 {
   GECKO_SCOPE_NAMED(runtime::labels::General, "SendEvent");
 
   [[maybe_unused]] const u32 codeModuleHash = GetEventModule(code);
-  [[maybe_unused]] const u32 emitterModuleHash =
-      static_cast<u32>(emitter.moduleId >> 32);
-  GECKO_ASSERT(codeModuleHash == emitterModuleHash &&
-               "Event code module mismatch with emitter module");
-  GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) &&
-               "Invalid emitter capability");
-  GECKO_ASSERT(payload.size <= sizeof(QueuedEvent::payloadStorage) &&
-               "Payload too large for queue");
+  [[maybe_unused]] const u32 emitterModuleHash = static_cast<u32>(emitter.moduleId >> 32);
+  GECKO_ASSERT(codeModuleHash == emitterModuleHash && "Event code module mismatch with emitter module");
+  GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) && "Invalid emitter capability");
+  GECKO_ASSERT(payload.size <= sizeof(QueuedEvent::payloadStorage) && "Payload too large for queue");
 
-  GECKO_TRACE(runtime::labels::General,
-              "Sending event code=%u, moduleId=%llu, size=%zu", code,
+  GECKO_TRACE(runtime::labels::General, "Sending event code=%u, moduleId=%llu, size=%zu", code,
               (unsigned long long)emitter.moduleId, payload.size);
 
   QueuedEvent qEvent {};
@@ -185,8 +175,7 @@ void EventBus::Send(const EventEmitter& emitter, EventCode code,
     if (count == 0)
       return 0;
 
-    GECKO_TRACE(runtime::labels::General, "Dispatching %zu queued events",
-                count);
+    GECKO_TRACE(runtime::labels::General, "Dispatching %zu queued events", count);
 
     events.reserve(count);
     for (std::size_t i = 0; i < count; ++i)
@@ -200,8 +189,7 @@ void EventBus::Send(const EventEmitter& emitter, EventCode code,
   {
     GECKO_PROFILE_NAMED(runtime::labels::General, "Dispatch::Notify");
     EventView view {qEvent.payloadStorage, qEvent.payloadSize};
-    NotifySubscribers(qEvent.meta.code, qEvent.meta, view,
-                      SubscriptionDelivery::Queued);
+    NotifySubscribers(qEvent.meta.code, qEvent.meta, view, SubscriptionDelivery::Queued);
   }
 
   return events.size();
@@ -216,8 +204,7 @@ EventEmitter EventBus::CreateEmitter(u64 moduleId, u64 sender) noexcept
   return emitter;
 }
 
-bool EventBus::ValidateEmitter(const EventEmitter& emitter,
-                               u64 expectedModuleId) const noexcept
+bool EventBus::ValidateEmitter(const EventEmitter& emitter, u64 expectedModuleId) const noexcept
 {
   if (emitter.moduleId != expectedModuleId)
     return false;
@@ -226,8 +213,7 @@ bool EventBus::ValidateEmitter(const EventEmitter& emitter,
   return emitter.capability == expectedCapability;
 }
 
-void EventBus::NotifySubscribers(EventCode code, const EventMeta& meta,
-                                 EventView payload,
+void EventBus::NotifySubscribers(EventCode code, const EventMeta& meta, EventView payload,
                                  SubscriptionDelivery deliveryFilter)
 {
   GECKO_PROFILE_NAMED(runtime::labels::General, "EventBus::NotifySubscribers");

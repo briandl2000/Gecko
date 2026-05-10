@@ -30,8 +30,7 @@ public:
   void EnumerateMonitors() noexcept override;
   u32 GetMonitorCount() const noexcept override;
   MonitorHandle GetMonitorHandle(u32 index) const noexcept override;
-  MonitorInfo GetMonitorProperties(
-      MonitorHandle handle) const noexcept override;
+  MonitorInfo GetMonitorProperties(MonitorHandle handle) const noexcept override;
   MonitorHandle GetPrimaryMonitor() const noexcept override;
   MonitorBounds GetMonitorBounds(MonitorHandle handle) const noexcept override;
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;

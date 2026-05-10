@@ -46,36 +46,27 @@ public:
 
   // Keyboard --------------------------------------------------------
   /// `true` while `key` is held.
-  [[nodiscard]] GECKO_API virtual bool IsKeyDown(
-      KeyCode key) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool IsKeyDown(KeyCode key) const noexcept = 0;
   /// `true` for the single frame on which `key` transitioned to down.
-  [[nodiscard]] GECKO_API virtual bool WasKeyPressed(
-      KeyCode key) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool WasKeyPressed(KeyCode key) const noexcept = 0;
   /// `true` for the single frame on which `key` transitioned to up.
-  [[nodiscard]] GECKO_API virtual bool WasKeyReleased(
-      KeyCode key) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool WasKeyReleased(KeyCode key) const noexcept = 0;
 
   // Mouse -----------------------------------------------------------
   /// `true` while `button` is held.
-  [[nodiscard]] GECKO_API virtual bool IsMouseButtonDown(
-      MouseButton button) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool IsMouseButtonDown(MouseButton button) const noexcept = 0;
   /// `true` for the single frame on which `button` transitioned to down.
-  [[nodiscard]] GECKO_API virtual bool WasMouseButtonPressed(
-      MouseButton button) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool WasMouseButtonPressed(MouseButton button) const noexcept = 0;
   /// `true` for the single frame on which `button` transitioned to up.
-  [[nodiscard]] GECKO_API virtual bool WasMouseButtonReleased(
-      MouseButton button) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual bool WasMouseButtonReleased(MouseButton button) const noexcept = 0;
 
   /// Cursor position within the currently focused window.
-  [[nodiscard]] GECKO_API virtual MousePosition GetMousePosition()
-      const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual MousePosition GetMousePosition() const noexcept = 0;
   /// Cursor position within `window` (last known value; not updated
   /// while the cursor is outside the window).
-  [[nodiscard]] GECKO_API virtual MousePosition GetMousePosition(
-      WindowHandle window) const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual MousePosition GetMousePosition(WindowHandle window) const noexcept = 0;
   /// Cursor movement since the previous `NewFrame()`.
-  [[nodiscard]] GECKO_API virtual MousePosition GetMouseDelta()
-      const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual MousePosition GetMouseDelta() const noexcept = 0;
   /// Accumulated horizontal wheel delta since the previous `NewFrame()`.
   [[nodiscard]] GECKO_API virtual float GetMouseScrollX() const noexcept = 0;
   /// Accumulated vertical wheel delta since the previous `NewFrame()`.
@@ -84,21 +75,18 @@ public:
   // Window focus / hover --------------------------------------------
   /// The window currently receiving keyboard focus, or
   /// `WindowHandle::InvalidId` when none of our windows is focused.
-  [[nodiscard]] GECKO_API virtual WindowHandle FocusedWindow()
-      const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual WindowHandle FocusedWindow() const noexcept = 0;
   /// The window the mouse cursor is over. `WindowHandle::InvalidId` when
   /// the cursor is outside all of our windows or has not entered any
   /// since startup.
-  [[nodiscard]] GECKO_API virtual WindowHandle HoveredWindow()
-      const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual WindowHandle HoveredWindow() const noexcept = 0;
 
   // Text input ------------------------------------------------------
   /// UTF-8 text typed since the last `NewFrame()`; cleared on `NewFrame()`.
   /// Reflects modifiers and IME composition (e.g. Shift+a -> "A",
   /// AltGr -> currency glyphs). The view is valid until the next
   /// `IInput` call; copy if you need to retain it across frames.
-  [[nodiscard]] GECKO_API virtual ::std::string_view GetTypedText()
-      const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual ::std::string_view GetTypedText() const noexcept = 0;
 };
 
 /// Service accessor. Returns the published `IInput`, or `nullptr` when
@@ -122,15 +110,13 @@ public:
 /// `IInput::WasMouseButtonPressed` via `GetInput()`.
 [[nodiscard]] GECKO_API bool WasMouseButtonPressed(MouseButton button) noexcept;
 /// `IInput::WasMouseButtonReleased` via `GetInput()`.
-[[nodiscard]] GECKO_API bool WasMouseButtonReleased(
-    MouseButton button) noexcept;
+[[nodiscard]] GECKO_API bool WasMouseButtonReleased(MouseButton button) noexcept;
 
 /// `IInput::GetMousePosition()` via `GetInput()`. Returns `{0,0}` when no
 /// service.
 [[nodiscard]] GECKO_API MousePosition GetMousePosition() noexcept;
 /// `IInput::GetMousePosition(window)` via `GetInput()`.
-[[nodiscard]] GECKO_API MousePosition
-GetMousePosition(WindowHandle window) noexcept;
+[[nodiscard]] GECKO_API MousePosition GetMousePosition(WindowHandle window) noexcept;
 /// `IInput::GetMouseDelta` via `GetInput()`. Returns `{0,0}` when no service.
 [[nodiscard]] GECKO_API MousePosition GetMouseDelta() noexcept;
 /// `IInput::GetMouseScrollX` via `GetInput()`. Returns `0` when no service.

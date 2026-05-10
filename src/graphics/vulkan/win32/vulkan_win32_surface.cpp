@@ -14,8 +14,7 @@
 
 namespace gecko::graphics {
 
-VkResult CreateWin32Surface(VkInstance instance,
-                            const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateWin32Surface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
                             VkSurfaceKHR* out) noexcept
 {
   VkWin32SurfaceCreateInfoKHR sci {};
@@ -23,12 +22,10 @@ VkResult CreateWin32Surface(VkInstance instance,
   sci.hinstance = ::GetModuleHandle(nullptr);
   sci.hwnd = static_cast<HWND>(native.Handle);
 
-  auto fn = reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(
-      vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR"));
+  auto fn = reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(vkGetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR"));
   if (fn == nullptr)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanSurface: vkCreateWin32SurfaceKHR not available");
+    GECKO_ERROR(labels::Vulkan, "VulkanSurface: vkCreateWin32SurfaceKHR not available");
     return VK_ERROR_EXTENSION_NOT_PRESENT;
   }
   return fn(instance, &sci, nullptr, out);

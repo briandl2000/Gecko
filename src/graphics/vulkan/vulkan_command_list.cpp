@@ -10,8 +10,7 @@
 
 namespace gecko::graphics {
 
-VulkanCommandList::VulkanCommandList(VulkanDevice& device,
-                                     bool compute) noexcept
+VulkanCommandList::VulkanCommandList(VulkanDevice& device, bool compute) noexcept
     : m_Device(&device), m_Compute(compute)
 {
   m_Pool = device.AcquireThreadCommandPool();
@@ -21,8 +20,7 @@ VulkanCommandList::VulkanCommandList(VulkanDevice& device,
   allocInfo.commandPool = m_Pool;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = 1;
-  VULKAN_CHECK(
-      vkAllocateCommandBuffers(device.Device(), &allocInfo, &m_CmdBuffer));
+  VULKAN_CHECK(vkAllocateCommandBuffers(device.Device(), &allocInfo, &m_CmdBuffer));
 
   // Per-command-list descriptor pool. Reset at Begin(). Sized to handle
   // many BindPipeline calls per frame without running out.
@@ -39,8 +37,7 @@ VulkanCommandList::VulkanCommandList(VulkanDevice& device,
   descPoolCreateInfo.maxSets = 128;
   descPoolCreateInfo.poolSizeCount = sizeof(sizes) / sizeof(sizes[0]);
   descPoolCreateInfo.pPoolSizes = sizes;
-  VULKAN_CHECK(vkCreateDescriptorPool(device.Device(), &descPoolCreateInfo,
-                                      nullptr, &m_DescPool));
+  VULKAN_CHECK(vkCreateDescriptorPool(device.Device(), &descPoolCreateInfo, nullptr, &m_DescPool));
 }
 
 VulkanCommandList::~VulkanCommandList()
@@ -95,8 +92,7 @@ void VulkanCommandList::End() noexcept
   VULKAN_CHECK(vkEndCommandBuffer(m_CmdBuffer));
 }
 
-void VulkanCommandList::TransitionToColorAttachment(VulkanSwapchainData* data,
-                                                    u32 imageIndex) noexcept
+void VulkanCommandList::TransitionToColorAttachment(VulkanSwapchainData* data, u32 imageIndex) noexcept
 {
   const VkImageLayout oldLayout = data->ImageLayouts[imageIndex];
 
@@ -110,24 +106,20 @@ void VulkanCommandList::TransitionToColorAttachment(VulkanSwapchainData* data,
   barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   barrier.subresourceRange.levelCount = 1;
   barrier.subresourceRange.layerCount = 1;
-  barrier.srcAccessMask =
-      (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) ? 0 : 0;
+  barrier.srcAccessMask = (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) ? 0 : 0;
   barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-  const VkPipelineStageFlags srcStage =
-      (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
-          ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
-          : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+  const VkPipelineStageFlags srcStage = (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
+                                            ? VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+                                            : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 
-  vkCmdPipelineBarrier(m_CmdBuffer, srcStage,
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0,
-                       nullptr, 0, nullptr, 1, &barrier);
+  vkCmdPipelineBarrier(m_CmdBuffer, srcStage, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr,
+                       1, &barrier);
 
   data->ImageLayouts[imageIndex] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 }
 
-void VulkanCommandList::TransitionToPresent(VulkanSwapchainData* data,
-                                            u32 imageIndex) noexcept
+void VulkanCommandList::TransitionToPresent(VulkanSwapchainData* data, u32 imageIndex) noexcept
 {
   const VkImageLayout oldLayout = data->ImageLayouts[imageIndex];
 
@@ -143,10 +135,8 @@ void VulkanCommandList::TransitionToPresent(VulkanSwapchainData* data,
   barrier.subresourceRange.layerCount = 1;
   barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
   barrier.dstAccessMask = 0;
-  vkCmdPipelineBarrier(m_CmdBuffer,
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                       VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0,
-                       nullptr, 1, &barrier);
+  vkCmdPipelineBarrier(m_CmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                       0, 0, nullptr, 0, nullptr, 1, &barrier);
 
   data->ImageLayouts[imageIndex] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 }
@@ -154,11 +144,8 @@ void VulkanCommandList::TransitionToPresent(VulkanSwapchainData* data,
 // Generic two-sided layout transition used for offscreen RTs flipping
 // between COLOR_ATTACHMENT and SHADER_READ_ONLY as they're drawn-to and
 // sampled within a single command buffer.
-void VulkanCommandList::TransitionImage(VkImage image,
-                                        VkImageAspectFlags aspect,
-                                        VkImageLayout oldLayout,
-                                        VkImageLayout newLayout, u32 baseMip,
-                                        u32 mipCount, u32 baseLayer,
+void VulkanCommandList::TransitionImage(VkImage image, VkImageAspectFlags aspect, VkImageLayout oldLayout,
+                                        VkImageLayout newLayout, u32 baseMip, u32 mipCount, u32 baseLayer,
                                         u32 layerCount) noexcept
 {
   if (oldLayout == newLayout)
@@ -228,8 +215,7 @@ void VulkanCommandList::TransitionImage(VkImage image,
     break;
   }
 
-  vkCmdPipelineBarrier(m_CmdBuffer, srcStage, dstStage, 0, 0, nullptr, 0,
-                       nullptr, 1, &barrier);
+  vkCmdPipelineBarrier(m_CmdBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
@@ -237,8 +223,7 @@ void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
   if (!rt.Data)
     return;
   auto* rtd = static_cast<VulkanRTData*>(rt.Data.get());
-  if (rtd->RTKind != VulkanRTData::Kind::Swapchain ||
-      rtd->SwapchainData == nullptr)
+  if (rtd->RTKind != VulkanRTData::Kind::Swapchain || rtd->SwapchainData == nullptr)
     return;
 
   // Deduplicate
@@ -249,17 +234,13 @@ void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
   }
   if (m_TouchedCount >= MaxSwapchainsPerSubmit)
   {
-    GECKO_WARN(labels::Vulkan,
-               "VulkanCommandList: more than %u swapchains touched, dropping",
-               MaxSwapchainsPerSubmit);
+    GECKO_WARN(labels::Vulkan, "VulkanCommandList: more than %u swapchains touched, dropping", MaxSwapchainsPerSubmit);
     return;
   }
-  m_Touched[m_TouchedCount++] = {rtd->SwapchainData, rtd->FrameIndex,
-                                 rtd->ImageIndex};
+  m_Touched[m_TouchedCount++] = {rtd->SwapchainData, rtd->FrameIndex, rtd->ImageIndex};
 }
 
-void VulkanCommandList::BeginRendering(const RenderTarget& color,
-                                       const ClearValue* clear) noexcept
+void VulkanCommandList::BeginRendering(const RenderTarget& color, const ClearValue* clear) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BeginRendering");
   if (!color.Data)
@@ -281,8 +262,7 @@ void VulkanCommandList::BeginRendering(const RenderTarget& color,
       auto* td = rtd->OffscreenTex[i];
       if (td == nullptr)
         continue;
-      TransitionImage(td->Image, td->Aspect, td->CurrentLayout,
-                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      TransitionImage(td->Image, td->Aspect, td->CurrentLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
       td->CurrentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
     m_ActiveOffscreenRT = rtd;
@@ -292,8 +272,7 @@ void VulkanCommandList::BeginRendering(const RenderTarget& color,
   colorAtt.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
   colorAtt.imageView = rtd->ImageView;
   colorAtt.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  colorAtt.loadOp =
-      clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+  colorAtt.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
   colorAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
   if (clear != nullptr && clear->Type == ClearValueType::RenderTarget)
   {
@@ -312,9 +291,8 @@ void VulkanCommandList::BeginRendering(const RenderTarget& color,
   vkCmdBeginRendering(m_CmdBuffer, &renderingInfo);
 }
 
-void VulkanCommandList::BeginRendering(
-    ::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
-    ::std::span<const ClearValue> clears) noexcept
+void VulkanCommandList::BeginRendering(::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
+                                       ::std::span<const ClearValue> clears) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BeginRendering(MRT)");
   if (colors.empty() && depth == nullptr)
@@ -346,8 +324,7 @@ void VulkanCommandList::BeginRendering(
     colorAtts[slot].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     const bool hasClear = clears.size() > i;
-    colorAtts[slot].loadOp =
-        hasClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAtts[slot].loadOp = hasClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
     colorAtts[slot].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     if (hasClear)
     {
@@ -392,22 +369,19 @@ void VulkanCommandList::EndRendering() noexcept
       auto* td = m_ActiveOffscreenRT->OffscreenTex[i];
       if (td == nullptr)
         continue;
-      TransitionImage(td->Image, td->Aspect, td->CurrentLayout,
-                      VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+      TransitionImage(td->Image, td->Aspect, td->CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
       td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
     m_ActiveOffscreenRT = nullptr;
   }
 }
 
-void VulkanCommandList::SetViewport(f32 x, f32 y, f32 write, f32 h, f32 minD,
-                                    f32 maxD) noexcept
+void VulkanCommandList::SetViewport(f32 x, f32 y, f32 write, f32 h, f32 minD, f32 maxD) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::SetViewport");
   VkViewport viewport {};
   viewport.x = x;
-  viewport.y =
-      y + h;  // flip Y: Vulkan clip-space is -Y-up; VK_KHR_maintenance1
+  viewport.y = y + h;  // flip Y: Vulkan clip-space is -Y-up; VK_KHR_maintenance1
   viewport.width = write;
   viewport.height = -h;
   viewport.minDepth = minD;
@@ -427,14 +401,11 @@ void VulkanCommandList::SetScissor(i32 x, i32 y, u32 write, u32 h) noexcept
 namespace {
 
 // Allocate (or reuse) one descriptor set for the currently bound pipeline.
-VkDescriptorSet EnsureCurrentDescSet(VulkanCommandList* self, VkDevice device,
-                                     VkDescriptorPool pool,
-                                     VulkanPipelineData* pd,
-                                     VkDescriptorSet& slot) noexcept
+VkDescriptorSet EnsureCurrentDescSet(VulkanCommandList* self, VkDevice device, VkDescriptorPool pool,
+                                     VulkanPipelineData* pd, VkDescriptorSet& slot) noexcept
 {
   (void)self;
-  if (slot != VK_NULL_HANDLE || pd == nullptr ||
-      pd->DescSetLayout == VK_NULL_HANDLE)
+  if (slot != VK_NULL_HANDLE || pd == nullptr || pd->DescSetLayout == VK_NULL_HANDLE)
     return slot;
   VkDescriptorSetAllocateInfo allocInfo {};
   allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -443,8 +414,7 @@ VkDescriptorSet EnsureCurrentDescSet(VulkanCommandList* self, VkDevice device,
   allocInfo.pSetLayouts = &pd->DescSetLayout;
   if (vkAllocateDescriptorSets(device, &allocInfo, &slot) != VK_SUCCESS)
   {
-    GECKO_ERROR(labels::Vulkan,
-                "VulkanCommandList: descriptor-set alloc failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanCommandList: descriptor-set alloc failed");
     slot = VK_NULL_HANDLE;
   }
   return slot;
@@ -474,8 +444,7 @@ void VulkanCommandList::BindPipeline(const ComputePipeline& pipeline) noexcept
   m_CurrentDescSet = VK_NULL_HANDLE;
 }
 
-void VulkanCommandList::BindVertexBuffer(const Buffer& buffer,
-                                         u32 slot) noexcept
+void VulkanCommandList::BindVertexBuffer(const Buffer& buffer, u32 slot) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindVertexBuffer");
   if (!buffer.Data)
@@ -494,20 +463,17 @@ void VulkanCommandList::BindIndexBuffer(const Buffer& buffer) noexcept
   vkCmdBindIndexBuffer(m_CmdBuffer, bd->Buffer, 0, VK_INDEX_TYPE_UINT32);
 }
 
-void VulkanCommandList::BindConstantBuffer(u32 slot,
-                                           const Buffer& buffer) noexcept
+void VulkanCommandList::BindConstantBuffer(u32 slot, const Buffer& buffer) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindConstantBuffer");
-  if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
-      m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !buffer.Data)
+  if (m_Device == nullptr || m_CurrentPipeline == nullptr || m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE ||
+      !buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (bd->Buffer == VK_NULL_HANDLE)
     return;
 
-  VkDescriptorSet set =
-      EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool,
-                           m_CurrentPipeline, m_CurrentDescSet);
+  VkDescriptorSet set = EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool, m_CurrentPipeline, m_CurrentDescSet);
   if (set == VK_NULL_HANDLE)
     return;
 
@@ -525,18 +491,15 @@ void VulkanCommandList::BindConstantBuffer(u32 slot,
   write.pBufferInfo = &bufferInfo;
   vkUpdateDescriptorSets(m_Device->Device(), 1, &write, 0, nullptr);
 
-  const VkPipelineBindPoint bindPoint = m_CurrentPipeline->IsCompute
-                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
-                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
-  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0,
-                          1, &set, 0, nullptr);
+  const VkPipelineBindPoint bindPoint =
+      m_CurrentPipeline->IsCompute ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0, 1, &set, 0, nullptr);
 }
 
 void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindTexture");
-  if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
-      m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE)
+  if (m_Device == nullptr || m_CurrentPipeline == nullptr || m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE)
     return;
   if (!texture.Data)
     return;
@@ -544,9 +507,7 @@ void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
   if (td->ImageView == VK_NULL_HANDLE)
     return;
 
-  VkDescriptorSet set =
-      EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool,
-                           m_CurrentPipeline, m_CurrentDescSet);
+  VkDescriptorSet set = EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool, m_CurrentPipeline, m_CurrentDescSet);
   if (set == VK_NULL_HANDLE)
     return;
 
@@ -568,34 +529,29 @@ void VulkanCommandList::BindTexture(u32 slot, const Texture& texture) noexcept
   write.pImageInfo = &imageInfo;
   vkUpdateDescriptorSets(m_Device->Device(), 1, &write, 0, nullptr);
 
-  const VkPipelineBindPoint bindPoint = m_CurrentPipeline->IsCompute
-                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
-                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
-  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0,
-                          1, &set, 0, nullptr);
+  const VkPipelineBindPoint bindPoint =
+      m_CurrentPipeline->IsCompute ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0, 1, &set, 0, nullptr);
 }
 
 void VulkanCommandList::BindRWTexture(u32 slot, const Texture& texture) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindRWTexture");
-  if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
-      m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !texture.Data)
+  if (m_Device == nullptr || m_CurrentPipeline == nullptr || m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE ||
+      !texture.Data)
     return;
   auto* td = static_cast<VulkanTextureData*>(texture.Data.get());
   if (td->ImageView == VK_NULL_HANDLE)
     return;
 
-  VkDescriptorSet set =
-      EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool,
-                           m_CurrentPipeline, m_CurrentDescSet);
+  VkDescriptorSet set = EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool, m_CurrentPipeline, m_CurrentDescSet);
   if (set == VK_NULL_HANDLE)
     return;
 
   // Storage images must be in GENERAL layout.
   if (td->CurrentLayout != VK_IMAGE_LAYOUT_GENERAL)
   {
-    TransitionImage(td->Image, td->Aspect, td->CurrentLayout,
-                    VK_IMAGE_LAYOUT_GENERAL);
+    TransitionImage(td->Image, td->Aspect, td->CurrentLayout, VK_IMAGE_LAYOUT_GENERAL);
     td->CurrentLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
 
@@ -612,26 +568,22 @@ void VulkanCommandList::BindRWTexture(u32 slot, const Texture& texture) noexcept
   write.pImageInfo = &imageInfo;
   vkUpdateDescriptorSets(m_Device->Device(), 1, &write, 0, nullptr);
 
-  const VkPipelineBindPoint bindPoint = m_CurrentPipeline->IsCompute
-                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
-                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
-  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0,
-                          1, &set, 0, nullptr);
+  const VkPipelineBindPoint bindPoint =
+      m_CurrentPipeline->IsCompute ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0, 1, &set, 0, nullptr);
 }
 
 void VulkanCommandList::BindSampler(u32 slot, const Sampler& sampler) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BindSampler");
-  if (m_Device == nullptr || m_CurrentPipeline == nullptr ||
-      m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE || !sampler.Data)
+  if (m_Device == nullptr || m_CurrentPipeline == nullptr || m_CurrentPipeline->DescSetLayout == VK_NULL_HANDLE ||
+      !sampler.Data)
     return;
   auto* sd = static_cast<VulkanSamplerData*>(sampler.Data.get());
   if (sd->Sampler == VK_NULL_HANDLE)
     return;
 
-  VkDescriptorSet set =
-      EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool,
-                           m_CurrentPipeline, m_CurrentDescSet);
+  VkDescriptorSet set = EnsureCurrentDescSet(this, m_Device->Device(), m_DescPool, m_CurrentPipeline, m_CurrentDescSet);
   if (set == VK_NULL_HANDLE)
     return;
 
@@ -647,27 +599,21 @@ void VulkanCommandList::BindSampler(u32 slot, const Sampler& sampler) noexcept
   write.pImageInfo = &imageInfo;
   vkUpdateDescriptorSets(m_Device->Device(), 1, &write, 0, nullptr);
 
-  const VkPipelineBindPoint bindPoint = m_CurrentPipeline->IsCompute
-                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
-                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
-  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0,
-                          1, &set, 0, nullptr);
+  const VkPipelineBindPoint bindPoint =
+      m_CurrentPipeline->IsCompute ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  vkCmdBindDescriptorSets(m_CmdBuffer, bindPoint, m_CurrentPipeline->Layout, 0, 1, &set, 0, nullptr);
 }
 
 namespace {
-void BindStorageBuffer(VulkanCommandList* self, VulkanDevice* device,
-                       VkCommandBuffer cmd, VkDescriptorPool pool,
-                       VulkanPipelineData* pd, VkDescriptorSet& cur, u32 slot,
-                       const Buffer& buffer) noexcept
+void BindStorageBuffer(VulkanCommandList* self, VulkanDevice* device, VkCommandBuffer cmd, VkDescriptorPool pool,
+                       VulkanPipelineData* pd, VkDescriptorSet& cur, u32 slot, const Buffer& buffer) noexcept
 {
-  if (device == nullptr || pd == nullptr ||
-      pd->DescSetLayout == VK_NULL_HANDLE || !buffer.Data)
+  if (device == nullptr || pd == nullptr || pd->DescSetLayout == VK_NULL_HANDLE || !buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (bd->Buffer == VK_NULL_HANDLE)
     return;
-  VkDescriptorSet set =
-      EnsureCurrentDescSet(self, device->Device(), pool, pd, cur);
+  VkDescriptorSet set = EnsureCurrentDescSet(self, device->Device(), pool, pd, cur);
   if (set == VK_NULL_HANDLE)
     return;
 
@@ -685,96 +631,77 @@ void BindStorageBuffer(VulkanCommandList* self, VulkanDevice* device,
   write.pBufferInfo = &bufferInfo;
   vkUpdateDescriptorSets(device->Device(), 1, &write, 0, nullptr);
 
-  const VkPipelineBindPoint bindPoint = pd->IsCompute
-                                            ? VK_PIPELINE_BIND_POINT_COMPUTE
-                                            : VK_PIPELINE_BIND_POINT_GRAPHICS;
+  const VkPipelineBindPoint bindPoint =
+      pd->IsCompute ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
   vkCmdBindDescriptorSets(cmd, bindPoint, pd->Layout, 0, 1, &set, 0, nullptr);
 }
 }  // namespace
 
-void VulkanCommandList::BindStructuredBuffer(u32 slot,
-                                             const Buffer& buffer) noexcept
+void VulkanCommandList::BindStructuredBuffer(u32 slot, const Buffer& buffer) noexcept
 {
-  BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline,
-                    m_CurrentDescSet, slot, buffer);
+  BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline, m_CurrentDescSet, slot, buffer);
 }
 
-void VulkanCommandList::BindRWStructuredBuffer(u32 slot,
-                                               const Buffer& buffer) noexcept
+void VulkanCommandList::BindRWStructuredBuffer(u32 slot, const Buffer& buffer) noexcept
 {
-  BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline,
-                    m_CurrentDescSet, slot, buffer);
+  BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline, m_CurrentDescSet, slot, buffer);
 }
 
-void VulkanCommandList::SetConstants(
-    u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept
+void VulkanCommandList::SetConstants(u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::SetConstants");
-  if (m_CurrentPipeline == nullptr ||
-      m_CurrentPipeline->PushConstantBytes == 0 || bytes.empty())
+  if (m_CurrentPipeline == nullptr || m_CurrentPipeline->PushConstantBytes == 0 || bytes.empty())
     return;
   const u32 size = static_cast<u32>(bytes.size());
   if (offset + size > m_CurrentPipeline->PushConstantBytes)
     return;
-  const VkShaderStageFlags stages = m_CurrentPipeline->IsCompute
-                                        ? VK_SHADER_STAGE_COMPUTE_BIT
-                                        : VK_SHADER_STAGE_ALL_GRAPHICS;
-  vkCmdPushConstants(m_CmdBuffer, m_CurrentPipeline->Layout, stages, offset,
-                     size, bytes.data());
+  const VkShaderStageFlags stages =
+      m_CurrentPipeline->IsCompute ? VK_SHADER_STAGE_COMPUTE_BIT : VK_SHADER_STAGE_ALL_GRAPHICS;
+  vkCmdPushConstants(m_CmdBuffer, m_CurrentPipeline->Layout, stages, offset, size, bytes.data());
 }
 
-void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount,
-                             u32 firstVertex, u32 firstInstance) noexcept
+void VulkanCommandList::Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Draw");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw",
-                             ::gecko::ProfLevel::Detailed);
-  vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex,
-            firstInstance);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Draw", ::gecko::ProfLevel::Detailed);
+  vkCmdDraw(m_CmdBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
 }
 
-void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount,
-                                    u32 firstIndex, i32 vertexOffset,
+void VulkanCommandList::DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset,
                                     u32 firstInstance) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndexed");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed",
-                             ::gecko::ProfLevel::Detailed);
-  vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex,
-                   vertexOffset, firstInstance);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexed", ::gecko::ProfLevel::Detailed);
+  vkCmdDrawIndexed(m_CmdBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
 }
 
-void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset,
-                                     u32 drawCount, u32 stride) noexcept
+void VulkanCommandList::DrawIndirect(const Buffer& buffer, u64 offset, u32 drawCount, u32 stride) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect",
-                             ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndirect", ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
 }
 
-void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset,
-                                            u32 drawCount, u32 stride) noexcept
+void VulkanCommandList::DrawIndexedIndirect(const Buffer& buffer, u64 offset, u32 drawCount, u32 stride) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DrawIndexedIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect",
-                             ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DrawIndexedIndirect", ::gecko::ProfLevel::Detailed);
   vkCmdDrawIndexedIndirect(m_CmdBuffer, bd->Buffer, offset, drawCount, stride);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
@@ -784,33 +711,28 @@ void VulkanCommandList::Dispatch(u32 x, u32 y, u32 z) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::Dispatch");
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch",
-                             ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "Dispatch", ::gecko::ProfLevel::Detailed);
   vkCmdDispatch(m_CmdBuffer, x, y, z);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
 }
 
-void VulkanCommandList::DispatchIndirect(const Buffer& buffer,
-                                         u64 offset) noexcept
+void VulkanCommandList::DispatchIndirect(const Buffer& buffer, u64 offset) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::DispatchIndirect");
   if (!buffer.Data)
     return;
   auto* bd = static_cast<VulkanBufferData*>(buffer.Data.get());
   if (m_AutoSampler)
-    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect",
-                             ::gecko::ProfLevel::Detailed);
+    m_AutoSampler->BeginZone(*this, m_AutoZoneLabel, "DispatchIndirect", ::gecko::ProfLevel::Detailed);
   vkCmdDispatchIndirect(m_CmdBuffer, bd->Buffer, offset);
   if (m_AutoSampler)
     m_AutoSampler->EndZone(*this);
 }
 
-void VulkanCommandList::TransitionTextureForRead(
-    const Texture& texture) noexcept
+void VulkanCommandList::TransitionTextureForRead(const Texture& texture) noexcept
 {
-  GECKO_PROFILE_NAMED(labels::Vulkan,
-                      "VulkanCommandList::TransitionTextureForRead");
+  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::TransitionTextureForRead");
   if (!texture.Data)
     return;
   auto* td = static_cast<VulkanTextureData*>(texture.Data.get());
@@ -818,13 +740,11 @@ void VulkanCommandList::TransitionTextureForRead(
     return;
   if (td->CurrentLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
     return;
-  TransitionImage(td->Image, td->Aspect, td->CurrentLayout,
-                  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  TransitionImage(td->Image, td->Aspect, td->CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
-void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,
-                                   const Buffer& src, u64 srcOffset,
+void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset, const Buffer& src, u64 srcOffset,
                                    u64 size) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::CopyBuffer");
@@ -839,8 +759,7 @@ void VulkanCommandList::CopyBuffer(const Buffer& dst, u64 dstOffset,
   vkCmdCopyBuffer(m_CmdBuffer, sd->Buffer, dd->Buffer, 1, &region);
 }
 
-void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
-                                            u32 slice, const Buffer& src,
+void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip, u32 slice, const Buffer& src,
                                             u64 srcOffset) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::CopyBufferToTexture");
@@ -850,8 +769,7 @@ void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
   auto* bd = static_cast<VulkanBufferData*>(src.Data.get());
 
   const VkImageLayout prev = td->CurrentLayout;
-  TransitionImage(td->Image, td->Aspect, prev,
-                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  TransitionImage(td->Image, td->Aspect, prev, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
   VkBufferImageCopy region {};
   region.bufferOffset = srcOffset;
@@ -860,16 +778,14 @@ void VulkanCommandList::CopyBufferToTexture(const Texture& dst, u32 mip,
   region.imageSubresource.baseArrayLayer = slice;
   region.imageSubresource.layerCount = 1;
   region.imageExtent = {td->Width, td->Height, 1};
-  vkCmdCopyBufferToImage(m_CmdBuffer, bd->Buffer, td->Image,
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  vkCmdCopyBufferToImage(m_CmdBuffer, bd->Buffer, td->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
   TransitionImage(td->Image, td->Aspect, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                   VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
   td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
-void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
-                                            const Texture& src, u32 mip,
+void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset, const Texture& src, u32 mip,
                                             u32 slice) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::CopyTextureToBuffer");
@@ -879,8 +795,7 @@ void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
   auto* td = static_cast<VulkanTextureData*>(src.Data.get());
 
   const VkImageLayout prev = td->CurrentLayout;
-  TransitionImage(td->Image, td->Aspect, prev,
-                  VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+  TransitionImage(td->Image, td->Aspect, prev, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
   VkBufferImageCopy region {};
   region.bufferOffset = dstOffset;
@@ -889,17 +804,13 @@ void VulkanCommandList::CopyTextureToBuffer(const Buffer& dst, u64 dstOffset,
   region.imageSubresource.baseArrayLayer = slice;
   region.imageSubresource.layerCount = 1;
   region.imageExtent = {td->Width, td->Height, 1};
-  vkCmdCopyImageToBuffer(m_CmdBuffer, td->Image,
-                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bd->Buffer, 1,
-                         &region);
+  vkCmdCopyImageToBuffer(m_CmdBuffer, td->Image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, bd->Buffer, 1, &region);
 
-  TransitionImage(td->Image, td->Aspect, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                  prev);
+  TransitionImage(td->Image, td->Aspect, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, prev);
   td->CurrentLayout = prev;
 }
 
-void VulkanCommandList::ResetTimestamps(const QueryPool& pool, u32 first,
-                                        u32 count) noexcept
+void VulkanCommandList::ResetTimestamps(const QueryPool& pool, u32 first, u32 count) noexcept
 {
   if (!pool.IsValid())
     return;
@@ -907,18 +818,15 @@ void VulkanCommandList::ResetTimestamps(const QueryPool& pool, u32 first,
   vkCmdResetQueryPool(m_CmdBuffer, qd->QueryPool, first, count);
 }
 
-void VulkanCommandList::WriteTimestamp(const QueryPool& pool,
-                                       u32 index) noexcept
+void VulkanCommandList::WriteTimestamp(const QueryPool& pool, u32 index) noexcept
 {
   if (!pool.IsValid())
     return;
   auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
-  vkCmdWriteTimestamp(m_CmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                      qd->QueryPool, index);
+  vkCmdWriteTimestamp(m_CmdBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, qd->QueryPool, index);
 }
 
-void VulkanCommandList::AttachGpuSampler(IGpuSampler* sampler,
-                                         ::gecko::Label autoZoneLabel) noexcept
+void VulkanCommandList::AttachGpuSampler(IGpuSampler* sampler, ::gecko::Label autoZoneLabel) noexcept
 {
   m_AutoSampler = sampler;
   m_AutoZoneLabel = autoZoneLabel;
@@ -927,8 +835,7 @@ void VulkanCommandList::AttachGpuSampler(IGpuSampler* sampler,
   // GPU-time-per-cmd-list bracket the user gets for free.
   if (sampler && !m_AutoCmdListZoneOpen)
   {
-    sampler->BeginZone(*this, autoZoneLabel, "CommandList",
-                       ::gecko::ProfLevel::Always);
+    sampler->BeginZone(*this, autoZoneLabel, "CommandList", ::gecko::ProfLevel::Always);
     m_AutoCmdListZoneOpen = true;
   }
 }

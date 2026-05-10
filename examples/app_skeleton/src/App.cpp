@@ -12,8 +12,7 @@ namespace gecko::examples::app_skeleton {
 
 namespace labels {
 inline constexpr ::gecko::Label App = ::gecko::MakeLabel("app.app_skeleton");
-inline constexpr ::gecko::Label Main =
-    ::gecko::MakeLabel("app.app_skeleton.main");
+inline constexpr ::gecko::Label Main = ::gecko::MakeLabel("app.app_skeleton.main");
 }  // namespace labels
 
 ::gecko::Label App::SkeletonModule::RootLabel() const noexcept
@@ -30,14 +29,13 @@ void App::SkeletonModule::Shutdown(::gecko::IModuleRegistry&) noexcept
 {}
 
 App::App(const AppConfig& cfg)
-    : m_Config(cfg), m_PlatformModule(::gecko::platform::PlatformConfig {
-                         .Backend = cfg.backend, .Window = {}, .Monitor = {}})
+    : m_Config(cfg),
+      m_PlatformModule(::gecko::platform::PlatformConfig {.Backend = cfg.backend, .Window = {}, .Monitor = {}})
 {
   if (!m_AllocScope)
     return;
 
-  m_Engine = ::gecko::Engine::Create(
-      {&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
+  m_Engine = ::gecko::Engine::Create({&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
   if (!m_Engine)
     return;
 
@@ -89,10 +87,7 @@ void App::RunWindowed()
 
   auto closeSub = ::gecko::SubscribeEvent(
       events::WindowCloseRequested,
-      [](void* user, const ::gecko::EventMeta&, ::gecko::EventView) {
-        *static_cast<bool*>(user) = false;
-      },
-      &running);
+      [](void* user, const ::gecko::EventMeta&, ::gecko::EventView) { *static_cast<bool*>(user) = false; }, &running);
 
   while (running && GetWindows()->IsWindowAlive(window))
   {

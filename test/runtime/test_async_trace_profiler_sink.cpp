@@ -24,8 +24,7 @@ namespace {
 
 ::std::string MakeTempPath(const char* tag)
 {
-  auto tmp = ::std::filesystem::temp_directory_path() /
-             (::std::string("gecko_trace_test_") + tag + ".json");
+  auto tmp = ::std::filesystem::temp_directory_path() / (::std::string("gecko_trace_test_") + tag + ".json");
   ::std::error_code ec;
   ::std::filesystem::remove(tmp, ec);
   return tmp.string();
@@ -48,8 +47,7 @@ struct ProfilerScope
 
 }  // namespace
 
-TEST_CASE("AsyncTraceProfilerSink writes a valid Chrome-trace JSON",
-          "[runtime][profiler][trace]")
+TEST_CASE("AsyncTraceProfilerSink writes a valid Chrome-trace JSON", "[runtime][profiler][trace]")
 {
   const auto path = MakeTempPath("basic");
 
@@ -85,8 +83,7 @@ TEST_CASE("AsyncTraceProfilerSink writes a valid Chrome-trace JSON",
   ::std::filesystem::remove(path);
 }
 
-TEST_CASE("AsyncTraceProfilerSink with a null path is inert",
-          "[runtime][profiler][trace]")
+TEST_CASE("AsyncTraceProfilerSink with a null path is inert", "[runtime][profiler][trace]")
 {
   runtime::AsyncTraceProfilerSink sink(nullptr);
   REQUIRE_FALSE(sink.IsOpen());
@@ -100,8 +97,7 @@ TEST_CASE("AsyncTraceProfilerSink with a null path is inert",
   sink.Flush();
 }
 
-TEST_CASE("AsyncTraceProfilerSink drains profiler events on dtor",
-          "[runtime][profiler][trace]")
+TEST_CASE("AsyncTraceProfilerSink drains profiler events on dtor", "[runtime][profiler][trace]")
 {
   const auto path = MakeTempPath("dtor_drain");
 
@@ -139,8 +135,7 @@ TEST_CASE("AsyncTraceProfilerSink drains profiler events on dtor",
   ::std::filesystem::remove(path);
 }
 
-TEST_CASE("AsyncTraceProfilerSink emits thread_name metadata",
-          "[runtime][profiler][trace]")
+TEST_CASE("AsyncTraceProfilerSink emits thread_name metadata", "[runtime][profiler][trace]")
 {
   const auto path = MakeTempPath("threadname");
 
@@ -171,8 +166,7 @@ TEST_CASE("AsyncTraceProfilerSink emits thread_name metadata",
   RegisterThreadProfilerName(7777, nullptr);
 }
 
-TEST_CASE("AsyncTraceProfilerSink::SetMinLevel filters out lower-level zones",
-          "[runtime][profiler][trace]")
+TEST_CASE("AsyncTraceProfilerSink::SetMinLevel filters out lower-level zones", "[runtime][profiler][trace]")
 {
   const auto path = MakeTempPath("minlevel");
 

@@ -160,8 +160,7 @@ Win32WindowsBackend::~Win32WindowsBackend() noexcept
 {
   ::DWORD style = WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
-  if (desc.Mode == WindowMode::Fullscreen ||
-      desc.Mode == WindowMode::BorderlessFullscreen)
+  if (desc.Mode == WindowMode::Fullscreen || desc.Mode == WindowMode::BorderlessFullscreen)
   {
     style |= WS_POPUP;
   }
@@ -184,8 +183,7 @@ Win32WindowsBackend::~Win32WindowsBackend() noexcept
   return style;
 }
 
-void Win32WindowsBackend::ApplyDecorations(::HWND hwnd, bool decorated,
-                                           bool resizable) noexcept
+void Win32WindowsBackend::ApplyDecorations(::HWND hwnd, bool decorated, bool resizable) noexcept
 {
   ::DWORD style = static_cast<::DWORD>(::GetWindowLongPtrW(hwnd, GWL_STYLE));
 
@@ -197,14 +195,12 @@ void Win32WindowsBackend::ApplyDecorations(::HWND hwnd, bool decorated,
   }
   else
   {
-    style &= ~(WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME |
-               WS_MAXIMIZEBOX);
+    style &= ~(WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_THICKFRAME | WS_MAXIMIZEBOX);
     style |= WS_POPUP;
   }
 
   ::SetWindowLongPtrW(hwnd, GWL_STYLE, static_cast<LONG_PTR>(style));
-  ::SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ::SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 }
 
 WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
@@ -227,17 +223,14 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   const int titleLen = ::MultiByteToWideChar(CP_UTF8, 0, title, -1, nullptr, 0);
   if (titleLen <= 0)
   {
-    GECKO_WARN(labels::Window,
-               "CreateWindow: failed to convert title to UTF-16");
+    GECKO_WARN(labels::Window, "CreateWindow: failed to convert title to UTF-16");
     return WindowHandle {};
   }
   ::std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));
   ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), titleLen);
 
-  ::HWND hwnd =
-      ::CreateWindowExW(exStyle, WndClassName, wTitle.data(), style,
-                        CW_USEDEFAULT, CW_USEDEFAULT, windowWidth, windowHeight,
-                        nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
+  ::HWND hwnd = ::CreateWindowExW(exStyle, WndClassName, wTitle.data(), style, CW_USEDEFAULT, CW_USEDEFAULT,
+                                  windowWidth, windowHeight, nullptr, nullptr, ::GetModuleHandleW(nullptr), nullptr);
 
   if (!hwnd)
   {
@@ -250,14 +243,12 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   Win32WindowEntry entry;
   entry.Desc = desc;
   entry.Hwnd = hwnd;
-  entry.ClientSize = {static_cast<u32>(desc.Size.X),
-                      static_cast<u32>(desc.Size.Y)};
+  entry.ClientSize = {static_cast<u32>(desc.Size.X), static_cast<u32>(desc.Size.Y)};
   entry.Decorated = desc.Decorated;
   entry.Resizable = desc.Resizable;
   entry.Mode = desc.Mode;
   entry.Buttons = desc.Buttons;
-  entry.State = desc.Visible ? platform::WindowState::Normal
-                             : platform::WindowState::Hidden;
+  entry.State = desc.Visible ? platform::WindowState::Normal : platform::WindowState::Hidden;
   entry.Alive = true;
   entry.TitleStorage = title;
   entry.Desc.Title = entry.TitleStorage.c_str();
@@ -265,8 +256,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   // Query actual position
   ::RECT winRect;
   if (::GetWindowRect(hwnd, &winRect))
-    entry.Position = {static_cast<i32>(winRect.left),
-                      static_cast<i32>(winRect.top)};
+    entry.Position = {static_cast<i32>(winRect.left), static_cast<i32>(winRect.top)};
 
   auto [it, ok] = m_Windows.emplace(id, ::std::move(entry));
   it->second.Desc.Title = it->second.TitleStorage.c_str();
@@ -277,8 +267,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   if (desc.Visible)
     ::ShowWindow(hwnd, SW_SHOW);
 
-  GECKO_INFO(labels::General,
-             "Win32WindowsBackend: created window id=%llu hwnd=%p",
+  GECKO_INFO(labels::General, "Win32WindowsBackend: created window id=%llu hwnd=%p",
              static_cast<unsigned long long>(id), static_cast<void*>(hwnd));
   return WindowHandle {id};
 }
@@ -320,8 +309,7 @@ bool Win32WindowsBackend::RequestClose(WindowHandle window) noexcept
   StagedEvent ev;
   ev.Code = events::WindowCloseRequested;
   ev.Data.CloseRequested = {window, NowNsSafe()};
-  ev.PayloadSize =
-      static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
+  ev.PayloadSize = static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
   m_Staged.push_back(ev);
   return true;
 }
@@ -336,8 +324,7 @@ Extent2D Win32WindowsBackend::GetClientSize(WindowHandle window) const noexcept
   return entry->ClientSize;
 }
 
-void Win32WindowsBackend::SetClientSize(WindowHandle window,
-                                        Extent2D size) noexcept
+void Win32WindowsBackend::SetClientSize(WindowHandle window, Extent2D size) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -345,23 +332,19 @@ void Win32WindowsBackend::SetClientSize(WindowHandle window,
 
   entry->ClientSize = size;
 
-  ::DWORD style =
-      static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
-  ::DWORD exStyle =
-      static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
+  ::DWORD style = static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
+  ::DWORD exStyle = static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
 
   ::RECT rect {};
   rect.right = static_cast<::LONG>(size.Width);
   rect.bottom = static_cast<::LONG>(size.Height);
   ::AdjustWindowRectEx(&rect, style, FALSE, exStyle);
 
-  ::SetWindowPos(entry->Hwnd, nullptr, 0, 0, rect.right - rect.left,
-                 rect.bottom - rect.top,
+  ::SetWindowPos(entry->Hwnd, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
                  SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
-void Win32WindowsBackend::SetTitle(WindowHandle window,
-                                   const char* title) noexcept
+void Win32WindowsBackend::SetTitle(WindowHandle window, const char* title) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -370,13 +353,11 @@ void Win32WindowsBackend::SetTitle(WindowHandle window,
   entry->TitleStorage = title ? title : "";
   entry->Desc.Title = entry->TitleStorage.c_str();
 
-  const int len = ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(),
-                                        -1, nullptr, 0);
+  const int len = ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(), -1, nullptr, 0);
   if (len <= 0)
     return;
   ::std::vector<wchar_t> wTitle(static_cast<size_t>(len));
-  ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(), -1,
-                        wTitle.data(), len);
+  ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(), -1, wTitle.data(), len);
   ::SetWindowTextW(entry->Hwnd, wTitle.data());
 }
 
@@ -388,16 +369,14 @@ const char* Win32WindowsBackend::GetTitle(WindowHandle window) const noexcept
   return entry->TitleStorage.c_str();
 }
 
-void Win32WindowsBackend::SetPosition(WindowHandle window,
-                                      math::Int2 pos) noexcept
+void Win32WindowsBackend::SetPosition(WindowHandle window, math::Int2 pos) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
     return;
 
   entry->Position = pos;
-  ::SetWindowPos(entry->Hwnd, nullptr, pos.X, pos.Y, 0, 0,
-                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+  ::SetWindowPos(entry->Hwnd, nullptr, pos.X, pos.Y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
 math::Int2 Win32WindowsBackend::GetPosition(WindowHandle window) const noexcept
@@ -422,8 +401,7 @@ DpiInfo Win32WindowsBackend::GetDpi(WindowHandle window) const noexcept
   return DpiInfo {};
 }
 
-NativeWindowHandle Win32WindowsBackend::GetNativeWindowHandle(
-    WindowHandle window) const noexcept
+NativeWindowHandle Win32WindowsBackend::GetNativeWindowHandle(WindowHandle window) const noexcept
 {
   const auto* entry = FindEntry(window);
   if (!entry)
@@ -438,8 +416,7 @@ NativeWindowHandle Win32WindowsBackend::GetNativeWindowHandle(
 
 // -- Window state -------------------------------------------------------
 
-void Win32WindowsBackend::SetWindowState(WindowHandle window,
-                                         platform::WindowState state) noexcept
+void Win32WindowsBackend::SetWindowState(WindowHandle window, platform::WindowState state) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -474,8 +451,7 @@ void Win32WindowsBackend::SetWindowState(WindowHandle window,
   m_Staged.push_back(ev);
 }
 
-platform::WindowState Win32WindowsBackend::GetWindowState(
-    WindowHandle window) const noexcept
+platform::WindowState Win32WindowsBackend::GetWindowState(WindowHandle window) const noexcept
 {
   const auto* entry = FindEntry(window);
   if (!entry)
@@ -483,8 +459,7 @@ platform::WindowState Win32WindowsBackend::GetWindowState(
   return entry->State;
 }
 
-void Win32WindowsBackend::SetDecorated(WindowHandle window,
-                                       bool decorated) noexcept
+void Win32WindowsBackend::SetDecorated(WindowHandle window, bool decorated) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -512,8 +487,7 @@ void Win32WindowsBackend::RequestFocus(WindowHandle window) noexcept
   ::SetFocus(entry->Hwnd);
 }
 
-void Win32WindowsBackend::SetResizable(WindowHandle window,
-                                       bool resizable) noexcept
+void Win32WindowsBackend::SetResizable(WindowHandle window, bool resizable) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -531,8 +505,7 @@ bool Win32WindowsBackend::IsResizable(WindowHandle window) const noexcept
   return entry->Resizable;
 }
 
-void Win32WindowsBackend::SetWindowMode(WindowHandle window,
-                                        WindowMode mode) noexcept
+void Win32WindowsBackend::SetWindowMode(WindowHandle window, WindowMode mode) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -542,28 +515,22 @@ void Win32WindowsBackend::SetWindowMode(WindowHandle window,
   if (old == mode)
     return;
 
-  if (mode == WindowMode::Fullscreen ||
-      mode == WindowMode::BorderlessFullscreen)
+  if (mode == WindowMode::Fullscreen || mode == WindowMode::BorderlessFullscreen)
   {
     // Save current style and position for restoration.
-    entry->SavedStyle =
-        static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
-    entry->SavedExStyle =
-        static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
+    entry->SavedStyle = static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE));
+    entry->SavedExStyle = static_cast<::DWORD>(::GetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE));
     ::GetWindowRect(entry->Hwnd, &entry->SavedRect);
 
     // Go borderless fullscreen on the current monitor.
-    ::HMONITOR hMon =
-        ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
+    ::HMONITOR hMon = ::MonitorFromWindow(entry->Hwnd, MONITOR_DEFAULTTONEAREST);
     MONITORINFO mi {};
     mi.cbSize = sizeof(mi);
     ::GetMonitorInfoW(hMon, &mi);
 
     ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-    ::SetWindowPos(entry->Hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top,
-                   mi.rcMonitor.right - mi.rcMonitor.left,
-                   mi.rcMonitor.bottom - mi.rcMonitor.top,
-                   SWP_FRAMECHANGED | SWP_NOACTIVATE);
+    ::SetWindowPos(entry->Hwnd, HWND_TOP, mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right - mi.rcMonitor.left,
+                   mi.rcMonitor.bottom - mi.rcMonitor.top, SWP_FRAMECHANGED | SWP_NOACTIVATE);
   }
   else
   {
@@ -572,10 +539,8 @@ void Win32WindowsBackend::SetWindowMode(WindowHandle window,
     {
       ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE, entry->SavedStyle);
       ::SetWindowLongPtrW(entry->Hwnd, GWL_EXSTYLE, entry->SavedExStyle);
-      ::SetWindowPos(entry->Hwnd, nullptr, entry->SavedRect.left,
-                     entry->SavedRect.top,
-                     entry->SavedRect.right - entry->SavedRect.left,
-                     entry->SavedRect.bottom - entry->SavedRect.top,
+      ::SetWindowPos(entry->Hwnd, nullptr, entry->SavedRect.left, entry->SavedRect.top,
+                     entry->SavedRect.right - entry->SavedRect.left, entry->SavedRect.bottom - entry->SavedRect.top,
                      SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE);
     }
     else
@@ -587,8 +552,7 @@ void Win32WindowsBackend::SetWindowMode(WindowHandle window,
   entry->Mode = mode;
 }
 
-WindowMode Win32WindowsBackend::GetWindowMode(
-    WindowHandle window) const noexcept
+WindowMode Win32WindowsBackend::GetWindowMode(WindowHandle window) const noexcept
 {
   const auto* entry = FindEntry(window);
   if (!entry)
@@ -596,8 +560,7 @@ WindowMode Win32WindowsBackend::GetWindowMode(
   return entry->Mode;
 }
 
-void Win32WindowsBackend::SetWindowButtons(WindowHandle window,
-                                           WindowButtons buttons) noexcept
+void Win32WindowsBackend::SetWindowButtons(WindowHandle window, WindowButtons buttons) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -635,12 +598,10 @@ void Win32WindowsBackend::SetWindowButtons(WindowHandle window,
   ::SetWindowLongPtrW(entry->Hwnd, GWL_STYLE, style);
 
   ::DrawMenuBar(entry->Hwnd);
-  ::SetWindowPos(entry->Hwnd, nullptr, 0, 0, 0, 0,
-                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+  ::SetWindowPos(entry->Hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
 }
 
-WindowButtons Win32WindowsBackend::GetWindowButtons(
-    WindowHandle window) const noexcept
+WindowButtons Win32WindowsBackend::GetWindowButtons(WindowHandle window) const noexcept
 {
   const auto* entry = FindEntry(window);
   if (!entry)
@@ -648,8 +609,7 @@ WindowButtons Win32WindowsBackend::GetWindowButtons(
   return entry->Buttons;
 }
 
-void Win32WindowsBackend::SetMinSize(WindowHandle window,
-                                     Extent2D size) noexcept
+void Win32WindowsBackend::SetMinSize(WindowHandle window, Extent2D size) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry)
@@ -657,8 +617,7 @@ void Win32WindowsBackend::SetMinSize(WindowHandle window,
   entry->MinSize = size;
 }
 
-void Win32WindowsBackend::SetMaxSize(WindowHandle window,
-                                     Extent2D size) noexcept
+void Win32WindowsBackend::SetMaxSize(WindowHandle window, Extent2D size) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry)
@@ -666,16 +625,14 @@ void Win32WindowsBackend::SetMaxSize(WindowHandle window,
   entry->MaxSize = size;
 }
 
-void Win32WindowsBackend::SetAlwaysOnTop(WindowHandle window,
-                                         bool topmost) noexcept
+void Win32WindowsBackend::SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
     return;
 
   entry->AlwaysOnTop = topmost;
-  ::SetWindowPos(entry->Hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0,
-                 0, SWP_NOMOVE | SWP_NOSIZE);
+  ::SetWindowPos(entry->Hwnd, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 }
 
 bool Win32WindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
@@ -688,8 +645,7 @@ bool Win32WindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
 
 // -- Cursor -------------------------------------------------------------
 
-void Win32WindowsBackend::SetCursorMode(WindowHandle window,
-                                        CursorMode mode) noexcept
+void Win32WindowsBackend::SetCursorMode(WindowHandle window, CursorMode mode) noexcept
 {
   auto* entry = FindEntry(window);
   if (!entry || !entry->Hwnd)
@@ -727,8 +683,7 @@ void Win32WindowsBackend::SetCursorMode(WindowHandle window,
   }
 }
 
-CursorMode Win32WindowsBackend::GetCursorMode(
-    WindowHandle window) const noexcept
+CursorMode Win32WindowsBackend::GetCursorMode(WindowHandle window) const noexcept
 {
   const auto* entry = FindEntry(window);
   if (!entry)
@@ -738,8 +693,7 @@ CursorMode Win32WindowsBackend::GetCursorMode(
 
 // -- Event pump ---------------------------------------------------------
 
-void Win32WindowsBackend::PumpEvents(
-    const gecko::EventEmitter& emitter) noexcept
+void Win32WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 {
   GECKO_PROFILE_NAMED(labels::General, "Win32WindowsBackend::PumpEvents");
   m_CurrentEmitter = &emitter;
@@ -760,9 +714,7 @@ void Win32WindowsBackend::PumpEvents(
 
 // -- WndProc ------------------------------------------------------------
 
-::LRESULT CALLBACK Win32WindowsBackend::WndProc(::HWND hwnd, ::UINT msg,
-                                                ::WPARAM wParam,
-                                                ::LPARAM lParam)
+::LRESULT CALLBACK Win32WindowsBackend::WndProc(::HWND hwnd, ::UINT msg, ::WPARAM wParam, ::LPARAM lParam)
 {
   if (!s_Instance)
     return ::DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -779,8 +731,7 @@ void Win32WindowsBackend::PumpEvents(
       StagedEvent ev;
       ev.Code = events::WindowCloseRequested;
       ev.Data.CloseRequested = {wh, NowNsSafe()};
-      ev.PayloadSize =
-          static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
+      ev.PayloadSize = static_cast<u32>(sizeof(events::WindowCloseRequestedPayload));
       self->m_Staged.push_back(ev);
     }
     return 0;  // prevent default DestroyWindow
@@ -816,8 +767,7 @@ void Win32WindowsBackend::PumpEvents(
       StagedEvent stEv;
       stEv.Code = events::WindowStateChanged;
       stEv.Data.StateChanged = {wh, NowNsSafe(), oldState, newState};
-      stEv.PayloadSize =
-          static_cast<u32>(sizeof(events::WindowStateChangedPayload));
+      stEv.PayloadSize = static_cast<u32>(sizeof(events::WindowStateChangedPayload));
       self->m_Staged.push_back(stEv);
     }
     break;
@@ -885,9 +835,7 @@ void Win32WindowsBackend::PumpEvents(
       // Low surrogate -- combine with stored high surrogate.
       if (entry->PendingHighSurrogate == 0)
         break;  // unpaired, drop
-      codepoint = 0x10000 +
-                  ((::gecko::u32(entry->PendingHighSurrogate) - 0xD800) << 10) +
-                  (unit - 0xDC00);
+      codepoint = 0x10000 + ((::gecko::u32(entry->PendingHighSurrogate) - 0xD800) << 10) + (unit - 0xDC00);
       entry->PendingHighSurrogate = 0;
     }
     else
@@ -897,8 +845,7 @@ void Win32WindowsBackend::PumpEvents(
     }
 
     // Skip control characters except tab/CR/LF.
-    if (codepoint < 32 && codepoint != '\t' && codepoint != '\n' &&
-        codepoint != '\r')
+    if (codepoint < 32 && codepoint != '\t' && codepoint != '\n' && codepoint != '\r')
       break;
     if (codepoint == 127)
       break;
@@ -929,8 +876,7 @@ void Win32WindowsBackend::PumpEvents(
       StagedEvent enterEv;
       enterEv.Code = events::WindowMouseEntered;
       enterEv.Data.MouseEntered = {wh, NowNsSafe()};
-      enterEv.PayloadSize =
-          static_cast<u32>(sizeof(events::WindowMouseEnteredPayload));
+      enterEv.PayloadSize = static_cast<u32>(sizeof(events::WindowMouseEnteredPayload));
       self->m_Staged.push_back(enterEv);
     }
 
@@ -993,8 +939,7 @@ void Win32WindowsBackend::PumpEvents(
   case WM_MOUSEWHEEL: {
     if (!entry)
       break;
-    const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) /
-                        static_cast<float>(WHEEL_DELTA);
+    const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / static_cast<float>(WHEEL_DELTA);
 
     StagedEvent ev;
     ev.Code = events::WindowMouseWheel;
@@ -1007,8 +952,7 @@ void Win32WindowsBackend::PumpEvents(
   case WM_MOUSEHWHEEL: {
     if (!entry)
       break;
-    const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) /
-                        static_cast<float>(WHEEL_DELTA);
+    const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / static_cast<float>(WHEEL_DELTA);
 
     StagedEvent ev;
     ev.Code = events::WindowMouseWheel;
@@ -1024,8 +968,7 @@ void Win32WindowsBackend::PumpEvents(
     StagedEvent ev;
     ev.Code = events::WindowFocusChanged;
     ev.Data.FocusChanged = {wh, NowNsSafe(), 1};
-    ev.PayloadSize =
-        static_cast<u32>(sizeof(events::WindowFocusChangedPayload));
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowFocusChangedPayload));
     self->m_Staged.push_back(ev);
     break;
   }
@@ -1040,8 +983,7 @@ void Win32WindowsBackend::PumpEvents(
     StagedEvent ev;
     ev.Code = events::WindowFocusChanged;
     ev.Data.FocusChanged = {wh, NowNsSafe(), 0};
-    ev.PayloadSize =
-        static_cast<u32>(sizeof(events::WindowFocusChangedPayload));
+    ev.PayloadSize = static_cast<u32>(sizeof(events::WindowFocusChangedPayload));
     self->m_Staged.push_back(ev);
     break;
   }
@@ -1054,10 +996,8 @@ void Win32WindowsBackend::PumpEvents(
 
     // Resize to suggested rect
     const ::RECT* suggested = reinterpret_cast<const ::RECT*>(lParam);
-    ::SetWindowPos(entry->Hwnd, nullptr, suggested->left, suggested->top,
-                   suggested->right - suggested->left,
-                   suggested->bottom - suggested->top,
-                   SWP_NOZORDER | SWP_NOACTIVATE);
+    ::SetWindowPos(entry->Hwnd, nullptr, suggested->left, suggested->top, suggested->right - suggested->left,
+                   suggested->bottom - suggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
 
     StagedEvent ev;
     ev.Code = events::WindowDpiChanged;
@@ -1099,8 +1039,7 @@ void Win32WindowsBackend::PumpEvents(
 
 // -- Helpers ------------------------------------------------------------
 
-Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
-    WindowHandle window) noexcept
+Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(WindowHandle window) noexcept
 {
   if (!window.IsValid())
     return nullptr;
@@ -1108,8 +1047,7 @@ Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
   return (it != m_Windows.end()) ? &it->second : nullptr;
 }
 
-const Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
-    WindowHandle window) const noexcept
+const Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(WindowHandle window) const noexcept
 {
   if (!window.IsValid())
     return nullptr;
@@ -1117,8 +1055,7 @@ const Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindEntry(
   return (it != m_Windows.end()) ? &it->second : nullptr;
 }
 
-Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindByHwnd(
-    ::HWND hwnd) noexcept
+Win32WindowsBackend::Win32WindowEntry* Win32WindowsBackend::FindByHwnd(::HWND hwnd) noexcept
 {
   const u64 id = static_cast<u64>(::GetWindowLongPtrW(hwnd, GWLP_USERDATA));
   if (id == WindowHandle::InvalidId)
@@ -1144,13 +1081,11 @@ void Win32WindowsBackend::FlushStagedEvents() noexcept
     return;
 
   for (const auto& ev : m_Staged)
-    gecko::SendEvent(*m_CurrentEmitter, ev.Code,
-                     gecko::EventView {&ev.Data, ev.PayloadSize});
+    gecko::SendEvent(*m_CurrentEmitter, ev.Code, gecko::EventView {&ev.Data, ev.PayloadSize});
   m_Staged.clear();
 }
 
-void Win32WindowsBackend::SetModalFrameCallback(ModalFrameFn callback,
-                                                void* userData) noexcept
+void Win32WindowsBackend::SetModalFrameCallback(ModalFrameFn callback, void* userData) noexcept
 {
   m_ModalFrameCallback = callback;
   m_ModalFrameUserData = userData;

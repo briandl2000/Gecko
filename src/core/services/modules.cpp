@@ -7,8 +7,7 @@
 
 namespace gecko {
 
-ModuleHandle::ModuleHandle(IModuleRegistry* modules, Label label) noexcept
-    : m_modules {modules}, m_label {label}
+ModuleHandle::ModuleHandle(IModuleRegistry* modules, Label label) noexcept : m_modules {modules}, m_label {label}
 {}
 
 ModuleHandle::ModuleHandle(ModuleHandle&& other) noexcept

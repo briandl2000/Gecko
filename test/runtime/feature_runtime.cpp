@@ -39,8 +39,7 @@ constexpr u32 LocalEventCode = 0x42;
 
 }  // namespace
 
-TEST_CASE("RuntimeModule publishes the four foundational services in order",
-          "[feature][runtime][module]")
+TEST_CASE("RuntimeModule publishes the four foundational services in order", "[feature][runtime][module]")
 {
   SystemAllocator alloc;
   REQUIRE(SetAllocator(&alloc));
@@ -70,8 +69,7 @@ TEST_CASE("RuntimeModule publishes the four foundational services in order",
   ResetAllocator();
 }
 
-TEST_CASE("Job system dispatches work end-to-end through the registry",
-          "[feature][runtime][jobs]")
+TEST_CASE("Job system dispatches work end-to-end through the registry", "[feature][runtime][jobs]")
 {
   SystemAllocator alloc;
   REQUIRE(SetAllocator(&alloc));
@@ -92,9 +90,8 @@ TEST_CASE("Job system dispatches work end-to-end through the registry",
   handles.reserve(N);
   for (int i = 0; i < N; ++i)
   {
-    handles.push_back(GetJobSystem()->Submit([&counter]() noexcept {
-      counter.fetch_add(1, ::std::memory_order_relaxed);
-    }));
+    handles.push_back(
+        GetJobSystem()->Submit([&counter]() noexcept { counter.fetch_add(1, ::std::memory_order_relaxed); }));
   }
   GetJobSystem()->WaitAll(handles.data(), static_cast<u32>(handles.size()));
   REQUIRE(counter.load() == N);
@@ -103,8 +100,7 @@ TEST_CASE("Job system dispatches work end-to-end through the registry",
   ResetAllocator();
 }
 
-TEST_CASE("Event bus delivers events through the runtime stack",
-          "[feature][runtime][events]")
+TEST_CASE("Event bus delivers events through the runtime stack", "[feature][runtime][events]")
 {
   SystemAllocator alloc;
   REQUIRE(SetAllocator(&alloc));
@@ -125,12 +121,9 @@ TEST_CASE("Event bus delivers events through the runtime stack",
   const EventCode code = MakeEventCode(TestLabel.Id, LocalEventCode);
   ::std::atomic<int> hits {0};
 
-  auto sub =
-      bus->Subscribe(code,
-                     [](void* user, const EventMeta&, EventView) {
-                       static_cast<::std::atomic<int>*>(user)->fetch_add(1);
-                     },
-                     &hits, {.delivery = SubscriptionDelivery::Immediate});
+  auto sub = bus->Subscribe(
+      code, [](void* user, const EventMeta&, EventView) { static_cast<::std::atomic<int>*>(user)->fetch_add(1); },
+      &hits, {.delivery = SubscriptionDelivery::Immediate});
 
   EventEmitter emitter = bus->CreateEmitter(TestLabel.Id, 0);
   for (int i = 0; i < 8; ++i)
@@ -143,8 +136,7 @@ TEST_CASE("Event bus delivers events through the runtime stack",
   ResetAllocator();
 }
 
-TEST_CASE("Module restart works repeatedly with the runtime stack",
-          "[feature][runtime][module]")
+TEST_CASE("Module restart works repeatedly with the runtime stack", "[feature][runtime][module]")
 {
   for (int iter = 0; iter < 4; ++iter)
   {

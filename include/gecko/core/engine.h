@@ -64,8 +64,7 @@ public:
   /// plugins ever need to construct an Engine, switch this to
   /// `Engine* Create(IModule* const* modules, usize count)` and an
   /// out-pointer/`bool` failure path.
-  GECKO_API static ::std::optional<Engine> Create(
-      ::std::initializer_list<IModule*> modules) noexcept;
+  GECKO_API static ::std::optional<Engine> Create(::std::initializer_list<IModule*> modules) noexcept;
 
   /// Runs `Shutdown` on every module in reverse topological order.
   GECKO_API ~Engine() noexcept;

@@ -8,13 +8,11 @@
 
 namespace gecko {
 
-::std::optional<Engine> Engine::Create(
-    ::std::initializer_list<IModule*> modules) noexcept
+::std::optional<Engine> Engine::Create(::std::initializer_list<IModule*> modules) noexcept
 {
   GECKO_PROFILE_NAMED(::gecko::core::labels::Modules, "Engine::Create");
   Engine engine;
-  engine.m_registry = ::std::unique_ptr<IModuleRegistry>(
-      new (::std::nothrow)::gecko::core::detail::ModuleRegistry());
+  engine.m_registry = ::std::unique_ptr<IModuleRegistry>(new (::std::nothrow)::gecko::core::detail::ModuleRegistry());
   if (!engine.m_registry)
   {
     return ::std::nullopt;
@@ -67,8 +65,7 @@ Engine::~Engine() noexcept
   }
 }
 
-Engine::Engine(Engine&& other) noexcept
-    : m_registry(::std::move(other.m_registry))
+Engine::Engine(Engine&& other) noexcept : m_registry(::std::move(other.m_registry))
 {
   if (m_registry)
   {

@@ -82,8 +82,7 @@ TEST_CASE("TrackingAllocator label tracking", "[runtime][allocator]")
   alloc.Shutdown();
 }
 
-TEST_CASE("TrackingAllocator multiple alloc/free cycles",
-          "[runtime][allocator]")
+TEST_CASE("TrackingAllocator multiple alloc/free cycles", "[runtime][allocator]")
 {
   TrackingAllocator alloc;
   alloc.Init();

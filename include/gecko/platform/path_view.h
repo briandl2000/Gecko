@@ -31,8 +31,7 @@ class PathView
 public:
   constexpr PathView() noexcept = default;
   constexpr PathView(const char* str) noexcept
-      : m_View(str == nullptr ? ::std::string_view {}
-                              : ::std::string_view {str})
+      : m_View(str == nullptr ? ::std::string_view {} : ::std::string_view {str})
   {}
   constexpr PathView(::std::string_view view) noexcept : m_View(view)
   {}

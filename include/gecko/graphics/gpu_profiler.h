@@ -28,14 +28,11 @@ namespace gecko::graphics {
 /// Configuration for `IGpuSampler` creation.
 struct GpuSamplerDesc
 {
-  u32 MaxZonesPerFrame {
-      64};  ///< Worst-case zones per frame (each zone uses 2 timestamps).
-  u32 FramesInFlight {3};  ///< Frames kept in flight; must be >= the device's
-                           ///< `MaxFramesInFlight`.
-  u32 GpuThreadId {
-      0xFFFF0001u};  ///< Synthetic thread id used for GPU rows in the trace.
-  const char* GpuThreadName {
-      "GPU"};  ///< Display name registered for `GpuThreadId`.
+  u32 MaxZonesPerFrame {64};          ///< Worst-case zones per frame (each zone uses 2 timestamps).
+  u32 FramesInFlight {3};             ///< Frames kept in flight; must be >= the device's
+                                      ///< `MaxFramesInFlight`.
+  u32 GpuThreadId {0xFFFF0001u};      ///< Synthetic thread id used for GPU rows in the trace.
+  const char* GpuThreadName {"GPU"};  ///< Display name registered for `GpuThreadId`.
 };
 
 /// Records GPU-side timing zones for a single render queue.
@@ -62,9 +59,8 @@ public:
   /// @param label  Module label for the zone.
   /// @param name   Display name (zero-copy literal recommended).
   /// @param level  Verbosity level filter.
-  GECKO_API virtual void BeginZone(
-      ICommandList& cmd, ::gecko::Label label, const char* name,
-      ::gecko::ProfLevel level = ::gecko::ProfLevel::Normal) noexcept = 0;
+  GECKO_API virtual void BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name,
+                                   ::gecko::ProfLevel level = ::gecko::ProfLevel::Normal) noexcept = 0;
 
   /// Close the zone most recently opened by `BeginZone` on `cmd`.
   GECKO_API virtual void EndZone(ICommandList& cmd) noexcept = 0;
@@ -97,8 +93,7 @@ class [[nodiscard("GpuProfScope is a RAII guard - name the variable, e.g. via "
                   "GECKO_GPU_PROF_SCOPE")]] GpuProfScope
 {
 public:
-  GpuProfScope(IGpuSampler& sampler, ICommandList& cmd, ::gecko::Label label,
-               const char* name,
+  GpuProfScope(IGpuSampler& sampler, ICommandList& cmd, ::gecko::Label label, const char* name,
                ::gecko::ProfLevel level = ::gecko::ProfLevel::Normal) noexcept
       : m_Sampler(&sampler), m_Cmd(&cmd)
   {
@@ -125,13 +120,11 @@ private:
 /// RAII guard that picks up the `IGpuSampler` from the command list
 /// (attached via `AttachGpuSampler`). Silently no-ops if the command
 /// list has no attached sampler.
-class [[nodiscard(
-    "GpuAutoProfScope is a RAII guard - name the variable, e.g. via "
-    "GECKO_GPU_SCOPE_*")]] GpuAutoProfScope
+class [[nodiscard("GpuAutoProfScope is a RAII guard - name the variable, e.g. via "
+                  "GECKO_GPU_SCOPE_*")]] GpuAutoProfScope
 {
 public:
-  GpuAutoProfScope(ICommandList& cmd, ::gecko::Label label, const char* name,
-                   ::gecko::ProfLevel level) noexcept
+  GpuAutoProfScope(ICommandList& cmd, ::gecko::Label label, const char* name, ::gecko::ProfLevel level) noexcept
       : m_Sampler(cmd.GetAttachedGpuSampler()), m_Cmd(&cmd)
   {
     if (m_Sampler)
@@ -163,11 +156,10 @@ private:
 
 #if defined(GECKO_PROFILING)
 
-#define GECKO_GPU_PROF_SCOPE(sampler_ref, cmd_ref, label, name)       \
-  ::gecko::graphics::GpuProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_prof_, \
-                                                        __LINE__)     \
-  {                                                                   \
-    (sampler_ref), (cmd_ref), (label), name                           \
+#define GECKO_GPU_PROF_SCOPE(sampler_ref, cmd_ref, label, name)                 \
+  ::gecko::graphics::GpuProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_prof_, __LINE__) \
+  {                                                                             \
+    (sampler_ref), (cmd_ref), (label), name                                     \
   }
 
 // -- Ergonomic GPU scope macros (mirror CPU GECKO_SCOPE_*) ---------
@@ -180,25 +172,22 @@ private:
 //   _NORMAL_NAMED  -> Normal
 //   _ALWAYS_NAMED  -> Always
 
-#define GECKO_GPU_SCOPE_NAMED(cmd_ref, label, name)                       \
-  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, \
-                                                            __LINE__)     \
-  {                                                                       \
-    (cmd_ref), (label), name, ::gecko::ProfLevel::Detailed                \
+#define GECKO_GPU_SCOPE_NAMED(cmd_ref, label, name)                                 \
+  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, __LINE__) \
+  {                                                                                 \
+    (cmd_ref), (label), name, ::gecko::ProfLevel::Detailed                          \
   }
 
-#define GECKO_GPU_SCOPE_NORMAL_NAMED(cmd_ref, label, name)                \
-  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, \
-                                                            __LINE__)     \
-  {                                                                       \
-    (cmd_ref), (label), name, ::gecko::ProfLevel::Normal                  \
+#define GECKO_GPU_SCOPE_NORMAL_NAMED(cmd_ref, label, name)                          \
+  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, __LINE__) \
+  {                                                                                 \
+    (cmd_ref), (label), name, ::gecko::ProfLevel::Normal                            \
   }
 
-#define GECKO_GPU_SCOPE_ALWAYS_NAMED(cmd_ref, label, name)                \
-  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, \
-                                                            __LINE__)     \
-  {                                                                       \
-    (cmd_ref), (label), name, ::gecko::ProfLevel::Always                  \
+#define GECKO_GPU_SCOPE_ALWAYS_NAMED(cmd_ref, label, name)                          \
+  ::gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, __LINE__) \
+  {                                                                                 \
+    (cmd_ref), (label), name, ::gecko::ProfLevel::Always                            \
   }
 
 #else

@@ -30,8 +30,7 @@ u32 RingLogger::ThreadId() noexcept
   return HashThreadId();
 }
 
-RingLogger::RingLogger(size_t capacity) noexcept
-    : m_Capacity(capacity), m_LoggerLabel(labels::Logger)
+RingLogger::RingLogger(size_t capacity) noexcept : m_Capacity(capacity), m_LoggerLabel(labels::Logger)
 {
   GECKO_ASSERT(capacity > 0 && "Ring buffer capacity must be greater than 0");
 
@@ -72,13 +71,11 @@ void RingLogger::RemoveSink(ILogSink* sink) noexcept
     m_Sinks.erase(it);
 }
 
-void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
-                      va_list apIn) noexcept
+void RingLogger::LogV(LogLevel level, Label label, const char* fmt, va_list apIn) noexcept
 {
   GECKO_ASSERT(fmt && "Format string cannot be null");
 
-  if (static_cast<int>(level) <
-      static_cast<int>(m_Level.load(std::memory_order_relaxed)))
+  if (static_cast<int>(level) < static_cast<int>(m_Level.load(std::memory_order_relaxed)))
     return;
 
   char buffer[512];
@@ -93,11 +90,8 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
 
   if (!m_Run.load(std::memory_order_relaxed))
   {
-    LogMessage message {.TimeNs = NowNs(),
-                        .Text = buffer,
-                        .MessageLabel = label,
-                        .ThreadId = ThreadId(),
-                        .Level = level};
+    LogMessage message {
+        .TimeNs = NowNs(), .Text = buffer, .MessageLabel = label, .ThreadId = ThreadId(), .Level = level};
 
     // Copy sinks vector to avoid holding lock during I/O
     std::vector<ILogSink*> sinks;
@@ -130,11 +124,8 @@ void RingLogger::LogV(LogLevel level, Label label, const char* fmt,
       // The slot we claimed is "lost" but we don't hang
       m_Dropped.fetch_add(1, std::memory_order_relaxed);
 
-      LogMessage message {.TimeNs = NowNs(),
-                          .Text = buffer,
-                          .MessageLabel = label,
-                          .ThreadId = ThreadId(),
-                          .Level = level};
+      LogMessage message {
+          .TimeNs = NowNs(), .Text = buffer, .MessageLabel = label, .ThreadId = ThreadId(), .Level = level};
 
       std::vector<ILogSink*> sinks;
       {
@@ -189,8 +180,7 @@ void RingLogger::ProcessLogEntries() noexcept
   }
 
   LogMessage message {};
-  const int maxBatchSize =
-      128;  // Process more entries per job to reduce job overhead
+  const int maxBatchSize = 128;  // Process more entries per job to reduce job overhead
 
   for (int batch = 0; batch < maxBatchSize; ++batch)
   {
@@ -230,8 +220,7 @@ void RingLogger::ProcessLogEntries() noexcept
                             .ThreadId = ThreadId(),
                             .Level = LogLevel::Warn};
     char temp[128];
-    std::snprintf(temp, sizeof(temp), "[Logger] dropped %llu messages",
-                  static_cast<unsigned long long>(dropped));
+    std::snprintf(temp, sizeof(temp), "[Logger] dropped %llu messages", static_cast<unsigned long long>(dropped));
     dropMessage.Text = temp;
 
     for (auto* sink : sinks)
@@ -272,8 +261,7 @@ void RingLogger::TryScheduleConsumerJob() noexcept
     return;
 
   // Try to claim the scheduling slot atomically (still no mutex)
-  if (!m_LastScheduleNs.compare_exchange_weak(lastTime, now,
-                                              std::memory_order_relaxed))
+  if (!m_LastScheduleNs.compare_exchange_weak(lastTime, now, std::memory_order_relaxed))
     return;
 
   // Now we need to check if a job is already running - this needs the mutex
@@ -308,8 +296,7 @@ void RingLogger::TryScheduleConsumerJob() noexcept
     // Same reasoning: NullJobSystem inline-runs Submit, so set the guard
     // around the Submit call too.
     g_InsideRingLogger = true;
-    m_ConsumerJob = jobSystem->Submit([this]() { ProcessLogEntries(); },
-                                      JobPriority::Normal, m_LoggerLabel);
+    m_ConsumerJob = jobSystem->Submit([this]() { ProcessLogEntries(); }, JobPriority::Normal, m_LoggerLabel);
     g_InsideRingLogger = false;
   }
 }

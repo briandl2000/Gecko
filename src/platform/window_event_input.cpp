@@ -26,18 +26,12 @@ WindowEventInput::WindowEventInput() noexcept
 {
   m_KeySub = ::gecko::SubscribeEvent(events::WindowKey, &OnKey, this);
   m_CharSub = ::gecko::SubscribeEvent(events::WindowChar, &OnChar, this);
-  m_MouseMoveSub =
-      ::gecko::SubscribeEvent(events::WindowMouseMove, &OnMouseMove, this);
-  m_MouseButtonSub =
-      ::gecko::SubscribeEvent(events::WindowMouseButton, &OnMouseButton, this);
-  m_MouseWheelSub =
-      ::gecko::SubscribeEvent(events::WindowMouseWheel, &OnMouseWheel, this);
-  m_FocusSub = ::gecko::SubscribeEvent(events::WindowFocusChanged,
-                                       &OnFocusChanged, this);
-  m_MouseEnteredSub = ::gecko::SubscribeEvent(events::WindowMouseEntered,
-                                              &OnMouseEntered, this);
-  m_MouseExitedSub =
-      ::gecko::SubscribeEvent(events::WindowMouseExited, &OnMouseExited, this);
+  m_MouseMoveSub = ::gecko::SubscribeEvent(events::WindowMouseMove, &OnMouseMove, this);
+  m_MouseButtonSub = ::gecko::SubscribeEvent(events::WindowMouseButton, &OnMouseButton, this);
+  m_MouseWheelSub = ::gecko::SubscribeEvent(events::WindowMouseWheel, &OnMouseWheel, this);
+  m_FocusSub = ::gecko::SubscribeEvent(events::WindowFocusChanged, &OnFocusChanged, this);
+  m_MouseEnteredSub = ::gecko::SubscribeEvent(events::WindowMouseEntered, &OnMouseEntered, this);
+  m_MouseExitedSub = ::gecko::SubscribeEvent(events::WindowMouseExited, &OnMouseExited, this);
 }
 
 WindowEventInput::~WindowEventInput() noexcept = default;
@@ -91,8 +85,7 @@ MousePosition WindowEventInput::GetMousePosition() const noexcept
   return m_MousePos;
 }
 
-MousePosition WindowEventInput::GetMousePosition(
-    WindowHandle window) const noexcept
+MousePosition WindowEventInput::GetMousePosition(WindowHandle window) const noexcept
 {
   if (window.IsValid() && window == m_LastMouseWindow)
     return m_LastMouseWindowPos;
@@ -101,8 +94,7 @@ MousePosition WindowEventInput::GetMousePosition(
 
 MousePosition WindowEventInput::GetMouseDelta() const noexcept
 {
-  return MousePosition {m_MousePos.X - m_MousePosPrev.X,
-                        m_MousePos.Y - m_MousePosPrev.Y};
+  return MousePosition {m_MousePos.X - m_MousePosPrev.X, m_MousePos.Y - m_MousePosPrev.Y};
 }
 
 float WindowEventInput::GetMouseScrollX() const noexcept
@@ -132,21 +124,17 @@ WindowHandle WindowEventInput::HoveredWindow() const noexcept
 
 // -- Event handlers ----------------------------------------------
 
-void WindowEventInput::OnKey(void* user, const ::gecko::EventMeta&,
-                             ::gecko::EventView view) noexcept
+void WindowEventInput::OnKey(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowKeyPayload*>(view.Data());
   self->m_KeyDown[KeyIndex(p->Key)] = (p->Down != 0);
 }
 
-void WindowEventInput::OnChar(void* user, const ::gecko::EventMeta&,
-                              ::gecko::EventView view) noexcept
+void WindowEventInput::OnChar(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowCharPayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowCharPayload*>(view.Data());
   const ::gecko::u32 cp = p->Codepoint;
 
   // Encode the codepoint as UTF-8 and append to the per-frame buffer.
@@ -178,64 +166,52 @@ void WindowEventInput::OnChar(void* user, const ::gecko::EventMeta&,
   }
 }
 
-void WindowEventInput::OnMouseMove(void* user, const ::gecko::EventMeta&,
-                                   ::gecko::EventView view) noexcept
+void WindowEventInput::OnMouseMove(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowMouseMovePayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowMouseMovePayload*>(view.Data());
   self->m_LastMouseWindow = p->Window;
   self->m_LastMouseWindowPos = MousePosition {p->X, p->Y};
   if (p->Window == self->m_FocusedWindow || !self->m_FocusedWindow.IsValid())
     self->m_MousePos = MousePosition {p->X, p->Y};
 }
 
-void WindowEventInput::OnMouseButton(void* user, const ::gecko::EventMeta&,
-                                     ::gecko::EventView view) noexcept
+void WindowEventInput::OnMouseButton(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowMouseButtonPayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowMouseButtonPayload*>(view.Data());
   self->m_MouseDown[ButtonIndex(p->Button)] = (p->Down != 0);
 }
 
-void WindowEventInput::OnMouseWheel(void* user, const ::gecko::EventMeta&,
-                                    ::gecko::EventView view) noexcept
+void WindowEventInput::OnMouseWheel(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowMouseWheelPayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowMouseWheelPayload*>(view.Data());
   self->m_ScrollX += p->DeltaX;
   self->m_ScrollY += p->DeltaY;
 }
 
-void WindowEventInput::OnFocusChanged(void* user, const ::gecko::EventMeta&,
-                                      ::gecko::EventView view) noexcept
+void WindowEventInput::OnFocusChanged(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowFocusChangedPayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowFocusChangedPayload*>(view.Data());
   if (p->Focused)
     self->m_FocusedWindow = p->Window;
   else if (self->m_FocusedWindow == p->Window)
     self->m_FocusedWindow = {};
 }
 
-void WindowEventInput::OnMouseEntered(void* user, const ::gecko::EventMeta&,
-                                      ::gecko::EventView view) noexcept
+void WindowEventInput::OnMouseEntered(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowMouseEnteredPayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowMouseEnteredPayload*>(view.Data());
   self->m_HoveredWindow = p->Window;
 }
 
-void WindowEventInput::OnMouseExited(void* user, const ::gecko::EventMeta&,
-                                     ::gecko::EventView view) noexcept
+void WindowEventInput::OnMouseExited(void* user, const ::gecko::EventMeta&, ::gecko::EventView view) noexcept
 {
   auto* self = static_cast<WindowEventInput*>(user);
-  const auto* p =
-      reinterpret_cast<const events::WindowMouseExitedPayload*>(view.Data());
+  const auto* p = reinterpret_cast<const events::WindowMouseExitedPayload*>(view.Data());
   if (self->m_HoveredWindow == p->Window)
     self->m_HoveredWindow = {};
 }

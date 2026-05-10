@@ -58,11 +58,8 @@ static_assert(sizeof(i64) == 8, "Expected i64 to be 8 bytes.");
 static_assert(sizeof(f32) == 4, "Expected f32 to be 4 bytes.");
 static_assert(sizeof(f64) == 8, "Expected f64 to be 8 bytes.");
 
-static_assert(::std::numeric_limits<unsigned char>::digits == 8,
-              "Expected 8-bit bytes.");
-static_assert(::std::numeric_limits<f32>::is_iec559,
-              "Expected IEEE-754 float.");
-static_assert(::std::numeric_limits<f64>::is_iec559,
-              "Expected IEEE-754 double.");
+static_assert(::std::numeric_limits<unsigned char>::digits == 8, "Expected 8-bit bytes.");
+static_assert(::std::numeric_limits<f32>::is_iec559, "Expected IEEE-754 float.");
+static_assert(::std::numeric_limits<f64>::is_iec559, "Expected IEEE-754 double.");
 
 }  // namespace gecko

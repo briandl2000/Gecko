@@ -83,8 +83,7 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
 
     auto rr = Read(target);
     REQUIRE(rr.Ok());
-    ::std::string back {reinterpret_cast<const char*>(rr.Data().data()),
-                        rr.Size()};
+    ::std::string back {reinterpret_cast<const char*>(rr.Data().data()), rr.Size()};
     REQUIRE(back == "hello, world");
   }
 
@@ -94,8 +93,7 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
     REQUIRE(AtomicWrite(target, ToBytes("second")));
     auto rr = Read(target);
     REQUIRE(rr.Ok());
-    ::std::string back {reinterpret_cast<const char*>(rr.Data().data()),
-                        rr.Size()};
+    ::std::string back {reinterpret_cast<const char*>(rr.Data().data()), rr.Size()};
     REQUIRE(back == "second");
   }
 
@@ -104,8 +102,7 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
     REQUIRE(Write(target, ToBytes("aaa"), WriteMode::Truncate).Ok);
     REQUIRE(Write(target, ToBytes("bbb"), WriteMode::Append).Ok);
     auto rr = Read(target);
-    ::std::string back {reinterpret_cast<const char*>(rr.Data().data()),
-                        rr.Size()};
+    ::std::string back {reinterpret_cast<const char*>(rr.Data().data()), rr.Size()};
     REQUIRE(back == "aaabbb");
   }
 
@@ -151,8 +148,7 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
     auto m = Map(target);
     REQUIRE(m.Ok());
     REQUIRE(m.Size() == 14);
-    ::std::string back {reinterpret_cast<const char*>(m.Data().data()),
-                        m.Size()};
+    ::std::string back {reinterpret_cast<const char*>(m.Data().data()), m.Size()};
     REQUIRE(back == "mappable bytes");
   }
 

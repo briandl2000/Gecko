@@ -26,8 +26,7 @@ void PrintMemoryStats(const ::gecko::runtime::TrackingAllocator& tracker)
 {
   GECKO_INFO(labels::Main, "Total Live Bytes: %llu", tracker.TotalLiveBytes());
 
-  const ::gecko::Label all[] = {labels::Main, labels::Worker, labels::Memory,
-                                labels::Compute, labels::Simulation};
+  const ::gecko::Label all[] = {labels::Main, labels::Worker, labels::Memory, labels::Compute, labels::Simulation};
 
   ::gecko::u64 totalAllocs = 0;
   ::gecko::u64 totalFrees = 0;
@@ -46,12 +45,11 @@ void PrintMemoryStats(const ::gecko::runtime::TrackingAllocator& tracker)
     totalFrees += frees;
     totalLive += live;
 
-    GECKO_INFO(labels::Main, "Label '%s': Live=%llu Allocs=%llu Frees=%llu",
-               label.Name ? label.Name : "(unnamed)", live, allocs, frees);
+    GECKO_INFO(labels::Main, "Label '%s': Live=%llu Allocs=%llu Frees=%llu", label.Name ? label.Name : "(unnamed)",
+               live, allocs, frees);
   }
 
-  GECKO_INFO(labels::Main, "Summary: %llu allocs / %llu frees / %llu live",
-             totalAllocs, totalFrees, totalLive);
+  GECKO_INFO(labels::Main, "Summary: %llu allocs / %llu frees / %llu live", totalAllocs, totalFrees, totalLive);
 }
 
 // -- Particle simulation (used by the job system demo) ---------------
@@ -84,12 +82,9 @@ void RunParticleWorker(int workerId, int numParticles)
     ::gecko::SeedRandom(workerId * 12345 + 42);
     for (int i = 0; i < numParticles; ++i)
     {
-      particles[i] = {::gecko::RandomF32(-100.0f, 100.0f),
-                      ::gecko::RandomF32(-100.0f, 100.0f),
-                      ::gecko::RandomF32(-100.0f, 100.0f),
-                      ::gecko::RandomF32(-10.0f, 10.0f),
-                      ::gecko::RandomF32(-10.0f, 10.0f),
-                      ::gecko::RandomF32(-10.0f, 10.0f),
+      particles[i] = {::gecko::RandomF32(-100.0f, 100.0f), ::gecko::RandomF32(-100.0f, 100.0f),
+                      ::gecko::RandomF32(-100.0f, 100.0f), ::gecko::RandomF32(-10.0f, 10.0f),
+                      ::gecko::RandomF32(-10.0f, 10.0f),   ::gecko::RandomF32(-10.0f, 10.0f),
                       ::gecko::RandomF32(1.0f, 5.0f)};
     }
   }
@@ -131,8 +126,7 @@ struct EventDemoState
   ::gecko::EventSubscription queuedSub {};
 };
 
-void OnEventImmediate(void* user, const ::gecko::EventMeta&,
-                      ::gecko::EventView payload)
+void OnEventImmediate(void* user, const ::gecko::EventMeta&, ::gecko::EventView payload)
 {
   auto* state = static_cast<EventDemoState*>(user);
   const auto* p = static_cast<const events::TestEventPayload*>(payload.Data());
@@ -140,8 +134,7 @@ void OnEventImmediate(void* user, const ::gecko::EventMeta&,
   GECKO_INFO(labels::Events, "Immediate: value=%u", p ? p->value : 0u);
 }
 
-void OnEventQueued(void* user, const ::gecko::EventMeta&,
-                   ::gecko::EventView payload)
+void OnEventQueued(void* user, const ::gecko::EventMeta&, ::gecko::EventView payload)
 {
   auto* state = static_cast<EventDemoState*>(user);
   const auto* p = static_cast<const events::TestEventPayload*>(payload.Data());
@@ -212,18 +205,15 @@ void RunEvents()
 
   EventDemoState state {};
 
-  state.immediateSub = ::gecko::SubscribeEvent(
-      events::TestEvent, &OnEventImmediate, &state,
-      ::gecko::SubscriptionOptions {
-          .delivery = ::gecko::SubscriptionDelivery::Immediate});
+  state.immediateSub =
+      ::gecko::SubscribeEvent(events::TestEvent, &OnEventImmediate, &state,
+                              ::gecko::SubscriptionOptions {.delivery = ::gecko::SubscriptionDelivery::Immediate});
 
-  state.queuedSub = ::gecko::SubscribeEvent(
-      events::TestEvent, &OnEventQueued, &state,
-      ::gecko::SubscriptionOptions {.delivery =
-                                        ::gecko::SubscriptionDelivery::Queued});
+  state.queuedSub =
+      ::gecko::SubscribeEvent(events::TestEvent, &OnEventQueued, &state,
+                              ::gecko::SubscriptionOptions {.delivery = ::gecko::SubscriptionDelivery::Queued});
 
-  const ::gecko::EventEmitter emitter =
-      ::gecko::CreateEmitterForModule(labels::App, /*sender=*/0xC0DE);
+  const ::gecko::EventEmitter emitter = ::gecko::CreateEmitterForModule(labels::App, /*sender=*/0xC0DE);
 
   // Three Send calls -- two from main, one from a worker job.
   {
@@ -242,26 +232,25 @@ void RunEvents()
     ::gecko::SendEvent(emitter, events::TestEvent, payload);
   }
 
-  GECKO_INFO(labels::Events, "Before Dispatch: Immediate=%u Queued=%u",
-             state.immediateCount.load(), state.queuedCount.load());
+  GECKO_INFO(labels::Events, "Before Dispatch: Immediate=%u Queued=%u", state.immediateCount.load(),
+             state.queuedCount.load());
 
   const ::std::size_t dispatched = ::gecko::DispatchEvents();
   GECKO_INFO(labels::Events, "Dispatched %zu queued events", dispatched);
-  GECKO_INFO(labels::Events, "After Dispatch:  Immediate=%u Queued=%u",
-             state.immediateCount.load(), state.queuedCount.load());
+  GECKO_INFO(labels::Events, "After Dispatch:  Immediate=%u Queued=%u", state.immediateCount.load(),
+             state.queuedCount.load());
 }
 
 void RunThreading()
 {
   GECKO_SCOPE(labels::Main);
 
-  GECKO_INFO(labels::Main, "ThisThreadId=%u  HardwareThreadCount=%u",
-             ::gecko::ThisThreadId(), ::gecko::HardwareThreadCount());
+  GECKO_INFO(labels::Main, "ThisThreadId=%u  HardwareThreadCount=%u", ::gecko::ThisThreadId(),
+             ::gecko::HardwareThreadCount());
 
   const ::gecko::u64 t0 = ::gecko::HighResTimeNs();
   ::gecko::PreciseSleepNs(1'000'000);  // 1 ms
-  GECKO_INFO(labels::Main, "PreciseSleepNs(1ms) measured=%llu ns",
-             ::gecko::HighResTimeNs() - t0);
+  GECKO_INFO(labels::Main, "PreciseSleepNs(1ms) measured=%llu ns", ::gecko::HighResTimeNs() - t0);
 
   ::gecko::YieldThread();
 
@@ -282,8 +271,7 @@ void RunJobs(::gecko::runtime::TrackingAllocator& tracker)
   {
     const int particleCount = 800 + i * 400;
     auto job = [i, particleCount]() { RunParticleWorker(i, particleCount); };
-    sims.push_back(
-        ::gecko::SubmitJob(job, ::gecko::JobPriority::Normal, labels::Worker));
+    sims.push_back(::gecko::SubmitJob(job, ::gecko::JobPriority::Normal, labels::Worker));
   }
   ::gecko::WaitForJobs(sims.data(), static_cast<::gecko::u32>(sims.size()));
   PrintMemoryStats(tracker);
@@ -326,12 +314,10 @@ void RunJobs(::gecko::runtime::TrackingAllocator& tracker)
       GECKO_SCOPE_NAMED(labels::Compute, "MainThreadJob");
       GECKO_INFO(labels::Compute, "main-thread job %d", i);
     };
-    mainJobs.push_back(
-        ::gecko::SubmitJob(job, ::gecko::JobPriority::Low, labels::Compute));
+    mainJobs.push_back(::gecko::SubmitJob(job, ::gecko::JobPriority::Low, labels::Compute));
   }
   ::gecko::GetJobSystem()->ProcessJobs(2);
-  ::gecko::WaitForJobs(mainJobs.data(),
-                       static_cast<::gecko::u32>(mainJobs.size()));
+  ::gecko::WaitForJobs(mainJobs.data(), static_cast<::gecko::u32>(mainJobs.size()));
 }
 
 void RunLogging()

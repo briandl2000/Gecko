@@ -29,8 +29,7 @@ public:
   RingLogger() noexcept;
   virtual ~RingLogger();
 
-  virtual void LogV(LogLevel level, Label label, const char* fmt,
-                    va_list) noexcept override;
+  virtual void LogV(LogLevel level, Label label, const char* fmt, va_list) noexcept override;
 
   virtual bool Init() noexcept override;
   virtual void Shutdown() noexcept override;

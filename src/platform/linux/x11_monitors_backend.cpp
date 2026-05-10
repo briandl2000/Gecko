@@ -29,20 +29,16 @@ X11MonitorsBackend::X11MonitorsBackend() noexcept
   int errorBase = 0;
   if (!::XRRQueryExtension(m_Display, &eventBase, &errorBase))
   {
-    GECKO_WARN(labels::General,
-               "X11MonitorsBackend: XRandR extension not available");
+    GECKO_WARN(labels::General, "X11MonitorsBackend: XRandR extension not available");
     return;
   }
   m_RREventBase = eventBase;
 
   // Subscribe to screen change notifications for hotplug detection.
   ::XRRSelectInput(m_Display, DefaultRootWindow(m_Display),
-                   RRScreenChangeNotifyMask | RROutputChangeNotifyMask |
-                       RRCrtcChangeNotifyMask);
+                   RRScreenChangeNotifyMask | RROutputChangeNotifyMask | RRCrtcChangeNotifyMask);
 
-  GECKO_INFO(labels::General,
-             "X11MonitorsBackend: initialized (display=%p, rrEventBase=%d)",
-             m_Display, m_RREventBase);
+  GECKO_INFO(labels::General, "X11MonitorsBackend: initialized (display=%p, rrEventBase=%d)", m_Display, m_RREventBase);
 }
 
 X11MonitorsBackend::~X11MonitorsBackend() noexcept
@@ -69,8 +65,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
   ::XRRScreenResources* resources = ::XRRGetScreenResources(m_Display, root);
   if (!resources)
   {
-    GECKO_WARN(labels::General,
-               "X11MonitorsBackend: XRRGetScreenResources failed");
+    GECKO_WARN(labels::General, "X11MonitorsBackend: XRRGetScreenResources failed");
     return;
   }
 
@@ -78,8 +73,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
 
   for (int i = 0; i < resources->noutput; ++i)
   {
-    ::XRROutputInfo* outInfo =
-        ::XRRGetOutputInfo(m_Display, resources, resources->outputs[i]);
+    ::XRROutputInfo* outInfo = ::XRRGetOutputInfo(m_Display, resources, resources->outputs[i]);
     if (!outInfo)
       continue;
 
@@ -94,8 +88,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     // CRTC is actively driving a display. Trust the CRTC assignment over
     // the connection flag.
 
-    ::XRRCrtcInfo* crtcInfo =
-        ::XRRGetCrtcInfo(m_Display, resources, outInfo->crtc);
+    ::XRRCrtcInfo* crtcInfo = ::XRRGetCrtcInfo(m_Display, resources, outInfo->crtc);
     if (!crtcInfo)
     {
       ::XRRFreeOutputInfo(outInfo);
@@ -108,9 +101,8 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
 
     MonitorInfo& info = entry.Info;
     info.SetName(outInfo->name);
-    info.Bounds = math::Rect2D {
-        static_cast<i32>(crtcInfo->x), static_cast<i32>(crtcInfo->y),
-        static_cast<i32>(crtcInfo->width), static_cast<i32>(crtcInfo->height)};
+    info.Bounds = math::Rect2D {static_cast<i32>(crtcInfo->x), static_cast<i32>(crtcInfo->y),
+                                static_cast<i32>(crtcInfo->width), static_cast<i32>(crtcInfo->height)};
     info.WorkArea = info.Bounds;
     info.IsPrimary = (resources->outputs[i] == primaryOutput);
 
@@ -123,10 +115,8 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
         if (mode.hTotal > 0 && mode.vTotal > 0)
         {
           double rate = static_cast<double>(mode.dotClock) /
-                        (static_cast<double>(mode.hTotal) *
-                         static_cast<double>(mode.vTotal));
-          info.RefreshRateMilliHz =
-              static_cast<u32>(::std::round(rate * 1000.0));
+                        (static_cast<double>(mode.hTotal) * static_cast<double>(mode.vTotal));
+          info.RefreshRateMilliHz = static_cast<u32>(::std::round(rate * 1000.0));
         }
         break;
       }
@@ -135,18 +125,15 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     // DPI from physical size
     if (outInfo->mm_width > 0 && outInfo->mm_height > 0)
     {
-      double dpiX = static_cast<double>(crtcInfo->width) * 25.4 /
-                    static_cast<double>(outInfo->mm_width);
+      double dpiX = static_cast<double>(crtcInfo->width) * 25.4 / static_cast<double>(outInfo->mm_width);
       info.Dpi = static_cast<u32>(::std::round(dpiX));
       info.DpiScale = static_cast<float>(info.Dpi) / 96.0F;
     }
 
     m_Monitors.push_back(entry);
 
-    GECKO_DEBUG(labels::General,
-                "Monitor: %s (%dx%d @ %d,%d, %u mHz, %u DPI%s)", outInfo->name,
-                crtcInfo->width, crtcInfo->height, crtcInfo->x, crtcInfo->y,
-                info.RefreshRateMilliHz, info.Dpi,
+    GECKO_DEBUG(labels::General, "Monitor: %s (%dx%d @ %d,%d, %u mHz, %u DPI%s)", outInfo->name, crtcInfo->width,
+                crtcInfo->height, crtcInfo->x, crtcInfo->y, info.RefreshRateMilliHz, info.Dpi,
                 info.IsPrimary ? ", primary" : "");
 
     ::XRRFreeCrtcInfo(crtcInfo);
@@ -155,8 +142,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
 
   ::XRRFreeScreenResources(resources);
 
-  GECKO_INFO(labels::General, "X11MonitorsBackend: enumerated %u monitor(s)",
-             static_cast<u32>(m_Monitors.size()));
+  GECKO_INFO(labels::General, "X11MonitorsBackend: enumerated %u monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
 
 u32 X11MonitorsBackend::GetMonitorCount() const noexcept
@@ -171,8 +157,7 @@ MonitorHandle X11MonitorsBackend::GetMonitorHandle(u32 index) const noexcept
   return m_Monitors[index].Handle;
 }
 
-MonitorInfo X11MonitorsBackend::GetMonitorProperties(
-    MonitorHandle handle) const noexcept
+MonitorInfo X11MonitorsBackend::GetMonitorProperties(MonitorHandle handle) const noexcept
 {
   if (!handle.IsValid())
     return {};
@@ -196,8 +181,7 @@ MonitorHandle X11MonitorsBackend::GetPrimaryMonitor() const noexcept
   return {};
 }
 
-MonitorBounds X11MonitorsBackend::GetMonitorBounds(
-    MonitorHandle handle) const noexcept
+MonitorBounds X11MonitorsBackend::GetMonitorBounds(MonitorHandle handle) const noexcept
 {
   MonitorInfo info = GetMonitorProperties(handle);
   return {info.Bounds, info.WorkArea};
@@ -225,8 +209,7 @@ void X11MonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   }
 }
 
-void X11MonitorsBackend::HandleScreenChange(
-    const gecko::EventEmitter& emitter) noexcept
+void X11MonitorsBackend::HandleScreenChange(const gecko::EventEmitter& emitter) noexcept
 {
   auto oldMonitors = m_Monitors;
   EnumerateMonitors();
@@ -246,8 +229,7 @@ void X11MonitorsBackend::HandleScreenChange(
     }
     if (!found)
     {
-      gecko::SendEvent(emitter, events::MonitorDisconnected,
-                       events::MonitorDisconnectedPayload {old.Handle, now});
+      gecko::SendEvent(emitter, events::MonitorDisconnected, events::MonitorDisconnectedPayload {old.Handle, now});
     }
   }
 
@@ -261,23 +243,18 @@ void X11MonitorsBackend::HandleScreenChange(
       {
         wasPresent = true;
         // Check for property changes
-        if (old.Info.Bounds != cur.Info.Bounds ||
-            old.Info.RefreshRateMilliHz != cur.Info.RefreshRateMilliHz ||
-            old.Info.Dpi != cur.Info.Dpi ||
-            old.Info.IsPrimary != cur.Info.IsPrimary)
+        if (old.Info.Bounds != cur.Info.Bounds || old.Info.RefreshRateMilliHz != cur.Info.RefreshRateMilliHz ||
+            old.Info.Dpi != cur.Info.Dpi || old.Info.IsPrimary != cur.Info.IsPrimary)
         {
-          gecko::SendEvent(
-              emitter, events::MonitorReconfigured,
-              events::MonitorReconfiguredPayload {cur.Handle, now, cur.Info});
+          gecko::SendEvent(emitter, events::MonitorReconfigured,
+                           events::MonitorReconfiguredPayload {cur.Handle, now, cur.Info});
         }
         break;
       }
     }
     if (!wasPresent)
     {
-      gecko::SendEvent(
-          emitter, events::MonitorConnected,
-          events::MonitorConnectedPayload {cur.Handle, now, cur.Info});
+      gecko::SendEvent(emitter, events::MonitorConnected, events::MonitorConnectedPayload {cur.Handle, now, cur.Info});
     }
   }
 }

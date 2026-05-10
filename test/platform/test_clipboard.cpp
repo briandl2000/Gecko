@@ -11,8 +11,7 @@
 //
 // Default unit-test runs leave the user's clipboard alone.
 
-TEST_CASE("Clipboard: round-trip ASCII text",
-          "[.clipboard][platform][clipboard]")
+TEST_CASE("Clipboard: round-trip ASCII text", "[.clipboard][platform][clipboard]")
 {
   using namespace gecko::platform;
 
@@ -30,8 +29,7 @@ TEST_CASE("Clipboard: round-trip ASCII text",
   (void)SetClipboardText(original);
 }
 
-TEST_CASE("Clipboard: round-trip UTF-8 text",
-          "[.clipboard][platform][clipboard]")
+TEST_CASE("Clipboard: round-trip UTF-8 text", "[.clipboard][platform][clipboard]")
 {
   using namespace gecko::platform;
 
@@ -51,8 +49,7 @@ TEST_CASE("Clipboard: round-trip UTF-8 text",
   (void)SetClipboardText(original);
 }
 
-TEST_CASE("Clipboard: empty string is valid input",
-          "[.clipboard][platform][clipboard]")
+TEST_CASE("Clipboard: empty string is valid input", "[.clipboard][platform][clipboard]")
 {
   using namespace gecko::platform;
 

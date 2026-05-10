@@ -4,8 +4,7 @@
 
 using namespace gecko;
 
-TEST_CASE("Service accessors return Null fallbacks before engine boot",
-          "[core][services]")
+TEST_CASE("Service accessors return Null fallbacks before engine boot", "[core][services]")
 {
   REQUIRE(GetJobSystem() != nullptr);
   REQUIRE(GetProfiler() != nullptr);
@@ -14,8 +13,7 @@ TEST_CASE("Service accessors return Null fallbacks before engine boot",
   REQUIRE(GetModules() != nullptr);
 }
 
-TEST_CASE("Allocator returns default before any SetAllocator",
-          "[core][services]")
+TEST_CASE("Allocator returns default before any SetAllocator", "[core][services]")
 {
   IAllocator& alloc = Allocator();
   // Reference-returning API: we just exercise it.

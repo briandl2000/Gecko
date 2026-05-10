@@ -21,8 +21,7 @@ using namespace ::gecko::platform;
 namespace {
 
 constexpr ::gecko::Label App_Label = ::gecko::MakeLabel("app.graphics_example");
-constexpr ::gecko::Label Main_Label =
-    ::gecko::MakeLabel("app.graphics_example.main");
+constexpr ::gecko::Label Main_Label = ::gecko::MakeLabel("app.graphics_example.main");
 
 struct Vertex
 {
@@ -62,8 +61,7 @@ App::App() : m_GraphicsModule(MakeGraphicsConfig())
   if (!m_AllocScope)
     return;
 
-  m_Engine = ::gecko::Engine::Create(
-      {&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule, &m_AppModule});
+  m_Engine = ::gecko::Engine::Create({&m_RuntimeModule, &m_PlatformModule, &m_GraphicsModule, &m_AppModule});
   if (!m_Engine)
     return;
 
@@ -170,7 +168,7 @@ bool App::CreateWindows()
     wd.Title = WindowTitles[i];
     wd.Size = {1280, 720};
     wd.Visible = true;
-    wd.Resizable = true;
+    wd.Resizable = false;
     wd.Mode = WindowMode::Windowed;
     m_Slots[i].Handle = ::gecko::platform::GetWindows()->CreateWindow(wd);
     if (!m_Slots[i].Handle.IsValid())
@@ -187,11 +185,8 @@ bool App::CreateSwapchains()
 {
   for (::gecko::u32 i = 0; i < 2; ++i)
   {
-    NativeWindowHandle native =
-        ::gecko::platform::GetWindows()->GetNativeWindowHandle(
-            m_Slots[i].Handle);
-    Extent2D sz =
-        ::gecko::platform::GetWindows()->GetClientSize(m_Slots[i].Handle);
+    NativeWindowHandle native = ::gecko::platform::GetWindows()->GetNativeWindowHandle(m_Slots[i].Handle);
+    Extent2D sz = ::gecko::platform::GetWindows()->GetClientSize(m_Slots[i].Handle);
 
     SwapchainDesc scDesc;
     scDesc.Width = sz.Width;
@@ -214,12 +209,10 @@ bool App::CreateRenderResources()
   rtDesc.Height = OffscreenH;
   rtDesc.NumRenderTargets = 1;
   rtDesc.RenderTargetFormats[0] = OffscreenFmt;
-  rtDesc.RenderTargetClearValues[0] =
-      ClearValue::RenderTarget(0.1F, 0.1F, 0.15F, 1.0F);
+  rtDesc.RenderTargetClearValues[0] = ClearValue::RenderTarget(0.1F, 0.1F, 0.15F, 1.0F);
   m_OffscreenRT = m_Device->CreateRenderTarget(rtDesc);
   if (m_OffscreenRT.IsValid())
-    GECKO_INFO(Main_Label, "Offscreen render target created (%ux%u)",
-               OffscreenW, OffscreenH);
+    GECKO_INFO(Main_Label, "Offscreen render target created (%ux%u)", OffscreenW, OffscreenH);
   else
     GECKO_WARN(Main_Label, "Offscreen render target creation failed");
 
@@ -232,13 +225,11 @@ bool App::CreateRenderResources()
   plasmaDesc.AllowUnorderedAccess = true;
   for (::gecko::u32 i = 0; i < 2; ++i)
   {
-    plasmaDesc.DebugName =
-        (i == 0) ? "PlasmaStorageTexture[0]" : "PlasmaStorageTexture[1]";
+    plasmaDesc.DebugName = (i == 0) ? "PlasmaStorageTexture[0]" : "PlasmaStorageTexture[1]";
     m_PlasmaTex[i] = m_Device->CreateTexture(plasmaDesc);
   }
   if (m_PlasmaTex[0].IsValid() && m_PlasmaTex[1].IsValid())
-    GECKO_INFO(Main_Label, "Plasma storage textures created (2x %ux%u)",
-               OffscreenW, OffscreenH);
+    GECKO_INFO(Main_Label, "Plasma storage textures created (2x %ux%u)", OffscreenW, OffscreenH);
   else
     GECKO_WARN(Main_Label, "Plasma storage texture creation failed");
 
@@ -264,9 +255,8 @@ bool App::CreateRenderResources()
   if (m_IndirectBuffer.IsValid())
   {
     const ::gecko::u32 indirectArgs[4] = {3, 1, 0, 0};
-    m_Device->UploadBufferData(
-        m_IndirectBuffer, {reinterpret_cast<const ::gecko::byte*>(indirectArgs),
-                           sizeof(indirectArgs)});
+    m_Device->UploadBufferData(m_IndirectBuffer,
+                               {reinterpret_cast<const ::gecko::byte*>(indirectArgs), sizeof(indirectArgs)});
   }
 
   SamplerDesc blitSamplerDesc {};
@@ -288,13 +278,11 @@ bool App::CreatePipelines()
   GraphicsPipelineDesc triPDesc;
   triPDesc.VertexShader = ShaderCode {
       .Format = ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::TriangleVert),
-                sizeof(shaders::TriangleVert)},
+      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::TriangleVert), sizeof(shaders::TriangleVert)},
   };
   triPDesc.PixelShader = ShaderCode {
       .Format = ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::TriangleFrag),
-                sizeof(shaders::TriangleFrag)},
+      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::TriangleFrag), sizeof(shaders::TriangleFrag)},
   };
   triPDesc.Layout = triLayout;
   triPDesc.NumRenderTargets = 1;
@@ -307,24 +295,18 @@ bool App::CreatePipelines()
   GraphicsPipelineDesc blitPDesc;
   blitPDesc.VertexShader = ShaderCode {
       .Format = ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::FullscreenVert),
-                sizeof(shaders::FullscreenVert)},
+      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::FullscreenVert), sizeof(shaders::FullscreenVert)},
   };
   blitPDesc.PixelShader = ShaderCode {
       .Format = ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::FullscreenFrag),
-                sizeof(shaders::FullscreenFrag)},
+      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::FullscreenFrag), sizeof(shaders::FullscreenFrag)},
   };
   blitPDesc.Layout = {};
   blitPDesc.NumRenderTargets = 1;
-  blitPDesc.RenderTargetFormats[0] = m_Slots[0].SC.IsValid()
-                                         ? m_Slots[0].SC.Desc.Format
-                                         : DataFormat::R8G8B8A8_UNORM;
+  blitPDesc.RenderTargetFormats[0] = m_Slots[0].SC.IsValid() ? m_Slots[0].SC.Desc.Format : DataFormat::R8G8B8A8_UNORM;
   blitPDesc.Culling = CullMode::None;
-  blitPDesc.PipelineResources[0] =
-      PipelineResource::TextureBinding(1, ShaderType::Pixel);
-  blitPDesc.PipelineResources[1] =
-      PipelineResource::SamplerBinding(1, ShaderType::Pixel);
+  blitPDesc.PipelineResources[0] = PipelineResource::TextureBinding(1, ShaderType::Pixel);
+  blitPDesc.PipelineResources[1] = PipelineResource::SamplerBinding(1, ShaderType::Pixel);
   blitPDesc.NumPipelineResources = 2;
   blitPDesc.PushConstantBytes = 16;
   blitPDesc.DebugName = "BlitPipeline";
@@ -333,11 +315,9 @@ bool App::CreatePipelines()
   ComputePipelineDesc plasmaPDesc;
   plasmaPDesc.ComputeShader = ShaderCode {
       .Format = ShaderFormat::SPIRV,
-      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::PlasmaComp),
-                sizeof(shaders::PlasmaComp)},
+      .Bytes = {reinterpret_cast<const ::gecko::byte*>(shaders::PlasmaComp), sizeof(shaders::PlasmaComp)},
   };
-  plasmaPDesc.PipelineResources[0] =
-      PipelineResource::RWTextureBinding(1, ShaderType::Compute);
+  plasmaPDesc.PipelineResources[0] = PipelineResource::RWTextureBinding(1, ShaderType::Compute);
   plasmaPDesc.NumPipelineResources = 1;
   plasmaPDesc.PushConstantBytes = 16;
   plasmaPDesc.DebugName = "PlasmaComputePipeline";
@@ -345,8 +325,7 @@ bool App::CreatePipelines()
 
   if (!m_TrianglePipeline.IsValid() || !m_BlitPipeline.IsValid())
   {
-    GECKO_WARN(Main_Label,
-               "One or more pipelines failed to build - rendering disabled");
+    GECKO_WARN(Main_Label, "One or more pipelines failed to build - rendering disabled");
   }
   else
   {
@@ -370,16 +349,13 @@ void App::SubscribeEvents()
 {
   m_CloseSub = ::gecko::SubscribeEvent(
       events::WindowCloseRequested,
-      [](void* user, const ::gecko::EventMeta&, ::gecko::EventView) {
-        static_cast<App*>(user)->m_Running = false;
-      },
+      [](void* user, const ::gecko::EventMeta&, ::gecko::EventView) { static_cast<App*>(user)->m_Running = false; },
       this);
 
   m_ResizeSub = ::gecko::SubscribeEvent(
       events::WindowResized,
       [](void* user, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowResizedPayload*>(view.Data());
+        const auto* p = static_cast<const events::WindowResizedPayload*>(view.Data());
         auto* self = static_cast<App*>(user);
         for (::gecko::u32 i = 0; i < 2; ++i)
         {
@@ -396,8 +372,7 @@ void App::SubscribeEvents()
   m_KeySub = ::gecko::SubscribeEvent(
       events::WindowKey,
       [](void* user, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowKeyPayload*>(view.Data());
+        const auto* p = static_cast<const events::WindowKeyPayload*>(view.Data());
         if (!p->Down || p->Repeat)
           return;
         static_cast<App*>(user)->OnKey(p->Key);
@@ -439,8 +414,7 @@ void App::HandlePendingResizes()
 
 void App::RecordComputePass(::gecko::f32 time)
 {
-  const bool havePlasma = m_PlasmaPipeline.IsValid() &&
-                          m_PlasmaTex[0].IsValid() && m_PlasmaTex[1].IsValid();
+  const bool havePlasma = m_PlasmaPipeline.IsValid() && m_PlasmaTex[0].IsValid() && m_PlasmaTex[1].IsValid();
   if (!havePlasma)
     return;
 
@@ -462,8 +436,7 @@ void App::RecordComputePass(::gecko::f32 time)
       computeCmd[i]->BindPipeline(m_PlasmaPipeline);
       computeCmd[i]->BindRWTexture(0, m_PlasmaTex[0]);
       const ::gecko::f32 pc[4] = {time, 0.0F, 0.0F, 0.0F};
-      computeCmd[i]->SetConstants(
-          0, {reinterpret_cast<const ::gecko::byte*>(pc), sizeof(pc)});
+      computeCmd[i]->SetConstants(0, {reinterpret_cast<const ::gecko::byte*>(pc), sizeof(pc)});
       const ::gecko::u32 gx = (OffscreenW + 15) / 16;
       const ::gecko::u32 gy = (OffscreenH + 15) / 16;
       {
@@ -486,8 +459,7 @@ void App::RecordTrianglePass(ICommandList& cmd, ::gecko::f32 time)
 {
   ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
   cmd.BeginRendering(m_OffscreenRT, &rtClear);
-  cmd.SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(OffscreenW),
-                  static_cast<::gecko::f32>(OffscreenH));
+  cmd.SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(OffscreenW), static_cast<::gecko::f32>(OffscreenH));
   cmd.SetScissor(0, 0, OffscreenW, OffscreenH);
   cmd.BindPipeline(m_TrianglePipeline);
   cmd.BindVertexBuffer(m_VertexBuffer);
@@ -509,12 +481,10 @@ void App::RecordTrianglePass(ICommandList& cmd, ::gecko::f32 time)
   cmd.EndRendering();
 }
 
-void App::RecordBlitPass(ICommandList& cmd, FrameContext (&frames)[2],
-                         ::gecko::f32 time)
+void App::RecordBlitPass(ICommandList& cmd, FrameContext (&frames)[2], ::gecko::f32 time)
 {
   const Texture& triSampled = m_OffscreenRT.RenderTextures[0];
-  const bool havePlasma = m_PlasmaPipeline.IsValid() &&
-                          m_PlasmaTex[0].IsValid() && m_PlasmaTex[1].IsValid();
+  const bool havePlasma = m_PlasmaPipeline.IsValid() && m_PlasmaTex[0].IsValid() && m_PlasmaTex[1].IsValid();
 
   // Tint pulses 0.6..1.0 so push constants visibly affect the output.
   const ::gecko::f32 pulse = 0.8F + 0.2F * ::std::sin(time * 2.0F);
@@ -533,17 +503,13 @@ void App::RecordBlitPass(ICommandList& cmd, FrameContext (&frames)[2],
       const Texture& src = (i == 1 && havePlasma) ? m_PlasmaTex[0] : triSampled;
       ClearValue scClear = ClearValue::RenderTarget(0.0F, 0.0F, 0.0F, 1.0F);
       cmd.BeginRendering(frames[i].BackBuffer, &scClear);
-      cmd.SetViewport(
-          0.0F, 0.0F,
-          static_cast<::gecko::f32>(frames[i].BackBuffer.Desc.Width),
-          static_cast<::gecko::f32>(frames[i].BackBuffer.Desc.Height));
-      cmd.SetScissor(0, 0, frames[i].BackBuffer.Desc.Width,
-                     frames[i].BackBuffer.Desc.Height);
+      cmd.SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(frames[i].BackBuffer.Desc.Width),
+                      static_cast<::gecko::f32>(frames[i].BackBuffer.Desc.Height));
+      cmd.SetScissor(0, 0, frames[i].BackBuffer.Desc.Width, frames[i].BackBuffer.Desc.Height);
       cmd.BindPipeline(m_BlitPipeline);
       cmd.BindTexture(0, src);
       cmd.BindSampler(1, m_BlitSampler);
-      cmd.SetConstants(
-          0, {reinterpret_cast<const ::gecko::byte*>(tint), sizeof(tint)});
+      cmd.SetConstants(0, {reinterpret_cast<const ::gecko::byte*>(tint), sizeof(tint)});
       cmd.Draw(3);
       cmd.EndRendering();
     }
@@ -558,8 +524,8 @@ void App::RenderFrame()
 
   HandlePendingResizes();
 
-  if (!m_TrianglePipeline.IsValid() || !m_BlitPipeline.IsValid() ||
-      !m_VertexBuffer.IsValid() || !m_OffscreenRT.IsValid())
+  if (!m_TrianglePipeline.IsValid() || !m_BlitPipeline.IsValid() || !m_VertexBuffer.IsValid() ||
+      !m_OffscreenRT.IsValid())
     return;
 
   FrameContext frames[2] {};
@@ -583,9 +549,7 @@ void App::RenderFrame()
     cmd->ResetTimestamps(m_TimestampPool, 0, 4);
 
   const ::gecko::f32 time =
-      ::std::chrono::duration<::gecko::f32>(::std::chrono::steady_clock::now() -
-                                            m_StartTime)
-          .count();
+      ::std::chrono::duration<::gecko::f32>(::std::chrono::steady_clock::now() - m_StartTime).count();
 
   RecordComputePass(time);
   RecordTrianglePass(*cmd, time);
@@ -629,17 +593,14 @@ void App::PrintHudIfDue(::gecko::u32 drawCalls)
   const auto rend = prof->GetStats("renderFrame");
   const auto tri = prof->GetStats("TrianglePass", ::gecko::ProfSource::GPU);
   const auto blit = prof->GetStats("BlitPass", ::gecko::ProfSource::GPU);
-  const ::gecko::f64 fps =
-      (frame.AvgNs > 0) ? 1.0e9 / static_cast<::gecko::f64>(frame.AvgNs) : 0.0;
+  const ::gecko::f64 fps = (frame.AvgNs > 0) ? 1.0e9 / static_cast<::gecko::f64>(frame.AvgNs) : 0.0;
   const ::gecko::u64 live = m_Allocator.TotalLiveBytes();
   GECKO_INFO(Main_Label,
              "HUD frame=%.2fms (%.1f fps)  cpu_render=%.2fms  "
              "gpu_tri=%.3fms  gpu_blit=%.3fms  draws=%u  "
              "alloc_live=%llu KB  frames=%llu",
-             frame.AvgNs / 1.0e6, fps, rend.AvgNs / 1.0e6, tri.AvgNs / 1.0e6,
-             blit.AvgNs / 1.0e6, drawCalls,
-             static_cast<unsigned long long>(live / 1024),
-             static_cast<unsigned long long>(m_FrameIndex));
+             frame.AvgNs / 1.0e6, fps, rend.AvgNs / 1.0e6, tri.AvgNs / 1.0e6, blit.AvgNs / 1.0e6, drawCalls,
+             static_cast<unsigned long long>(live / 1024), static_cast<unsigned long long>(m_FrameIndex));
 }
 
 void App::Update()
@@ -661,8 +622,7 @@ int App::Run()
   GECKO_INFO(Main_Label, "Entering frame loop - Escape or close to quit");
   m_StartTime = ::std::chrono::steady_clock::now();
 
-  ::gecko::platform::SetModalFrameCallback(
-      [](void* ud) { static_cast<App*>(ud)->Update(); }, this);
+  ::gecko::platform::SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->Update(); }, this);
 
   while (m_Running)
   {

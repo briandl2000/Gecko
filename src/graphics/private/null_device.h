@@ -24,8 +24,7 @@ public:
 
   void BeginRendering(const RenderTarget&, const ClearValue*) noexcept override
   {}
-  void BeginRendering(::std::span<const RenderTarget* const>,
-                      const RenderTarget*,
+  void BeginRendering(::std::span<const RenderTarget* const>, const RenderTarget*,
                       ::std::span<const ClearValue>) noexcept override
   {}
   void EndRendering() noexcept override
@@ -78,11 +77,9 @@ public:
 
   void CopyBuffer(const Buffer&, u64, const Buffer&, u64, u64) noexcept override
   {}
-  void CopyBufferToTexture(const Texture&, u32, u32, const Buffer&,
-                           u64) noexcept override
+  void CopyBufferToTexture(const Texture&, u32, u32, const Buffer&, u64) noexcept override
   {}
-  void CopyTextureToBuffer(const Buffer&, u64, const Texture&, u32,
-                           u32) noexcept override
+  void CopyTextureToBuffer(const Buffer&, u64, const Texture&, u32, u32) noexcept override
   {}
 
   void ResetTimestamps(const QueryPool&, u32, u32) noexcept override
@@ -106,8 +103,7 @@ public:
   NullDevice(const NullDevice&) = delete;
   NullDevice& operator=(const NullDevice&) = delete;
 
-  Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle&,
-                            const SwapchainDesc&) noexcept override;
+  Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle&, const SwapchainDesc&) noexcept override;
   void DestroySwapchain(Swapchain& swapchain) noexcept override;
   void ResizeSwapchain(Swapchain&) noexcept override;
 
@@ -126,23 +122,18 @@ public:
   Buffer CreateStructuredBuffer(const StructuredBufferDesc&) noexcept override;
   Texture CreateTexture(const TextureDesc&) noexcept override;
   Sampler CreateSampler(const SamplerDesc&) noexcept override;
-  GraphicsPipeline CreateGraphicsPipeline(
-      const GraphicsPipelineDesc&) noexcept override;
-  ComputePipeline CreateComputePipeline(
-      const ComputePipelineDesc&) noexcept override;
+  GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc&) noexcept override;
+  ComputePipeline CreateComputePipeline(const ComputePipelineDesc&) noexcept override;
   QueryPool CreateTimestampQueryPool(const QueryPoolDesc&) noexcept override;
   u32 ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept override;
 
-  ::gecko::Unique<IGpuSampler> CreateGpuSampler(
-      const GpuSamplerDesc&) noexcept override
+  ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc&) noexcept override
   {
     return nullptr;
   }
 
-  void UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32,
-                         u32) noexcept override;
-  void UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>,
-                        u32) noexcept override;
+  void UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32, u32) noexcept override;
+  void UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>, u32) noexcept override;
 };
 
 }  // namespace gecko::graphics

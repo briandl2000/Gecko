@@ -42,8 +42,7 @@ struct Float2x2
   constexpr Float2x2() noexcept : M00(1.0f), M01(0.0f), M10(0.0f), M11(1.0f)
   {}
 
-  constexpr Float2x2(f32 m00, f32 m01, f32 m10, f32 m11) noexcept
-      : M00(m00), M01(m01), M10(m10), M11(m11)
+  constexpr Float2x2(f32 m00, f32 m01, f32 m10, f32 m11) noexcept : M00(m00), M01(m01), M10(m10), M11(m11)
   {}
 
   [[nodiscard]] constexpr Float2& operator[](usize index) noexcept
@@ -91,14 +90,11 @@ struct Float3x3
   };
 
   constexpr Float3x3() noexcept
-      : M00(1.0f), M01(0.0f), M02(0.0f), M10(0.0f), M11(1.0f), M12(0.0f),
-        M20(0.0f), M21(0.0f), M22(1.0f)
+      : M00(1.0f), M01(0.0f), M02(0.0f), M10(0.0f), M11(1.0f), M12(0.0f), M20(0.0f), M21(0.0f), M22(1.0f)
   {}
 
-  constexpr Float3x3(f32 m00, f32 m01, f32 m02, f32 m10, f32 m11, f32 m12,
-                     f32 m20, f32 m21, f32 m22) noexcept
-      : M00(m00), M01(m01), M02(m02), M10(m10), M11(m11), M12(m12), M20(m20),
-        M21(m21), M22(m22)
+  constexpr Float3x3(f32 m00, f32 m01, f32 m02, f32 m10, f32 m11, f32 m12, f32 m20, f32 m21, f32 m22) noexcept
+      : M00(m00), M01(m01), M02(m02), M10(m10), M11(m11), M12(m12), M20(m20), M21(m21), M22(m22)
   {}
 
   [[nodiscard]] constexpr Float3& operator[](usize index) noexcept
@@ -168,17 +164,14 @@ struct Float4x4
   };
 
   constexpr Float4x4() noexcept
-      : M00(1.0f), M01(0.0f), M02(0.0f), M03(0.0f), M10(0.0f), M11(1.0f),
-        M12(0.0f), M13(0.0f), M20(0.0f), M21(0.0f), M22(1.0f), M23(0.0f),
-        M30(0.0f), M31(0.0f), M32(0.0f), M33(1.0f)
+      : M00(1.0f), M01(0.0f), M02(0.0f), M03(0.0f), M10(0.0f), M11(1.0f), M12(0.0f), M13(0.0f), M20(0.0f), M21(0.0f),
+        M22(1.0f), M23(0.0f), M30(0.0f), M31(0.0f), M32(0.0f), M33(1.0f)
   {}
 
-  constexpr Float4x4(f32 m00, f32 m01, f32 m02, f32 m03, f32 m10, f32 m11,
-                     f32 m12, f32 m13, f32 m20, f32 m21, f32 m22, f32 m23,
-                     f32 m30, f32 m31, f32 m32, f32 m33) noexcept
-      : M00(m00), M01(m01), M02(m02), M03(m03), M10(m10), M11(m11), M12(m12),
-        M13(m13), M20(m20), M21(m21), M22(m22), M23(m23), M30(m30), M31(m31),
-        M32(m32), M33(m33)
+  constexpr Float4x4(f32 m00, f32 m01, f32 m02, f32 m03, f32 m10, f32 m11, f32 m12, f32 m13, f32 m20, f32 m21, f32 m22,
+                     f32 m23, f32 m30, f32 m31, f32 m32, f32 m33) noexcept
+      : M00(m00), M01(m01), M02(m02), M03(m03), M10(m10), M11(m11), M12(m12), M13(m13), M20(m20), M21(m21), M22(m22),
+        M23(m23), M30(m30), M31(m31), M32(m32), M33(m33)
   {}
 
   [[nodiscard]] constexpr Float4& operator[](usize index) noexcept
@@ -198,44 +191,38 @@ struct Float4x4
 
   static constexpr Float4x4 Translation(const Float3& t) noexcept
   {
-    return {1.0f, 0.0f, 0.0f, t.X, 0.0f, 1.0f, 0.0f, t.Y,
-            0.0f, 0.0f, 1.0f, t.Z, 0.0f, 0.0f, 0.0f, 1.0f};
+    return {1.0f, 0.0f, 0.0f, t.X, 0.0f, 1.0f, 0.0f, t.Y, 0.0f, 0.0f, 1.0f, t.Z, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static constexpr Float4x4 Scale(const Float3& s) noexcept
   {
-    return {s.X,  0.0f, 0.0f, 0.0f, 0.0f, s.Y,  0.0f, 0.0f,
-            0.0f, 0.0f, s.Z,  0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    return {s.X, 0.0f, 0.0f, 0.0f, 0.0f, s.Y, 0.0f, 0.0f, 0.0f, 0.0f, s.Z, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static inline Float4x4 RotationX(f32 angle) noexcept
   {
     const f32 c = ::gecko::math::Cos(angle);
     const f32 s = ::gecko::math::Sin(angle);
-    return {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, c,    -s,   0.0f,
-            0.0f, s,    c,    0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    return {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, c, -s, 0.0f, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static inline Float4x4 RotationY(f32 angle) noexcept
   {
     const f32 c = ::gecko::math::Cos(angle);
     const f32 s = ::gecko::math::Sin(angle);
-    return {c,  0.0f, s, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f,
-            -s, 0.0f, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    return {c, 0.0f, s, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, -s, 0.0f, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static inline Float4x4 RotationZ(f32 angle) noexcept
   {
     const f32 c = ::gecko::math::Cos(angle);
     const f32 s = ::gecko::math::Sin(angle);
-    return {c,    -s,   0.0f, 0.0f, s,    c,    0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+    return {c, -s, 0.0f, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   /// Build a right-handed view matrix that places the camera at `eye`
   /// looking toward `target`, with `up` as the world up direction.
-  static inline Float4x4 LookAt(const Float3& eye, const Float3& target,
-                                const Float3& up) noexcept
+  static inline Float4x4 LookAt(const Float3& eye, const Float3& target, const Float3& up) noexcept
   {
     const Float3 f = Normalized(target - eye);
     const Float3 r = Normalized(Cross(f, up));
@@ -246,16 +233,13 @@ struct Float4x4
 
   /// Build an orthographic projection mapping the box
   /// `[left, right] x [bottom, top] x [near, far]` into clip space.
-  static inline Float4x4 Orthographic(f32 left, f32 right, f32 bottom, f32 top,
-                                      f32 near, f32 far) noexcept
+  static inline Float4x4 Orthographic(f32 left, f32 right, f32 bottom, f32 top, f32 near, f32 far) noexcept
   {
     const f32 rl = 1.0f / (right - left);
     const f32 tb = 1.0f / (top - bottom);
     const f32 fn = 1.0f / (far - near);
-    return {2.0f * rl, 0.0f,      0.0f,       -(right + left) * rl,
-            0.0f,      2.0f * tb, 0.0f,       -(top + bottom) * tb,
-            0.0f,      0.0f,      -2.0f * fn, -(far + near) * fn,
-            0.0f,      0.0f,      0.0f,       1.0f};
+    return {2.0f * rl, 0.0f, 0.0f,       -(right + left) * rl, 0.0f, 2.0f * tb, 0.0f, -(top + bottom) * tb,
+            0.0f,      0.0f, -2.0f * fn, -(far + near) * fn,   0.0f, 0.0f,      0.0f, 1.0f};
   }
 
   /// Build a right-handed perspective projection.
@@ -263,8 +247,7 @@ struct Float4x4
   /// @param aspect  Width / height aspect ratio.
   /// @param near    Near plane distance (positive).
   /// @param far     Far plane distance (positive, > `near`).
-  static inline Float4x4 Perspective(f32 fovY, f32 aspect, f32 near,
-                                     f32 far) noexcept
+  static inline Float4x4 Perspective(f32 fovY, f32 aspect, f32 near, f32 far) noexcept
   {
     const f32 tanHalfFovy = ::gecko::math::Tan(fovY / 2.0f);
     const f32 fn = 1.0f / (far - near);
@@ -290,20 +273,16 @@ struct Float4x4
 // Matrix multiply
 constexpr Float2x2 operator*(const Float2x2& a, const Float2x2& b) noexcept
 {
-  return {a.M00 * b.M00 + a.M01 * b.M10, a.M00 * b.M01 + a.M01 * b.M11,
-          a.M10 * b.M00 + a.M11 * b.M10, a.M10 * b.M01 + a.M11 * b.M11};
+  return {a.M00 * b.M00 + a.M01 * b.M10, a.M00 * b.M01 + a.M01 * b.M11, a.M10 * b.M00 + a.M11 * b.M10,
+          a.M10 * b.M01 + a.M11 * b.M11};
 }
 
 constexpr Float3x3 operator*(const Float3x3& a, const Float3x3& b) noexcept
 {
-  return {a.M00 * b.M00 + a.M01 * b.M10 + a.M02 * b.M20,
-          a.M00 * b.M01 + a.M01 * b.M11 + a.M02 * b.M21,
-          a.M00 * b.M02 + a.M01 * b.M12 + a.M02 * b.M22,
-          a.M10 * b.M00 + a.M11 * b.M10 + a.M12 * b.M20,
-          a.M10 * b.M01 + a.M11 * b.M11 + a.M12 * b.M21,
-          a.M10 * b.M02 + a.M11 * b.M12 + a.M12 * b.M22,
-          a.M20 * b.M00 + a.M21 * b.M10 + a.M22 * b.M20,
-          a.M20 * b.M01 + a.M21 * b.M11 + a.M22 * b.M21,
+  return {a.M00 * b.M00 + a.M01 * b.M10 + a.M02 * b.M20, a.M00 * b.M01 + a.M01 * b.M11 + a.M02 * b.M21,
+          a.M00 * b.M02 + a.M01 * b.M12 + a.M02 * b.M22, a.M10 * b.M00 + a.M11 * b.M10 + a.M12 * b.M20,
+          a.M10 * b.M01 + a.M11 * b.M11 + a.M12 * b.M21, a.M10 * b.M02 + a.M11 * b.M12 + a.M12 * b.M22,
+          a.M20 * b.M00 + a.M21 * b.M10 + a.M22 * b.M20, a.M20 * b.M01 + a.M21 * b.M11 + a.M22 * b.M21,
           a.M20 * b.M02 + a.M21 * b.M12 + a.M22 * b.M22};
 }
 
@@ -335,23 +314,19 @@ constexpr Float2 operator*(const Float2x2& m, const Float2& v) noexcept
 
 constexpr Float3 operator*(const Float3x3& m, const Float3& v) noexcept
 {
-  return {m.M00 * v.X + m.M01 * v.Y + m.M02 * v.Z,
-          m.M10 * v.X + m.M11 * v.Y + m.M12 * v.Z,
+  return {m.M00 * v.X + m.M01 * v.Y + m.M02 * v.Z, m.M10 * v.X + m.M11 * v.Y + m.M12 * v.Z,
           m.M20 * v.X + m.M21 * v.Y + m.M22 * v.Z};
 }
 
 constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
 {
-  return {m.M00 * v.X + m.M01 * v.Y + m.M02 * v.Z + m.M03 * v.W,
-          m.M10 * v.X + m.M11 * v.Y + m.M12 * v.Z + m.M13 * v.W,
-          m.M20 * v.X + m.M21 * v.Y + m.M22 * v.Z + m.M23 * v.W,
-          m.M30 * v.X + m.M31 * v.Y + m.M32 * v.Z + m.M33 * v.W};
+  return {m.M00 * v.X + m.M01 * v.Y + m.M02 * v.Z + m.M03 * v.W, m.M10 * v.X + m.M11 * v.Y + m.M12 * v.Z + m.M13 * v.W,
+          m.M20 * v.X + m.M21 * v.Y + m.M22 * v.Z + m.M23 * v.W, m.M30 * v.X + m.M31 * v.Y + m.M32 * v.Z + m.M33 * v.W};
 }
 
 /// Transform a 3D **point** by `m` (treats `v` as homogeneous `(v, 1)`).
 /// Use this for positions; translations are applied.
-[[nodiscard]] constexpr Float3 TransformPoint(const Float4x4& m,
-                                              const Float3& v) noexcept
+[[nodiscard]] constexpr Float3 TransformPoint(const Float4x4& m, const Float3& v) noexcept
 {
   const Float4 p = m * Float4 {v.X, v.Y, v.Z, 1.0f};
   return {p.X, p.Y, p.Z};
@@ -359,8 +334,7 @@ constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
 
 /// Transform a 3D **direction/vector** by `m` (treats `v` as `(v, 0)`).
 /// Use this for directions; translations are ignored.
-[[nodiscard]] constexpr Float3 TransformVector(const Float4x4& m,
-                                               const Float3& v) noexcept
+[[nodiscard]] constexpr Float3 TransformVector(const Float4x4& m, const Float3& v) noexcept
 {
   const Float4 p = m * Float4 {v.X, v.Y, v.Z, 0.0f};
   return {p.X, p.Y, p.Z};

@@ -61,19 +61,16 @@ public:
   GECKO_API explicit RuntimeModule(Backends backends) noexcept;
 
   /// Explicit-injection ctor (all four impls externally owned).
-  GECKO_API RuntimeModule(IJobSystem& jobs, IProfiler& profiler,
-                          ILogger& logger, IEventBus& eventBus) noexcept;
+  GECKO_API RuntimeModule(IJobSystem& jobs, IProfiler& profiler, ILogger& logger, IEventBus& eventBus) noexcept;
 
   GECKO_API ~RuntimeModule() noexcept override;
 
   [[nodiscard]] GECKO_API ::gecko::Label RootLabel() const noexcept override;
 
-  [[nodiscard]] GECKO_API bool Startup(
-      ::gecko::IModuleRegistry& modules) noexcept override;
+  [[nodiscard]] GECKO_API bool Startup(::gecko::IModuleRegistry& modules) noexcept override;
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 
-  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes()
-      const noexcept override;
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes() const noexcept override;
 
 private:
   // Resolved service pointers (either injected or pointing to the
