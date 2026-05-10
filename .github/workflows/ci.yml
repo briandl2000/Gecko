@@ -26,7 +26,14 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc
+          sudo apt-get install -y ninja-build gcc-15 g++-15 lld ccache libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc
+
+      - name: ccache (Linux)
+        if: runner.os == 'Linux'
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ci-linux-${{ github.ref_name }}
+          max-size: 500M
 
       - name: Setup MSVC (Windows)
         if: runner.os == 'Windows'
@@ -94,19 +101,15 @@ jobs:
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
-          for target in core_tests platform_tests runtime_tests math_tests; do
-            cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
-          done
+          cmake --build out/build/$GECKO_PLATFORM_ID --config Release \
+            --target core_tests platform_tests runtime_tests math_tests
 
       - name: Build tests (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: |
-          for %%T in (core_tests platform_tests runtime_tests math_tests) do (
-            cmake --build out/build/%GECKO_PLATFORM_ID% --config Release --target %%T || exit /b 1
-          )
+        run: cmake --build out/build/%GECKO_PLATFORM_ID% --config Release --target core_tests platform_tests runtime_tests math_tests
 
       - name: Run tests (Linux)
         if: runner.os == 'Linux'
@@ -208,9 +211,8 @@ jobs:
         env:
           GECKO_PLATFORM_ID: Linux-aarch64
         run: |
-          for target in core_tests platform_tests runtime_tests math_tests graphics_tests; do
-            cmake --build out/build/$GECKO_PLATFORM_ID --config Release --target $target
-          done
+          cmake --build out/build/$GECKO_PLATFORM_ID --config Release \
+            --target core_tests platform_tests runtime_tests math_tests graphics_tests
 
       - name: Verify aarch64 binaries
         env:
@@ -400,14 +402,14 @@ jobs:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
           export CC=gcc-15 CXX=g++-15
-          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_DIST=ON
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake -S . -B out/build/%GECKO_PLATFORM_ID% -G "Ninja Multi-Config" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
+        run: cmake -S . -B out/build/%GECKO_PLATFORM_ID% -G "Ninja Multi-Config" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DGECKO_DIST=ON
 
       - name: Build Release (Linux)
         if: runner.os == 'Linux'

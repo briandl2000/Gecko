@@ -22,9 +22,17 @@ configure_file(
   "${CMAKE_BINARY_DIR}/generated/include/gecko/version.h"
   @ONLY)
 
-# Enable LTO only for Release builds (Debug builds are much faster without it)
-if(CMAKE_BUILD_TYPE MATCHES "Release|RelWithDebInfo")
-  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+# LTO is opt-in via GECKO_DIST. Local Release dev builds skip LTO so that
+# linking stays fast (the user iterates in Release; full LTO only matters
+# for shipped artefacts). CI's `package` job sets -DGECKO_DIST=ON.
+# Note: previous gating on CMAKE_BUILD_TYPE was a no-op under Ninja
+# Multi-Config (the variable is empty there), so LTO had silently never
+# been applied -- now it is, but only when explicitly requested.
+option(GECKO_DIST "Enable distribution-grade optimization (LTO etc.)" OFF)
+if(GECKO_DIST)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+  message(STATUS "GECKO_DIST=ON: LTO enabled for Release/RelWithDebInfo")
 endif()
 
 # Enable ccache if available for faster rebuilds
@@ -33,6 +41,25 @@ if(CCACHE_PROGRAM)
   set(CMAKE_C_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
   set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
   message(STATUS "Using ccache: ${CCACHE_PROGRAM}")
+endif()
+
+# Auto-select a fast linker on GCC/Clang. mold > lld > default ld.bfd.
+# On Linux a typical incremental rebuild spends most of its time linking
+# 4 example exes + the shared lib; switching to lld/mold cuts that
+# multi-second link wall-clock to a few hundred ms. Suppress with
+# -DGECKO_FAST_LINKER=OFF if a downstream tool (e.g. perf/gdb) needs the
+# default linker for some reason.
+option(GECKO_FAST_LINKER "Use mold/lld when available (GCC/Clang only)" ON)
+if(GECKO_FAST_LINKER AND NOT MSVC)
+  find_program(GECKO_MOLD mold)
+  find_program(GECKO_LLD ld.lld)
+  if(GECKO_MOLD)
+    add_link_options(-fuse-ld=mold)
+    message(STATUS "Using mold linker: ${GECKO_MOLD}")
+  elseif(GECKO_LLD)
+    add_link_options(-fuse-ld=lld)
+    message(STATUS "Using lld linker: ${GECKO_LLD}")
+  endif()
 endif()
 
 # Compiler warnings — GCC and Clang share these flags.
