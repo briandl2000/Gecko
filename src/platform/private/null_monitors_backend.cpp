@@ -27,8 +27,7 @@ void NullMonitorsBackend::EnumerateMonitors() noexcept
 
   m_Monitors.push_back(entry);
 
-  GECKO_INFO(labels::General,
-             "NullMonitorsBackend: enumerated 1 virtual monitor");
+  GECKO_INFO(labels::General, "NullMonitorsBackend: enumerated 1 virtual monitor");
 }
 
 u32 NullMonitorsBackend::GetMonitorCount() const noexcept
@@ -43,8 +42,7 @@ MonitorHandle NullMonitorsBackend::GetMonitorHandle(u32 index) const noexcept
   return m_Monitors[index].Handle;
 }
 
-MonitorInfo NullMonitorsBackend::GetMonitorProperties(
-    MonitorHandle handle) const noexcept
+MonitorInfo NullMonitorsBackend::GetMonitorProperties(MonitorHandle handle) const noexcept
 {
   if (!handle.IsValid())
     return {};
@@ -68,15 +66,13 @@ MonitorHandle NullMonitorsBackend::GetPrimaryMonitor() const noexcept
   return {};
 }
 
-MonitorBounds NullMonitorsBackend::GetMonitorBounds(
-    MonitorHandle handle) const noexcept
+MonitorBounds NullMonitorsBackend::GetMonitorBounds(MonitorHandle handle) const noexcept
 {
   MonitorInfo info = GetMonitorProperties(handle);
   return {info.Bounds, info.WorkArea};
 }
 
-void NullMonitorsBackend::PumpEvents(
-    const gecko::EventEmitter& /*emitter*/) noexcept
+void NullMonitorsBackend::PumpEvents(const gecko::EventEmitter& /*emitter*/) noexcept
 {
   // Null backend: no OS monitor-change events.
 }

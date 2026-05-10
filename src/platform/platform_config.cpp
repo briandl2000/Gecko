@@ -38,9 +38,8 @@ namespace {
     ::XCloseDisplay(dpy);
     return true;
   }
-  GECKO_WARN(labels::Platform,
-             "X11: XOpenDisplay failed - DISPLAY not set or X server "
-             "unreachable");
+  GECKO_WARN(labels::Platform, "X11: XOpenDisplay failed - DISPLAY not set or X server "
+                               "unreachable");
   return false;
 #else
   return false;
@@ -56,9 +55,8 @@ namespace {
     ::wl_display_disconnect(dpy);
     return true;
   }
-  GECKO_WARN(labels::Platform,
-             "Wayland: wl_display_connect failed - WAYLAND_DISPLAY not set or "
-             "compositor unreachable");
+  GECKO_WARN(labels::Platform, "Wayland: wl_display_connect failed - WAYLAND_DISPLAY not set or "
+                               "compositor unreachable");
   return false;
 #else
   return false;
@@ -134,12 +132,10 @@ PlatformConfig Resolve(const PlatformConfig& requested) noexcept
 {
   PlatformConfig resolved = requested;
 
-  if (resolved.Backend == DisplayBackendKind::Auto ||
-      resolved.Backend == DisplayBackendKind::Unknown)
+  if (resolved.Backend == DisplayBackendKind::Auto || resolved.Backend == DisplayBackendKind::Unknown)
   {
     resolved.Backend = ProbeBackend();
-    GECKO_INFO(labels::General, "Platform backend: Auto resolved to %s",
-               BackendName(resolved.Backend));
+    GECKO_INFO(labels::General, "Platform backend: Auto resolved to %s", BackendName(resolved.Backend));
     return resolved;
   }
 
@@ -155,8 +151,7 @@ PlatformConfig Resolve(const PlatformConfig& requested) noexcept
     return resolved;
   }
 
-  GECKO_INFO(labels::General, "Platform backend: %s (explicit)",
-             BackendName(resolved.Backend));
+  GECKO_INFO(labels::General, "Platform backend: %s (explicit)", BackendName(resolved.Backend));
   return resolved;
 }
 

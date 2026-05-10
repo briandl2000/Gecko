@@ -13,8 +13,7 @@ Unique<GraphicsDevice> CreateGraphicsDevice() noexcept
   return CreateUnique<NullDevice>();
 }
 
-Unique<GraphicsDevice> CreateGraphicsDevice(
-    const GraphicsDeviceDesc& desc) noexcept
+Unique<GraphicsDevice> CreateGraphicsDevice(const GraphicsDeviceDesc& desc) noexcept
 {
   switch (desc.Backend)
   {

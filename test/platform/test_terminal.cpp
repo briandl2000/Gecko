@@ -5,8 +5,7 @@
 
 using namespace gecko::platform;
 
-TEST_CASE("Terminal: IsTerminal returns a bool without crashing",
-          "[platform][terminal]")
+TEST_CASE("Terminal: IsTerminal returns a bool without crashing", "[platform][terminal]")
 {
   // Test runner pipes stdout when collecting, so this is normally false.
   // Just exercise the call.
@@ -15,16 +14,14 @@ TEST_CASE("Terminal: IsTerminal returns a bool without crashing",
   SUCCEED();
 }
 
-TEST_CASE("Terminal: Print + PrintLine accept empty strings",
-          "[platform][terminal]")
+TEST_CASE("Terminal: Print + PrintLine accept empty strings", "[platform][terminal]")
 {
   Print(TermStream::Stdout, TermColor::Default, "");
   PrintLine(TermStream::Stdout, TermColor::Green, "");
   SUCCEED();
 }
 
-TEST_CASE("Terminal: Print writes plain text to non-tty without escapes",
-          "[platform][terminal]")
+TEST_CASE("Terminal: Print writes plain text to non-tty without escapes", "[platform][terminal]")
 {
   // When stdout is captured (typical in `gk test`), color must be
   // suppressed. We can't easily intercept stdout from inside the
@@ -44,11 +41,9 @@ TEST_CASE("Terminal: writes UTF-8 multi-byte sequences", "[platform][terminal]")
   SUCCEED();
 }
 
-TEST_CASE("Terminal: every TermColor enumerator is accepted",
-          "[platform][terminal]")
+TEST_CASE("Terminal: every TermColor enumerator is accepted", "[platform][terminal]")
 {
-  for (::gecko::u8 i = 0; i <= static_cast<::gecko::u8>(TermColor::BrightWhite);
-       ++i)
+  for (::gecko::u8 i = 0; i <= static_cast<::gecko::u8>(TermColor::BrightWhite); ++i)
   {
     Print(TermStream::Stdout, static_cast<TermColor>(i), "");
   }

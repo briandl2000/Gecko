@@ -8,8 +8,7 @@
 
 namespace gecko::graphics {
 
-VulkanGpuSampler::VulkanGpuSampler(VulkanDevice& device,
-                                   const GpuSamplerDesc& desc) noexcept
+VulkanGpuSampler::VulkanGpuSampler(VulkanDevice& device, const GpuSamplerDesc& desc) noexcept
     : m_Device(&device), m_Desc(desc)
 {
   // Each frame needs 2 timestamps per zone (begin + end).
@@ -25,8 +24,7 @@ VulkanGpuSampler::VulkanGpuSampler(VulkanDevice& device,
     m_Frames[i].Pool = device.CreateTimestampQueryPool(qpDesc);
     if (!m_Frames[i].Pool.IsValid())
     {
-      GECKO_ERROR(labels::Vulkan,
-                  "VulkanGpuSampler: CreateTimestampQueryPool failed");
+      GECKO_ERROR(labels::Vulkan, "VulkanGpuSampler: CreateTimestampQueryPool failed");
       return;
     }
     m_Frames[i].Zones.reserve(m_Desc.MaxZonesPerFrame);
@@ -35,8 +33,7 @@ VulkanGpuSampler::VulkanGpuSampler(VulkanDevice& device,
   // Register the synthetic GPU thread name so trace sinks show "GPU" on
   // its row instead of a numeric id.
   if (m_Desc.GpuThreadName != nullptr)
-    ::gecko::RegisterThreadProfilerName(m_Desc.GpuThreadId,
-                                        m_Desc.GpuThreadName);
+    ::gecko::RegisterThreadProfilerName(m_Desc.GpuThreadId, m_Desc.GpuThreadName);
 
   m_Valid = true;
 }
@@ -105,8 +102,7 @@ void VulkanGpuSampler::EndFrame(ICommandList& cmd) noexcept
   (void)cmd;
 }
 
-void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label,
-                                 const char* name,
+void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name,
                                  ::gecko::ProfLevel level) noexcept
 {
   if (!m_Valid)
@@ -179,8 +175,7 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
   // Pull all timestamps in one shot. ReadTimestamps converts ticks->ns
   // internally using the device timestamp period.
   std::vector<u64> ts(slot.NextQuery, 0);
-  const u32 got = m_Device->ReadTimestamps(
-      slot.Pool, 0, std::span<u64>(ts.data(), ts.size()));
+  const u32 got = m_Device->ReadTimestamps(slot.Pool, 0, std::span<u64>(ts.data(), ts.size()));
   if (got == 0)
   {
     m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
@@ -217,11 +212,8 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
   // Prefer the first vkQueueSubmit CPU timestamp as the rebase anchor
   // (closest to actual GPU work start). Fall back to BeginFrame time
   // only if OnSubmit was never called (e.g. cmd lists never submitted).
-  const u64 cpuAnchor =
-      slot.SubmitCpuNs != 0 ? slot.SubmitCpuNs : slot.CpuFrameStartNs;
-  auto rebase = [&](u64 ns) noexcept -> u64 {
-    return cpuAnchor + (ns - gpuFrameStart);
-  };
+  const u64 cpuAnchor = slot.SubmitCpuNs != 0 ? slot.SubmitCpuNs : slot.CpuFrameStartNs;
+  auto rebase = [&](u64 ns) noexcept -> u64 { return cpuAnchor + (ns - gpuFrameStart); };
 
   for (const ZoneRecord& rec : slot.Zones)
   {

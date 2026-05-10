@@ -35,8 +35,7 @@ public:
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return m_Engine.has_value() && m_Device != nullptr &&
-           m_Slots[0].Handle.IsValid() && m_Slots[1].Handle.IsValid();
+    return m_Engine.has_value() && m_Device != nullptr && m_Slots[0].Handle.IsValid() && m_Slots[1].Handle.IsValid();
   }
 
   /// Enters the main loop. Returns the process exit code.
@@ -45,8 +44,7 @@ public:
 private:
   static constexpr ::gecko::u32 OffscreenW = 1280;
   static constexpr ::gecko::u32 OffscreenH = 720;
-  static constexpr ::gecko::graphics::DataFormat OffscreenFmt =
-      ::gecko::graphics::DataFormat::R8G8B8A8_UNORM;
+  static constexpr ::gecko::graphics::DataFormat OffscreenFmt = ::gecko::graphics::DataFormat::R8G8B8A8_UNORM;
 
   class ExampleModule final : public ::gecko::IModule
   {
@@ -78,10 +76,8 @@ private:
 
   void HandlePendingResizes();
   void RecordComputePass(::gecko::f32 time);
-  void RecordTrianglePass(::gecko::graphics::ICommandList& cmd,
-                          ::gecko::f32 time);
-  void RecordBlitPass(::gecko::graphics::ICommandList& cmd,
-                      ::gecko::graphics::FrameContext (&frames)[2],
+  void RecordTrianglePass(::gecko::graphics::ICommandList& cmd, ::gecko::f32 time);
+  void RecordBlitPass(::gecko::graphics::ICommandList& cmd, ::gecko::graphics::FrameContext (&frames)[2],
                       ::gecko::f32 time);
   void RenderFrame();
   void Update();

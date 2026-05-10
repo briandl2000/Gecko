@@ -25,9 +25,7 @@ public:
 
   void Write(const LogMessage& msg) noexcept override
   {
-    Messages.push_back({.Level = msg.Level,
-                        .Text = msg.Text,
-                        .MessageLabel = msg.MessageLabel});
+    Messages.push_back({.Level = msg.Level, .Text = msg.Text, .MessageLabel = msg.MessageLabel});
   }
 };
 

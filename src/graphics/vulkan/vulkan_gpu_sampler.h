@@ -33,8 +33,7 @@ public:
 
   void BeginFrame(ICommandList& cmd) noexcept override;
   void EndFrame(ICommandList& cmd) noexcept override;
-  void BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name,
-                 ::gecko::ProfLevel level) noexcept override;
+  void BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name, ::gecko::ProfLevel level) noexcept override;
   void EndZone(ICommandList& cmd) noexcept override;
   void OnSubmit(u64 cpuNowNs) noexcept override;
 

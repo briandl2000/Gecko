@@ -134,9 +134,8 @@ struct IJobSystem
   /// @param priority Scheduler hint.
   /// @param label Memory label active during the job.
   /// @return A handle usable with `Wait` / `IsComplete`.
-  GECKO_API virtual JobHandle SubmitRaw(
-      JobFn job, JobPriority priority = JobPriority::Normal,
-      Label label = {}) noexcept = 0;
+  GECKO_API virtual JobHandle SubmitRaw(JobFn job, JobPriority priority = JobPriority::Normal,
+                                        Label label = {}) noexcept = 0;
 
   /// Submit a pre-built `JobFn` that runs only after every dependency has
   /// finished.
@@ -145,10 +144,8 @@ struct IJobSystem
   /// @param dependencyCount Number of entries in `dependencies`.
   /// @param priority Scheduler hint.
   /// @param label Memory label active during the job.
-  GECKO_API virtual JobHandle SubmitRaw(
-      JobFn job, const JobHandle* dependencies, u32 dependencyCount,
-      JobPriority priority = JobPriority::Normal,
-      Label label = {}) noexcept = 0;
+  GECKO_API virtual JobHandle SubmitRaw(JobFn job, const JobHandle* dependencies, u32 dependencyCount,
+                                        JobPriority priority = JobPriority::Normal, Label label = {}) noexcept = 0;
 
   /// Convenience overload that boxes any callable (lambda, function
   /// pointer, `std::function`, ...) into a `JobFn` and forwards to
@@ -158,8 +155,7 @@ struct IJobSystem
   // abi-ok-begin: header-only templates; std:: forwarding refs are
   // resolved per consumer TU and never reach the dispatched virtual.
   template <class F>
-  JobHandle Submit(F&& f, JobPriority priority = JobPriority::Normal,
-                   Label label = {}) noexcept
+  JobHandle Submit(F&& f, JobPriority priority = JobPriority::Normal, Label label = {}) noexcept
   {
     JobFn job = detail::MakeJobFn(::std::forward<F>(f));
     if (!job.IsValid())
@@ -171,8 +167,7 @@ struct IJobSystem
   /// `Submit` for the boxing rules.
   template <class F>
   JobHandle Submit(F&& f, const JobHandle* dependencies, u32 dependencyCount,
-                   JobPriority priority = JobPriority::Normal,
-                   Label label = {}) noexcept
+                   JobPriority priority = JobPriority::Normal, Label label = {}) noexcept
   {
     JobFn job = detail::MakeJobFn(::std::forward<F>(f));
     if (!job.IsValid())
@@ -189,8 +184,7 @@ struct IJobSystem
   /// Block until every supplied handle has completed.
   /// @param handles Pointer to an array of handles.
   /// @param count Number of entries in `handles`.
-  GECKO_API virtual void WaitAll(const JobHandle* handles,
-                                 u32 count) noexcept = 0;
+  GECKO_API virtual void WaitAll(const JobHandle* handles, u32 count) noexcept = 0;
 
   /// @param handle Job to query.
   /// @return `true` if `handle` has finished or was never valid.
@@ -219,26 +213,21 @@ GECKO_API IJobSystem* GetJobSystem() noexcept;
 
 /// Convenience wrapper around `IJobSystem::Submit`.
 template <class F>
-inline JobHandle SubmitJob(F&& f, JobPriority priority = JobPriority::Normal,
-                           Label label = {}) noexcept
+inline JobHandle SubmitJob(F&& f, JobPriority priority = JobPriority::Normal, Label label = {}) noexcept
 {
   auto* jobSystem = GetJobSystem();
-  return jobSystem ? jobSystem->Submit(::std::forward<F>(f), priority, label)
-                   : JobHandle {};
+  return jobSystem ? jobSystem->Submit(::std::forward<F>(f), priority, label) : JobHandle {};
 }
 
 /// Convenience wrapper that submits a job with explicit dependencies.
 template <class F>
-inline JobHandle SubmitJob(F&& f, const JobHandle* dependencies,
-                           u32 dependencyCount,
-                           JobPriority priority = JobPriority::Normal,
-                           Label label = {}) noexcept
+inline JobHandle SubmitJob(F&& f, const JobHandle* dependencies, u32 dependencyCount,
+                           JobPriority priority = JobPriority::Normal, Label label = {}) noexcept
 {
   auto* jobSystem = GetJobSystem();
   if (!jobSystem)
     return JobHandle {};
-  return jobSystem->Submit(::std::forward<F>(f), dependencies, dependencyCount,
-                           priority, label);
+  return jobSystem->Submit(::std::forward<F>(f), dependencies, dependencyCount, priority, label);
 }
 
 // abi-ok-end
@@ -272,16 +261,13 @@ inline bool IsJobComplete(JobHandle handle) noexcept
 
 struct NullJobSystem final : IJobSystem
 {
-  GECKO_API virtual JobHandle SubmitRaw(
-      JobFn job, JobPriority priority = JobPriority::Normal,
-      Label label = Label {}) noexcept override;
-  GECKO_API virtual JobHandle SubmitRaw(
-      JobFn job, const JobHandle* dependencies, u32 dependencyCount,
-      JobPriority priority = JobPriority::Normal,
-      Label label = Label {}) noexcept override;
+  GECKO_API virtual JobHandle SubmitRaw(JobFn job, JobPriority priority = JobPriority::Normal,
+                                        Label label = Label {}) noexcept override;
+  GECKO_API virtual JobHandle SubmitRaw(JobFn job, const JobHandle* dependencies, u32 dependencyCount,
+                                        JobPriority priority = JobPriority::Normal,
+                                        Label label = Label {}) noexcept override;
   GECKO_API virtual void Wait(JobHandle handle) noexcept override;
-  GECKO_API virtual void WaitAll(const JobHandle* handles,
-                                 u32 count) noexcept override;
+  GECKO_API virtual void WaitAll(const JobHandle* handles, u32 count) noexcept override;
   GECKO_API virtual bool IsComplete(JobHandle handle) noexcept override;
   GECKO_API virtual u32 WorkerThreadCount() const noexcept override;
   GECKO_API virtual void ProcessJobs(u32 maxJobs = 1) noexcept override;

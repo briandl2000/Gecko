@@ -61,8 +61,7 @@ void ImmediateLogger::RemoveSink(ILogSink* sink) noexcept
   }
 }
 
-void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt,
-                           va_list apIn) noexcept
+void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt, va_list apIn) noexcept
 {
   GECKO_ASSERT(fmt && "Format string cannot be null");
 

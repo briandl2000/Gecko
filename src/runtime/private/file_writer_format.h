@@ -20,8 +20,7 @@ namespace gecko::runtime::detail {
 //
 // `w` may be null (no-op). Format errors silently drop the record so
 // the caller never has to check a return.
-inline void WriteFmt(::gecko::platform::FileWriter* w, const char* fmt,
-                     ...) noexcept
+inline void WriteFmt(::gecko::platform::FileWriter* w, const char* fmt, ...) noexcept
 {
   if (!w)
     return;

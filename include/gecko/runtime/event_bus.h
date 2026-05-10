@@ -27,18 +27,15 @@ public:
   EventBus();
   ~EventBus() override;
 
-  EventSubscription Subscribe(
-      EventCode code, CallbackFn fn, void* user,
-      SubscriptionOptions options = {}) noexcept override;
-  void Send(const EventEmitter& emitter, EventCode code,
-            EventView payload) noexcept override;
+  EventSubscription Subscribe(EventCode code, CallbackFn fn, void* user,
+                              SubscriptionOptions options = {}) noexcept override;
+  void Send(const EventEmitter& emitter, EventCode code, EventView payload) noexcept override;
   usize Dispatch(usize maxCount) noexcept override;
 
   bool RegisterModule(u64 moduleId) noexcept override;
   void UnregisterModule(u64 moduleId) noexcept override;
   EventEmitter CreateEmitter(u64 moduleId, u64 sender) noexcept override;
-  bool ValidateEmitter(const EventEmitter& emitter,
-                       u64 expectedModuleId) const noexcept override;
+  bool ValidateEmitter(const EventEmitter& emitter, u64 expectedModuleId) const noexcept override;
 
   bool Init() noexcept override;
   void Shutdown() noexcept override;
@@ -62,12 +59,9 @@ private:
     u32 payloadSize {0};
   };
 
-  void NotifySubscribers(EventCode code, const EventMeta& meta,
-                         EventView payload,
-                         SubscriptionDelivery deliveryFilter);
+  void NotifySubscribers(EventCode code, const EventMeta& meta, EventView payload, SubscriptionDelivery deliveryFilter);
 
-  std::unique_ptr<std::unordered_map<EventCode, std::vector<Subscriber>>>
-      m_Subscribers;
+  std::unique_ptr<std::unordered_map<EventCode, std::vector<Subscriber>>> m_Subscribers;
   std::mutex m_SubscribersMutex;
   std::unique_ptr<std::deque<QueuedEvent>> m_EventQueue;
   std::mutex m_QueueMutex;

@@ -13,8 +13,7 @@ using namespace gecko::runtime;
 
 namespace {
 
-ProfEvent MakeZoneBegin(u32 hash, u64 t,
-                        ProfLevel lvl = ProfLevel::Normal) noexcept
+ProfEvent MakeZoneBegin(u32 hash, u64 t, ProfLevel lvl = ProfLevel::Normal) noexcept
 {
   ProfEvent e {};
   e.TimestampNs = t;
@@ -26,8 +25,7 @@ ProfEvent MakeZoneBegin(u32 hash, u64 t,
   return e;
 }
 
-ProfEvent MakeZoneEnd(u32 hash, u64 t,
-                      ProfLevel lvl = ProfLevel::Normal) noexcept
+ProfEvent MakeZoneEnd(u32 hash, u64 t, ProfLevel lvl = ProfLevel::Normal) noexcept
 {
   ProfEvent e {};
   e.TimestampNs = t;
@@ -83,8 +81,7 @@ struct RecordingSink : ::gecko::IProfilerSink
 };
 }  // namespace
 
-TEST_CASE("RingProfiler delivers events to sinks in FIFO order",
-          "[runtime][profiler]")
+TEST_CASE("RingProfiler delivers events to sinks in FIFO order", "[runtime][profiler]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
@@ -130,8 +127,7 @@ TEST_CASE("RingProfiler overflow drops events", "[runtime][profiler]")
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler aggregator min/max/last/count",
-          "[runtime][profiler][aggregator]")
+TEST_CASE("RingProfiler aggregator min/max/last/count", "[runtime][profiler][aggregator]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
@@ -157,8 +153,7 @@ TEST_CASE("RingProfiler aggregator min/max/last/count",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler aggregator captures every level",
-          "[runtime][profiler][aggregator]")
+TEST_CASE("RingProfiler aggregator captures every level", "[runtime][profiler][aggregator]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
@@ -178,8 +173,7 @@ TEST_CASE("RingProfiler aggregator captures every level",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler FrameMark no longer auto-resets aggregator",
-          "[runtime][profiler][aggregator]")
+TEST_CASE("RingProfiler FrameMark no longer auto-resets aggregator", "[runtime][profiler][aggregator]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
@@ -202,8 +196,7 @@ TEST_CASE("RingProfiler FrameMark no longer auto-resets aggregator",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler categories: register, enable, disable",
-          "[runtime][profiler][categories]")
+TEST_CASE("RingProfiler categories: register, enable, disable", "[runtime][profiler][categories]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
@@ -228,8 +221,7 @@ TEST_CASE("RingProfiler categories: register, enable, disable",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler diagnostics counters non-decreasing",
-          "[runtime][profiler]")
+TEST_CASE("RingProfiler diagnostics counters non-decreasing", "[runtime][profiler]")
 {
   RingProfiler prof(8);
   REQUIRE(prof.Init());
@@ -259,8 +251,7 @@ struct CountingSink : ::gecko::IProfilerSink
   }
   void WriteBatch(::gecko::Span<const ProfEvent> events) noexcept override
   {
-    Received.fetch_add(static_cast<u32>(events.size()),
-                       ::std::memory_order_relaxed);
+    Received.fetch_add(static_cast<u32>(events.size()), ::std::memory_order_relaxed);
   }
   void Flush() noexcept override
   {}
@@ -268,8 +259,7 @@ struct CountingSink : ::gecko::IProfilerSink
 
 }  // namespace
 
-TEST_CASE("RingProfiler delivers events to sinks without explicit Flush",
-          "[runtime][profiler][sink]")
+TEST_CASE("RingProfiler delivers events to sinks without explicit Flush", "[runtime][profiler][sink]")
 {
   // Regression guard: if the consumer-job scheduling path from Emit() ever
   // breaks (e.g. reentrancy guard mis-ordering), this test catches it.
@@ -301,8 +291,7 @@ TEST_CASE("RingProfiler delivers events to sinks without explicit Flush",
   REQUIRE(receivedBeforeShutdown > 0u);
 }
 
-TEST_CASE("RingProfiler RegisterCategory rejects null name",
-          "[runtime][profiler][categories]")
+TEST_CASE("RingProfiler RegisterCategory rejects null name", "[runtime][profiler][categories]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
@@ -310,8 +299,7 @@ TEST_CASE("RingProfiler RegisterCategory rejects null name",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler RegisterCategory copies the name buffer",
-          "[runtime][profiler][categories]")
+TEST_CASE("RingProfiler RegisterCategory copies the name buffer", "[runtime][profiler][categories]")
 {
   RingProfiler prof(64);
   REQUIRE(prof.Init());
@@ -335,8 +323,7 @@ TEST_CASE("RingProfiler RegisterCategory copies the name buffer",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler aggregator pairs across threads correctly",
-          "[runtime][profiler][aggregator][threads]")
+TEST_CASE("RingProfiler aggregator pairs across threads correctly", "[runtime][profiler][aggregator][threads]")
 {
   // Regression guard for the OpenBeginNs cross-thread bug. Before the
   // TLS-stack fix, the same NameHash on multiple threads shared a single
@@ -388,8 +375,7 @@ TEST_CASE("RingProfiler aggregator pairs across threads correctly",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler aggregator handles nested same-name scopes",
-          "[runtime][profiler][aggregator]")
+TEST_CASE("RingProfiler aggregator handles nested same-name scopes", "[runtime][profiler][aggregator]")
 {
   // Nested ZoneBegin with the same hash on one thread used to corrupt
   // OpenBeginNs (inner Begin overwrote the outer's start). With the TLS
@@ -416,8 +402,7 @@ TEST_CASE("RingProfiler aggregator handles nested same-name scopes",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler aggregator ignores orphan ZoneEnd",
-          "[runtime][profiler][aggregator]")
+TEST_CASE("RingProfiler aggregator ignores orphan ZoneEnd", "[runtime][profiler][aggregator]")
 {
   // A ZoneEnd with no matching open Begin must not bump Count or pollute
   // Min/Max. (Could happen if a ZoneBegin was filtered by category gating
@@ -436,8 +421,7 @@ TEST_CASE("RingProfiler aggregator ignores orphan ZoneEnd",
   prof.Shutdown();
 }
 
-TEST_CASE("RingProfiler aggregator: orphan ZoneBegin does not produce a sample",
-          "[runtime][profiler][aggregator]")
+TEST_CASE("RingProfiler aggregator: orphan ZoneBegin does not produce a sample", "[runtime][profiler][aggregator]")
 {
   // Begin without matching End leaves the open-scope stack non-empty for
   // this thread but contributes no Count and no Min/Max update.

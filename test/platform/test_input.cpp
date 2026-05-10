@@ -37,9 +37,7 @@ struct InputTestScope
     return cfg;
   }
 
-  InputTestScope()
-      : runtimeMod(jobs, profiler, logger, events),
-        platformMod(MakeNullConfig())
+  InputTestScope() : runtimeMod(jobs, profiler, logger, events), platformMod(MakeNullConfig())
   {
     REQUIRE(SetAllocator(&alloc));
     engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
@@ -56,64 +54,49 @@ struct InputTestScope
 // Helper: emit a WindowKey event and dispatch immediately.
 void EmitKey(KeyCode key, bool down) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
-  events::WindowKeyPayload payload {.Window = WindowHandle {1},
-                                    .TimeNs = 0,
-                                    .Key = key,
-                                    .Down = static_cast<u8>(down ? 1 : 0),
-                                    .Repeat = 0};
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowKeyPayload payload {
+      .Window = WindowHandle {1}, .TimeNs = 0, .Key = key, .Down = static_cast<u8>(down ? 1 : 0), .Repeat = 0};
   ::gecko::SendEvent(emitter, events::WindowKey, payload);
   (void)::gecko::DispatchEvents();
 }
 
 void EmitMouseMove(WindowHandle w, i32 x, i32 y) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
-  events::WindowMouseMovePayload payload {
-      .Window = w, .TimeNs = 0, .X = x, .Y = y};
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowMouseMovePayload payload {.Window = w, .TimeNs = 0, .X = x, .Y = y};
   ::gecko::SendEvent(emitter, events::WindowMouseMove, payload);
   (void)::gecko::DispatchEvents();
 }
 
 void EmitMouseButton(MouseButton b, bool down) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
-  events::WindowMouseButtonPayload payload {.Window = WindowHandle {1},
-                                            .TimeNs = 0,
-                                            .Button = b,
-                                            .Down =
-                                                static_cast<u8>(down ? 1 : 0)};
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowMouseButtonPayload payload {
+      .Window = WindowHandle {1}, .TimeNs = 0, .Button = b, .Down = static_cast<u8>(down ? 1 : 0)};
   ::gecko::SendEvent(emitter, events::WindowMouseButton, payload);
   (void)::gecko::DispatchEvents();
 }
 
 void EmitMouseWheel(float dx, float dy) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
-  events::WindowMouseWheelPayload payload {
-      .Window = WindowHandle {1}, .TimeNs = 0, .DeltaX = dx, .DeltaY = dy};
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowMouseWheelPayload payload {.Window = WindowHandle {1}, .TimeNs = 0, .DeltaX = dx, .DeltaY = dy};
   ::gecko::SendEvent(emitter, events::WindowMouseWheel, payload);
   (void)::gecko::DispatchEvents();
 }
 
 void EmitFocus(WindowHandle w, bool focused) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
-  events::WindowFocusChangedPayload payload {
-      .Window = w, .TimeNs = 0, .Focused = static_cast<u8>(focused ? 1 : 0)};
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowFocusChangedPayload payload {.Window = w, .TimeNs = 0, .Focused = static_cast<u8>(focused ? 1 : 0)};
   ::gecko::SendEvent(emitter, events::WindowFocusChanged, payload);
   (void)::gecko::DispatchEvents();
 }
 
 void EmitMouseEntered(WindowHandle w) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
   events::WindowMouseEnteredPayload payload {.Window = w, .TimeNs = 0};
   ::gecko::SendEvent(emitter, events::WindowMouseEntered, payload);
   (void)::gecko::DispatchEvents();
@@ -121,8 +104,7 @@ void EmitMouseEntered(WindowHandle w) noexcept
 
 void EmitMouseExited(WindowHandle w) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
   events::WindowMouseExitedPayload payload {.Window = w, .TimeNs = 0};
   ::gecko::SendEvent(emitter, events::WindowMouseExited, payload);
   (void)::gecko::DispatchEvents();
@@ -130,8 +112,7 @@ void EmitMouseExited(WindowHandle w) noexcept
 
 }  // namespace
 
-TEST_CASE("Input service is published after PlatformModule startup",
-          "[platform][input]")
+TEST_CASE("Input service is published after PlatformModule startup", "[platform][input]")
 {
   InputTestScope scope;
   REQUIRE(GetInput() != nullptr);
@@ -177,8 +158,7 @@ TEST_CASE("Input: WasKeyReleased is an edge", "[platform][input]")
   REQUIRE_FALSE(in->WasKeyReleased(KeyCode::B));
 }
 
-TEST_CASE("Input: free-function helpers forward to service",
-          "[platform][input]")
+TEST_CASE("Input: free-function helpers forward to service", "[platform][input]")
 {
   InputTestScope scope;
   EmitKey(KeyCode::Space, true);
@@ -230,8 +210,7 @@ TEST_CASE("Input: mouse button state + edge", "[platform][input]")
   REQUIRE(in->WasMouseButtonReleased(MouseButton::Left));
 }
 
-TEST_CASE("Input: scroll accumulates and clears on NewFrame",
-          "[platform][input]")
+TEST_CASE("Input: scroll accumulates and clears on NewFrame", "[platform][input]")
 {
   InputTestScope scope;
   auto* in = GetInput();
@@ -282,8 +261,7 @@ TEST_CASE("Input: hover tracking via Entered/Exited", "[platform][input]")
   REQUIRE(in->HoveredWindow() == w1);
 }
 
-TEST_CASE("Input: free-function HoveredWindow forwards to service",
-          "[platform][input]")
+TEST_CASE("Input: free-function HoveredWindow forwards to service", "[platform][input]")
 {
   InputTestScope scope;
   WindowHandle w {99};
@@ -291,8 +269,7 @@ TEST_CASE("Input: free-function HoveredWindow forwards to service",
   REQUIRE(HoveredWindow() == w);
 }
 
-TEST_CASE("Input: PumpEvents auto-calls NewFrame on the input service",
-          "[platform][input]")
+TEST_CASE("Input: PumpEvents auto-calls NewFrame on the input service", "[platform][input]")
 {
   // Null backend has no real OS events but PumpEvents should still
   // call NewFrame() on the input service. We verify by setting up a
@@ -330,8 +307,7 @@ TEST_CASE("MockInput: keys + edges", "[platform][input][mock]")
   REQUIRE(m.WasKeyReleased(KeyCode::A));
 }
 
-TEST_CASE("MockInput: mouse + scroll + focus + hover",
-          "[platform][input][mock]")
+TEST_CASE("MockInput: mouse + scroll + focus + hover", "[platform][input][mock]")
 {
   MockInput m;
   WindowHandle w {3};
@@ -366,8 +342,7 @@ TEST_CASE("MockInput: mouse + scroll + focus + hover",
   REQUIRE_FALSE(m.FocusedWindow().IsValid());
 }
 
-TEST_CASE("MockInput: usable as IInput via base pointer",
-          "[platform][input][mock]")
+TEST_CASE("MockInput: usable as IInput via base pointer", "[platform][input][mock]")
 {
   MockInput m;
   IInput* in = &m;
@@ -383,17 +358,14 @@ TEST_CASE("MockInput: usable as IInput via base pointer",
 namespace {
 void EmitChar(WindowHandle w, ::gecko::u32 codepoint) noexcept
 {
-  auto emitter =
-      ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
-  events::WindowCharPayload payload {
-      .Window = w, .TimeNs = 0, .Codepoint = codepoint};
+  auto emitter = ::gecko::CreateEmitterForModule(::gecko::platform::labels::Platform);
+  events::WindowCharPayload payload {.Window = w, .TimeNs = 0, .Codepoint = codepoint};
   ::gecko::SendEvent(emitter, events::WindowChar, payload);
   (void)::gecko::DispatchEvents();
 }
 }  // namespace
 
-TEST_CASE("Input: GetTypedText collects ASCII WindowChar events",
-          "[platform][input][text]")
+TEST_CASE("Input: GetTypedText collects ASCII WindowChar events", "[platform][input][text]")
 {
   InputTestScope scope;
   auto* in = GetInput();
@@ -407,8 +379,7 @@ TEST_CASE("Input: GetTypedText collects ASCII WindowChar events",
   REQUIRE(in->GetTypedText().empty());
 }
 
-TEST_CASE("Input: GetTypedText encodes non-ASCII codepoints as UTF-8",
-          "[platform][input][text]")
+TEST_CASE("Input: GetTypedText encodes non-ASCII codepoints as UTF-8", "[platform][input][text]")
 {
   InputTestScope scope;
   auto* in = GetInput();
@@ -425,8 +396,7 @@ TEST_CASE("Input: GetTypedText encodes non-ASCII codepoints as UTF-8",
   REQUIRE(t == "\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80");
 }
 
-TEST_CASE("Input: GetTypedText free function forwards to service",
-          "[platform][input][text]")
+TEST_CASE("Input: GetTypedText free function forwards to service", "[platform][input][text]")
 {
   InputTestScope scope;
   WindowHandle w {1};
@@ -435,8 +405,7 @@ TEST_CASE("Input: GetTypedText free function forwards to service",
   REQUIRE(GetTypedText() == "AB");
 }
 
-TEST_CASE("MockInput: TypeText / TypeChar build a UTF-8 buffer",
-          "[platform][input][mock][text]")
+TEST_CASE("MockInput: TypeText / TypeChar build a UTF-8 buffer", "[platform][input][mock][text]")
 {
   MockInput m;
   REQUIRE(m.GetTypedText().empty());

@@ -60,15 +60,14 @@ enum class ColorSpace : u8
 /// Snapshot of a monitor's properties at the time of query.
 struct MonitorInfo
 {
-  char Name[MaxMonitorNameLength] {};  ///< NUL-terminated UTF-8 name.
-  math::Rect2D Bounds {};    ///< Full monitor bounds in virtual desktop pixels.
-  math::Rect2D WorkArea {};  ///< Bounds excluding OS taskbars/docks.
-  u32 RefreshRateMilliHz {
-      60000};             ///< Refresh rate in millihertz (60 Hz = `60000`).
-  u32 Dpi {96};           ///< Logical DPI.
-  float DpiScale {1.0F};  ///< Linear scale factor (`Dpi / 96`).
+  char Name[MaxMonitorNameLength] {};               ///< NUL-terminated UTF-8 name.
+  math::Rect2D Bounds {};                           ///< Full monitor bounds in virtual desktop pixels.
+  math::Rect2D WorkArea {};                         ///< Bounds excluding OS taskbars/docks.
+  u32 RefreshRateMilliHz {60000};                   ///< Refresh rate in millihertz (60 Hz = `60000`).
+  u32 Dpi {96};                                     ///< Logical DPI.
+  float DpiScale {1.0F};                            ///< Linear scale factor (`Dpi / 96`).
   ColorSpace MonitorColorSpace {ColorSpace::Srgb};  ///< Reported color space.
-  bool IsPrimary {false};  ///< `true` for the system primary monitor.
+  bool IsPrimary {false};                           ///< `true` for the system primary monitor.
 
   /// Copy `name` into `Name`, truncating to `MaxMonitorNameLength - 1`
   /// bytes and always NUL-terminating. No-op when `name` is null.
@@ -77,8 +76,7 @@ struct MonitorInfo
     if (name)
     {
       const auto len = ::std::strlen(name);
-      const auto count =
-          len < MaxMonitorNameLength - 1 ? len : MaxMonitorNameLength - 1;
+      const auto count = len < MaxMonitorNameLength - 1 ? len : MaxMonitorNameLength - 1;
       ::std::memcpy(Name, name, count);
       Name[count] = '\0';
     }

@@ -82,9 +82,8 @@ struct VulkanRTData
   };
 
   Kind RTKind {Kind::Offscreen};
-  VkImage Image {VK_NULL_HANDLE};  ///< primary color image (non-owning alias)
-  VkImageView ImageView {
-      VK_NULL_HANDLE};  ///< primary color view  (non-owning alias)
+  VkImage Image {VK_NULL_HANDLE};          ///< primary color image (non-owning alias)
+  VkImageView ImageView {VK_NULL_HANDLE};  ///< primary color view  (non-owning alias)
 
   // Only valid when RTKind == Swapchain
   VulkanSwapchainData* SwapchainData {nullptr};

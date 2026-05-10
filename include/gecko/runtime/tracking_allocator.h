@@ -32,8 +32,8 @@ struct MemLabelStats
   MemLabelStats& operator=(const MemLabelStats&) = delete;
 
   MemLabelStats(MemLabelStats&& other) noexcept
-      : LiveBytes(other.LiveBytes.load()), Allocs(other.Allocs.load()),
-        Frees(other.Frees.load()), StatsLabel(other.StatsLabel)
+      : LiveBytes(other.LiveBytes.load()), Allocs(other.Allocs.load()), Frees(other.Frees.load()),
+        StatsLabel(other.StatsLabel)
   {}
 
   MemLabelStats& operator=(MemLabelStats&& other) noexcept
@@ -56,8 +56,7 @@ struct MemLabelStats
 template <typename T>
 class MallocAllocator
 {
-  static_assert(alignof(T) <= alignof(::std::max_align_t),
-                "MallocAllocator does not support over-aligned types");
+  static_assert(alignof(T) <= alignof(::std::max_align_t), "MallocAllocator does not support over-aligned types");
 
 public:
   using value_type = T;

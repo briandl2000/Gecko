@@ -31,15 +31,13 @@ public:
   void EnumerateMonitors() noexcept override;
   u32 GetMonitorCount() const noexcept override;
   MonitorHandle GetMonitorHandle(u32 index) const noexcept override;
-  MonitorInfo GetMonitorProperties(
-      MonitorHandle handle) const noexcept override;
+  MonitorInfo GetMonitorProperties(MonitorHandle handle) const noexcept override;
   MonitorHandle GetPrimaryMonitor() const noexcept override;
   MonitorBounds GetMonitorBounds(MonitorHandle handle) const noexcept override;
   void PumpEvents(const gecko::EventEmitter& emitter) noexcept override;
 
 private:
-  static ::BOOL CALLBACK EnumProc(::HMONITOR hMonitor, ::HDC hdc, LPRECT lpRect,
-                                  ::LPARAM lParam) noexcept;
+  static ::BOOL CALLBACK EnumProc(::HMONITOR hMonitor, ::HDC hdc, LPRECT lpRect, ::LPARAM lParam) noexcept;
 
   ::std::vector<MonitorEntry> m_Monitors;
 };

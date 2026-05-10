@@ -19,8 +19,8 @@ namespace gecko::platform {
 namespace {
 int X11ErrorHandler(::Display* /*display*/, ::XErrorEvent* event)
 {
-  GECKO_WARN(labels::General, "X11 error: request=%u, error=%u, serial=%lu",
-             event->request_code, event->error_code, event->serial);
+  GECKO_WARN(labels::General, "X11 error: request=%u, error=%u, serial=%lu", event->request_code, event->error_code,
+             event->serial);
   return 0;
 }
 }  // namespace
@@ -41,18 +41,14 @@ X11WindowsBackend::X11WindowsBackend() noexcept
   m_WmDeleteWindow = ::XInternAtom(m_Display, "WM_DELETE_WINDOW", False);
   m_WmProtocols = ::XInternAtom(m_Display, "WM_PROTOCOLS", False);
   m_NetWmState = ::XInternAtom(m_Display, "_NET_WM_STATE", False);
-  m_NetWmStateFullscreen =
-      ::XInternAtom(m_Display, "_NET_WM_STATE_FULLSCREEN", False);
-  m_NetWmStateMaximizedHorz =
-      ::XInternAtom(m_Display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
-  m_NetWmStateMaximizedVert =
-      ::XInternAtom(m_Display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
+  m_NetWmStateFullscreen = ::XInternAtom(m_Display, "_NET_WM_STATE_FULLSCREEN", False);
+  m_NetWmStateMaximizedHorz = ::XInternAtom(m_Display, "_NET_WM_STATE_MAXIMIZED_HORZ", False);
+  m_NetWmStateMaximizedVert = ::XInternAtom(m_Display, "_NET_WM_STATE_MAXIMIZED_VERT", False);
   m_NetWmStateHidden = ::XInternAtom(m_Display, "_NET_WM_STATE_HIDDEN", False);
   m_NetWmStateAbove = ::XInternAtom(m_Display, "_NET_WM_STATE_ABOVE", False);
   m_MotifWmHints = ::XInternAtom(m_Display, "_MOTIF_WM_HINTS", False);
 
-  GECKO_INFO(labels::General, "Initialized X11 windows backend (display=%p)",
-             m_Display);
+  GECKO_INFO(labels::General, "Initialized X11 windows backend (display=%p)", m_Display);
 }
 
 X11WindowsBackend::~X11WindowsBackend() noexcept
@@ -83,17 +79,14 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   const int screen = DefaultScreen(m_Display);
   const ::Window root = RootWindow(m_Display, screen);
 
-  const unsigned int width =
-      desc.Size.X > 0 ? static_cast<unsigned int>(desc.Size.X) : 1280U;
-  const unsigned int height =
-      desc.Size.Y > 0 ? static_cast<unsigned int>(desc.Size.Y) : 720U;
+  const unsigned int width = desc.Size.X > 0 ? static_cast<unsigned int>(desc.Size.X) : 1280U;
+  const unsigned int height = desc.Size.Y > 0 ? static_cast<unsigned int>(desc.Size.Y) : 720U;
 
   WindowDesc appliedDesc = desc;
   appliedDesc.Size.X = static_cast<i32>(width);
   appliedDesc.Size.Y = static_cast<i32>(height);
 
-  const ::Window w = ::XCreateSimpleWindow(m_Display, root, 0, 0, width, height,
-                                           0, BlackPixel(m_Display, screen),
+  const ::Window w = ::XCreateSimpleWindow(m_Display, root, 0, 0, width, height, 0, BlackPixel(m_Display, screen),
                                            WhitePixel(m_Display, screen));
   if (w == 0)
   {
@@ -101,10 +94,8 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
     return {};
   }
 
-  long mask = ExposureMask | StructureNotifyMask | KeyPressMask |
-              KeyReleaseMask | ButtonPressMask | ButtonReleaseMask |
-              PointerMotionMask | FocusChangeMask | EnterWindowMask |
-              LeaveWindowMask;
+  long mask = ExposureMask | StructureNotifyMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask |
+              PointerMotionMask | FocusChangeMask | EnterWindowMask | LeaveWindowMask;
   ::XSelectInput(m_Display, w, mask);
 
   ::XStoreName(m_Display, w, desc.Title ? desc.Title : "Gecko");
@@ -141,8 +132,7 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   st.Resizable = desc.Resizable;
   st.Mode = desc.Mode;
   st.Buttons = desc.Buttons;
-  st.State = desc.Visible ? platform::WindowState::Normal
-                          : platform::WindowState::Hidden;
+  st.State = desc.Visible ? platform::WindowState::Normal : platform::WindowState::Hidden;
   st.WindowId = w;
 
   auto [it, ok] = m_Windows.emplace(id, ::std::move(st));
@@ -153,8 +143,8 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   if (desc.Buttons != WindowButtons::All)
     ApplyMotifFunctions(w, desc.Buttons, desc.Resizable);
 
-  GECKO_INFO(labels::Window, "Created X11 window id=%llu, xid=%lu, size=%ux%u",
-             (unsigned long long)id, (unsigned long)w, width, height);
+  GECKO_INFO(labels::Window, "Created X11 window id=%llu, xid=%lu, size=%ux%u", (unsigned long long)id,
+             (unsigned long)w, width, height);
   return WindowHandle {id};
 }
 
@@ -171,16 +161,14 @@ void X11WindowsBackend::DestroyWindow(WindowHandle window) noexcept
 
   if (m_Display && it->second.WindowId != 0)
   {
-    GECKO_DEBUG(labels::Window, "Destroying X11 window id=%llu, xid=%lu",
-                (unsigned long long)window.Id,
+    GECKO_DEBUG(labels::Window, "Destroying X11 window id=%llu, xid=%lu", (unsigned long long)window.Id,
                 (unsigned long)it->second.WindowId);
     m_WindowByXid.erase(it->second.WindowId);
     ::XDestroyWindow(m_Display, it->second.WindowId);
     ::XFlush(m_Display);
   }
 
-  m_Staged.push_back(MakeStagedEvent(
-      events::WindowClosed, events::WindowClosedPayload {window, NowNsSafe()}));
+  m_Staged.push_back(MakeStagedEvent(events::WindowClosed, events::WindowClosedPayload {window, NowNsSafe()}));
 
   m_Windows.erase(it);
 }
@@ -199,9 +187,8 @@ bool X11WindowsBackend::RequestClose(WindowHandle window) noexcept
   if (!IsWindowAlive(window))
     return false;
 
-  m_Staged.push_back(MakeStagedEvent(
-      events::WindowCloseRequested,
-      events::WindowCloseRequestedPayload {window, NowNsSafe()}));
+  m_Staged.push_back(
+      MakeStagedEvent(events::WindowCloseRequested, events::WindowCloseRequestedPayload {window, NowNsSafe()}));
   return true;
 }
 
@@ -211,8 +198,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 
   // Flush deferred events from RequestClose / DestroyWindow first.
   for (const auto& ev : m_Staged)
-    gecko::SendEvent(emitter, ev.Code,
-                     gecko::EventView {ev.PayloadStorage, ev.PayloadSize});
+    gecko::SendEvent(emitter, ev.Code, gecko::EventView {ev.PayloadStorage, ev.PayloadSize});
   m_Staged.clear();
 
   if (!m_Display)
@@ -231,16 +217,14 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
     switch (event.type)
     {
     case ClientMessage: {
-      if (event.xclient.message_type == m_WmProtocols &&
-          event.xclient.format == 32 &&
+      if (event.xclient.message_type == m_WmProtocols && event.xclient.format == 32 &&
           static_cast<Atom>(event.xclient.data.l[0]) == m_WmDeleteWindow)
       {
         const u64 id = FindWindowId(event.xclient.window);
         if (id != WindowHandle::InvalidId)
         {
-          gecko::SendEvent(
-              emitter, events::WindowCloseRequested,
-              events::WindowCloseRequestedPayload {WindowHandle {id}, now});
+          gecko::SendEvent(emitter, events::WindowCloseRequested,
+                           events::WindowCloseRequestedPayload {WindowHandle {id}, now});
         }
       }
     }
@@ -257,13 +241,11 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
 
       const u32 newW = static_cast<u32>(event.xconfigure.width);
       const u32 newH = static_cast<u32>(event.xconfigure.height);
-      if (it->second.ClientSize.Width != newW ||
-          it->second.ClientSize.Height != newH)
+      if (it->second.ClientSize.Width != newW || it->second.ClientSize.Height != newH)
       {
         it->second.ClientSize = Extent2D {newW, newH};
-        gecko::SendEvent(
-            emitter, events::WindowResized,
-            events::WindowResizedPayload {WindowHandle {id}, now, newW, newH});
+        gecko::SendEvent(emitter, events::WindowResized,
+                         events::WindowResizedPayload {WindowHandle {id}, now, newW, newH});
       }
 
       const i32 newX = static_cast<i32>(event.xconfigure.x);
@@ -271,9 +253,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
       if (it->second.Position.X != newX || it->second.Position.Y != newY)
       {
         it->second.Position = math::Int2 {newX, newY};
-        gecko::SendEvent(
-            emitter, events::WindowMoved,
-            events::WindowMovedPayload {WindowHandle {id}, now, newX, newY});
+        gecko::SendEvent(emitter, events::WindowMoved, events::WindowMovedPayload {WindowHandle {id}, now, newX, newY});
       }
     }
     break;
@@ -289,16 +269,14 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
       const KeyCode key = X11KeySymToKeyCode(keysym);
 
       gecko::SendEvent(emitter, events::WindowKey,
-                       events::WindowKeyPayload {WindowHandle {id}, now, key,
-                                                 down ? u8(1) : u8(0), 0});
+                       events::WindowKeyPayload {WindowHandle {id}, now, key, down ? u8(1) : u8(0), 0});
 
       if (down)
       {
         char buf[64];
         KeySym sym;
         XComposeStatus compose {};
-        const int len =
-            ::XLookupString(&event.xkey, buf, sizeof(buf), &sym, &compose);
+        const int len = ::XLookupString(&event.xkey, buf, sizeof(buf), &sym, &compose);
         // Decode the UTF-8 (XLookupString returns Latin-1, but for the
         // ASCII subset that's identical to UTF-8 -- full Unicode requires
         // an XIM input context which we don't currently set up). Skip
@@ -318,23 +296,19 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
             }
             else if ((b0 & 0xE0) == 0xC0 && i + 1 < len)
             {
-              cp = ::gecko::u32(b0 & 0x1F) << 6 |
-                   ::gecko::u32(bytes[i + 1] & 0x3F);
+              cp = ::gecko::u32(b0 & 0x1F) << 6 | ::gecko::u32(bytes[i + 1] & 0x3F);
               consumed = 2;
             }
             else if ((b0 & 0xF0) == 0xE0 && i + 2 < len)
             {
-              cp = ::gecko::u32(b0 & 0x0F) << 12 |
-                   ::gecko::u32(bytes[i + 1] & 0x3F) << 6 |
+              cp = ::gecko::u32(b0 & 0x0F) << 12 | ::gecko::u32(bytes[i + 1] & 0x3F) << 6 |
                    ::gecko::u32(bytes[i + 2] & 0x3F);
               consumed = 3;
             }
             else if ((b0 & 0xF8) == 0xF0 && i + 3 < len)
             {
-              cp = ::gecko::u32(b0 & 0x07) << 18 |
-                   ::gecko::u32(bytes[i + 1] & 0x3F) << 12 |
-                   ::gecko::u32(bytes[i + 2] & 0x3F) << 6 |
-                   ::gecko::u32(bytes[i + 3] & 0x3F);
+              cp = ::gecko::u32(b0 & 0x07) << 18 | ::gecko::u32(bytes[i + 1] & 0x3F) << 12 |
+                   ::gecko::u32(bytes[i + 2] & 0x3F) << 6 | ::gecko::u32(bytes[i + 3] & 0x3F);
               consumed = 4;
             }
             else
@@ -350,9 +324,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
             if (cp == 127)
               continue;
 
-            gecko::SendEvent(
-                emitter, events::WindowChar,
-                events::WindowCharPayload {WindowHandle {id}, now, cp});
+            gecko::SendEvent(emitter, events::WindowChar, events::WindowCharPayload {WindowHandle {id}, now, cp});
           }
         }
       }
@@ -364,11 +336,9 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
       if (id == WindowHandle::InvalidId)
         break;
 
-      gecko::SendEvent(
-          emitter, events::WindowMouseMove,
-          events::WindowMouseMovePayload {WindowHandle {id}, now,
-                                          static_cast<i32>(event.xmotion.x),
-                                          static_cast<i32>(event.xmotion.y)});
+      gecko::SendEvent(emitter, events::WindowMouseMove,
+                       events::WindowMouseMovePayload {WindowHandle {id}, now, static_cast<i32>(event.xmotion.x),
+                                                       static_cast<i32>(event.xmotion.y)});
     }
     break;
 
@@ -396,18 +366,15 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
           else if (btn == 7)
             dx = -1.0F;
 
-          gecko::SendEvent(
-              emitter, events::WindowMouseWheel,
-              events::WindowMouseWheelPayload {WindowHandle {id}, now, dx, dy});
+          gecko::SendEvent(emitter, events::WindowMouseWheel,
+                           events::WindowMouseWheelPayload {WindowHandle {id}, now, dx, dy});
         }
       }
       else
       {
-        gecko::SendEvent(
-            emitter, events::WindowMouseButton,
-            events::WindowMouseButtonPayload {WindowHandle {id}, now,
-                                              X11ButtonToMouseButton(btn),
-                                              down ? u8(1) : u8(0)});
+        gecko::SendEvent(emitter, events::WindowMouseButton,
+                         events::WindowMouseButtonPayload {WindowHandle {id}, now, X11ButtonToMouseButton(btn),
+                                                           down ? u8(1) : u8(0)});
       }
     }
     break;
@@ -419,8 +386,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
       {
         const u8 focused = (event.type == FocusIn) ? 1 : 0;
         gecko::SendEvent(emitter, events::WindowFocusChanged,
-                         events::WindowFocusChangedPayload {WindowHandle {id},
-                                                            now, focused});
+                         events::WindowFocusChangedPayload {WindowHandle {id}, now, focused});
       }
     }
     break;
@@ -429,9 +395,8 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
       const u64 id = FindWindowId(event.xcrossing.window);
       if (id != WindowHandle::InvalidId)
       {
-        gecko::SendEvent(
-            emitter, events::WindowMouseEntered,
-            events::WindowMouseEnteredPayload {WindowHandle {id}, now});
+        gecko::SendEvent(emitter, events::WindowMouseEntered,
+                         events::WindowMouseEnteredPayload {WindowHandle {id}, now});
       }
     }
     break;
@@ -440,9 +405,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
       const u64 id = FindWindowId(event.xcrossing.window);
       if (id != WindowHandle::InvalidId)
       {
-        gecko::SendEvent(
-            emitter, events::WindowMouseExited,
-            events::WindowMouseExitedPayload {WindowHandle {id}, now});
+        gecko::SendEvent(emitter, events::WindowMouseExited, events::WindowMouseExitedPayload {WindowHandle {id}, now});
       }
     }
     break;
@@ -464,8 +427,7 @@ Extent2D X11WindowsBackend::GetClientSize(WindowHandle window) const noexcept
   return it->second.ClientSize;
 }
 
-void X11WindowsBackend::SetTitle(WindowHandle window,
-                                 const char* title) noexcept
+void X11WindowsBackend::SetTitle(WindowHandle window, const char* title) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -485,8 +447,7 @@ DpiInfo X11WindowsBackend::GetDpi(WindowHandle /*window*/) const noexcept
   return DpiInfo {};
 }
 
-NativeWindowHandle X11WindowsBackend::GetNativeWindowHandle(
-    WindowHandle window) const noexcept
+NativeWindowHandle X11WindowsBackend::GetNativeWindowHandle(WindowHandle window) const noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -495,13 +456,11 @@ NativeWindowHandle X11WindowsBackend::GetNativeWindowHandle(
   NativeWindowHandle nh;
   nh.Backend = DisplayBackendKind::Xlib;
   nh.Display = m_Display;
-  nh.Handle =
-      reinterpret_cast<void*>(static_cast<uintptr_t>(it->second.WindowId));
+  nh.Handle = reinterpret_cast<void*>(static_cast<uintptr_t>(it->second.WindowId));
   return nh;
 }
 
-void X11WindowsBackend::SetClientSize(WindowHandle window,
-                                      Extent2D size) noexcept
+void X11WindowsBackend::SetClientSize(WindowHandle window, Extent2D size) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -520,8 +479,7 @@ const char* X11WindowsBackend::GetTitle(WindowHandle window) const noexcept
   return it->second.TitleStorage.c_str();
 }
 
-void X11WindowsBackend::SetPosition(WindowHandle window,
-                                    math::Int2 pos) noexcept
+void X11WindowsBackend::SetPosition(WindowHandle window, math::Int2 pos) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -540,8 +498,7 @@ math::Int2 X11WindowsBackend::GetPosition(WindowHandle window) const noexcept
   return it->second.Position;
 }
 
-void X11WindowsBackend::SetWindowState(WindowHandle window,
-                                       platform::WindowState state) noexcept
+void X11WindowsBackend::SetWindowState(WindowHandle window, platform::WindowState state) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -585,13 +542,11 @@ void X11WindowsBackend::SetWindowState(WindowHandle window,
   ::XFlush(m_Display);
   it->second.State = state;
 
-  m_Staged.push_back(MakeStagedEvent(
-      events::WindowStateChanged, events::WindowStateChangedPayload {
-                                      window, NowNsSafe(), oldState, state}));
+  m_Staged.push_back(MakeStagedEvent(events::WindowStateChanged,
+                                     events::WindowStateChangedPayload {window, NowNsSafe(), oldState, state}));
 }
 
-platform::WindowState X11WindowsBackend::GetWindowState(
-    WindowHandle window) const noexcept
+platform::WindowState X11WindowsBackend::GetWindowState(WindowHandle window) const noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -599,8 +554,7 @@ platform::WindowState X11WindowsBackend::GetWindowState(
   return it->second.State;
 }
 
-void X11WindowsBackend::SetDecorated(WindowHandle window,
-                                     bool decorated) noexcept
+void X11WindowsBackend::SetDecorated(WindowHandle window, bool decorated) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -630,8 +584,7 @@ void X11WindowsBackend::RequestFocus(WindowHandle window) noexcept
   ::XFlush(m_Display);
 }
 
-void X11WindowsBackend::SetResizable(WindowHandle window,
-                                     bool resizable) noexcept
+void X11WindowsBackend::SetResizable(WindowHandle window, bool resizable) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -681,8 +634,7 @@ bool X11WindowsBackend::IsResizable(WindowHandle window) const noexcept
   return it->second.Resizable;
 }
 
-void X11WindowsBackend::SetWindowMode(WindowHandle window,
-                                      WindowMode mode) noexcept
+void X11WindowsBackend::SetWindowMode(WindowHandle window, WindowMode mode) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -727,8 +679,7 @@ WindowMode X11WindowsBackend::GetWindowMode(WindowHandle window) const noexcept
   return it->second.Mode;
 }
 
-void X11WindowsBackend::SetWindowButtons(WindowHandle window,
-                                         WindowButtons buttons) noexcept
+void X11WindowsBackend::SetWindowButtons(WindowHandle window, WindowButtons buttons) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -739,8 +690,7 @@ void X11WindowsBackend::SetWindowButtons(WindowHandle window,
   ::XFlush(m_Display);
 }
 
-WindowButtons X11WindowsBackend::GetWindowButtons(
-    WindowHandle window) const noexcept
+WindowButtons X11WindowsBackend::GetWindowButtons(WindowHandle window) const noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end())
@@ -770,8 +720,7 @@ void X11WindowsBackend::SetMaxSize(WindowHandle window, Extent2D size) noexcept
     ApplySizeConstraints(it->second);
 }
 
-void X11WindowsBackend::SetAlwaysOnTop(WindowHandle window,
-                                       bool topmost) noexcept
+void X11WindowsBackend::SetAlwaysOnTop(WindowHandle window, bool topmost) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -781,8 +730,7 @@ void X11WindowsBackend::SetAlwaysOnTop(WindowHandle window,
 
   const int screen = DefaultScreen(m_Display);
   const ::Window root = RootWindow(m_Display, screen);
-  SendNetWmStateMessage(root, it->second.WindowId, topmost ? 1 : 0,
-                        m_NetWmStateAbove);
+  SendNetWmStateMessage(root, it->second.WindowId, topmost ? 1 : 0, m_NetWmStateAbove);
   ::XFlush(m_Display);
 }
 
@@ -794,8 +742,7 @@ bool X11WindowsBackend::IsAlwaysOnTop(WindowHandle window) const noexcept
   return it->second.AlwaysOnTop;
 }
 
-void X11WindowsBackend::SetCursorMode(WindowHandle window,
-                                      CursorMode mode) noexcept
+void X11WindowsBackend::SetCursorMode(WindowHandle window, CursorMode mode) noexcept
 {
   auto it = m_Windows.find(window.Id);
   if (it == m_Windows.end() || !m_Display)
@@ -809,17 +756,15 @@ void X11WindowsBackend::SetCursorMode(WindowHandle window,
     // Create an invisible cursor.
     Pixmap blank = ::XCreatePixmap(m_Display, xid, 1, 1, 1);
     XColor dummy {};
-    Cursor invisible =
-        ::XCreatePixmapCursor(m_Display, blank, blank, &dummy, &dummy, 0, 0);
+    Cursor invisible = ::XCreatePixmapCursor(m_Display, blank, blank, &dummy, &dummy, 0, 0);
     ::XDefineCursor(m_Display, xid, invisible);
     ::XFreeCursor(m_Display, invisible);
     ::XFreePixmap(m_Display, blank);
 
     if (mode == CursorMode::Locked)
     {
-      ::XGrabPointer(m_Display, xid, True,
-                     PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
-                     GrabModeAsync, GrabModeAsync, xid, None, CurrentTime);
+      ::XGrabPointer(m_Display, xid, True, PointerMotionMask | ButtonPressMask | ButtonReleaseMask, GrabModeAsync,
+                     GrabModeAsync, xid, None, CurrentTime);
     }
   }
   else
@@ -839,8 +784,7 @@ CursorMode X11WindowsBackend::GetCursorMode(WindowHandle window) const noexcept
   return it->second.Cursor;
 }
 
-void X11WindowsBackend::ApplyResizableHint(::Window w,
-                                           const WindowDesc& desc) noexcept
+void X11WindowsBackend::ApplyResizableHint(::Window w, const WindowDesc& desc) noexcept
 {
   if (!m_Display || w == 0)
     return;
@@ -866,14 +810,11 @@ void X11WindowsBackend::ApplyMotifDecorations(::Window w, bool enabled) noexcept
   hints.flags = MwmHintsDecorations;
   hints.decorations = enabled ? MwmDecorAll : 0UL;
 
-  ::XChangeProperty(m_Display, w, m_MotifWmHints, m_MotifWmHints, 32,
-                    PropModeReplace,
-                    reinterpret_cast<const unsigned char*>(&hints),
-                    static_cast<int>(sizeof(hints) / sizeof(long)));
+  ::XChangeProperty(m_Display, w, m_MotifWmHints, m_MotifWmHints, 32, PropModeReplace,
+                    reinterpret_cast<const unsigned char*>(&hints), static_cast<int>(sizeof(hints) / sizeof(long)));
 }
 
-void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons,
-                                            bool resizable) noexcept
+void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons, bool resizable) noexcept
 {
   if (!m_Display || w == 0 || m_MotifWmHints == 0)
     return;
@@ -886,10 +827,8 @@ void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons,
   unsigned long bytesAfter {};
   unsigned char* propData {};
 
-  if (::XGetWindowProperty(m_Display, w, m_MotifWmHints, 0,
-                           sizeof(MwmHints) / sizeof(long), False,
-                           m_MotifWmHints, &actualType, &actualFormat, &nItems,
-                           &bytesAfter, &propData) == Success &&
+  if (::XGetWindowProperty(m_Display, w, m_MotifWmHints, 0, sizeof(MwmHints) / sizeof(long), False, m_MotifWmHints,
+                           &actualType, &actualFormat, &nItems, &bytesAfter, &propData) == Success &&
       propData && nItems >= 5)
   {
     hints = *reinterpret_cast<MwmHints*>(propData);
@@ -909,34 +848,26 @@ void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons,
     funcs |= MwmFuncClose;
   hints.functions = funcs;
 
-  ::XChangeProperty(m_Display, w, m_MotifWmHints, m_MotifWmHints, 32,
-                    PropModeReplace,
-                    reinterpret_cast<const unsigned char*>(&hints),
-                    static_cast<int>(sizeof(hints) / sizeof(long)));
+  ::XChangeProperty(m_Display, w, m_MotifWmHints, m_MotifWmHints, 32, PropModeReplace,
+                    reinterpret_cast<const unsigned char*>(&hints), static_cast<int>(sizeof(hints) / sizeof(long)));
 }
 
-void X11WindowsBackend::ApplySizeConstraints(
-    const X11WindowState& state) noexcept
+void X11WindowsBackend::ApplySizeConstraints(const X11WindowState& state) noexcept
 {
   if (!m_Display || state.WindowId == 0)
     return;
 
   XSizeHints hints {};
   hints.flags = PMinSize | PMaxSize;
-  hints.min_width =
-      state.MinSize.Width > 0 ? static_cast<int>(state.MinSize.Width) : 1;
-  hints.min_height =
-      state.MinSize.Height > 0 ? static_cast<int>(state.MinSize.Height) : 1;
-  hints.max_width =
-      state.MaxSize.Width > 0 ? static_cast<int>(state.MaxSize.Width) : 32767;
-  hints.max_height =
-      state.MaxSize.Height > 0 ? static_cast<int>(state.MaxSize.Height) : 32767;
+  hints.min_width = state.MinSize.Width > 0 ? static_cast<int>(state.MinSize.Width) : 1;
+  hints.min_height = state.MinSize.Height > 0 ? static_cast<int>(state.MinSize.Height) : 1;
+  hints.max_width = state.MaxSize.Width > 0 ? static_cast<int>(state.MaxSize.Width) : 32767;
+  hints.max_height = state.MaxSize.Height > 0 ? static_cast<int>(state.MaxSize.Height) : 32767;
   ::XSetWMNormalHints(m_Display, state.WindowId, &hints);
   ::XFlush(m_Display);
 }
 
-void X11WindowsBackend::ApplyInitialWindowMode(::Window w, ::Window root,
-                                               const WindowDesc& desc) noexcept
+void X11WindowsBackend::ApplyInitialWindowMode(::Window w, ::Window root, const WindowDesc& desc) noexcept
 {
   if (!m_Display || w == 0)
     return;
@@ -956,8 +887,7 @@ void X11WindowsBackend::ApplyInitialWindowMode(::Window w, ::Window root,
     if (m_NetWmState != 0 && m_NetWmStateFullscreen != 0)
     {
       Atom atoms[1] = {m_NetWmStateFullscreen};
-      ::XChangeProperty(m_Display, w, m_NetWmState, XA_ATOM, 32,
-                        PropModeReplace,
+      ::XChangeProperty(m_Display, w, m_NetWmState, XA_ATOM, 32, PropModeReplace,
                         reinterpret_cast<const unsigned char*>(atoms), 1);
 
       // Also send a client message (some WMs prefer this path).
@@ -968,8 +898,7 @@ void X11WindowsBackend::ApplyInitialWindowMode(::Window w, ::Window root,
   }
 }
 
-void X11WindowsBackend::SendNetWmStateMessage(::Window root, ::Window w,
-                                              long action, Atom state1) noexcept
+void X11WindowsBackend::SendNetWmStateMessage(::Window root, ::Window w, long action, Atom state1) noexcept
 {
   if (!m_Display || root == 0 || w == 0 || m_NetWmState == 0 || state1 == 0)
     return;
@@ -988,8 +917,7 @@ void X11WindowsBackend::SendNetWmStateMessage(::Window root, ::Window w,
   ev.xclient.data.l[3] = 1;  // normal source indication
   ev.xclient.data.l[4] = 0;
 
-  ::XSendEvent(m_Display, root, False,
-               SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+  ::XSendEvent(m_Display, root, False, SubstructureRedirectMask | SubstructureNotifyMask, &ev);
 }
 
 u64 X11WindowsBackend::FindWindowId(::Window xid) const noexcept

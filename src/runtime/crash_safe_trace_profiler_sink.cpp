@@ -18,8 +18,7 @@ CrashSafeTraceProfilerSink::CrashSafeTraceProfilerSink(const char* path)
 {
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
-  m_Writer = ::gecko::platform::OpenWrite(
-      path, ::gecko::platform::WriteMode::Truncate);
+  m_Writer = ::gecko::platform::OpenWrite(path, ::gecko::platform::WriteMode::Truncate);
 
   if (m_Writer)
   {
@@ -53,8 +52,7 @@ void CrashSafeTraceProfilerSink::Write(const ProfEvent& event) noexcept
     EnsureValidJson();
 }
 
-void CrashSafeTraceProfilerSink::WriteBatch(
-    ::gecko::Span<const ProfEvent> events) noexcept
+void CrashSafeTraceProfilerSink::WriteBatch(::gecko::Span<const ProfEvent> events) noexcept
 {
   if (!m_Writer || events.empty())
     return;

@@ -19,8 +19,7 @@ struct AppConfig
   const char* title = "Gecko App";
   bool windowed = true;
   ::gecko::u32 maxFrames = 0;  ///< 0 = run until window closes.
-  ::gecko::platform::DisplayBackendKind backend =
-      ::gecko::platform::DisplayBackendKind::Auto;
+  ::gecko::platform::DisplayBackendKind backend = ::gecko::platform::DisplayBackendKind::Auto;
 };
 
 /// Minimal Gecko application.

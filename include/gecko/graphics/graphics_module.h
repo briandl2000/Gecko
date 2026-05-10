@@ -75,25 +75,20 @@ public:
 
   /// Construct with custom backends. Any null field is auto-created
   /// from `config` during `Startup`.
-  GECKO_API GraphicsModule(const GraphicsConfig& config,
-                           Backends backends) noexcept;
+  GECKO_API GraphicsModule(const GraphicsConfig& config, Backends backends) noexcept;
 
   GECKO_API ~GraphicsModule() noexcept override;
 
-  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
-      const noexcept override
+  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel() const noexcept override
   {
     return labels::Graphics;
   }
 
-  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires()
-      const noexcept override;
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires() const noexcept override;
 
-  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes()
-      const noexcept override;
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes() const noexcept override;
 
-  [[nodiscard]] GECKO_API bool Startup(
-      ::gecko::IModuleRegistry& modules) noexcept override;
+  [[nodiscard]] GECKO_API bool Startup(::gecko::IModuleRegistry& modules) noexcept override;
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 

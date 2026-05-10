@@ -26,8 +26,7 @@ struct Job
   std::atomic<bool> Completed {false};
 
   Job() = default;
-  Job(JobFn func, JobPriority prio, gecko::Label label,
-      JobHandle handle) noexcept
+  Job(JobFn func, JobPriority prio, gecko::Label label, JobHandle handle) noexcept
       : Function(func), Priority(prio), JobLabel(label), Handle(handle)
   {}
 
@@ -45,10 +44,8 @@ struct Job
 
   // Allow move operations
   Job(Job&& other) noexcept
-      : Function(other.Function), Priority(other.Priority),
-        JobLabel(other.JobLabel), Handle(other.Handle),
-        Dependencies(std::move(other.Dependencies)),
-        Completed(other.Completed.load())
+      : Function(other.Function), Priority(other.Priority), JobLabel(other.JobLabel), Handle(other.Handle),
+        Dependencies(std::move(other.Dependencies)), Completed(other.Completed.load())
   {
     other.Function = JobFn {};
   }
@@ -82,13 +79,10 @@ public:
     Shutdown();
   }
 
-  virtual JobHandle SubmitRaw(JobFn job,
-                              JobPriority priority = JobPriority::Normal,
+  virtual JobHandle SubmitRaw(JobFn job, JobPriority priority = JobPriority::Normal,
                               Label label = Label {}) noexcept override;
-  virtual JobHandle SubmitRaw(JobFn job, const JobHandle* dependencies,
-                              u32 dependencyCount,
-                              JobPriority priority = JobPriority::Normal,
-                              Label label = Label {}) noexcept override;
+  virtual JobHandle SubmitRaw(JobFn job, const JobHandle* dependencies, u32 dependencyCount,
+                              JobPriority priority = JobPriority::Normal, Label label = Label {}) noexcept override;
   virtual void Wait(JobHandle handle) noexcept override;
   virtual void WaitAll(const JobHandle* handles, u32 count) noexcept override;
   virtual bool IsComplete(JobHandle handle) noexcept override;
@@ -109,8 +103,7 @@ public:
 private:
   struct JobCompare
   {
-    bool operator()(const std::shared_ptr<Job>& a,
-                    const std::shared_ptr<Job>& b) const
+    bool operator()(const std::shared_ptr<Job>& a, const std::shared_ptr<Job>& b) const
     {
       // Higher priority jobs should come first (reverse order for
       // priority_queue)
@@ -127,9 +120,7 @@ private:
   std::condition_variable m_JobAvailable;
   std::condition_variable m_JobCompleted;
 
-  std::priority_queue<std::shared_ptr<Job>, std::vector<std::shared_ptr<Job>>,
-                      JobCompare>
-      m_JobQueue;
+  std::priority_queue<std::shared_ptr<Job>, std::vector<std::shared_ptr<Job>>, JobCompare> m_JobQueue;
   std::unordered_map<u64, std::shared_ptr<Job>> m_ActiveJobs;
 
   std::vector<std::thread> m_WorkerThreads;

@@ -11,8 +11,7 @@ void* operator new(::std::size_t size)
 
 void* operator new(::std::size_t size, ::std::align_val_t align)
 {
-  return ::gecko::AllocBytes(static_cast<::gecko::u64>(size),
-                             static_cast<::gecko::u32>(align));
+  return ::gecko::AllocBytes(static_cast<::gecko::u64>(size), static_cast<::gecko::u32>(align));
 }
 
 void* operator new(::std::size_t size, const ::std::nothrow_t&) noexcept

@@ -29,8 +29,7 @@ public:
   }
 
   virtual void Write(const ProfEvent& event) noexcept override;
-  virtual void WriteBatch(
-      ::gecko::Span<const ProfEvent> events) noexcept override;
+  virtual void WriteBatch(::gecko::Span<const ProfEvent> events) noexcept override;
   virtual void Flush() noexcept override;
 
 private:

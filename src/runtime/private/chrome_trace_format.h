@@ -9,8 +9,7 @@ namespace gecko::runtime::detail {
 // Single-event chrome://tracing JSON formatter shared by the crash-safe and
 // async trace sinks. `time0Ns` is the trace's start-of-time (subtract from
 // each event's TimestampNs to get a relative microsecond stamp).
-inline void WriteChromeTraceEvent(::gecko::platform::FileWriter* w,
-                                  const ProfEvent& event, u64 time0Ns) noexcept
+inline void WriteChromeTraceEvent(::gecko::platform::FileWriter* w, const ProfEvent& event, u64 time0Ns) noexcept
 {
   if (!w)
     return;
@@ -25,15 +24,13 @@ inline void WriteChromeTraceEvent(::gecko::platform::FileWriter* w,
     WriteFmt(w,
              "{\"name\":\"%s\",\"cat\":\"%s "
              "(%llu)\",\"ph\":\"B\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-             name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-             event.ThreadId);
+             name, label, (unsigned long long)event.EventLabel.Id, timeUs, event.ThreadId);
     break;
   case ProfEventKind::ZoneEnd:
     WriteFmt(w,
              "{\"name\":\"%s\",\"cat\":\"%s "
              "(%llu)\",\"ph\":\"E\",\"ts\":%.3f,\"pid\":1,\"tid\":%u}",
-             name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-             event.ThreadId);
+             name, label, (unsigned long long)event.EventLabel.Id, timeUs, event.ThreadId);
     break;
   case ProfEventKind::FrameMark:
     WriteFmt(w,
@@ -42,20 +39,17 @@ inline void WriteChromeTraceEvent(::gecko::platform::FileWriter* w,
              name, timeUs, event.ThreadId);
     break;
   case ProfEventKind::Counter:
-    WriteFmt(
-        w,
-        "{\"name\":\"%s\",\"cat\":\"%s "
-        "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
-        name, label, (unsigned long long)event.EventLabel.Id, timeUs,
-        (unsigned long long)event.Value);
+    WriteFmt(w,
+             "{\"name\":\"%s\",\"cat\":\"%s "
+             "(%llu)\",\"ph\":\"C\",\"ts\":%.3f,\"pid\":1,\"args\":{\"v\":%llu}}",
+             name, label, (unsigned long long)event.EventLabel.Id, timeUs, (unsigned long long)event.Value);
     break;
   }
 }
 
 // Emit a chrome-trace `thread_name` metadata record. Should be written once
 // per thread on first sight by sinks that care.
-inline void WriteChromeTraceThreadName(::gecko::platform::FileWriter* w,
-                                       u32 threadId, const char* name) noexcept
+inline void WriteChromeTraceThreadName(::gecko::platform::FileWriter* w, u32 threadId, const char* name) noexcept
 {
   if (!w || !name)
     return;

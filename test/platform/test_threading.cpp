@@ -47,14 +47,12 @@ TEST_CASE("SleepNanoseconds(0) is a no-op", "[platform][threading]")
   SUCCEED();
 }
 
-TEST_CASE("Non-zero sleep blocks for at least the requested time",
-          "[platform][threading]")
+TEST_CASE("Non-zero sleep blocks for at least the requested time", "[platform][threading]")
 {
   auto start = ::std::chrono::steady_clock::now();
   SleepNanoseconds(2'000'000ULL);
   auto elapsed = ::std::chrono::steady_clock::now() - start;
-  auto ns =
-      ::std::chrono::duration_cast<::std::chrono::nanoseconds>(elapsed).count();
+  auto ns = ::std::chrono::duration_cast<::std::chrono::nanoseconds>(elapsed).count();
   REQUIRE(ns >= 1'000'000);
 }
 

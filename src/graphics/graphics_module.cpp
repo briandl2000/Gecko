@@ -36,25 +36,21 @@ IGpuSampler* g_Sampler = nullptr;
 
 }  // namespace
 
-GraphicsModule::GraphicsModule(const GraphicsConfig& config) noexcept
-    : m_Config(config)
+GraphicsModule::GraphicsModule(const GraphicsConfig& config) noexcept : m_Config(config)
 {}
 
-GraphicsModule::GraphicsModule(const GraphicsConfig& config,
-                               Backends backends) noexcept
+GraphicsModule::GraphicsModule(const GraphicsConfig& config, Backends backends) noexcept
     : m_Config(config), m_Device(backends.Device)
 {}
 
 GraphicsModule::~GraphicsModule() noexcept = default;
 
-::gecko::Span<const ::gecko::ServiceId> GraphicsModule::Requires()
-    const noexcept
+::gecko::Span<const ::gecko::ServiceId> GraphicsModule::Requires() const noexcept
 {
   return ::gecko::Span<const ::gecko::ServiceId> {RequiredServices};
 }
 
-::gecko::Span<const ::gecko::ServiceId> GraphicsModule::Publishes()
-    const noexcept
+::gecko::Span<const ::gecko::ServiceId> GraphicsModule::Publishes() const noexcept
 {
   return ::gecko::Span<const ::gecko::ServiceId> {PublishedServices};
 }

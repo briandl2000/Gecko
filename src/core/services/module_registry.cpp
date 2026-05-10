@@ -45,15 +45,13 @@ struct ModuleRegistry::Impl
     return (it != Modules.end()) ? &it->second : nullptr;
   }
 
-  [[nodiscard]] const ModuleRecord* FindModuleRecord(
-      ::gecko::Label root) const noexcept
+  [[nodiscard]] const ModuleRecord* FindModuleRecord(::gecko::Label root) const noexcept
   {
     auto it = Modules.find(root.Id);
     return (it != Modules.end()) ? &it->second : nullptr;
   }
 
-  [[nodiscard]] bool StartupModule(ModuleRegistry& self,
-                                   ModuleRecord& rec) noexcept
+  [[nodiscard]] bool StartupModule(ModuleRegistry& self, ModuleRecord& rec) noexcept
   {
     if (rec.Started)
     {
@@ -61,8 +59,7 @@ struct ModuleRegistry::Impl
     }
     GECKO_ASSERT(rec.Module != nullptr);
     const char* name = rec.Root.Name ? rec.Root.Name : "Module::Startup";
-    ::gecko::ProfScope _scope_module_startup(::gecko::core::labels::Modules,
-                                             ::gecko::FNV1a(name), name,
+    ::gecko::ProfScope _scope_module_startup(::gecko::core::labels::Modules, ::gecko::FNV1a(name), name,
                                              ::gecko::ProfLevel::Normal);
     if (!rec.Module->Startup(self))
     {
@@ -168,8 +165,7 @@ void ModuleRegistry::Shutdown() noexcept
   m_impl.reset();
 }
 
-::gecko::ModuleRegistration ModuleRegistry::RegisterStatic(
-    ::gecko::IModule& module) noexcept
+::gecko::ModuleRegistration ModuleRegistry::RegisterStatic(::gecko::IModule& module) noexcept
 {
   GECKO_SCOPE(::gecko::core::labels::Modules);
 
@@ -178,30 +174,24 @@ void ModuleRegistry::Shutdown() noexcept
     m_impl.reset(new (::std::nothrow) Impl());
     if (!m_impl)
     {
-      return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
-                                          ::gecko::ModuleResult::OutOfMemory};
+      return ::gecko::ModuleRegistration {::gecko::ModuleHandle {}, ::gecko::ModuleResult::OutOfMemory};
     }
   }
 
   const ::gecko::Label root = module.RootLabel();
-  GECKO_INFO(::gecko::core::labels::Modules, "RegisterStatic: %s",
-             root.Name ? root.Name : "(unnamed)");
+  GECKO_INFO(::gecko::core::labels::Modules, "RegisterStatic: %s", root.Name ? root.Name : "(unnamed)");
 
   if (!root.IsValid())
   {
-    GECKO_WARN(::gecko::core::labels::Modules,
-               "RegisterStatic failed: invalid root label");
-    return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
-                                        ::gecko::ModuleResult::InvalidArgument};
+    GECKO_WARN(::gecko::core::labels::Modules, "RegisterStatic failed: invalid root label");
+    return ::gecko::ModuleRegistration {::gecko::ModuleHandle {}, ::gecko::ModuleResult::InvalidArgument};
   }
 
   if (m_impl->Modules.contains(root.Id))
   {
-    GECKO_WARN(::gecko::core::labels::Modules,
-               "RegisterStatic failed: duplicate module %s",
+    GECKO_WARN(::gecko::core::labels::Modules, "RegisterStatic failed: duplicate module %s",
                root.Name ? root.Name : "(unnamed)");
-    return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
-                                        ::gecko::ModuleResult::DuplicateModule};
+    return ::gecko::ModuleRegistration {::gecko::ModuleHandle {}, ::gecko::ModuleResult::DuplicateModule};
   }
 
   // Register module ID with event bus for event scoping
@@ -211,10 +201,8 @@ void ModuleRegistry::Shutdown() noexcept
     GECKO_WARN(::gecko::core::labels::Modules,
                "RegisterStatic failed: module ID %llu already registered with "
                "event bus for %s",
-               static_cast<unsigned long long>(root.Id),
-               root.Name ? root.Name : "(unnamed)");
-    return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
-                                        ::gecko::ModuleResult::DuplicateModule};
+               static_cast<unsigned long long>(root.Id), root.Name ? root.Name : "(unnamed)");
+    return ::gecko::ModuleRegistration {::gecko::ModuleHandle {}, ::gecko::ModuleResult::DuplicateModule};
   }
 
   Impl::ModuleRecord rec;
@@ -230,23 +218,18 @@ void ModuleRegistry::Shutdown() noexcept
     auto* inserted = m_impl->FindModuleRecord(root);
     if (!inserted)
     {
-      return ::gecko::ModuleRegistration {
-          ::gecko::ModuleHandle {}, ::gecko::ModuleResult::InvalidArgument};
+      return ::gecko::ModuleRegistration {::gecko::ModuleHandle {}, ::gecko::ModuleResult::InvalidArgument};
     }
     if (!m_impl->StartupModule(*this, *inserted))
     {
       (void)Unregister(root);
-      GECKO_ERROR(::gecko::core::labels::Modules, "Startup failed for %s",
-                  root.Name ? root.Name : "(unnamed)");
-      return ::gecko::ModuleRegistration {::gecko::ModuleHandle {},
-                                          ::gecko::ModuleResult::StartupFailed};
+      GECKO_ERROR(::gecko::core::labels::Modules, "Startup failed for %s", root.Name ? root.Name : "(unnamed)");
+      return ::gecko::ModuleRegistration {::gecko::ModuleHandle {}, ::gecko::ModuleResult::StartupFailed};
     }
   }
 
-  GECKO_INFO(::gecko::core::labels::Modules, "Registered: %s",
-             root.Name ? root.Name : "(unnamed)");
-  return ::gecko::ModuleRegistration {MakeHandle(root),
-                                      ::gecko::ModuleResult::Ok};
+  GECKO_INFO(::gecko::core::labels::Modules, "Registered: %s", root.Name ? root.Name : "(unnamed)");
+  return ::gecko::ModuleRegistration {MakeHandle(root), ::gecko::ModuleResult::Ok};
 }
 
 ::gecko::ModuleResult ModuleRegistry::Unregister(::gecko::Label module) noexcept
@@ -256,13 +239,11 @@ void ModuleRegistry::Shutdown() noexcept
     return ::gecko::ModuleResult::NotFound;
   }
 
-  GECKO_INFO(::gecko::core::labels::Modules, "Unregister: %s",
-             module.Name ? module.Name : "(unnamed)");
+  GECKO_INFO(::gecko::core::labels::Modules, "Unregister: %s", module.Name ? module.Name : "(unnamed)");
   auto it = m_impl->Modules.find(module.Id);
   if (it == m_impl->Modules.end())
   {
-    GECKO_WARN(::gecko::core::labels::Modules,
-               "Unregister failed: not found %s",
+    GECKO_WARN(::gecko::core::labels::Modules, "Unregister failed: not found %s",
                module.Name ? module.Name : "(unnamed)");
     return ::gecko::ModuleResult::NotFound;
   }
@@ -280,8 +261,7 @@ void ModuleRegistry::Shutdown() noexcept
 
   Impl::EraseFirstU64(m_impl->RegistrationOrder, module.Id);
   m_impl->Modules.erase(it);
-  GECKO_INFO(::gecko::core::labels::Modules, "Unregistered: %s",
-             module.Name ? module.Name : "(unnamed)");
+  GECKO_INFO(::gecko::core::labels::Modules, "Unregistered: %s", module.Name ? module.Name : "(unnamed)");
   return ::gecko::ModuleResult::Ok;
 }
 
@@ -295,8 +275,7 @@ void ModuleRegistry::Shutdown() noexcept
   return rec ? rec->Module : nullptr;
 }
 
-const ::gecko::IModule* ModuleRegistry::GetModule(
-    ::gecko::Label module) const noexcept
+const ::gecko::IModule* ModuleRegistry::GetModule(::gecko::Label module) const noexcept
 {
   if (!m_impl)
   {
@@ -387,12 +366,8 @@ bool ModuleRegistry::StartupAllModules() noexcept
         GECKO_ERROR(::gecko::core::labels::Modules,
                     "Duplicate service publisher: '%s' and '%s' both publish "
                     "service id 0x%016llx",
-                    nodes[existing].Module->RootLabel().Name
-                        ? nodes[existing].Module->RootLabel().Name
-                        : "(unnamed)",
-                    nodes[i].Module->RootLabel().Name
-                        ? nodes[i].Module->RootLabel().Name
-                        : "(unnamed)",
+                    nodes[existing].Module->RootLabel().Name ? nodes[existing].Module->RootLabel().Name : "(unnamed)",
+                    nodes[i].Module->RootLabel().Name ? nodes[i].Module->RootLabel().Name : "(unnamed)",
                     static_cast<unsigned long long>(pid.Value));
         return false;
       }
@@ -412,8 +387,7 @@ bool ModuleRegistry::StartupAllModules() noexcept
       // module (registered earlier and started in a previous
       // StartupAllModules invocation). In that case it's satisfied and
       // contributes no edge.
-      if (m_impl->FindServiceImpl(rid) != nullptr &&
-          findPublisher(rid.Value) < 0)
+      if (m_impl->FindServiceImpl(rid) != nullptr && findPublisher(rid.Value) < 0)
       {
         continue;
       }
@@ -424,9 +398,7 @@ bool ModuleRegistry::StartupAllModules() noexcept
         GECKO_ERROR(::gecko::core::labels::Modules,
                     "Module '%s' requires service id 0x%016llx but no "
                     "registered module publishes it",
-                    nodes[i].Module->RootLabel().Name
-                        ? nodes[i].Module->RootLabel().Name
-                        : "(unnamed)",
+                    nodes[i].Module->RootLabel().Name ? nodes[i].Module->RootLabel().Name : "(unnamed)",
                     static_cast<unsigned long long>(rid.Value));
         return false;
       }
@@ -488,8 +460,7 @@ bool ModuleRegistry::StartupAllModules() noexcept
     }
     if (!m_impl->StartupModule(*this, it->second))
     {
-      for (auto rit = startedThisCall.rbegin(); rit != startedThisCall.rend();
-           ++rit)
+      for (auto rit = startedThisCall.rbegin(); rit != startedThisCall.rend(); ++rit)
       {
         auto it2 = m_impl->Modules.find(*rit);
         if (it2 != m_impl->Modules.end())
@@ -518,8 +489,7 @@ void ModuleRegistry::ShutdownAllModules() noexcept
     return;
   }
 
-  GECKO_INFO(::gecko::core::labels::Modules, "ShutdownAllModules (booted=%s)",
-             m_impl->Booted ? "true" : "false");
+  GECKO_INFO(::gecko::core::labels::Modules, "ShutdownAllModules (booted=%s)", m_impl->Booted ? "true" : "false");
 
   // Shutdown in REVERSE order of successful Startup completion. This is
   // the inverse of the topological order computed by StartupAllModules
@@ -527,8 +497,7 @@ void ModuleRegistry::ShutdownAllModules() noexcept
   // module is always torn down before any module it transitively
   // depended on. ShutdownModule erases from StartupOrder, so we copy
   // the ids out first to avoid iterator invalidation.
-  std::vector<u64> shutdownOrder(m_impl->StartupOrder.rbegin(),
-                                 m_impl->StartupOrder.rend());
+  std::vector<u64> shutdownOrder(m_impl->StartupOrder.rbegin(), m_impl->StartupOrder.rend());
   for (u64 id : shutdownOrder)
   {
     auto it = m_impl->Modules.find(id);
@@ -543,8 +512,7 @@ void ModuleRegistry::ShutdownAllModules() noexcept
   m_impl->Booted = false;
 }
 
-bool ModuleRegistry::PublishServiceImpl(::gecko::ServiceId id,
-                                        void* impl) noexcept
+bool ModuleRegistry::PublishServiceImpl(::gecko::ServiceId id, void* impl) noexcept
 {
   if (impl == nullptr)
   {

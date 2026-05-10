@@ -98,8 +98,7 @@ TEST_CASE("VertexAttribute default is invalid", "[graphics][objects]")
   REQUIRE_FALSE(static_cast<bool>(attr));
 }
 
-TEST_CASE("VertexAttribute constructed from format is valid",
-          "[graphics][objects]")
+TEST_CASE("VertexAttribute constructed from format is valid", "[graphics][objects]")
 {
   VertexAttribute attr {DataFormat::R32G32B32_FLOAT, "Position"};
   REQUIRE(attr.IsValid());
@@ -128,8 +127,7 @@ TEST_CASE("VertexLayout with attributes is valid", "[graphics][objects]")
   REQUIRE(layout.Attributes[1].Offset == 12);
 }
 
-TEST_CASE("VertexLayout AddAttribute ignores DataFormat::None",
-          "[graphics][objects]")
+TEST_CASE("VertexLayout AddAttribute ignores DataFormat::None", "[graphics][objects]")
 {
   VertexLayout layout;
   layout.AddAttribute(DataFormat::None, "Bad");
@@ -138,8 +136,7 @@ TEST_CASE("VertexLayout AddAttribute ignores DataFormat::None",
   REQUIRE_FALSE(layout.IsValid());
 }
 
-TEST_CASE("VertexLayout AddAttribute mixed valid and invalid formats",
-          "[graphics][objects]")
+TEST_CASE("VertexLayout AddAttribute mixed valid and invalid formats", "[graphics][objects]")
 {
   VertexLayout layout;
   layout.AddAttribute(DataFormat::R32G32B32_FLOAT, "Position");
@@ -169,8 +166,7 @@ TEST_CASE("VertexBufferDesc valid when all fields set", "[graphics][objects]")
   REQUIRE(desc.IsValid());
 }
 
-TEST_CASE("VertexBufferDesc invalid when NumVertices is 0",
-          "[graphics][objects]")
+TEST_CASE("VertexBufferDesc invalid when NumVertices is 0", "[graphics][objects]")
 {
   VertexBufferDesc desc {
       .NumVertices = 0,
@@ -228,8 +224,7 @@ TEST_CASE("RenderTargetDesc valid with depth-only", "[graphics][objects]")
   REQUIRE(desc.IsValid());
 }
 
-TEST_CASE("RenderTargetDesc invalid when no target format",
-          "[graphics][objects]")
+TEST_CASE("RenderTargetDesc invalid when no target format", "[graphics][objects]")
 {
   RenderTargetDesc desc;
   desc.Width = 1280;
@@ -246,8 +241,7 @@ TEST_CASE("GraphicsPipelineDesc default is invalid", "[graphics][objects]")
   REQUIRE_FALSE(desc.IsValid());
 }
 
-TEST_CASE("GraphicsPipelineDesc valid with shader path and render target",
-          "[graphics][objects]")
+TEST_CASE("GraphicsPipelineDesc valid with shader path and render target", "[graphics][objects]")
 {
   static constexpr ::gecko::byte DummySpv[] = {::gecko::byte {0}};
   GraphicsPipelineDesc desc;
@@ -297,8 +291,7 @@ TEST_CASE("SwapchainDesc valid with width/height/format", "[graphics][objects]")
 
 // ── ClearValue helpers ────────────────────────────────────────────────────
 
-TEST_CASE("ClearValue::RenderTarget sets correct type and color",
-          "[graphics][objects]")
+TEST_CASE("ClearValue::RenderTarget sets correct type and color", "[graphics][objects]")
 {
   auto cv = ClearValue::RenderTarget(0.1F, 0.2F, 0.3F, 1.0F);
   REQUIRE(cv.Type == ClearValueType::RenderTarget);
@@ -306,8 +299,7 @@ TEST_CASE("ClearValue::RenderTarget sets correct type and color",
   REQUIRE(cv.Color[3] == 1.0F);
 }
 
-TEST_CASE("ClearValue::DepthStencil sets correct type and values",
-          "[graphics][objects]")
+TEST_CASE("ClearValue::DepthStencil sets correct type and values", "[graphics][objects]")
 {
   auto cv = ClearValue::DepthStencil(1.0F, 0);
   REQUIRE(cv.Type == ClearValueType::DepthStencil);

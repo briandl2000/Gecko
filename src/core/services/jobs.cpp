@@ -19,8 +19,7 @@ JobHandle NullJobSystem::SubmitRaw(JobFn job, JobPriority, Label) noexcept
   return JobHandle {};
 }
 
-JobHandle NullJobSystem::SubmitRaw(JobFn job, const JobHandle*, u32,
-                                   JobPriority, Label) noexcept
+JobHandle NullJobSystem::SubmitRaw(JobFn job, const JobHandle*, u32, JobPriority, Label) noexcept
 {
   RunAndFree(job);
   return JobHandle {};

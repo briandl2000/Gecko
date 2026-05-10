@@ -62,13 +62,12 @@ TEST_CASE("EventBus subscribe and immediate delivery", "[runtime][events]")
   EventEmitter emitter = scope.eventBus.CreateEmitter(1, 0);
 
   int received = 0;
-  auto sub = scope.eventBus.Subscribe(
-      TestEvent1,
-      [](void* user, const EventMeta&, EventView) {
-        auto* count = static_cast<int*>(user);
-        *count += 1;
-      },
-      &received, {.delivery = SubscriptionDelivery::Immediate});
+  auto sub = scope.eventBus.Subscribe(TestEvent1,
+                                      [](void* user, const EventMeta&, EventView) {
+                                        auto* count = static_cast<int*>(user);
+                                        *count += 1;
+                                      },
+                                      &received, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {42};
   scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
@@ -116,12 +115,9 @@ TEST_CASE("EventBus unsubscribe via RAII", "[runtime][events]")
 
   int received = 0;
   {
-    auto sub = scope.eventBus.Subscribe(
-        TestEvent1,
-        [](void* user, const EventMeta&, EventView) {
-          *static_cast<int*>(user) += 1;
-        },
-        &received, {.delivery = SubscriptionDelivery::Immediate});
+    auto sub = scope.eventBus.Subscribe(TestEvent1,
+                                        [](void* user, const EventMeta&, EventView) { *static_cast<int*>(user) += 1; },
+                                        &received, {.delivery = SubscriptionDelivery::Immediate});
 
     PayloadData data {1};
     scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
@@ -145,19 +141,13 @@ TEST_CASE("EventBus multiple subscribers", "[runtime][events]")
   int count1 = 0;
   int count2 = 0;
 
-  auto sub1 = scope.eventBus.Subscribe(
-      TestEvent1,
-      [](void* user, const EventMeta&, EventView) {
-        *static_cast<int*>(user) += 1;
-      },
-      &count1, {.delivery = SubscriptionDelivery::Immediate});
+  auto sub1 = scope.eventBus.Subscribe(TestEvent1,
+                                       [](void* user, const EventMeta&, EventView) { *static_cast<int*>(user) += 1; },
+                                       &count1, {.delivery = SubscriptionDelivery::Immediate});
 
-  auto sub2 = scope.eventBus.Subscribe(
-      TestEvent1,
-      [](void* user, const EventMeta&, EventView) {
-        *static_cast<int*>(user) += 1;
-      },
-      &count2, {.delivery = SubscriptionDelivery::Immediate});
+  auto sub2 = scope.eventBus.Subscribe(TestEvent1,
+                                       [](void* user, const EventMeta&, EventView) { *static_cast<int*>(user) += 1; },
+                                       &count2, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {1};
   scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
@@ -178,19 +168,13 @@ TEST_CASE("EventBus different event codes stay separate", "[runtime][events]")
   int count1 = 0;
   int count2 = 0;
 
-  auto sub1 = scope.eventBus.Subscribe(
-      TestEvent1,
-      [](void* user, const EventMeta&, EventView) {
-        *static_cast<int*>(user) += 1;
-      },
-      &count1, {.delivery = SubscriptionDelivery::Immediate});
+  auto sub1 = scope.eventBus.Subscribe(TestEvent1,
+                                       [](void* user, const EventMeta&, EventView) { *static_cast<int*>(user) += 1; },
+                                       &count1, {.delivery = SubscriptionDelivery::Immediate});
 
-  auto sub2 = scope.eventBus.Subscribe(
-      TestEvent2,
-      [](void* user, const EventMeta&, EventView) {
-        *static_cast<int*>(user) += 1;
-      },
-      &count2, {.delivery = SubscriptionDelivery::Immediate});
+  auto sub2 = scope.eventBus.Subscribe(TestEvent2,
+                                       [](void* user, const EventMeta&, EventView) { *static_cast<int*>(user) += 1; },
+                                       &count2, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {1};
   scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));
@@ -209,13 +193,12 @@ TEST_CASE("EventBus payload delivery", "[runtime][events]")
   EventEmitter emitter = scope.eventBus.CreateEmitter(1, 0);
 
   int capturedValue = 0;
-  auto sub = scope.eventBus.Subscribe(
-      TestEvent1,
-      [](void* user, const EventMeta&, EventView payload) {
-        auto* data = static_cast<const PayloadData*>(payload.Data());
-        *static_cast<int*>(user) = data->Value;
-      },
-      &capturedValue, {.delivery = SubscriptionDelivery::Immediate});
+  auto sub = scope.eventBus.Subscribe(TestEvent1,
+                                      [](void* user, const EventMeta&, EventView payload) {
+                                        auto* data = static_cast<const PayloadData*>(payload.Data());
+                                        *static_cast<int*>(user) = data->Value;
+                                      },
+                                      &capturedValue, {.delivery = SubscriptionDelivery::Immediate});
 
   PayloadData data {999};
   scope.eventBus.Send(emitter, TestEvent1, MakePayload(data));

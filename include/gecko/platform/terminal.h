@@ -53,12 +53,10 @@ enum class TermStream : ::gecko::u8
 /// and virtual-terminal mode is enabled where supported. When `stream`
 /// is not a TTY (redirection or pipe) colour is suppressed so captured
 /// output never contains raw escape sequences.
-GECKO_API void Print(TermStream stream, TermColor fg,
-                     ::std::string_view text) noexcept;
+GECKO_API void Print(TermStream stream, TermColor fg, ::std::string_view text) noexcept;
 
 /// Convenience: write `text` followed by a newline.
-GECKO_API void PrintLine(TermStream stream, TermColor fg,
-                         ::std::string_view text) noexcept;
+GECKO_API void PrintLine(TermStream stream, TermColor fg, ::std::string_view text) noexcept;
 
 /// Default-colour overload.
 inline void Print(TermStream stream, ::std::string_view text) noexcept

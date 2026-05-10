@@ -57,8 +57,7 @@ struct FeaturePlatformScope
     return cfg;
   }
 
-  FeaturePlatformScope()
-      : Runtime(Jobs, Profiler, Logger, Events), Platform(MakeAutoConfig())
+  FeaturePlatformScope() : Runtime(Jobs, Profiler, Logger, Events), Platform(MakeAutoConfig())
   {
     if (!HasLiveDisplay())
       SKIP("No live display server available");

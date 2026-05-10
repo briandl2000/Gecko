@@ -14,8 +14,7 @@ namespace gecko::examples::platform_example {
 namespace {
 
 constexpr ::gecko::Label App_Label = ::gecko::MakeLabel("app.platform_example");
-constexpr ::gecko::Label Main_Label =
-    ::gecko::MakeLabel("app.platform_example.main");
+constexpr ::gecko::Label Main_Label = ::gecko::MakeLabel("app.platform_example.main");
 
 const char* WindowModeToString(::gecko::platform::WindowMode mode) noexcept
 {
@@ -79,8 +78,7 @@ App::App()
   if (!m_AllocScope)
     return;
 
-  m_Engine = ::gecko::Engine::Create(
-      {&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
+  m_Engine = ::gecko::Engine::Create({&m_RuntimeModule, &m_PlatformModule, &m_AppModule});
   if (!m_Engine)
     return;
 
@@ -140,20 +138,17 @@ void App::SubscribeWindowEvents()
       events::WindowCloseRequested,
       [](void* user, const ::gecko::EventMeta&, ::gecko::EventView view) {
         auto* self = static_cast<App*>(user);
-        const auto* p = static_cast<const events::WindowCloseRequestedPayload*>(
-            view.Data());
+        const auto* p = static_cast<const events::WindowCloseRequestedPayload*>(view.Data());
         if (p->Window == self->m_MainWindow)
         {
           self->m_Running = false;
           return;
         }
-        for (auto it = self->m_SpawnedWindows.begin();
-             it != self->m_SpawnedWindows.end(); ++it)
+        for (auto it = self->m_SpawnedWindows.begin(); it != self->m_SpawnedWindows.end(); ++it)
         {
           if (*it == p->Window)
           {
-            GECKO_INFO(Main_Label, "Child window %llu closed",
-                       static_cast<unsigned long long>(it->Id));
+            GECKO_INFO(Main_Label, "Child window %llu closed", static_cast<unsigned long long>(it->Id));
             Windows().DestroyWindow(*it);
             self->m_SpawnedWindows.erase(it);
             break;
@@ -166,8 +161,7 @@ void App::SubscribeWindowEvents()
       events::WindowKey,
       [](void* user, const ::gecko::EventMeta&, ::gecko::EventView view) {
         auto* self = static_cast<App*>(user);
-        const auto* p =
-            static_cast<const events::WindowKeyPayload*>(view.Data());
+        const auto* p = static_cast<const events::WindowKeyPayload*>(view.Data());
         if (!p->Down || p->Repeat)
           return;
         self->OnKey(p->Key);
@@ -177,10 +171,8 @@ void App::SubscribeWindowEvents()
   m_FocusSub = ::gecko::SubscribeEvent(
       events::WindowFocusChanged,
       [](void*, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowFocusChangedPayload*>(view.Data());
-        GECKO_INFO(Main_Label, "WindowFocus: id=%llu focused=%u",
-                   static_cast<unsigned long long>(p->Window.Id),
+        const auto* p = static_cast<const events::WindowFocusChangedPayload*>(view.Data());
+        GECKO_INFO(Main_Label, "WindowFocus: id=%llu focused=%u", static_cast<unsigned long long>(p->Window.Id),
                    static_cast<unsigned>(p->Focused));
       },
       nullptr);
@@ -188,33 +180,27 @@ void App::SubscribeWindowEvents()
   m_MovedSub = ::gecko::SubscribeEvent(
       events::WindowMoved,
       [](void*, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowMovedPayload*>(view.Data());
-        GECKO_INFO(Main_Label, "WindowMoved: id=%llu pos=(%d, %d)",
-                   static_cast<unsigned long long>(p->Window.Id), p->X, p->Y);
+        const auto* p = static_cast<const events::WindowMovedPayload*>(view.Data());
+        GECKO_INFO(Main_Label, "WindowMoved: id=%llu pos=(%d, %d)", static_cast<unsigned long long>(p->Window.Id), p->X,
+                   p->Y);
       },
       nullptr);
 
   m_ResizedSub = ::gecko::SubscribeEvent(
       events::WindowResized,
       [](void*, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowResizedPayload*>(view.Data());
-        GECKO_INFO(Main_Label, "WindowResized: id=%llu size=%ux%u",
-                   static_cast<unsigned long long>(p->Window.Id), p->Width,
-                   p->Height);
+        const auto* p = static_cast<const events::WindowResizedPayload*>(view.Data());
+        GECKO_INFO(Main_Label, "WindowResized: id=%llu size=%ux%u", static_cast<unsigned long long>(p->Window.Id),
+                   p->Width, p->Height);
       },
       nullptr);
 
   m_StateChangedSub = ::gecko::SubscribeEvent(
       events::WindowStateChanged,
       [](void*, const ::gecko::EventMeta&, ::gecko::EventView view) {
-        const auto* p =
-            static_cast<const events::WindowStateChangedPayload*>(view.Data());
-        GECKO_INFO(Main_Label, "WindowStateChanged: id=%llu %s -> %s",
-                   static_cast<unsigned long long>(p->Window.Id),
-                   WindowStateToString(p->OldState),
-                   WindowStateToString(p->NewState));
+        const auto* p = static_cast<const events::WindowStateChangedPayload*>(view.Data());
+        GECKO_INFO(Main_Label, "WindowStateChanged: id=%llu %s -> %s", static_cast<unsigned long long>(p->Window.Id),
+                   WindowStateToString(p->OldState), WindowStateToString(p->NewState));
       },
       nullptr);
 }
@@ -226,8 +212,7 @@ int App::Run()
 
   // Frame callback is also used during Win32 modal drag/resize so the
   // app keeps ticking.
-  ::gecko::platform::SetModalFrameCallback(
-      [](void* ud) { static_cast<App*>(ud)->RunFrame(); }, this);
+  ::gecko::platform::SetModalFrameCallback([](void* ud) { static_cast<App*>(ud)->RunFrame(); }, this);
 
   GECKO_INFO(Main_Label, "Entering main loop...");
   while (m_Running && Windows().IsWindowAlive(m_MainWindow))
@@ -265,22 +250,18 @@ void App::PollInput()
   {
     MouseButton Btn;
     const char* Name;
-  } Buttons[] = {{MouseButton::Left, "Left"},
-                 {MouseButton::Right, "Right"},
-                 {MouseButton::Middle, "Middle"}};
+  } Buttons[] = {{MouseButton::Left, "Left"}, {MouseButton::Right, "Right"}, {MouseButton::Middle, "Middle"}};
   for (const auto& b : Buttons)
   {
     if (input->WasMouseButtonPressed(b.Btn))
     {
       auto p = input->GetMousePosition();
-      GECKO_INFO(Main_Label, "Input: %s mouse pressed at (%d, %d)", b.Name, p.X,
-                 p.Y);
+      GECKO_INFO(Main_Label, "Input: %s mouse pressed at (%d, %d)", b.Name, p.X, p.Y);
     }
     if (input->WasMouseButtonReleased(b.Btn))
     {
       auto p = input->GetMousePosition();
-      GECKO_INFO(Main_Label, "Input: %s mouse released at (%d, %d)", b.Name,
-                 p.X, p.Y);
+      GECKO_INFO(Main_Label, "Input: %s mouse released at (%d, %d)", b.Name, p.X, p.Y);
     }
   }
 
@@ -397,8 +378,7 @@ void App::HandleSpawnKey(::gecko::platform::KeyCode key)
     }
     {
       WindowHandle last = m_SpawnedWindows.back();
-      GECKO_INFO(Main_Label, "Closing last spawned window (id=%llu)",
-                 static_cast<unsigned long long>(last.Id));
+      GECKO_INFO(Main_Label, "Closing last spawned window (id=%llu)", static_cast<unsigned long long>(last.Id));
       Windows().DestroyWindow(last);
       m_SpawnedWindows.pop_back();
     }
@@ -411,8 +391,7 @@ void App::HandleSpawnKey(::gecko::platform::KeyCode key)
   if (h.IsValid())
   {
     m_SpawnedWindows.push_back(h);
-    GECKO_INFO(Main_Label, "Spawned '%s' (id=%llu)", desc.Title,
-               static_cast<unsigned long long>(h.Id));
+    GECKO_INFO(Main_Label, "Spawned '%s' (id=%llu)", desc.Title, static_cast<unsigned long long>(h.Id));
   }
 }
 
@@ -427,32 +406,26 @@ void App::HandleMainWindowKey(::gecko::platform::KeyCode key)
   case KeyCode::D: {
     const bool decorated = windows.IsDecorated(main);
     windows.SetDecorated(main, !decorated);
-    GECKO_INFO(Main_Label, "Decorations: %s -> %s", BoolStr(decorated),
-               BoolStr(!decorated));
+    GECKO_INFO(Main_Label, "Decorations: %s -> %s", BoolStr(decorated), BoolStr(!decorated));
     return;
   }
   case KeyCode::R: {
     const bool resizable = windows.IsResizable(main);
     windows.SetResizable(main, !resizable);
-    GECKO_INFO(Main_Label, "Resizable: %s -> %s", BoolStr(resizable),
-               BoolStr(!resizable));
+    GECKO_INFO(Main_Label, "Resizable: %s -> %s", BoolStr(resizable), BoolStr(!resizable));
     return;
   }
   case KeyCode::F: {
     const WindowMode mode = windows.GetWindowMode(main);
-    const WindowMode next = (mode == WindowMode::Windowed)
-                                ? WindowMode::BorderlessFullscreen
-                                : WindowMode::Windowed;
+    const WindowMode next = (mode == WindowMode::Windowed) ? WindowMode::BorderlessFullscreen : WindowMode::Windowed;
     windows.SetWindowMode(main, next);
-    GECKO_INFO(Main_Label, "Window mode: %s -> %s", WindowModeToString(mode),
-               WindowModeToString(next));
+    GECKO_INFO(Main_Label, "Window mode: %s -> %s", WindowModeToString(mode), WindowModeToString(next));
     return;
   }
   case KeyCode::T: {
     const bool topmost = windows.IsAlwaysOnTop(main);
     windows.SetAlwaysOnTop(main, !topmost);
-    GECKO_INFO(Main_Label, "Always on top: %s -> %s", BoolStr(topmost),
-               BoolStr(!topmost));
+    GECKO_INFO(Main_Label, "Always on top: %s -> %s", BoolStr(topmost), BoolStr(!topmost));
     return;
   }
   case KeyCode::M: {
@@ -471,8 +444,7 @@ void App::HandleMainWindowKey(::gecko::platform::KeyCode key)
       break;
     }
     windows.SetWindowState(main, next);
-    GECKO_INFO(Main_Label, "Window state: %s -> %s", WindowStateToString(st),
-               WindowStateToString(next));
+    GECKO_INFO(Main_Label, "Window state: %s -> %s", WindowStateToString(st), WindowStateToString(next));
     return;
   }
   default:
@@ -490,30 +462,24 @@ void App::HandleTitleBarButtonsKey(::gecko::platform::KeyCode key)
   switch (key)
   {
   case KeyCode::D5: {
-    const WindowButtons next = Any(btns & WindowButtons::Close)
-                                   ? (btns & ~WindowButtons::Close)
-                                   : (btns | WindowButtons::Close);
+    const WindowButtons next =
+        Any(btns & WindowButtons::Close) ? (btns & ~WindowButtons::Close) : (btns | WindowButtons::Close);
     windows.SetWindowButtons(main, next);
-    GECKO_INFO(Main_Label, "Close button: %s",
-               BoolStr(Any(next & WindowButtons::Close)));
+    GECKO_INFO(Main_Label, "Close button: %s", BoolStr(Any(next & WindowButtons::Close)));
     return;
   }
   case KeyCode::D6: {
-    const WindowButtons next = Any(btns & WindowButtons::Minimize)
-                                   ? (btns & ~WindowButtons::Minimize)
-                                   : (btns | WindowButtons::Minimize);
+    const WindowButtons next =
+        Any(btns & WindowButtons::Minimize) ? (btns & ~WindowButtons::Minimize) : (btns | WindowButtons::Minimize);
     windows.SetWindowButtons(main, next);
-    GECKO_INFO(Main_Label, "Minimize button: %s",
-               BoolStr(Any(next & WindowButtons::Minimize)));
+    GECKO_INFO(Main_Label, "Minimize button: %s", BoolStr(Any(next & WindowButtons::Minimize)));
     return;
   }
   case KeyCode::D7: {
-    const WindowButtons next = Any(btns & WindowButtons::Maximize)
-                                   ? (btns & ~WindowButtons::Maximize)
-                                   : (btns | WindowButtons::Maximize);
+    const WindowButtons next =
+        Any(btns & WindowButtons::Maximize) ? (btns & ~WindowButtons::Maximize) : (btns | WindowButtons::Maximize);
     windows.SetWindowButtons(main, next);
-    GECKO_INFO(Main_Label, "Maximize button: %s",
-               BoolStr(Any(next & WindowButtons::Maximize)));
+    GECKO_INFO(Main_Label, "Maximize button: %s", BoolStr(Any(next & WindowButtons::Maximize)));
     return;
   }
   case KeyCode::D8:
@@ -587,24 +553,15 @@ void App::PrintWindowInfo()
   GECKO_INFO(Main_Label, "----- Window Info -----");
   GECKO_INFO(Main_Label, "  Size:          %ux%u", size.Width, size.Height);
   GECKO_INFO(Main_Label, "  Position:      (%d, %d)", pos.X, pos.Y);
-  GECKO_INFO(Main_Label, "  DPI:           %u (scale %.2f)", dpi.Dpi,
-             static_cast<double>(dpi.Scale));
-  GECKO_INFO(Main_Label, "  Native:        backend=%u handle=%p",
-             static_cast<unsigned>(native.Backend), native.Handle);
-  GECKO_INFO(Main_Label, "  Mode:          %s",
-             WindowModeToString(windows.GetWindowMode(main)));
-  GECKO_INFO(Main_Label, "  State:         %s",
-             WindowStateToString(windows.GetWindowState(main)));
-  GECKO_INFO(Main_Label, "  Decorated:     %s",
-             BoolStr(windows.IsDecorated(main)));
-  GECKO_INFO(Main_Label, "  Resizable:     %s",
-             BoolStr(windows.IsResizable(main)));
-  GECKO_INFO(Main_Label, "  Always on top: %s",
-             BoolStr(windows.IsAlwaysOnTop(main)));
-  GECKO_INFO(Main_Label, "  Buttons:       close=%s min=%s max=%s",
-             BoolStr(Any(btns & WindowButtons::Close)),
-             BoolStr(Any(btns & WindowButtons::Minimize)),
-             BoolStr(Any(btns & WindowButtons::Maximize)));
+  GECKO_INFO(Main_Label, "  DPI:           %u (scale %.2f)", dpi.Dpi, static_cast<double>(dpi.Scale));
+  GECKO_INFO(Main_Label, "  Native:        backend=%u handle=%p", static_cast<unsigned>(native.Backend), native.Handle);
+  GECKO_INFO(Main_Label, "  Mode:          %s", WindowModeToString(windows.GetWindowMode(main)));
+  GECKO_INFO(Main_Label, "  State:         %s", WindowStateToString(windows.GetWindowState(main)));
+  GECKO_INFO(Main_Label, "  Decorated:     %s", BoolStr(windows.IsDecorated(main)));
+  GECKO_INFO(Main_Label, "  Resizable:     %s", BoolStr(windows.IsResizable(main)));
+  GECKO_INFO(Main_Label, "  Always on top: %s", BoolStr(windows.IsAlwaysOnTop(main)));
+  GECKO_INFO(Main_Label, "  Buttons:       close=%s min=%s max=%s", BoolStr(Any(btns & WindowButtons::Close)),
+             BoolStr(Any(btns & WindowButtons::Minimize)), BoolStr(Any(btns & WindowButtons::Maximize)));
 }
 
 void App::PrintInputSnapshot()
@@ -619,23 +576,17 @@ void App::PrintInputSnapshot()
   const auto delta = input->GetMouseDelta();
   const auto focused = input->FocusedWindow();
   const auto hovered = input->HoveredWindow();
-  const bool shift = input->IsKeyDown(KeyCode::LeftShift) ||
-                     input->IsKeyDown(KeyCode::RightShift);
-  const bool ctrl = input->IsKeyDown(KeyCode::LeftControl) ||
-                    input->IsKeyDown(KeyCode::RightControl);
+  const bool shift = input->IsKeyDown(KeyCode::LeftShift) || input->IsKeyDown(KeyCode::RightShift);
+  const bool ctrl = input->IsKeyDown(KeyCode::LeftControl) || input->IsKeyDown(KeyCode::RightControl);
 
   GECKO_INFO(Main_Label, "----- Input snapshot -----");
-  GECKO_INFO(Main_Label, "  Mouse:    pos=(%d, %d) delta=(%d, %d) scrollY=%.2f",
-             pos.X, pos.Y, delta.X, delta.Y,
+  GECKO_INFO(Main_Label, "  Mouse:    pos=(%d, %d) delta=(%d, %d) scrollY=%.2f", pos.X, pos.Y, delta.X, delta.Y,
              static_cast<double>(input->GetMouseScrollY()));
-  GECKO_INFO(Main_Label, "  Buttons:  L=%s R=%s M=%s",
-             input->IsMouseButtonDown(MouseButton::Left) ? "down" : "up",
+  GECKO_INFO(Main_Label, "  Buttons:  L=%s R=%s M=%s", input->IsMouseButtonDown(MouseButton::Left) ? "down" : "up",
              input->IsMouseButtonDown(MouseButton::Right) ? "down" : "up",
              input->IsMouseButtonDown(MouseButton::Middle) ? "down" : "up");
-  GECKO_INFO(Main_Label, "  Modifiers: shift=%s ctrl=%s", BoolStr(shift),
-             BoolStr(ctrl));
-  GECKO_INFO(Main_Label, "  Focused=%llu Hovered=%llu",
-             static_cast<unsigned long long>(focused.Id),
+  GECKO_INFO(Main_Label, "  Modifiers: shift=%s ctrl=%s", BoolStr(shift), BoolStr(ctrl));
+  GECKO_INFO(Main_Label, "  Focused=%llu Hovered=%llu", static_cast<unsigned long long>(focused.Id),
              static_cast<unsigned long long>(hovered.Id));
 }
 

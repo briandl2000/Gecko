@@ -16,8 +16,7 @@
 using namespace gecko;
 using namespace gecko::platform;
 
-TEST_CASE("Live backend: IInput service is published",
-          "[feature][platform][input]")
+TEST_CASE("Live backend: IInput service is published", "[feature][platform][input]")
 {
   if (!::gecko::test::HasLiveDisplay())
     SKIP("No live display available");
@@ -26,8 +25,7 @@ TEST_CASE("Live backend: IInput service is published",
   REQUIRE(GetInput() != nullptr);
 }
 
-TEST_CASE("Live backend: IInput initial state is empty",
-          "[feature][platform][input]")
+TEST_CASE("Live backend: IInput initial state is empty", "[feature][platform][input]")
 {
   if (!::gecko::test::HasLiveDisplay())
     SKIP("No live display available");
@@ -41,8 +39,7 @@ TEST_CASE("Live backend: IInput initial state is empty",
   REQUIRE(in->GetMouseScrollY() == 0.0f);
 }
 
-TEST_CASE("Live backend: PumpEvents auto-rolls input edges without crashing",
-          "[feature][platform][input]")
+TEST_CASE("Live backend: PumpEvents auto-rolls input edges without crashing", "[feature][platform][input]")
 {
   if (!::gecko::test::HasLiveDisplay())
     SKIP("No live display available");
@@ -57,8 +54,7 @@ TEST_CASE("Live backend: PumpEvents auto-rolls input edges without crashing",
   SUCCEED("PumpEvents+DispatchEvents loop completed");
 }
 
-TEST_CASE("Live backend: IInput accessors safe to query with no input",
-          "[feature][platform][input]")
+TEST_CASE("Live backend: IInput accessors safe to query with no input", "[feature][platform][input]")
 {
   if (!::gecko::test::HasLiveDisplay())
     SKIP("No live display available");
@@ -89,8 +85,7 @@ TEST_CASE("Live backend: IInput accessors safe to query with no input",
 // see the backend doing its thing, then asserts the IInput service
 // stayed coherent across the loop (no service drop-out, no crash on
 // repeated NewFrame via PumpEvents).
-TEST_CASE("Live backend: visible IInput showcase",
-          "[.visible][feature][platform][input][window]")
+TEST_CASE("Live backend: visible IInput showcase", "[.visible][feature][platform][input][window]")
 {
   ::gecko::test::FeaturePlatformScope scope;
 
@@ -124,8 +119,7 @@ TEST_CASE("Live backend: visible IInput showcase",
 // whatever the user types. Always passes — the goal is a visible demo
 // that the OS → events::WindowChar → IInput::GetTypedText pipeline is
 // alive on the current backend.
-TEST_CASE("Live backend: visible IInput typed-text showcase",
-          "[.visible][feature][platform][input][text][window]")
+TEST_CASE("Live backend: visible IInput typed-text showcase", "[.visible][feature][platform][input][text][window]")
 {
   ::gecko::test::FeaturePlatformScope scope;
 

@@ -55,9 +55,8 @@ public:
   /// directly without going through the module registry.
   struct Backends
   {
-    IWindowsBackend* Windows = nullptr;  ///< Optional injected window backend.
-    IMonitorsBackend* Monitors =
-        nullptr;  ///< Optional injected monitor backend.
+    IWindowsBackend* Windows = nullptr;    ///< Optional injected window backend.
+    IMonitorsBackend* Monitors = nullptr;  ///< Optional injected monitor backend.
   };
 
   /// Construct with a `PlatformConfig` and OS-default backends.
@@ -66,24 +65,19 @@ public:
   /// Construct with `config` plus caller-injected `backends`.
   /// @param config    Platform configuration.
   /// @param backends  Backend injection (any null field is auto-created).
-  GECKO_API PlatformModule(const PlatformConfig& config,
-                           Backends backends) noexcept;
+  GECKO_API PlatformModule(const PlatformConfig& config, Backends backends) noexcept;
   GECKO_API ~PlatformModule() noexcept override;
 
-  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel()
-      const noexcept override
+  [[nodiscard]] constexpr GECKO_API ::gecko::Label RootLabel() const noexcept override
   {
     return labels::Platform;
   }
 
-  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires()
-      const noexcept override;
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Requires() const noexcept override;
 
-  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes()
-      const noexcept override;
+  [[nodiscard]] GECKO_API ::gecko::Span<const ::gecko::ServiceId> Publishes() const noexcept override;
 
-  [[nodiscard]] GECKO_API bool Startup(
-      ::gecko::IModuleRegistry& modules) noexcept override;
+  [[nodiscard]] GECKO_API bool Startup(::gecko::IModuleRegistry& modules) noexcept override;
 
   GECKO_API void Shutdown(::gecko::IModuleRegistry& modules) noexcept override;
 
@@ -132,7 +126,6 @@ GECKO_API void PumpEvents() noexcept;
 /// @param callback  Function to invoke each modal-loop tick, or `nullptr` to
 /// clear.
 /// @param userData  Opaque value passed back to `callback`.
-GECKO_API void SetModalFrameCallback(IWindowsBackend::ModalFrameFn callback,
-                                     void* userData) noexcept;
+GECKO_API void SetModalFrameCallback(IWindowsBackend::ModalFrameFn callback, void* userData) noexcept;
 
 }  // namespace gecko::platform

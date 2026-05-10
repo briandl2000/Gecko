@@ -279,8 +279,7 @@ enum class ColorWriteMask : u8
 
 /// Compute the full mip-chain count for a 2D texture of `width` x
 /// `height`. Returns `0` if either dimension is zero.
-[[nodiscard]] constexpr u32 CalculateNumberOfMips(u32 width,
-                                                  u32 height) noexcept
+[[nodiscard]] constexpr u32 CalculateNumberOfMips(u32 width, u32 height) noexcept
 {
   if (width == 0 || height == 0)
     return 0;
@@ -308,8 +307,7 @@ struct VertexAttribute
   VertexAttribute() = default;
 
   VertexAttribute(DataFormat format, const char* name) noexcept
-      : Name(name), AttributeFormat(format), Size(FormatSizeInBytes(format)),
-        Offset(0)
+      : Name(name), AttributeFormat(format), Size(FormatSizeInBytes(format)), Offset(0)
   {}
 
   [[nodiscard]] bool IsValid() const noexcept
@@ -323,8 +321,7 @@ struct VertexAttribute
 
   [[nodiscard]] bool operator==(const VertexAttribute& other) const noexcept
   {
-    return AttributeFormat == other.AttributeFormat && Size == other.Size &&
-           Offset == other.Offset;
+    return AttributeFormat == other.AttributeFormat && Size == other.Size && Offset == other.Offset;
   }
 };
 
@@ -383,8 +380,7 @@ struct ClearValue
   f32 Depth {1.0F};
   u8 Stencil {0};
 
-  [[nodiscard]] static constexpr ClearValue RenderTarget(f32 r, f32 g, f32 b,
-                                                         f32 a) noexcept
+  [[nodiscard]] static constexpr ClearValue RenderTarget(f32 r, f32 g, f32 b, f32 a) noexcept
   {
     ClearValue cv;
     cv.Type = ClearValueType::RenderTarget;
@@ -395,8 +391,7 @@ struct ClearValue
     return cv;
   }
 
-  [[nodiscard]] static constexpr ClearValue DepthStencil(f32 depth,
-                                                         u8 stencil) noexcept
+  [[nodiscard]] static constexpr ClearValue DepthStencil(f32 depth, u8 stencil) noexcept
   {
     ClearValue cv;
     cv.Type = ClearValueType::DepthStencil;
@@ -442,8 +437,7 @@ struct PipelineResource
   ShaderType ShaderVisibility {ShaderType::All};
   u32 NumResources {1};
 
-  [[nodiscard]] static constexpr PipelineResource TextureBinding(
-      u32 count, ShaderType visibility) noexcept
+  [[nodiscard]] static constexpr PipelineResource TextureBinding(u32 count, ShaderType visibility) noexcept
   {
     return PipelineResource {
         .Type = ResourceType::Texture,
@@ -452,8 +446,7 @@ struct PipelineResource
     };
   }
 
-  [[nodiscard]] static constexpr PipelineResource RWTextureBinding(
-      u32 count, ShaderType visibility) noexcept
+  [[nodiscard]] static constexpr PipelineResource RWTextureBinding(u32 count, ShaderType visibility) noexcept
   {
     return PipelineResource {
         .Type = ResourceType::RWTexture,
@@ -462,8 +455,7 @@ struct PipelineResource
     };
   }
 
-  [[nodiscard]] static constexpr PipelineResource ConstantBufferBinding(
-      u32 count, ShaderType visibility) noexcept
+  [[nodiscard]] static constexpr PipelineResource ConstantBufferBinding(u32 count, ShaderType visibility) noexcept
   {
     return PipelineResource {
         .Type = ResourceType::ConstantBuffer,
@@ -472,8 +464,7 @@ struct PipelineResource
     };
   }
 
-  [[nodiscard]] static constexpr PipelineResource StructuredBufferBinding(
-      u32 count, ShaderType visibility) noexcept
+  [[nodiscard]] static constexpr PipelineResource StructuredBufferBinding(u32 count, ShaderType visibility) noexcept
   {
     return PipelineResource {
         .Type = ResourceType::StructuredBuffer,
@@ -482,8 +473,7 @@ struct PipelineResource
     };
   }
 
-  [[nodiscard]] static constexpr PipelineResource RWStructuredBufferBinding(
-      u32 count, ShaderType visibility) noexcept
+  [[nodiscard]] static constexpr PipelineResource RWStructuredBufferBinding(u32 count, ShaderType visibility) noexcept
   {
     return PipelineResource {
         .Type = ResourceType::RWStructuredBuffer,
@@ -492,8 +482,7 @@ struct PipelineResource
     };
   }
 
-  [[nodiscard]] static constexpr PipelineResource SamplerBinding(
-      u32 count, ShaderType visibility) noexcept
+  [[nodiscard]] static constexpr PipelineResource SamplerBinding(u32 count, ShaderType visibility) noexcept
   {
     return PipelineResource {
         .Type = ResourceType::Sampler,
@@ -666,8 +655,8 @@ struct TextureDesc
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return Width > 0 && Height > 0 && Format != DataFormat::None &&
-           Type != TextureType::None && Memory != MemoryType::None;
+    return Width > 0 && Height > 0 && Format != DataFormat::None && Type != TextureType::None &&
+           Memory != MemoryType::None;
   }
   explicit operator bool() const noexcept
   {
@@ -776,8 +765,7 @@ struct GraphicsPipelineDesc
   VertexLayout Layout {};
 
   u32 NumRenderTargets {0};
-  DataFormat RenderTargetFormats[RenderTargetDesc::MaxRenderTargets] {
-      DataFormat::None};
+  DataFormat RenderTargetFormats[RenderTargetDesc::MaxRenderTargets] {DataFormat::None};
   DataFormat DepthStencilFormat {DataFormat::None};
 
   static constexpr u32 MaxPipelineResources = 32;
@@ -808,8 +796,7 @@ struct GraphicsPipelineDesc
       if (RenderTargetFormats[i] == DataFormat::None)
         return false;
     }
-    if (PushConstantBytes > MaxPushConstantBytes ||
-        (PushConstantBytes % 4) != 0)
+    if (PushConstantBytes > MaxPushConstantBytes || (PushConstantBytes % 4) != 0)
       return false;
     return true;
   }
@@ -854,8 +841,7 @@ struct ComputePipelineDesc
   {
     if (!ComputeShader.IsValid())
       return false;
-    if (PushConstantBytes > MaxPushConstantBytes ||
-        (PushConstantBytes % 4) != 0)
+    if (PushConstantBytes > MaxPushConstantBytes || (PushConstantBytes % 4) != 0)
       return false;
     return true;
   }
@@ -895,8 +881,7 @@ struct SwapchainDesc
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return Width > 0 && Height > 0 && NumBackBuffers > 0 &&
-           Format != DataFormat::None;
+    return Width > 0 && Height > 0 && NumBackBuffers > 0 && Format != DataFormat::None;
   }
   explicit operator bool() const noexcept
   {
