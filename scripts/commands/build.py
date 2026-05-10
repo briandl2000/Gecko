@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
 
 from scripts.commands import BUILD_DIR, _REPO_ROOT, _is_windows
 
@@ -12,10 +13,9 @@ _CONFIGS = {
     "release": "Release",
 }
 
-# Test targets are EXCLUDE_FROM_ALL in CMake (to keep `cmake --build` fast for
-# development); when GECKO_BUILD_TESTS=ON we still want `gk build` to build
-# them so cross-compile flows (gk-pi, Windows mirror) get test binaries
-# alongside the engine and examples. Keep this in sync with
+# Test targets are EXCLUDE_FROM_ALL in CMake to keep `gk build` fast for the
+# day-to-day edit/build/run loop. They are only built when the user runs
+# `gk build tests` or `gk test`. Keep this in sync with
 # scripts/commands/test.py.
 _TEST_TARGETS = (
     "core_tests",
@@ -27,20 +27,6 @@ _TEST_TARGETS = (
     "runtime_feature_tests",
     "graphics_feature_tests",
 )
-
-
-def _tests_enabled() -> bool:
-    cache_file = os.path.join(BUILD_DIR, "CMakeCache.txt")
-    if not os.path.isfile(cache_file):
-        return False
-    try:
-        with open(cache_file) as f:
-            for line in f:
-                if line.strip() == "GECKO_BUILD_TESTS:BOOL=ON":
-                    return True
-    except OSError:
-        return False
-    return False
 
 
 def _auto_configure() -> int:
@@ -86,17 +72,33 @@ def register(subparsers) -> None:
         help="Build the engine (Debug/Release)",
     )
     parser.add_argument(
-        "config",
+        "what",
         nargs="?",
         default="debug",
-        choices=["debug", "release", "all"],
-        help="Build configuration",
+        help="What to build: debug | release | all | tests",
+    )
+    parser.add_argument(
+        "config",
+        nargs="?",
+        default=None,
+        help="Config when 'what' is 'tests' (debug | release, default debug)",
     )
     parser.set_defaults(handler=_run)
 
 
+def _build(build_dir_rel: str, cmake_config: str,
+           targets: tuple[str, ...] = ()) -> int:
+    cmd = ["cmake", "--build", build_dir_rel, "--config", cmake_config]
+    if targets:
+        cmd += ["--target", *targets]
+    return subprocess.run(cmd, cwd=_REPO_ROOT, check=False).returncode
+
+
 def _run(args) -> int:
-    if not os.path.isdir(BUILD_DIR) or not os.path.isfile(os.path.join(BUILD_DIR, "CMakeCache.txt")):
+    start = time.perf_counter()
+
+    if (not os.path.isdir(BUILD_DIR)
+            or not os.path.isfile(os.path.join(BUILD_DIR, "CMakeCache.txt"))):
         rc = _auto_configure()
         if rc != 0:
             return rc
@@ -106,56 +108,37 @@ def _run(args) -> int:
     # cannot use as a working directory).
     build_dir_rel = os.path.relpath(BUILD_DIR, _REPO_ROOT)
 
-    if args.config == "all":
-        result = subprocess.run(
-            ["cmake", "--build", build_dir_rel, "--config", "Debug"],
-            cwd=_REPO_ROOT,
-            check=False,
-        )
-        if result.returncode != 0:
-            return result.returncode
+    what = args.what.lower()
 
-        if _tests_enabled():
-            result = subprocess.run(
-                ["cmake", "--build", build_dir_rel, "--config", "Debug",
-                 "--target", *_TEST_TARGETS],
-                cwd=_REPO_ROOT,
-                check=False,
-            )
-            if result.returncode != 0:
-                return result.returncode
+    # `gk build tests [config]` -> build only the test targets.
+    if what == "tests":
+        cfg = (args.config or "debug").lower()
+        if cfg not in _CONFIGS:
+            print(f"Unknown test config: {cfg!r} (expected debug or release)")
+            return 2
+        rc = _build(build_dir_rel, _CONFIGS[cfg], _TEST_TARGETS)
+        _report(start, rc)
+        return rc
 
-        result = subprocess.run(
-            ["cmake", "--build", build_dir_rel, "--config", "Release"],
-            cwd=_REPO_ROOT,
-            check=False,
-        )
-        if result.returncode != 0:
-            return result.returncode
+    # `gk build all` -> both configs, engine + examples only.
+    if what == "all":
+        rc = _build(build_dir_rel, "Debug")
+        if rc == 0:
+            rc = _build(build_dir_rel, "Release")
+        _report(start, rc)
+        return rc
 
-        if _tests_enabled():
-            result = subprocess.run(
-                ["cmake", "--build", build_dir_rel, "--config", "Release",
-                 "--target", *_TEST_TARGETS],
-                cwd=_REPO_ROOT,
-                check=False,
-            )
-        return result.returncode
-    else:
-        cmake_config = _CONFIGS[args.config]
-        result = subprocess.run(
-            ["cmake", "--build", build_dir_rel, "--config", cmake_config],
-            cwd=_REPO_ROOT,
-            check=False,
-        )
-        if result.returncode != 0:
-            return result.returncode
+    if what not in _CONFIGS:
+        print(f"Unknown build target: {what!r} "
+              f"(expected debug, release, all, or tests)")
+        return 2
 
-        if _tests_enabled():
-            result = subprocess.run(
-                ["cmake", "--build", build_dir_rel, "--config", cmake_config,
-                 "--target", *_TEST_TARGETS],
-                cwd=_REPO_ROOT,
-                check=False,
-            )
-        return result.returncode
+    rc = _build(build_dir_rel, _CONFIGS[what])
+    _report(start, rc)
+    return rc
+
+
+def _report(start: float, rc: int) -> None:
+    elapsed = time.perf_counter() - start
+    status = "ok" if rc == 0 else f"FAILED ({rc})"
+    print(f"[gk build] {status} in {elapsed:.2f}s")
