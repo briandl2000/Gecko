@@ -104,6 +104,7 @@ private:
   WindowSlot m_Slots[2] {};
 
   ::gecko::graphics::RenderTarget m_OffscreenRT {};
+  ::gecko::graphics::RenderTarget m_DepthRT {};
   ::gecko::graphics::Texture m_PlasmaTex[2] {};
   ::gecko::graphics::Buffer m_VertexBuffer {};
   ::gecko::graphics::Buffer m_IndirectBuffer {};

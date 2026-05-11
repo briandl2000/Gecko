@@ -51,17 +51,9 @@ public:
   [[nodiscard]]
   GECKO_API virtual bool IsValid() const noexcept = 0;
 
-  /// Begin a render pass against a single render target.
-  /// @param color  Color render target to render into.
-  /// @param clear  Optional clear value applied to the color attachment.
-  GECKO_API virtual void BeginRendering(const RenderTarget& color, const ClearValue* clear = nullptr) noexcept = 0;
-
-  /// Begin a render pass against multiple color targets and an optional depth.
-  /// @param colors  Color render targets (one entry per attachment).
-  /// @param depth   Optional depth/stencil render target.
-  /// @param clears  Per-attachment clear values; pass empty span to load.
-  GECKO_API virtual void BeginRendering(::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
-                                        ::std::span<const ClearValue> clears) noexcept = 0;
+  /// Begin a render pass using a single descriptor object.
+  /// @param info  Render pass setup, including attachments and clear/load behavior.
+  GECKO_API virtual void BeginRendering(const BeginRenderingInfo& info) noexcept = 0;
 
   /// End the current render pass started by `BeginRendering`.
   GECKO_API virtual void EndRendering() noexcept = 0;

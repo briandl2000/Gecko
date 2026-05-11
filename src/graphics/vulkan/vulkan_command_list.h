@@ -41,9 +41,8 @@ public:
     return m_CmdBuffer != VK_NULL_HANDLE;
   }
 
-  void BeginRendering(const RenderTarget& color, const ClearValue* clear) noexcept override;
-  void BeginRendering(::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
-                      ::std::span<const ClearValue> clears) noexcept override;
+  void BeginRendering(const BeginRenderingInfo& info) noexcept override;
+
   void EndRendering() noexcept override;
 
   void SetViewport(f32 x, f32 y, f32 w, f32 h, f32 minD, f32 maxD) noexcept override;
@@ -116,10 +115,14 @@ private:
   TouchedSwapchain m_Touched[MaxSwapchainsPerSubmit] {};
   u32 m_TouchedCount {0};
 
-  // Track the single-RT rendering in-progress for proper layout transitions.
+  // Track the rendering in-progress for proper layout transitions in
+  // EndRendering. Offscreen color textures get flipped to SHADER_READ so
+  // they can be sampled in a subsequent pass; depth stays in its
+  // attachment layout for the next BeginRendering to pick up.
   VulkanSwapchainData* m_ActiveSwapchain {nullptr};
   u32 m_ActiveSwapchainImageIndex {0};
-  struct VulkanRTData* m_ActiveOffscreenRT {nullptr};
+  struct VulkanTextureData* m_ActiveColorTex[RenderTargetDesc::MaxRenderTargets] {};
+  u32 m_NumActiveColorTex {0};
 
   // Pipeline currently bound for graphics; used by BindTexture to source
   // the descriptor-set layout for ad-hoc descriptor sets.

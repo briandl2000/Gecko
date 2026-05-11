@@ -68,7 +68,7 @@ void VulkanCommandList::Begin() noexcept
   m_TouchedCount = 0;
   m_ActiveSwapchain = nullptr;
   m_ActiveSwapchainImageIndex = 0;
-  m_ActiveOffscreenRT = nullptr;
+  m_NumActiveColorTex = 0;
   m_CurrentPipeline = nullptr;
   m_CurrentDescSet = VK_NULL_HANDLE;
 }
@@ -240,82 +240,126 @@ void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
   m_Touched[m_TouchedCount++] = {rtd->SwapchainData, rtd->FrameIndex, rtd->ImageIndex};
 }
 
-void VulkanCommandList::BeginRendering(const RenderTarget& color, const ClearValue* clear) noexcept
-{
-  GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BeginRendering");
-  if (!color.Data)
-    return;
-  auto* rtd = static_cast<VulkanRTData*>(color.Data.get());
-
-  MaybeRecordSwapchain(color);
-
-  if (rtd->RTKind == VulkanRTData::Kind::Swapchain)
-  {
-    TransitionToColorAttachment(rtd->SwapchainData, rtd->ImageIndex);
-    m_ActiveSwapchain = rtd->SwapchainData;
-    m_ActiveSwapchainImageIndex = rtd->ImageIndex;
-  }
-  else
-  {
-    for (u32 i = 0; i < rtd->NumOffscreen; ++i)
-    {
-      auto* td = rtd->OffscreenTex[i];
-      if (td == nullptr)
-        continue;
-      TransitionImage(td->Image, td->Aspect, td->CurrentLayout, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-      td->CurrentLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    }
-    m_ActiveOffscreenRT = rtd;
-  }
-
-  VkRenderingAttachmentInfo colorAtt {};
-  colorAtt.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-  colorAtt.imageView = rtd->ImageView;
-  colorAtt.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-  colorAtt.loadOp = clear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
-  colorAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-  if (clear != nullptr && clear->Type == ClearValueType::RenderTarget)
-  {
-    colorAtt.clearValue.color.float32[0] = clear->Color[0];
-    colorAtt.clearValue.color.float32[1] = clear->Color[1];
-    colorAtt.clearValue.color.float32[2] = clear->Color[2];
-    colorAtt.clearValue.color.float32[3] = clear->Color[3];
-  }
-
-  VkRenderingInfo renderingInfo {};
-  renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-  renderingInfo.renderArea.extent = {color.Desc.Width, color.Desc.Height};
-  renderingInfo.layerCount = 1;
-  renderingInfo.colorAttachmentCount = 1;
-  renderingInfo.pColorAttachments = &colorAtt;
-  vkCmdBeginRendering(m_CmdBuffer, &renderingInfo);
-}
-
-void VulkanCommandList::BeginRendering(::std::span<const RenderTarget* const> colors, const RenderTarget* depth,
-                                       ::std::span<const ClearValue> clears) noexcept
+void VulkanCommandList::BeginRendering(const BeginRenderingInfo& info) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::BeginRendering(MRT)");
-  if (colors.empty() && depth == nullptr)
+  if (info.Colors.empty() && info.Depth == nullptr)
     return;
+
+  if (info.Colors.size() > RenderTargetDesc::MaxRenderTargets)
+  {
+    GECKO_WARN(labels::Vulkan, "VulkanCommandList::BeginRendering: too many render targets (%zu), max is %u",
+               info.Colors.size(), RenderTargetDesc::MaxRenderTargets);
+    return;
+  }
+
+  if (info.ClearColors.size() > 0 && info.Colors.size() != info.ClearColors.size())
+  {
+    GECKO_WARN(labels::Vulkan, "VulkanCommandList::BeginRendering: colors/clears size mismatch (%zu vs %zu)",
+               info.Colors.size(), info.ClearColors.size());
+    return;
+  }
+
+  // Collect all required layout transitions into a single
+  // vkCmdPipelineBarrier. One barrier per offscreen attachment
+  // (color + optional depth) is cheap to batch; swapchain images still
+  // go through the legacy single-image helper (it handles the
+  // PRESENT->COLOR stage masks specially).
+  constexpr u32 MaxBarriers = RenderTargetDesc::MaxRenderTargets + 1;
+  VkImageMemoryBarrier barriers[MaxBarriers] {};
+  u32 barrierCount = 0;
+  VkPipelineStageFlags srcStage = 0;
+  VkPipelineStageFlags dstStage = 0;
+
+  auto addBarrier = [&](VulkanTextureData* td, VkImageLayout newLayout) noexcept {
+    if (td == nullptr || td->CurrentLayout == newLayout)
+      return;
+
+    VkAccessFlags srcAccess = 0;
+    VkAccessFlags dstAccess = 0;
+    VkPipelineStageFlags sStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkPipelineStageFlags dStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+    switch (td->CurrentLayout)
+    {
+    case VK_IMAGE_LAYOUT_UNDEFINED:
+      sStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      srcAccess = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      sStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
+      srcAccess = VK_ACCESS_SHADER_READ_BIT;
+      sStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      srcAccess = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      sStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+      break;
+    default:
+      break;
+    }
+
+    switch (newLayout)
+    {
+    case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+      dstAccess = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      dStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+      break;
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+      dstAccess = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      dStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+      break;
+    default:
+      break;
+    }
+
+    auto& b = barriers[barrierCount++];
+    b.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    b.oldLayout = td->CurrentLayout;
+    b.newLayout = newLayout;
+    b.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    b.image = td->Image;
+    b.subresourceRange.aspectMask = td->Aspect;
+    b.subresourceRange.baseMipLevel = 0;
+    b.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+    b.subresourceRange.baseArrayLayer = 0;
+    b.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+    b.srcAccessMask = srcAccess;
+    b.dstAccessMask = dstAccess;
+
+    srcStage |= sStage;
+    dstStage |= dStage;
+    td->CurrentLayout = newLayout;
+  };
 
   VkRenderingAttachmentInfo colorAtts[RenderTargetDesc::MaxRenderTargets] {};
   u32 width = 0;
   u32 height = 0;
   u32 validCount = 0;
 
-  for (u32 i = 0; i < colors.size(); ++i)
+  for (u32 i = 0; i < info.Colors.size(); ++i)
   {
-    const RenderTarget* c = colors[i];
-    if (c == nullptr || !c->Data)
+    const RenderTarget& c = info.Colors[i];
+    if (!c.Data)
       continue;
-    auto* rtd = static_cast<VulkanRTData*>(c->Data.get());
+    auto* rtd = static_cast<VulkanRTData*>(c.Data.get());
 
-    MaybeRecordSwapchain(*c);
+    MaybeRecordSwapchain(c);
     if (rtd->RTKind == VulkanRTData::Kind::Swapchain)
     {
       TransitionToColorAttachment(rtd->SwapchainData, rtd->ImageIndex);
       m_ActiveSwapchain = rtd->SwapchainData;
       m_ActiveSwapchainImageIndex = rtd->ImageIndex;
+    }
+    else
+    {
+      auto* td = rtd->OffscreenTex;
+      addBarrier(td, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+      if (td != nullptr && m_NumActiveColorTex < RenderTargetDesc::MaxRenderTargets)
+        m_ActiveColorTex[m_NumActiveColorTex++] = td;
     }
 
     const u32 slot = validCount++;
@@ -323,18 +367,40 @@ void VulkanCommandList::BeginRendering(::std::span<const RenderTarget* const> co
     colorAtts[slot].imageView = rtd->ImageView;
     colorAtts[slot].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    const bool hasClear = clears.size() > i;
+    const bool hasClear = info.ClearColors.size() > i;
     colorAtts[slot].loadOp = hasClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
     colorAtts[slot].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     if (hasClear)
     {
-      colorAtts[slot].clearValue.color.float32[0] = clears[i].Color[0];
-      colorAtts[slot].clearValue.color.float32[1] = clears[i].Color[1];
-      colorAtts[slot].clearValue.color.float32[2] = clears[i].Color[2];
-      colorAtts[slot].clearValue.color.float32[3] = clears[i].Color[3];
+      colorAtts[slot].clearValue.color.float32[0] = info.ClearColors[i].Color[0];
+      colorAtts[slot].clearValue.color.float32[1] = info.ClearColors[i].Color[1];
+      colorAtts[slot].clearValue.color.float32[2] = info.ClearColors[i].Color[2];
+      colorAtts[slot].clearValue.color.float32[3] = info.ClearColors[i].Color[3];
     }
-    width = c->Desc.Width;
-    height = c->Desc.Height;
+    width = c.Desc.Width;
+    height = c.Desc.Height;
+  }
+
+  VkRenderingAttachmentInfo depthAtt {};
+  if (info.Depth && info.Depth->Data)
+  {
+    auto* rtd = static_cast<VulkanRTData*>(info.Depth->Data.get());
+    addBarrier(rtd->OffscreenTex, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    depthAtt.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depthAtt.imageView = rtd->ImageView;
+    depthAtt.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    const bool hasClear = info.DepthClear != nullptr;
+    depthAtt.loadOp = hasClear ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD;
+    depthAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    if (hasClear)
+      depthAtt.clearValue.depthStencil.depth = info.DepthClear->Depth;
+  }
+
+  // Single batched barrier for all offscreen attachments.
+  if (barrierCount > 0)
+  {
+    vkCmdPipelineBarrier(m_CmdBuffer, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, barrierCount, barriers);
   }
 
   VkRenderingInfo renderingInfo {};
@@ -343,8 +409,9 @@ void VulkanCommandList::BeginRendering(::std::span<const RenderTarget* const> co
   renderingInfo.layerCount = 1;
   renderingInfo.colorAttachmentCount = validCount;
   renderingInfo.pColorAttachments = colorAtts;
-  // Depth handling is deferred with offscreen RT implementation.
-  (void)depth;
+  if (info.Depth && info.Depth->Data)
+    renderingInfo.pDepthAttachment = &depthAtt;
+
   vkCmdBeginRendering(m_CmdBuffer, &renderingInfo);
 }
 
@@ -360,19 +427,19 @@ void VulkanCommandList::EndRendering() noexcept
     m_ActiveSwapchainImageIndex = 0;
   }
 
-  if (m_ActiveOffscreenRT != nullptr)
+  if (m_NumActiveColorTex != 0)
   {
     // Flip offscreen color attachments to SHADER_READ so subsequent
     // BindTexture within this same command buffer can sample them.
-    for (u32 i = 0; i < m_ActiveOffscreenRT->NumOffscreen; ++i)
+    for (u32 i = 0; i < m_NumActiveColorTex; ++i)
     {
-      auto* td = m_ActiveOffscreenRT->OffscreenTex[i];
+      auto* td = m_ActiveColorTex[i];
       if (td == nullptr)
         continue;
       TransitionImage(td->Image, td->Aspect, td->CurrentLayout, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
       td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
-    m_ActiveOffscreenRT = nullptr;
+    m_NumActiveColorTex = 0;
   }
 }
 

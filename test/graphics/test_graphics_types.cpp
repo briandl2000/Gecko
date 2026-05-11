@@ -209,27 +209,25 @@ TEST_CASE("RenderTargetDesc valid with color target", "[graphics][objects]")
   RenderTargetDesc desc;
   desc.Width = 1280;
   desc.Height = 720;
-  desc.NumRenderTargets = 1;
-  desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
+  desc.Format = DataFormat::R8G8B8A8_UNORM;
   REQUIRE(desc.IsValid());
 }
 
-TEST_CASE("RenderTargetDesc valid with depth-only", "[graphics][objects]")
+TEST_CASE("RenderTargetDesc valid with depth target", "[graphics][objects]")
 {
   RenderTargetDesc desc;
   desc.Width = 1280;
   desc.Height = 720;
-  desc.NumRenderTargets = 0;
-  desc.DepthStencilFormat = DataFormat::R32_FLOAT;
+  desc.Format = DataFormat::D32_FLOAT;
   REQUIRE(desc.IsValid());
+  REQUIRE(desc.IsDepth());
 }
 
-TEST_CASE("RenderTargetDesc invalid when no target format", "[graphics][objects]")
+TEST_CASE("RenderTargetDesc invalid when no format", "[graphics][objects]")
 {
   RenderTargetDesc desc;
   desc.Width = 1280;
   desc.Height = 720;
-  desc.NumRenderTargets = 1;  // format left as None
   REQUIRE_FALSE(desc.IsValid());
 }
 
