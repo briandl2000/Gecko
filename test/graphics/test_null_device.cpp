@@ -48,8 +48,7 @@ TEST_CASE("NullDevice resource creation returns invalid objects", "[graphics][de
     RenderTargetDesc desc;
     desc.Width = 800;
     desc.Height = 600;
-    desc.NumRenderTargets = 1;
-    desc.RenderTargetFormats[0] = DataFormat::R8G8B8A8_UNORM;
+    desc.Format = DataFormat::R8G8B8A8_UNORM;
     RenderTarget rt = device->CreateRenderTarget(desc);
     REQUIRE_FALSE(rt.IsValid());
   }

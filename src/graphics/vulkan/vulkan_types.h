@@ -90,12 +90,12 @@ struct VulkanRTData
   u32 FrameIndex {0};
   u32 ImageIndex {0};
 
-  // Only valid when RTKind == Offscreen. Non-owning pointers into the
-  // Texture::Data payloads stored on the parent RenderTarget; the command
-  // list pokes CurrentLayout through these.
-  VulkanTextureData* OffscreenTex[RenderTargetDesc::MaxRenderTargets] {};
-  VulkanTextureData* OffscreenDepth {nullptr};
-  u32 NumOffscreen {0};
+  // Only valid when RTKind == Offscreen. Non-owning pointer into the
+  // single Texture::Data payload stored on the parent RenderTarget; the
+  // command list pokes CurrentLayout through this. For a depth target
+  // this is the depth texture; for a color target this is the color
+  // texture (same as `Image`/`ImageView` above).
+  VulkanTextureData* OffscreenTex {nullptr};
 };
 
 // -- Buffer GPU data -----------------------------------------------------

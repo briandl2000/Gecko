@@ -22,10 +22,7 @@ public:
     return true;
   }
 
-  void BeginRendering(const RenderTarget&, const ClearValue*) noexcept override
-  {}
-  void BeginRendering(::std::span<const RenderTarget* const>, const RenderTarget*,
-                      ::std::span<const ClearValue>) noexcept override
+  void BeginRendering(const BeginRenderingInfo&) noexcept override
   {}
   void EndRendering() noexcept override
   {}

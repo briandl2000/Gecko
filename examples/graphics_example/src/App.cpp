@@ -37,8 +37,9 @@ constexpr Vertex TriangleVertices[] = {
 
 bool WantValidation()
 {
-  const char* v = ::std::getenv("GECKO_VK_VALIDATION");
-  return v && v[0] != '\0' && v[0] != '0';
+  return true;
+  // const char* v = ::std::getenv("GECKO_VK_VALIDATION");
+  // return v && v[0] != '\0' && v[0] != '0';
 }
 
 }  // namespace
@@ -207,14 +208,26 @@ bool App::CreateRenderResources()
   RenderTargetDesc rtDesc;
   rtDesc.Width = OffscreenW;
   rtDesc.Height = OffscreenH;
-  rtDesc.NumRenderTargets = 1;
-  rtDesc.RenderTargetFormats[0] = OffscreenFmt;
-  rtDesc.RenderTargetClearValues[0] = ClearValue::RenderTarget(0.1F, 0.1F, 0.15F, 1.0F);
+  rtDesc.Format = OffscreenFmt;
+  rtDesc.Clear = ClearValue::RenderTarget(0.1F, 0.1F, 0.15F, 1.0F);
+  rtDesc.DebugName = "OffscreenRT";
   m_OffscreenRT = m_Device->CreateRenderTarget(rtDesc);
   if (m_OffscreenRT.IsValid())
     GECKO_INFO(Main_Label, "Offscreen render target created (%ux%u)", OffscreenW, OffscreenH);
   else
     GECKO_WARN(Main_Label, "Offscreen render target creation failed");
+
+  RenderTargetDesc depthDesc;
+  depthDesc.Width = OffscreenW;
+  depthDesc.Height = OffscreenH;
+  depthDesc.Format = DataFormat::D32_FLOAT;
+  depthDesc.Clear = ClearValue::DepthStencil(1.0F, 0);
+  depthDesc.DebugName = "OffscreenDepthRT";
+  m_DepthRT = m_Device->CreateRenderTarget(depthDesc);
+  if (m_DepthRT.IsValid())
+    GECKO_INFO(Main_Label, "Depth render target created (%ux%u)", OffscreenW, OffscreenH);
+  else
+    GECKO_WARN(Main_Label, "Depth render target creation failed");
 
   TextureDesc plasmaDesc {};
   plasmaDesc.Width = OffscreenW;
@@ -287,6 +300,10 @@ bool App::CreatePipelines()
   triPDesc.Layout = triLayout;
   triPDesc.NumRenderTargets = 1;
   triPDesc.RenderTargetFormats[0] = OffscreenFmt;
+  triPDesc.DepthStencilFormat = DataFormat::D32_FLOAT;
+  triPDesc.DepthStencil.DepthTestEnable = true;
+  triPDesc.DepthStencil.DepthWriteEnable = true;
+  triPDesc.DepthStencil.DepthCompare = CompareFunc::LessEqual;
   triPDesc.Culling = CullMode::None;
   triPDesc.PushConstantBytes = 16;
   triPDesc.DebugName = "TrianglePipeline";
@@ -458,7 +475,14 @@ void App::RecordComputePass(::gecko::f32 time)
 void App::RecordTrianglePass(ICommandList& cmd, ::gecko::f32 time)
 {
   ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
-  cmd.BeginRendering(m_OffscreenRT, &rtClear);
+  ClearValue depthClear = ClearValue::DepthStencil(1.0F, 0);
+  BeginRenderingInfo bri = {
+      .Colors = {&m_OffscreenRT, 1},
+      .ClearColors = {&rtClear, 1},
+      .Depth = &m_DepthRT,
+      .DepthClear = &depthClear,
+  };
+  cmd.BeginRendering(bri);
   cmd.SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(OffscreenW), static_cast<::gecko::f32>(OffscreenH));
   cmd.SetScissor(0, 0, OffscreenW, OffscreenH);
   cmd.BindPipeline(m_TrianglePipeline);
@@ -483,7 +507,7 @@ void App::RecordTrianglePass(ICommandList& cmd, ::gecko::f32 time)
 
 void App::RecordBlitPass(ICommandList& cmd, FrameContext (&frames)[2], ::gecko::f32 time)
 {
-  const Texture& triSampled = m_OffscreenRT.RenderTextures[0];
+  const Texture& triSampled = m_OffscreenRT.BackingTexture;
   const bool havePlasma = m_PlasmaPipeline.IsValid() && m_PlasmaTex[0].IsValid() && m_PlasmaTex[1].IsValid();
 
   // Tint pulses 0.6..1.0 so push constants visibly affect the output.
@@ -501,8 +525,12 @@ void App::RecordBlitPass(ICommandList& cmd, FrameContext (&frames)[2], ::gecko::
         continue;
       // Window 0: triangle offscreen RT. Window 1: plasma compute output.
       const Texture& src = (i == 1 && havePlasma) ? m_PlasmaTex[0] : triSampled;
-      ClearValue scClear = ClearValue::RenderTarget(0.0F, 0.0F, 0.0F, 1.0F);
-      cmd.BeginRendering(frames[i].BackBuffer, &scClear);
+      ClearValue rtClear = ClearValue::RenderTarget(0.08F, 0.08F, 0.12F, 1.0F);
+      BeginRenderingInfo bri = {
+          .Colors = {&frames[i].BackBuffer, 1},
+          .ClearColors = {&rtClear, 1},
+      };
+      cmd.BeginRendering(bri);
       cmd.SetViewport(0.0F, 0.0F, static_cast<::gecko::f32>(frames[i].BackBuffer.Desc.Width),
                       static_cast<::gecko::f32>(frames[i].BackBuffer.Desc.Height));
       cmd.SetScissor(0, 0, frames[i].BackBuffer.Desc.Width, frames[i].BackBuffer.Desc.Height);

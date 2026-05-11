@@ -875,8 +875,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   RenderTarget rt;
   rt.Desc.Width = data->Extent.width;
   rt.Desc.Height = data->Extent.height;
-  rt.Desc.NumRenderTargets = 1;
-  rt.Desc.RenderTargetFormats[0] = FromVkFormat(data->Format);
+  rt.Desc.Format = FromVkFormat(data->Format);
   rt.Data = Shared<void>(rtd, [](void* p) noexcept { FreeObject(static_cast<VulkanRTData*>(p)); });
 
   ctx.SC = &swapchain;
@@ -1081,69 +1080,39 @@ RenderTarget VulkanDevice::CreateRenderTarget(const RenderTargetDesc& desc) noex
   if (!desc.IsValid() || !m_Valid)
     return RenderTarget {};
 
-  RenderTarget rt;
-  rt.Desc = desc;
+  const bool isDepth = desc.IsDepth();
+
+  TextureDesc td {};
+  td.Width = desc.Width;
+  td.Height = desc.Height;
+  td.Depth = 1;
+  td.NumMips = 1;
+  td.NumArraySlices = 1;
+  td.Format = desc.Format;
+  td.Type = TextureType::Tex2D;
+  td.Memory = MemoryType::Dedicated;
+  td.IsRenderTarget = !isDepth;
+  td.IsDepthStencil = isDepth;
+  td.OptimizedClear = desc.Clear;
+
+  Texture t = CreateTexture(td);
+  if (!t.IsValid())
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateRenderTarget: backing texture failed (%s)",
+                desc.DebugName != nullptr ? desc.DebugName : "<unnamed>");
+    return RenderTarget {};
+  }
 
   auto* rtd = AllocObject<VulkanRTData>();
   rtd->RTKind = VulkanRTData::Kind::Offscreen;
+  auto* texData = static_cast<VulkanTextureData*>(t.Data.get());
+  rtd->Image = texData->Image;
+  rtd->ImageView = texData->ImageView;
+  rtd->OffscreenTex = texData;
 
-  // -- Colour textures -------------------------------------------
-  for (u32 i = 0; i < desc.NumRenderTargets; ++i)
-  {
-    TextureDesc td {};
-    td.Width = desc.Width;
-    td.Height = desc.Height;
-    td.Depth = 1;
-    td.NumMips = 1;
-    td.NumArraySlices = 1;
-    td.Format = desc.RenderTargetFormats[i];
-    td.Type = TextureType::Tex2D;
-    td.Memory = MemoryType::Dedicated;
-    td.IsRenderTarget = true;
-    td.OptimizedClear = desc.RenderTargetClearValues[i];
-
-    Texture t = CreateTexture(td);
-    if (!t.IsValid())
-    {
-      GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateRenderTarget: colour texture %u failed", i);
-      FreeObject(rtd);
-      return RenderTarget {};
-    }
-
-    auto* texData = static_cast<VulkanTextureData*>(t.Data.get());
-    rtd->OffscreenTex[i] = texData;
-    if (i == 0)
-    {
-      rtd->Image = texData->Image;
-      rtd->ImageView = texData->ImageView;
-    }
-    rt.RenderTextures[i] = ::std::move(t);
-  }
-  rtd->NumOffscreen = desc.NumRenderTargets;
-
-  // -- Depth texture (optional) ----------------------------------
-  if (desc.DepthStencilFormat != DataFormat::None)
-  {
-    TextureDesc td {};
-    td.Width = desc.Width;
-    td.Height = desc.Height;
-    td.Depth = 1;
-    td.NumMips = 1;
-    td.NumArraySlices = 1;
-    td.Format = desc.DepthStencilFormat;
-    td.Type = TextureType::Tex2D;
-    td.Memory = MemoryType::Dedicated;
-    td.IsDepthStencil = true;
-    td.OptimizedClear = desc.DepthStencilClearValue;
-
-    Texture d = CreateTexture(td);
-    if (d.IsValid())
-    {
-      rtd->OffscreenDepth = static_cast<VulkanTextureData*>(d.Data.get());
-      rt.DepthTexture = ::std::move(d);
-    }
-  }
-
+  RenderTarget rt;
+  rt.Desc = desc;
+  rt.BackingTexture = ::std::move(t);
   rt.Data = Shared<void>(rtd, [](void* p) noexcept { FreeObject(static_cast<VulkanRTData*>(p)); });
   return rt;
 }

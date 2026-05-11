@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/ptr.h"
+#include "gecko/core/span.h"
 #include "gecko/core/types.h"
 
 #include <span>
@@ -682,35 +683,34 @@ struct Texture
 
 // RenderTarget descriptor & object ----------------------------------
 
-/// Description of a render-target group (color attachments + optional
-/// depth-stencil).
+/// Description of a single render-target attachment: either one color
+/// or one depth-stencil image. To bind multiple color targets in a
+/// pass, create one `RenderTarget` per color and pass them all to
+/// `BeginRenderingInfo::Colors`.
 struct RenderTargetDesc
 {
+  /// Maximum simultaneously-bound color render targets per pass /
+  /// per graphics pipeline. Kept here as the natural home for the
+  /// engine-wide MRT cap.
   static constexpr u32 MaxRenderTargets = 8;
 
   u32 Width {0};
   u32 Height {0};
-  u32 NumRenderTargets {0};
-  DataFormat RenderTargetFormats[MaxRenderTargets] {DataFormat::None};
-  DataFormat DepthStencilFormat {DataFormat::None};
-  ClearValue RenderTargetClearValues[MaxRenderTargets] {};
-  ClearValue DepthStencilClearValue {ClearValue::DepthStencil(1.0F, 0)};
+  /// Attachment format. If `IsDepthFormat(Format)` is true this is a
+  /// depth-stencil target; otherwise a color target.
+  DataFormat Format {DataFormat::None};
+  /// Optimised clear value baked into the underlying texture. For depth
+  /// targets the depth/stencil fields are used.
+  ClearValue Clear {};
   const char* DebugName {nullptr};
 
+  [[nodiscard]] bool IsDepth() const noexcept
+  {
+    return IsDepthFormat(Format);
+  }
   [[nodiscard]] bool IsValid() const noexcept
   {
-    if (Width == 0 || Height == 0)
-      return false;
-    if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
-      return false;
-    if (NumRenderTargets > MaxRenderTargets)
-      return false;
-    for (u32 i = 0; i < NumRenderTargets; ++i)
-    {
-      if (RenderTargetFormats[i] == DataFormat::None)
-        return false;
-    }
-    return true;
+    return Width != 0 && Height != 0 && Format != DataFormat::None;
   }
   explicit operator bool() const noexcept
   {
@@ -718,13 +718,15 @@ struct RenderTargetDesc
   }
 };
 
-/// Opaque render-target handle. Owns the backing color textures plus
-/// the optional depth texture. The owning device must outlive it.
+/// Opaque render-target handle. Owns the single backing texture (color
+/// or depth-stencil). The owning device must outlive it.
 struct RenderTarget
 {
   RenderTargetDesc Desc {};
-  Texture RenderTextures[RenderTargetDesc::MaxRenderTargets] {};
-  Texture DepthTexture {};
+  /// Backing texture. Always valid when `IsValid()` returns true; can
+  /// be sampled in subsequent passes (color targets are transitioned to
+  /// SHADER_READ_ONLY automatically by `EndRendering`).
+  Texture BackingTexture {};
   Shared<void> Data {nullptr};
 
   [[nodiscard]] bool IsValid() const noexcept
@@ -735,6 +737,18 @@ struct RenderTarget
   {
     return IsValid();
   }
+};
+
+// Command list interface ------------------------------------------------
+// TODO: this is the only render struct that is used by the command list interface, this will have to be refactored and
+// moved to a more appropriate place when more like these are added.
+
+struct BeginRenderingInfo
+{
+  Span<const RenderTarget> Colors {};
+  Span<const ClearValue> ClearColors {};
+  const RenderTarget* Depth {nullptr};
+  const ClearValue* DepthClear {nullptr};
 };
 
 // Shader code -------------------------------------------------------
