@@ -395,6 +395,7 @@ void VulkanCommandList::BeginRendering(const BeginRenderingInfo& info) noexcept
     depthAtt.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     if (hasClear)
       depthAtt.clearValue.depthStencil.depth = info.DepthClear->Depth;
+    m_ActiveDepthTex = rtd->OffscreenTex;
   }
 
   // Single batched barrier for all offscreen attachments.
@@ -440,6 +441,14 @@ void VulkanCommandList::EndRendering() noexcept
       td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     }
     m_NumActiveColorTex = 0;
+  }
+
+  if (m_ActiveDepthTex != nullptr)
+  {
+    TransitionImage(m_ActiveDepthTex->Image, m_ActiveDepthTex->Aspect, m_ActiveDepthTex->CurrentLayout,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    m_ActiveDepthTex->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    m_ActiveDepthTex = nullptr;
   }
 }
 

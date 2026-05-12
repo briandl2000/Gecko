@@ -37,9 +37,8 @@ constexpr Vertex TriangleVertices[] = {
 
 bool WantValidation()
 {
-  return true;
-  // const char* v = ::std::getenv("GECKO_VK_VALIDATION");
-  // return v && v[0] != '\0' && v[0] != '0';
+  const char* v = ::std::getenv("GECKO_VK_VALIDATION");
+  return v && v[0] != '\0' && v[0] != '0';
 }
 
 }  // namespace

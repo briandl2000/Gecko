@@ -123,6 +123,7 @@ private:
   u32 m_ActiveSwapchainImageIndex {0};
   struct VulkanTextureData* m_ActiveColorTex[RenderTargetDesc::MaxRenderTargets] {};
   u32 m_NumActiveColorTex {0};
+  struct VulkanTextureData* m_ActiveDepthTex {nullptr};
 
   // Pipeline currently bound for graphics; used by BindTexture to source
   // the descriptor-set layout for ad-hoc descriptor sets.
