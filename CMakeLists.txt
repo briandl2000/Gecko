@@ -28,7 +28,14 @@ configure_file(
 # Note: previous gating on CMAKE_BUILD_TYPE was a no-op under Ninja
 # Multi-Config (the variable is empty there), so LTO had silently never
 # been applied -- now it is, but only when explicitly requested.
-option(GECKO_DIST "Enable distribution-grade optimization (LTO etc.)" OFF)
+#
+# IMPORTANT: GECKO_DIST is intentionally OFF in the CI `package` job. GCC
+# stores LTO IR in the object stream and that IR is locked to the GCC
+# major version that produced it (linking a libGeckoRuntime.a built with
+# GCC 15 against a consumer using GCC 16 fails with "bytecode stream
+# generated with LTO version 15.1 instead of 16.0"). Public binary
+# releases must therefore ship non-LTO static archives.
+option(GECKO_DIST "Enable distribution-grade optimization (LTO etc.) -- DO NOT enable for public binary releases" OFF)
 if(GECKO_DIST)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)

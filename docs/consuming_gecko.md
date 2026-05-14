@@ -24,6 +24,7 @@ project(MyGame LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Fill in the Gecko release tag you want to use. See:
 #   https://github.com/briandl2000/Gecko/releases
@@ -40,13 +41,39 @@ target_link_libraries(MyGame PRIVATE
     Gecko::Graphics     # remove if you don't need the renderer
 )
 
-# Copy Gecko's runtime DLLs/SOs next to the executable so it runs in-place.
+# On Linux, the executable needs to look in its own directory for the
+# Gecko .so files we copy next to it below.
+if(UNIX AND NOT APPLE)
+    set_target_properties(MyGame PROPERTIES
+        BUILD_RPATH "$ORIGIN"
+        INSTALL_RPATH "$ORIGIN"
+    )
+endif()
+
+# Copy Gecko's runtime shared library (CoreServices) next to the
+# executable so it runs in-place on both Linux and Windows.
+#
+# Note: $<TARGET_RUNTIME_DLLS:...> is empty on non-DLL platforms (Linux
+# and macOS), so it does NOT cover the libGeckoCoreServices.so case --
+# use $<TARGET_FILE:...> against the shared imported target instead.
 add_custom_command(TARGET MyGame POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        $<TARGET_RUNTIME_DLLS:MyGame>
-        $<TARGET_FILE_DIR:MyGame>
-    COMMAND_EXPAND_LISTS
+        "$<TARGET_FILE:Gecko::CoreServices>"
+        "$<TARGET_FILE_DIR:MyGame>"
+    VERBATIM
 )
+
+# Copy compile_commands.json to the project root so clangd / your editor
+# can find it without extra config.
+if(CMAKE_EXPORT_COMPILE_COMMANDS)
+    add_custom_target(copy_compile_commands ALL
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_BINARY_DIR}/compile_commands.json"
+            "${PROJECT_SOURCE_DIR}/compile_commands.json"
+        BYPRODUCTS "${PROJECT_SOURCE_DIR}/compile_commands.json"
+        VERBATIM
+    )
+endif()
 ```
 
 ### `cmake/FetchGecko.cmake`
@@ -105,19 +132,19 @@ if(NOT EXISTS "${_gecko_extract}/lib/cmake/Gecko/GeckoConfig.cmake")
     file(ARCHIVE_EXTRACT INPUT "${_gecko_zip}" DESTINATION "${_gecko_extract}")
 endif()
 
-# The zip extracts to <extract>/gecko-<version>/<install tree>.
-file(GLOB _gecko_config "${_gecko_extract}/*/lib/cmake/Gecko/GeckoConfig.cmake")
-if(NOT _gecko_config)
-    file(GLOB _gecko_config "${_gecko_extract}/lib/cmake/Gecko/GeckoConfig.cmake")
-endif()
+# The zip extracts to <extract>/<install tree>. Releases >= 0.0.0-alpha.4
+# zip the install contents directly (flat: <extract>/lib/cmake/Gecko/...),
+# while older releases wrapped them in an extra gecko-<version>/ folder.
+# Look for GeckoConfig.cmake in either layout.
+file(GLOB_RECURSE _gecko_config "${_gecko_extract}/*GeckoConfig.cmake")
 if(NOT _gecko_config)
     message(FATAL_ERROR "GeckoConfig.cmake not found under ${_gecko_extract}")
 endif()
 list(GET _gecko_config 0 _gecko_config)
 get_filename_component(Gecko_DIR "${_gecko_config}" DIRECTORY)
 
-# Put Gecko's bin/ on the runtime DLL search path so $<TARGET_RUNTIME_DLLS:...>
-# can find GeckoCoreServices.dll / .so on Windows and Linux respectively.
+# Put Gecko's root (containing bin/ lib/ include/) on CMAKE_PREFIX_PATH so
+# find_dependency() calls inside GeckoConfig.cmake can resolve normally.
 get_filename_component(_gecko_root "${Gecko_DIR}/../../.." ABSOLUTE)
 list(APPEND CMAKE_PREFIX_PATH "${_gecko_root}")
 

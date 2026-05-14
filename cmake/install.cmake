@@ -16,5 +16,6 @@ install(FILES
   ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}Config.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake
   ${CMAKE_SOURCE_DIR}/cmake/GeckoShaders.cmake
+  ${CMAKE_SOURCE_DIR}/cmake/spv_to_byte_array.cmake
   DESTINATION lib/cmake/${PROJECT_NAME})
 
