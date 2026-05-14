@@ -23,6 +23,7 @@
 /// target the next `Submit` will draw into (used for the viewport
 /// push constant today; will carry view/projection in the future).
 
+#include "gecko/math/vector.h"
 #include <gecko/core/types.h>
 #include <gecko/graphics/command_list.h>
 #include <gecko/graphics/graphics_types.h>
@@ -108,6 +109,8 @@ public:
   /// @param thickness  Width in pixels.
   void DrawLine(::gecko::math::float2 a, ::gecko::math::float2 b, ::gecko::math::float3 color, ::gecko::f32 thickness);
 
+  void DrawText(const char* text, ::gecko::math::float2 pos,  math::Float3 color, f32 scale);
+
   /// Record a draw command for the lines added since the last
   /// `Submit` (or since `NewFrame` for the first call this frame).
   ///
@@ -143,10 +146,21 @@ private:
     ::gecko::f32 Thickness;       ///< Width in pixels.
   };
 
+  struct Char2D
+  {
+    ::gecko::math::float2 Position;
+    ::gecko::f32 size;
+    ::gecko::f32 _Pad;
+    ::gecko::math::float3 Color;
+    ::gecko::f32 _Pad2;
+  };
+
   struct FrameSlot
   {
     ::std::vector<Line2D> CPU {};
+    ::std::vector<Char2D> CPU_chars {};
     ::gecko::graphics::Buffer GPU {};
+    ::gecko::graphics::Buffer GPU_chars {};
   };
 
   ::std::vector<FrameSlot> m_FrameSlots {};
@@ -156,11 +170,16 @@ private:
   ::gecko::u32 m_LineCursor {0};  ///< Next free slot in the CPU buffer.
   ::gecko::u32 m_BatchStart {0};  ///< First line of the current batch.
 
+  ::gecko::u32 m_CharCapacity {0};
+  ::gecko::u32 m_CharCursor {0};
+  ::gecko::u32 m_CharBatchStart {0};
+
   bool m_Valid {false};
   bool m_FrameStarted {false};        ///< NewFrame called, EndFrame pending.
   bool m_FrameUploaded {true};        ///< Last frame's lines reached the GPU.
   bool m_FrameBound {false};          ///< SetFrame called this frame.
   bool m_LineOverflowWarned {false};  ///< Per-frame latch.
+  bool m_CharOverflowWarned {false};  ///< Per-frame latch.
 };
 
 }  // namespace gecko::debug_renderer

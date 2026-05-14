@@ -13,5 +13,6 @@ struct DebugLinePushConstants
 };
 
 const ::gecko::graphics::GraphicsPipeline& GetDebugLinePipeline();
+const ::gecko::graphics::GraphicsPipeline& GetDebugTextPipeline();
 
 }  // namespace gecko::debug_renderer

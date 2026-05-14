@@ -1,4 +1,5 @@
 #include "App.h"
+#include "gecko/math/vector.h"
 
 #include <gecko/core/labels.h>
 #include <gecko/core/services.h>
@@ -110,7 +111,7 @@ bool App::CreateMainWindow()
   wd.Title = "Gecko Debug Renderer Example";
   wd.Size = {1280, 720};
   wd.Visible = true;
-  wd.Resizable = true;
+  wd.Resizable = false;
   wd.Mode = WindowMode::Windowed;
   m_Window = GetWindows()->CreateWindow(wd);
   if (!m_Window.IsValid())
@@ -219,15 +220,17 @@ void App::RenderFrame()
 
   const auto fbW = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Width);
   const auto fbH = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height);
-  for (::gecko::u32 i = 0; i < 4000; ++i)
-  {
-    const ::gecko::math::float2 center {::gecko::RandomF32(0.0F, fbW), ::gecko::RandomF32(0.0F, fbH)};
-    DrawCircle(center, ::gecko::RandomF32(20.0F, 100.0F), {1.0F, 0.0F, 0.0F}, 2.0F);
-  }
+
+  gecko::math::Float2 center = { fbW/2.0f, fbH/2.0f };
+  gecko::f32 radius = (fbW > fbH ? fbH : fbW) * 0.4f;
+  DrawCircle(center, radius, {0.2F, 0.3F, 9.0F}, 2.0F);
 
   const auto mousePos = GetInput()->GetMousePosition(m_Window);
   const ::gecko::math::float2 mousePosF {static_cast<::gecko::f32>(mousePos.X), static_cast<::gecko::f32>(mousePos.Y)};
   DrawCircle(mousePosF, 10.0F, {0.0F, 1.0F, 0.0F}, 4.0F);
+  m_DebugRendererContext->DrawLine(center, mousePosF, {0.3f, 0.9f, 0.4f}, 2.f);
+
+  m_DebugRendererContext->DrawText("Hello World!", {100.0f, 100.0f}, {.9f, .9f, .9f}, 50.0f);
 
   m_DebugRendererContext->Submit(cmd.get());
   cmd->EndRendering();

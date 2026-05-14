@@ -17,7 +17,7 @@ target_link_libraries(DebugRenderer
   PUBLIC
     Gecko::Core
     Gecko::CoreServices
-    
+
     Gecko::Platform
     Gecko::Graphics
     Gecko::Math
@@ -30,6 +30,8 @@ gecko_add_shaders(
   SHADERS
     debug_line.vert.hlsl=DebugLineVert
     debug_line.frag.hlsl=DebugLineFrag
+    debug_text.vert.hlsl=DebugTextVert
+    debug_text.frag.hlsl=DebugTextFrag
 )
 
 
