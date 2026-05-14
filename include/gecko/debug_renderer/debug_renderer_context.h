@@ -24,6 +24,7 @@
 /// push constant today; will carry view/projection in the future).
 
 #include "gecko/math/vector.h"
+
 #include <gecko/core/types.h>
 #include <gecko/graphics/command_list.h>
 #include <gecko/graphics/graphics_types.h>
@@ -109,7 +110,7 @@ public:
   /// @param thickness  Width in pixels.
   void DrawLine(::gecko::math::float2 a, ::gecko::math::float2 b, ::gecko::math::float3 color, ::gecko::f32 thickness);
 
-  void DrawText(const char* text, ::gecko::math::float2 pos,  math::Float3 color, f32 scale);
+  void DrawText(const char* text, ::gecko::math::float2 pos, math::Float3 color, f32 scale);
 
   /// Record a draw command for the lines added since the last
   /// `Submit` (or since `NewFrame` for the first call this frame).

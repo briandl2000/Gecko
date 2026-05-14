@@ -138,7 +138,7 @@ void DebugRendererContext::DrawLine(::gecko::math::float2 a, ::gecko::math::floa
   slot.CPU[m_LineCursor++] = Line2D {a, b, color, thickness};
 }
 
-void DebugRendererContext::DrawText(const char* text, ::gecko::math::float2 pos,  math::Float3 color, f32 scale)
+void DebugRendererContext::DrawText(const char* text, ::gecko::math::float2 pos, math::Float3 color, f32 scale)
 {
   if (!m_Valid)
     return;
@@ -164,7 +164,7 @@ void DebugRendererContext::DrawText(const char* text, ::gecko::math::float2 pos,
     }
 
     auto& slot = m_FrameSlots[m_CurrentSlot];
-    slot.CPU_chars[m_CharCursor++] = Char2D{.Position = c_pos, .size = scale, ._Pad = 0, .Color = color, ._Pad2 = 0};
+    slot.CPU_chars[m_CharCursor++] = Char2D {.Position = c_pos, .size = scale, ._Pad = 0, .Color = color, ._Pad2 = 0};
     c_pos.X += scale;
     c = text[++idx];
   }
@@ -229,7 +229,6 @@ void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
     cmd->Draw(batchSize * 6u, 1, m_CharBatchStart * 6u, 0);
     m_CharBatchStart = m_CharCursor;
   }
-
 }
 
 void DebugRendererContext::EndFrame()

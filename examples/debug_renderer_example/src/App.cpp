@@ -1,4 +1,5 @@
 #include "App.h"
+
 #include "gecko/math/vector.h"
 
 #include <gecko/core/labels.h>
@@ -221,7 +222,7 @@ void App::RenderFrame()
   const auto fbW = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Width);
   const auto fbH = static_cast<::gecko::f32>(frame.BackBuffer.Desc.Height);
 
-  gecko::math::Float2 center = { fbW/2.0f, fbH/2.0f };
+  gecko::math::Float2 center = {fbW / 2.0f, fbH / 2.0f};
   gecko::f32 radius = (fbW > fbH ? fbH : fbW) * 0.4f;
   DrawCircle(center, radius, {0.2F, 0.3F, 9.0F}, 2.0F);
 
