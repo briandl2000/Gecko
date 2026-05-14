@@ -437,6 +437,92 @@ jobs:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: cmake --install out/build/%GECKO_PLATFORM_ID% --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
 
+      - name: Check package is relocatable (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          pkg_dir="out/package/gecko-${{ needs.resolve-version.outputs.version }}"
+          echo "Scanning installed CMake files for host-specific paths..."
+          # The Gecko package must NOT bake in distro-specific absolute paths
+          # (e.g. /usr/lib/x86_64-linux-gnu/libXrandr.so on Ubuntu) because
+          # those make the same zip unusable on Arch/Fedora/etc. All system
+          # deps must be referenced via imported targets (X11::*, PkgConfig::*).
+          if grep -RnE "(/home/runner|/usr/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|${GITHUB_WORKSPACE})" \
+              "$pkg_dir/lib/cmake/Gecko"; then
+            echo "::error::Package contains host-specific absolute paths -- it will not be portable across Linux distros."
+            exit 1
+          fi
+          echo "OK: package CMake files are relocatable"
+
+      - name: Smoke test installed package (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          pkg_dir="$(pwd)/out/package/gecko-${{ needs.resolve-version.outputs.version }}"
+          smoke_dir="$(pwd)/out/smoke-consumer"
+          mkdir -p "$smoke_dir"
+
+          cat > "$smoke_dir/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.22)
+          project(GeckoConsumerSmoke LANGUAGES CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(Gecko CONFIG REQUIRED)
+          add_executable(smoke main.cpp)
+          target_link_libraries(smoke PRIVATE
+              Gecko::Core
+              Gecko::CoreServices
+              Gecko::Math
+              Gecko::Runtime
+              Gecko::Platform
+          )
+          EOF
+
+          cat > "$smoke_dir/main.cpp" <<'EOF'
+          #include <gecko/version.h>
+          int main() { return 0; }
+          EOF
+
+          export CC=gcc-15 CXX=g++-15
+          cmake -S "$smoke_dir" -B "$smoke_dir/build" -G Ninja \
+            -DCMAKE_PREFIX_PATH="$pkg_dir"
+          cmake --build "$smoke_dir/build"
+
+      - name: Smoke test installed package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -e
+          pkg_dir="$(pwd)/out/package/gecko-${{ needs.resolve-version.outputs.version }}"
+          smoke_dir="$(pwd)/out/smoke-consumer"
+          mkdir -p "$smoke_dir"
+
+          cat > "$smoke_dir/CMakeLists.txt" <<'EOF'
+          cmake_minimum_required(VERSION 3.22)
+          project(GeckoConsumerSmoke LANGUAGES CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          set(CMAKE_CXX_STANDARD_REQUIRED ON)
+          find_package(Gecko CONFIG REQUIRED)
+          add_executable(smoke main.cpp)
+          target_link_libraries(smoke PRIVATE
+              Gecko::Core
+              Gecko::CoreServices
+              Gecko::Math
+              Gecko::Runtime
+              Gecko::Platform
+          )
+          EOF
+
+          cat > "$smoke_dir/main.cpp" <<'EOF'
+          #include <gecko/version.h>
+          int main() { return 0; }
+          EOF
+
+          cmake -S "$smoke_dir" -B "$smoke_dir/build" -G Ninja \
+            -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl \
+            -DCMAKE_PREFIX_PATH="$pkg_dir"
+          cmake --build "$smoke_dir/build"
+
       - name: Create zip (Linux)
         if: runner.os == 'Linux'
         run: |

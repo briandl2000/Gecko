@@ -29,32 +29,37 @@ if(UNIX AND NOT APPLE)
       linux/x11_windows_interface.cpp
       linux/x11_monitors_backend.cpp
     )
-    if(TARGET X11::X11)
-      target_link_libraries(Platform PRIVATE X11::X11)
-    else()
-      target_include_directories(Platform PRIVATE ${X11_INCLUDE_DIR})
-      target_link_libraries(Platform PRIVATE ${X11_LIBRARIES})
+    # Always prefer imported targets (X11::X11, X11::Xrandr) over raw
+    # ${X11_*_LIB} variables: the raw variables hold absolute, distro-
+    # specific paths (e.g. /usr/lib/x86_64-linux-gnu/libXrandr.so on
+    # Ubuntu) that, if baked into the exported targets, make the released
+    # Gecko package unusable on other distros (Arch, Fedora, ...).
+    # Imported targets get re-resolved by find_dependency(X11) in the
+    # consumer's GeckoConfig.cmake load.
+    target_link_libraries(Platform PRIVATE X11::X11)
+
+    if(NOT X11_Xrandr_FOUND OR NOT TARGET X11::Xrandr)
+      message(FATAL_ERROR
+        "Gecko: libXrandr is required on Linux but was not found. "
+        "Install libxrandr-dev (Ubuntu/Debian) or libxrandr (Arch).")
     endif()
-    # XRandR for monitor enumeration
-    if(X11_Xrandr_FOUND)
-      target_link_libraries(Platform PRIVATE ${X11_Xrandr_LIB})
-    else()
-      find_library(XRANDR_LIB Xrandr)
-      if(XRANDR_LIB)
-        target_link_libraries(Platform PRIVATE ${XRANDR_LIB})
-      endif()
-    endif()
+    target_link_libraries(Platform PRIVATE X11::Xrandr)
+
     target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_X11)
   endif()
 
   find_package(PkgConfig QUIET)
   if(PkgConfig_FOUND)
-    pkg_check_modules(Wayland QUIET wayland-client)
+    # Use IMPORTED_TARGET so the exported package references named imported
+    # targets (PkgConfig::Wayland, ...) rather than absolute library paths
+    # that are baked in at build time. This is what makes the installed
+    # Gecko package relocatable across Linux distros (Ubuntu/Arch/Fedora).
+    pkg_check_modules(Wayland QUIET IMPORTED_TARGET wayland-client)
     if(Wayland_FOUND)
       # ── Wayland protocol code generation ──────────────────────────
       find_program(WAYLAND_SCANNER wayland-scanner)
-      pkg_check_modules(XkbCommon QUIET xkbcommon)
-      pkg_check_modules(WaylandCursor QUIET wayland-cursor)
+      pkg_check_modules(XkbCommon QUIET IMPORTED_TARGET xkbcommon)
+      pkg_check_modules(WaylandCursor QUIET IMPORTED_TARGET wayland-cursor)
 
       if(WAYLAND_SCANNER)
         execute_process(
@@ -142,17 +147,15 @@ if(UNIX AND NOT APPLE)
         )
       endif()
 
-      target_link_libraries(Platform PRIVATE ${Wayland_LINK_LIBRARIES})
-      target_include_directories(Platform PRIVATE ${Wayland_INCLUDE_DIRS})
+      target_link_libraries(Platform PRIVATE PkgConfig::Wayland)
       target_compile_definitions(Platform PRIVATE GECKO_PLATFORM_LINUX_WAYLAND)
 
       if(WaylandCursor_FOUND)
-        target_link_libraries(Platform PRIVATE ${WaylandCursor_LINK_LIBRARIES})
+        target_link_libraries(Platform PRIVATE PkgConfig::WaylandCursor)
       endif()
 
       if(XkbCommon_FOUND)
-        target_link_libraries(Platform PRIVATE ${XkbCommon_LINK_LIBRARIES})
-        target_include_directories(Platform PRIVATE ${XkbCommon_INCLUDE_DIRS})
+        target_link_libraries(Platform PRIVATE PkgConfig::XkbCommon)
         target_compile_definitions(Platform PRIVATE GECKO_HAS_XKBCOMMON)
       endif()
 
