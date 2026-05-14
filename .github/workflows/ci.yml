@@ -402,14 +402,18 @@ jobs:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
         run: |
           export CC=gcc-15 CXX=g++-15
-          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_DIST=ON
+          # LTO is deliberately OFF for binary releases: GCC LTO bytecode in
+          # static archives is locked to the GCC major version that produced
+          # it, so a libGeckoRuntime.a built with GCC 15 fails to link on a
+          # consumer using GCC 16. Keep GECKO_DIST off here.
+          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
 
       - name: Configure (Windows)
         if: runner.os == 'Windows'
         shell: cmd
         env:
           GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake -S . -B out/build/%GECKO_PLATFORM_ID% -G "Ninja Multi-Config" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DGECKO_DIST=ON
+        run: cmake -S . -B out/build/%GECKO_PLATFORM_ID% -G "Ninja Multi-Config" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
 
       - name: Build Release (Linux)
         if: runner.os == 'Linux'
@@ -523,18 +527,48 @@ jobs:
             -DCMAKE_PREFIX_PATH="$pkg_dir"
           cmake --build "$smoke_dir/build"
 
+      - name: Check static libs are free of GCC LTO bytecode (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -e
+          pkg_dir="out/package/gecko-${{ needs.resolve-version.outputs.version }}"
+          # GCC LTO IR baked into a .a archive is locked to the GCC major
+          # version that produced it. Shipping such archives forces all
+          # consumers to match the CI's GCC major version, which broke
+          # downstream Arch users in alpha.3. The simple invariant: no .a
+          # in the public zip may contain .gnu.lto_* ELF sections.
+          found_lto=0
+          while IFS= read -r archive; do
+            # Extract members into a temp dir and scan their ELF sections.
+            tmpdir="$(mktemp -d)"
+            ( cd "$tmpdir" && ar x "$GITHUB_WORKSPACE/$archive" )
+            if find "$tmpdir" -name '*.o' -print0 \
+                | xargs -0 -r readelf -SW 2>/dev/null \
+                | grep -qE '\.gnu\.lto_|\.gnu\.debuglto_'; then
+              echo "::error::$archive contains GCC LTO bytecode -- it will not link across GCC major versions"
+              found_lto=1
+            fi
+            rm -rf "$tmpdir"
+          done < <(find "$pkg_dir" -name '*.a')
+          if [ "$found_lto" -ne 0 ]; then exit 1; fi
+          echo "OK: no GCC LTO bytecode in shipped static archives"
+
       - name: Create zip (Linux)
         if: runner.os == 'Linux'
         run: |
-          cd out/package
-          zip -r gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip gecko-${{ needs.resolve-version.outputs.version }}
+          # Zip the package *contents* (not the wrapping gecko-<version> dir)
+          # so consumers who extract to e.g. gecko-<version>-linux/ end up
+          # with a flat <prefix>/{bin,include,lib} layout instead of the
+          # double-nested gecko-<version>/gecko-<version>/... we used to ship.
+          cd out/package/gecko-${{ needs.resolve-version.outputs.version }}
+          zip -r ../gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip .
 
       - name: Create zip (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cd out/package
-          Compress-Archive -Path "gecko-${{ needs.resolve-version.outputs.version }}" -DestinationPath "gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip"
+          cd out/package/gecko-${{ needs.resolve-version.outputs.version }}
+          Compress-Archive -Path "*" -DestinationPath "../gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip"
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
