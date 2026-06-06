@@ -1,111 +1,19 @@
 #pragma once
 
 /// @file
-/// Fixed-size float and integer vectors plus scalar math helpers.
+/// Fixed-size float and integer vectors plus vector math helpers.
 ///
-/// Defines `Float2`/`Float3`/`Float4`, `Int2`/`Int3`/`Int4` and a small
-/// kit of constexpr scalar utilities (`ToRadians`, `ToDegrees`, `Min`,
-/// `Max`, `Clamp`, `Lerp`, `Smoothstep`, `Abs`) plus thin wrappers over
-/// `<cmath>` (`Sqrt`, `Sin`, `Cos`, `Tan`, `Atan2`). All vector types
-/// expose both named members (`X`/`Y`/`Z`/`W`) and indexed access via
-/// `Data[]` / `operator[]`.
+/// Defines `Float2`/`Float3`/`Float4`, `Int2`/`Int3`/`Int4`. All vector
+/// types expose both named members (`X`/`Y`/`Z`/`W`) and indexed access via
+/// `Data[]` / `operator[]`. Scalar helpers are provided by
+/// `gecko/math/scalar.h`, included here for compatibility and convenience.
 ///
 /// Conventions: angles are in radians unless suffixed `Degrees`; the
 /// coordinate system is right-handed.
 
-#include "gecko/core/types.h"
-
-#include <cmath>
+#include "gecko/math/scalar.h"
 
 namespace gecko::math {
-
-/// Mathematical pi as `f32`.
-inline constexpr f32 Pi = 3.14159265358979323846f;
-/// 2*pi (one full turn in radians).
-inline constexpr f32 TwoPi = 6.28318530717958647692f;
-/// pi/2 (a quarter turn in radians).
-inline constexpr f32 HalfPi = 1.57079632679489661923f;
-/// Default tolerance for approximate equality of `f32` values.
-inline constexpr f32 Epsilon = 1e-6f;
-
-/// Convert degrees to radians.
-[[nodiscard]] constexpr f32 ToRadians(f32 degrees) noexcept
-{
-  return degrees * (Pi / 180.0f);
-}
-
-/// Convert radians to degrees.
-[[nodiscard]] constexpr f32 ToDegrees(f32 radians) noexcept
-{
-  return radians * (180.0f / Pi);
-}
-
-/// Smaller of two `f32` values.
-[[nodiscard]] constexpr f32 Min(f32 a, f32 b) noexcept
-{
-  return a < b ? a : b;
-}
-
-/// Larger of two `f32` values.
-[[nodiscard]] constexpr f32 Max(f32 a, f32 b) noexcept
-{
-  return a > b ? a : b;
-}
-
-/// Clamp `value` into the closed interval `[min, max]`.
-[[nodiscard]] constexpr f32 Clamp(f32 value, f32 min, f32 max) noexcept
-{
-  return value < min ? min : (value > max ? max : value);
-}
-
-/// Linear interpolation: `a + (b - a) * t`. `t` is not clamped.
-[[nodiscard]] constexpr f32 Lerp(f32 a, f32 b, f32 t) noexcept
-{
-  return a + (b - a) * t;
-}
-
-/// Hermite smoothstep: 0 below `edge0`, 1 above `edge1`, smooth between.
-[[nodiscard]] constexpr f32 Smoothstep(f32 edge0, f32 edge1, f32 x) noexcept
-{
-  const f32 t = Clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-  return t * t * (3.0f - 2.0f * t);
-}
-
-/// Absolute value of `x`.
-[[nodiscard]] constexpr f32 Abs(f32 x) noexcept
-{
-  return x < 0.0f ? -x : x;
-}
-
-/// Square root (wraps `std::sqrt`).
-[[nodiscard]] inline f32 Sqrt(f32 x) noexcept
-{
-  return ::std::sqrt(x);
-}
-
-/// Sine of `x` (radians).
-[[nodiscard]] inline f32 Sin(f32 x) noexcept
-{
-  return ::std::sin(x);
-}
-
-/// Cosine of `x` (radians).
-[[nodiscard]] inline f32 Cos(f32 x) noexcept
-{
-  return ::std::cos(x);
-}
-
-/// Tangent of `x` (radians).
-[[nodiscard]] inline f32 Tan(f32 x) noexcept
-{
-  return ::std::tan(x);
-}
-
-/// Two-argument arctangent: angle of `(x, y)` in radians.
-[[nodiscard]] inline f32 Atan2(f32 y, f32 x) noexcept
-{
-  return ::std::atan2(y, x);
-}
 
 /// Two-component float vector. Members `X`/`Y` alias `Data[0..1]`.
 struct Float2
@@ -310,6 +218,16 @@ constexpr Float2 operator-(const Float2& a, const Float2& b) noexcept
   return {a.X - b.X, a.Y - b.Y};
 }
 
+constexpr Float2 operator-(const Float2& v) noexcept
+{
+  return {-v.X, -v.Y};
+}
+
+constexpr Float2 operator*(const Float2& a, const Float2& b) noexcept
+{
+  return {a.X * b.X, a.Y * b.Y};
+}
+
 constexpr Float2 operator*(const Float2& v, f32 s) noexcept
 {
   return {v.X * s, v.Y * s};
@@ -323,6 +241,47 @@ constexpr Float2 operator*(f32 s, const Float2& v) noexcept
 constexpr Float2 operator/(const Float2& v, f32 s) noexcept
 {
   return {v.X / s, v.Y / s};
+}
+
+constexpr Float2 operator/(const Float2& a, const Float2& b) noexcept
+{
+  return {a.X / b.X, a.Y / b.Y};
+}
+
+constexpr Float2& operator+=(Float2& a, const Float2& b) noexcept
+{
+  a = a + b;
+  return a;
+}
+
+constexpr Float2& operator-=(Float2& a, const Float2& b) noexcept
+{
+  a = a - b;
+  return a;
+}
+
+constexpr Float2& operator*=(Float2& a, const Float2& b) noexcept
+{
+  a = a * b;
+  return a;
+}
+
+constexpr Float2& operator*=(Float2& v, f32 s) noexcept
+{
+  v = v * s;
+  return v;
+}
+
+constexpr Float2& operator/=(Float2& a, const Float2& b) noexcept
+{
+  a = a / b;
+  return a;
+}
+
+constexpr Float2& operator/=(Float2& v, f32 s) noexcept
+{
+  v = v / s;
+  return v;
 }
 
 /// Dot (scalar) product of two vectors. Overloaded for every vector type.
@@ -343,10 +302,22 @@ constexpr Float2 operator/(const Float2& v, f32 s) noexcept
   return v.X * v.X + v.Y * v.Y;
 }
 
+/// Squared distance between two points/vectors.
+[[nodiscard]] constexpr f32 DistanceSquared(const Float2& a, const Float2& b) noexcept
+{
+  return LengthSquared(a - b);
+}
+
 /// Euclidean length (magnitude) of a vector. Overloaded per vector type.
 [[nodiscard]] inline f32 Length(const Float2& v) noexcept
 {
   return ::std::sqrt(LengthSquared(v));
+}
+
+/// Euclidean distance between two points/vectors.
+[[nodiscard]] inline f32 Distance(const Float2& a, const Float2& b) noexcept
+{
+  return Length(a - b);
 }
 
 /// Returns `v` scaled to unit length, or the zero vector when `Length(v) == 0`.
@@ -381,6 +352,12 @@ constexpr Float2 operator/(const Float2& v, f32 s) noexcept
   return {Abs(v.X), Abs(v.Y)};
 }
 
+/// Reflect `incident` around a unit surface `normal`.
+[[nodiscard]] constexpr Float2 Reflect(const Float2& incident, const Float2& normal) noexcept
+{
+  return incident - normal * (2.0f * Dot(incident, normal));
+}
+
 // Float3 operations
 constexpr bool operator==(const Float3& a, const Float3& b) noexcept
 {
@@ -402,6 +379,16 @@ constexpr Float3 operator-(const Float3& a, const Float3& b) noexcept
   return {a.X - b.X, a.Y - b.Y, a.Z - b.Z};
 }
 
+constexpr Float3 operator-(const Float3& v) noexcept
+{
+  return {-v.X, -v.Y, -v.Z};
+}
+
+constexpr Float3 operator*(const Float3& a, const Float3& b) noexcept
+{
+  return {a.X * b.X, a.Y * b.Y, a.Z * b.Z};
+}
+
 constexpr Float3 operator*(const Float3& v, f32 s) noexcept
 {
   return {v.X * s, v.Y * s, v.Z * s};
@@ -415,6 +402,47 @@ constexpr Float3 operator*(f32 s, const Float3& v) noexcept
 constexpr Float3 operator/(const Float3& v, f32 s) noexcept
 {
   return {v.X / s, v.Y / s, v.Z / s};
+}
+
+constexpr Float3 operator/(const Float3& a, const Float3& b) noexcept
+{
+  return {a.X / b.X, a.Y / b.Y, a.Z / b.Z};
+}
+
+constexpr Float3& operator+=(Float3& a, const Float3& b) noexcept
+{
+  a = a + b;
+  return a;
+}
+
+constexpr Float3& operator-=(Float3& a, const Float3& b) noexcept
+{
+  a = a - b;
+  return a;
+}
+
+constexpr Float3& operator*=(Float3& a, const Float3& b) noexcept
+{
+  a = a * b;
+  return a;
+}
+
+constexpr Float3& operator*=(Float3& v, f32 s) noexcept
+{
+  v = v * s;
+  return v;
+}
+
+constexpr Float3& operator/=(Float3& a, const Float3& b) noexcept
+{
+  a = a / b;
+  return a;
+}
+
+constexpr Float3& operator/=(Float3& v, f32 s) noexcept
+{
+  v = v / s;
+  return v;
 }
 
 [[nodiscard]] constexpr f32 Dot(const Float3& a, const Float3& b) noexcept
@@ -433,9 +461,19 @@ constexpr Float3 operator/(const Float3& v, f32 s) noexcept
   return v.X * v.X + v.Y * v.Y + v.Z * v.Z;
 }
 
+[[nodiscard]] constexpr f32 DistanceSquared(const Float3& a, const Float3& b) noexcept
+{
+  return LengthSquared(a - b);
+}
+
 [[nodiscard]] inline f32 Length(const Float3& v) noexcept
 {
   return ::std::sqrt(LengthSquared(v));
+}
+
+[[nodiscard]] inline f32 Distance(const Float3& a, const Float3& b) noexcept
+{
+  return Length(a - b);
 }
 
 [[nodiscard]] inline Float3 Normalized(const Float3& v) noexcept
@@ -469,6 +507,11 @@ constexpr Float3 operator/(const Float3& v, f32 s) noexcept
   return {Abs(v.X), Abs(v.Y), Abs(v.Z)};
 }
 
+[[nodiscard]] constexpr Float3 Reflect(const Float3& incident, const Float3& normal) noexcept
+{
+  return incident - normal * (2.0f * Dot(incident, normal));
+}
+
 // Float4 operations
 constexpr bool operator==(const Float4& a, const Float4& b) noexcept
 {
@@ -490,6 +533,16 @@ constexpr Float4 operator-(const Float4& a, const Float4& b) noexcept
   return {a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W};
 }
 
+constexpr Float4 operator-(const Float4& v) noexcept
+{
+  return {-v.X, -v.Y, -v.Z, -v.W};
+}
+
+constexpr Float4 operator*(const Float4& a, const Float4& b) noexcept
+{
+  return {a.X * b.X, a.Y * b.Y, a.Z * b.Z, a.W * b.W};
+}
+
 constexpr Float4 operator*(const Float4& v, f32 s) noexcept
 {
   return {v.X * s, v.Y * s, v.Z * s, v.W * s};
@@ -505,6 +558,47 @@ constexpr Float4 operator/(const Float4& v, f32 s) noexcept
   return {v.X / s, v.Y / s, v.Z / s, v.W / s};
 }
 
+constexpr Float4 operator/(const Float4& a, const Float4& b) noexcept
+{
+  return {a.X / b.X, a.Y / b.Y, a.Z / b.Z, a.W / b.W};
+}
+
+constexpr Float4& operator+=(Float4& a, const Float4& b) noexcept
+{
+  a = a + b;
+  return a;
+}
+
+constexpr Float4& operator-=(Float4& a, const Float4& b) noexcept
+{
+  a = a - b;
+  return a;
+}
+
+constexpr Float4& operator*=(Float4& a, const Float4& b) noexcept
+{
+  a = a * b;
+  return a;
+}
+
+constexpr Float4& operator*=(Float4& v, f32 s) noexcept
+{
+  v = v * s;
+  return v;
+}
+
+constexpr Float4& operator/=(Float4& a, const Float4& b) noexcept
+{
+  a = a / b;
+  return a;
+}
+
+constexpr Float4& operator/=(Float4& v, f32 s) noexcept
+{
+  v = v / s;
+  return v;
+}
+
 [[nodiscard]] constexpr f32 Dot(const Float4& a, const Float4& b) noexcept
 {
   return a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
@@ -515,9 +609,19 @@ constexpr Float4 operator/(const Float4& v, f32 s) noexcept
   return v.X * v.X + v.Y * v.Y + v.Z * v.Z + v.W * v.W;
 }
 
+[[nodiscard]] constexpr f32 DistanceSquared(const Float4& a, const Float4& b) noexcept
+{
+  return LengthSquared(a - b);
+}
+
 [[nodiscard]] inline f32 Length(const Float4& v) noexcept
 {
   return ::std::sqrt(LengthSquared(v));
+}
+
+[[nodiscard]] inline f32 Distance(const Float4& a, const Float4& b) noexcept
+{
+  return Length(a - b);
 }
 
 [[nodiscard]] inline Float4 Normalized(const Float4& v) noexcept
@@ -551,6 +655,11 @@ constexpr Float4 operator/(const Float4& v, f32 s) noexcept
   return {Abs(v.X), Abs(v.Y), Abs(v.Z), Abs(v.W)};
 }
 
+[[nodiscard]] constexpr Float4 Reflect(const Float4& incident, const Float4& normal) noexcept
+{
+  return incident - normal * (2.0f * Dot(incident, normal));
+}
+
 // Int2 operations
 constexpr bool operator==(const Int2& a, const Int2& b) noexcept
 {
@@ -572,7 +681,22 @@ constexpr Int2 operator-(const Int2& a, const Int2& b) noexcept
   return {a.X - b.X, a.Y - b.Y};
 }
 
+constexpr Int2 operator-(const Int2& v) noexcept
+{
+  return {-v.X, -v.Y};
+}
+
+constexpr Int2 operator*(const Int2& a, const Int2& b) noexcept
+{
+  return {a.X * b.X, a.Y * b.Y};
+}
+
 constexpr Int2 operator*(const Int2& v, i32 s) noexcept
+{
+  return {v.X * s, v.Y * s};
+}
+
+constexpr Int2 operator*(i32 s, const Int2& v) noexcept
 {
   return {v.X * s, v.Y * s};
 }
@@ -580,6 +704,47 @@ constexpr Int2 operator*(const Int2& v, i32 s) noexcept
 constexpr Int2 operator/(const Int2& v, i32 s) noexcept
 {
   return {v.X / s, v.Y / s};
+}
+
+constexpr Int2 operator/(const Int2& a, const Int2& b) noexcept
+{
+  return {a.X / b.X, a.Y / b.Y};
+}
+
+constexpr Int2& operator+=(Int2& a, const Int2& b) noexcept
+{
+  a = a + b;
+  return a;
+}
+
+constexpr Int2& operator-=(Int2& a, const Int2& b) noexcept
+{
+  a = a - b;
+  return a;
+}
+
+constexpr Int2& operator*=(Int2& a, const Int2& b) noexcept
+{
+  a = a * b;
+  return a;
+}
+
+constexpr Int2& operator*=(Int2& v, i32 s) noexcept
+{
+  v = v * s;
+  return v;
+}
+
+constexpr Int2& operator/=(Int2& a, const Int2& b) noexcept
+{
+  a = a / b;
+  return a;
+}
+
+constexpr Int2& operator/=(Int2& v, i32 s) noexcept
+{
+  v = v / s;
+  return v;
 }
 
 [[nodiscard]] constexpr i32 Dot(const Int2& a, const Int2& b) noexcept
@@ -600,6 +765,11 @@ constexpr Int2 operator/(const Int2& v, i32 s) noexcept
 [[nodiscard]] constexpr Int2 Clamp(const Int2& v, const Int2& min, const Int2& max) noexcept
 {
   return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X), v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y)};
+}
+
+[[nodiscard]] constexpr Int2 Abs(const Int2& v) noexcept
+{
+  return {Abs(v.X), Abs(v.Y)};
 }
 
 // Int3 operations
@@ -623,7 +793,22 @@ constexpr Int3 operator-(const Int3& a, const Int3& b) noexcept
   return {a.X - b.X, a.Y - b.Y, a.Z - b.Z};
 }
 
+constexpr Int3 operator-(const Int3& v) noexcept
+{
+  return {-v.X, -v.Y, -v.Z};
+}
+
+constexpr Int3 operator*(const Int3& a, const Int3& b) noexcept
+{
+  return {a.X * b.X, a.Y * b.Y, a.Z * b.Z};
+}
+
 constexpr Int3 operator*(const Int3& v, i32 s) noexcept
+{
+  return {v.X * s, v.Y * s, v.Z * s};
+}
+
+constexpr Int3 operator*(i32 s, const Int3& v) noexcept
 {
   return {v.X * s, v.Y * s, v.Z * s};
 }
@@ -631,6 +816,47 @@ constexpr Int3 operator*(const Int3& v, i32 s) noexcept
 constexpr Int3 operator/(const Int3& v, i32 s) noexcept
 {
   return {v.X / s, v.Y / s, v.Z / s};
+}
+
+constexpr Int3 operator/(const Int3& a, const Int3& b) noexcept
+{
+  return {a.X / b.X, a.Y / b.Y, a.Z / b.Z};
+}
+
+constexpr Int3& operator+=(Int3& a, const Int3& b) noexcept
+{
+  a = a + b;
+  return a;
+}
+
+constexpr Int3& operator-=(Int3& a, const Int3& b) noexcept
+{
+  a = a - b;
+  return a;
+}
+
+constexpr Int3& operator*=(Int3& a, const Int3& b) noexcept
+{
+  a = a * b;
+  return a;
+}
+
+constexpr Int3& operator*=(Int3& v, i32 s) noexcept
+{
+  v = v * s;
+  return v;
+}
+
+constexpr Int3& operator/=(Int3& a, const Int3& b) noexcept
+{
+  a = a / b;
+  return a;
+}
+
+constexpr Int3& operator/=(Int3& v, i32 s) noexcept
+{
+  v = v / s;
+  return v;
 }
 
 [[nodiscard]] constexpr i32 Dot(const Int3& a, const Int3& b) noexcept
@@ -654,6 +880,11 @@ constexpr Int3 operator/(const Int3& v, i32 s) noexcept
           v.Z < min.Z ? min.Z : (v.Z > max.Z ? max.Z : v.Z)};
 }
 
+[[nodiscard]] constexpr Int3 Abs(const Int3& v) noexcept
+{
+  return {Abs(v.X), Abs(v.Y), Abs(v.Z)};
+}
+
 // Int4 operations
 constexpr bool operator==(const Int4& a, const Int4& b) noexcept
 {
@@ -675,7 +906,22 @@ constexpr Int4 operator-(const Int4& a, const Int4& b) noexcept
   return {a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W};
 }
 
+constexpr Int4 operator-(const Int4& v) noexcept
+{
+  return {-v.X, -v.Y, -v.Z, -v.W};
+}
+
+constexpr Int4 operator*(const Int4& a, const Int4& b) noexcept
+{
+  return {a.X * b.X, a.Y * b.Y, a.Z * b.Z, a.W * b.W};
+}
+
 constexpr Int4 operator*(const Int4& v, i32 s) noexcept
+{
+  return {v.X * s, v.Y * s, v.Z * s, v.W * s};
+}
+
+constexpr Int4 operator*(i32 s, const Int4& v) noexcept
 {
   return {v.X * s, v.Y * s, v.Z * s, v.W * s};
 }
@@ -685,9 +931,71 @@ constexpr Int4 operator/(const Int4& v, i32 s) noexcept
   return {v.X / s, v.Y / s, v.Z / s, v.W / s};
 }
 
+constexpr Int4 operator/(const Int4& a, const Int4& b) noexcept
+{
+  return {a.X / b.X, a.Y / b.Y, a.Z / b.Z, a.W / b.W};
+}
+
+constexpr Int4& operator+=(Int4& a, const Int4& b) noexcept
+{
+  a = a + b;
+  return a;
+}
+
+constexpr Int4& operator-=(Int4& a, const Int4& b) noexcept
+{
+  a = a - b;
+  return a;
+}
+
+constexpr Int4& operator*=(Int4& a, const Int4& b) noexcept
+{
+  a = a * b;
+  return a;
+}
+
+constexpr Int4& operator*=(Int4& v, i32 s) noexcept
+{
+  v = v * s;
+  return v;
+}
+
+constexpr Int4& operator/=(Int4& a, const Int4& b) noexcept
+{
+  a = a / b;
+  return a;
+}
+
+constexpr Int4& operator/=(Int4& v, i32 s) noexcept
+{
+  v = v / s;
+  return v;
+}
+
 [[nodiscard]] constexpr i32 Dot(const Int4& a, const Int4& b) noexcept
 {
   return a.X * b.X + a.Y * b.Y + a.Z * b.Z + a.W * b.W;
+}
+
+[[nodiscard]] constexpr Int4 Min(const Int4& a, const Int4& b) noexcept
+{
+  return {a.X < b.X ? a.X : b.X, a.Y < b.Y ? a.Y : b.Y, a.Z < b.Z ? a.Z : b.Z, a.W < b.W ? a.W : b.W};
+}
+
+[[nodiscard]] constexpr Int4 Max(const Int4& a, const Int4& b) noexcept
+{
+  return {a.X > b.X ? a.X : b.X, a.Y > b.Y ? a.Y : b.Y, a.Z > b.Z ? a.Z : b.Z, a.W > b.W ? a.W : b.W};
+}
+
+[[nodiscard]] constexpr Int4 Clamp(const Int4& v, const Int4& min, const Int4& max) noexcept
+{
+  return {v.X < min.X ? min.X : (v.X > max.X ? max.X : v.X), v.Y < min.Y ? min.Y : (v.Y > max.Y ? max.Y : v.Y),
+          v.Z < min.Z ? min.Z : (v.Z > max.Z ? max.Z : v.Z), v.W < min.W ? min.W : (v.W > max.W ? max.W : v.W)};
+}
+
+[[nodiscard]] constexpr Int4 Abs(const Int4& v) noexcept
+{
+  return {Abs(v.X), Abs(v.Y), Abs(v.Z), Abs(v.W)};
 }
 
 // Convenience aliases

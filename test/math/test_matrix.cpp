@@ -61,6 +61,39 @@ TEST_CASE("Float2x2 array access", "[matrix][Float2x2]")
   }
 }
 
+TEST_CASE("Matrix algebra helpers", "[matrix][algebra]")
+{
+  SECTION("Float2x2 determinant transpose inverse")
+  {
+    Float2x2 m {4.0f, 7.0f, 2.0f, 6.0f};
+    REQUIRE_THAT(Determinant(m), WithinAbs(10.0f, 0.00001f));
+
+    Float2x2 transposed = Transposed(m);
+    REQUIRE(transposed.M01 == 2.0f);
+    REQUIRE(transposed.M10 == 7.0f);
+
+    Float2x2 identity = m * Inversed(m);
+    REQUIRE_THAT(identity.M00, WithinAbs(1.0f, 0.00001f));
+    REQUIRE_THAT(identity.M01, WithinAbs(0.0f, 0.00001f));
+    REQUIRE_THAT(identity.M10, WithinAbs(0.0f, 0.00001f));
+    REQUIRE_THAT(identity.M11, WithinAbs(1.0f, 0.00001f));
+  }
+
+  SECTION("Float3x3 affine 2D helpers")
+  {
+    Float3x3 transform = Float3x3::Translation({5.0f, 6.0f}) * Float3x3::Scale({2.0f, 3.0f});
+    Float3 result = transform * Float3 {1.0f, 2.0f, 1.0f};
+    REQUIRE(result == Float3 {7.0f, 12.0f, 1.0f});
+
+    Float3x3 identity = transform * Inversed(transform);
+    REQUIRE_THAT(identity.M00, WithinAbs(1.0f, 0.00001f));
+    REQUIRE_THAT(identity.M11, WithinAbs(1.0f, 0.00001f));
+    REQUIRE_THAT(identity.M22, WithinAbs(1.0f, 0.00001f));
+    REQUIRE_THAT(identity.M02, WithinAbs(0.0f, 0.00001f));
+    REQUIRE_THAT(identity.M12, WithinAbs(0.0f, 0.00001f));
+  }
+}
+
 TEST_CASE("Float3x3 identity matrix", "[matrix][Float3x3]")
 {
   Float3x3 identity = Float3x3::Identity();
@@ -246,6 +279,34 @@ TEST_CASE("Float4x4 matrix multiplication", "[matrix][Float4x4]")
   REQUIRE(result.X == 7.0f);
   REQUIRE(result.Y == 2.0f);
   REQUIRE(result.Z == 2.0f);
+}
+
+TEST_CASE("Float4x4 inverse and quat conversion", "[matrix][Float4x4][quat]")
+{
+  Float4x4 transform = Float4x4::Translation({5.0f, -2.0f, 1.0f}) * Float4x4::RotationY(ToRadians(90.0f)) *
+                       Float4x4::Scale({2.0f, 3.0f, 4.0f});
+
+  Float4x4 identity = transform * Inversed(transform);
+  REQUIRE_THAT(identity.M00, WithinAbs(1.0f, 0.00001f));
+  REQUIRE_THAT(identity.M11, WithinAbs(1.0f, 0.00001f));
+  REQUIRE_THAT(identity.M22, WithinAbs(1.0f, 0.00001f));
+  REQUIRE_THAT(identity.M33, WithinAbs(1.0f, 0.00001f));
+  REQUIRE_THAT(identity.M03, WithinAbs(0.0f, 0.00001f));
+  REQUIRE_THAT(identity.M13, WithinAbs(0.0f, 0.00001f));
+  REQUIRE_THAT(identity.M23, WithinAbs(0.0f, 0.00001f));
+
+  Quat q = Quat::AxisAngle({0.0f, 1.0f, 0.0f}, ToRadians(90.0f));
+  Float3 rotatedByQuat = Rotate(q, {1.0f, 0.0f, 0.0f});
+  Float3 rotatedByMatrix = ToMatrix3(q) * Float3 {1.0f, 0.0f, 0.0f};
+  REQUIRE_THAT(rotatedByMatrix.X, WithinAbs(rotatedByQuat.X, 0.00001f));
+  REQUIRE_THAT(rotatedByMatrix.Y, WithinAbs(rotatedByQuat.Y, 0.00001f));
+  REQUIRE_THAT(rotatedByMatrix.Z, WithinAbs(rotatedByQuat.Z, 0.00001f));
+
+  Quat recovered = ToQuat(ToMatrix3(q));
+  Float3 rotatedByRecovered = Rotate(recovered, {1.0f, 0.0f, 0.0f});
+  REQUIRE_THAT(rotatedByRecovered.X, WithinAbs(rotatedByQuat.X, 0.00001f));
+  REQUIRE_THAT(rotatedByRecovered.Y, WithinAbs(rotatedByQuat.Y, 0.00001f));
+  REQUIRE_THAT(rotatedByRecovered.Z, WithinAbs(rotatedByQuat.Z, 0.00001f));
 }
 
 TEST_CASE("Matrix row access", "[matrix][Float4x4]")

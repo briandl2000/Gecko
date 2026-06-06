@@ -16,12 +16,10 @@
 /// - `Perspective` produces a clip space matching the engine's GPU
 ///   convention (Z in `[-1, 1]`, Y down to GPU swap chain orientation).
 
+#include "gecko/math/quat.h"
 #include "gecko/math/vector.h"
 
 namespace gecko::math {
-
-// Forward declaration
-struct Rotor;
 
 /// Row-major 2x2 float matrix. Default constructs to identity.
 struct Float2x2
@@ -58,6 +56,11 @@ struct Float2x2
   static constexpr Float2x2 Identity() noexcept
   {
     return {};
+  }
+
+  static constexpr Float2x2 Scale(const Float2& s) noexcept
+  {
+    return {s.X, 0.0f, 0.0f, s.Y};
   }
 
   static inline Float2x2 Rotation(f32 angle) noexcept
@@ -110,6 +113,23 @@ struct Float3x3
   static constexpr Float3x3 Identity() noexcept
   {
     return {};
+  }
+
+  static constexpr Float3x3 Translation(const Float2& t) noexcept
+  {
+    return {1.0f, 0.0f, t.X, 0.0f, 1.0f, t.Y, 0.0f, 0.0f, 1.0f};
+  }
+
+  static constexpr Float3x3 Scale(const Float2& s) noexcept
+  {
+    return {s.X, 0.0f, 0.0f, 0.0f, s.Y, 0.0f, 0.0f, 0.0f, 1.0f};
+  }
+
+  static inline Float3x3 Rotation(f32 angle) noexcept
+  {
+    const f32 c = ::gecko::math::Cos(angle);
+    const f32 s = ::gecko::math::Sin(angle);
+    return {c, -s, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static inline Float3x3 RotationX(f32 angle) noexcept
@@ -277,6 +297,16 @@ constexpr Float2x2 operator*(const Float2x2& a, const Float2x2& b) noexcept
           a.M10 * b.M01 + a.M11 * b.M11};
 }
 
+constexpr Float2x2 operator*(const Float2x2& m, f32 s) noexcept
+{
+  return {m.M00 * s, m.M01 * s, m.M10 * s, m.M11 * s};
+}
+
+constexpr Float2x2 operator*(f32 s, const Float2x2& m) noexcept
+{
+  return m * s;
+}
+
 constexpr Float3x3 operator*(const Float3x3& a, const Float3x3& b) noexcept
 {
   return {a.M00 * b.M00 + a.M01 * b.M10 + a.M02 * b.M20, a.M00 * b.M01 + a.M01 * b.M11 + a.M02 * b.M21,
@@ -284,6 +314,16 @@ constexpr Float3x3 operator*(const Float3x3& a, const Float3x3& b) noexcept
           a.M10 * b.M01 + a.M11 * b.M11 + a.M12 * b.M21, a.M10 * b.M02 + a.M11 * b.M12 + a.M12 * b.M22,
           a.M20 * b.M00 + a.M21 * b.M10 + a.M22 * b.M20, a.M20 * b.M01 + a.M21 * b.M11 + a.M22 * b.M21,
           a.M20 * b.M02 + a.M21 * b.M12 + a.M22 * b.M22};
+}
+
+constexpr Float3x3 operator*(const Float3x3& m, f32 s) noexcept
+{
+  return {m.M00 * s, m.M01 * s, m.M02 * s, m.M10 * s, m.M11 * s, m.M12 * s, m.M20 * s, m.M21 * s, m.M22 * s};
+}
+
+constexpr Float3x3 operator*(f32 s, const Float3x3& m) noexcept
+{
+  return m * s;
 }
 
 constexpr Float4x4 operator*(const Float4x4& a, const Float4x4& b) noexcept
@@ -306,6 +346,17 @@ constexpr Float4x4 operator*(const Float4x4& a, const Float4x4& b) noexcept
           a.M30 * b.M03 + a.M31 * b.M13 + a.M32 * b.M23 + a.M33 * b.M33};
 }
 
+constexpr Float4x4 operator*(const Float4x4& m, f32 s) noexcept
+{
+  return {m.M00 * s, m.M01 * s, m.M02 * s, m.M03 * s, m.M10 * s, m.M11 * s, m.M12 * s, m.M13 * s,
+          m.M20 * s, m.M21 * s, m.M22 * s, m.M23 * s, m.M30 * s, m.M31 * s, m.M32 * s, m.M33 * s};
+}
+
+constexpr Float4x4 operator*(f32 s, const Float4x4& m) noexcept
+{
+  return m * s;
+}
+
 // Matrix * vector
 constexpr Float2 operator*(const Float2x2& m, const Float2& v) noexcept
 {
@@ -324,6 +375,120 @@ constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
           m.M20 * v.X + m.M21 * v.Y + m.M22 * v.Z + m.M23 * v.W, m.M30 * v.X + m.M31 * v.Y + m.M32 * v.Z + m.M33 * v.W};
 }
 
+[[nodiscard]] constexpr Float2x2 Transposed(const Float2x2& m) noexcept
+{
+  return {m.M00, m.M10, m.M01, m.M11};
+}
+
+[[nodiscard]] constexpr Float3x3 Transposed(const Float3x3& m) noexcept
+{
+  return {m.M00, m.M10, m.M20, m.M01, m.M11, m.M21, m.M02, m.M12, m.M22};
+}
+
+[[nodiscard]] constexpr Float4x4 Transposed(const Float4x4& m) noexcept
+{
+  return {m.M00, m.M10, m.M20, m.M30, m.M01, m.M11, m.M21, m.M31,
+          m.M02, m.M12, m.M22, m.M32, m.M03, m.M13, m.M23, m.M33};
+}
+
+[[nodiscard]] constexpr f32 Determinant(const Float2x2& m) noexcept
+{
+  return m.M00 * m.M11 - m.M01 * m.M10;
+}
+
+[[nodiscard]] constexpr f32 Determinant(const Float3x3& m) noexcept
+{
+  return m.M00 * (m.M11 * m.M22 - m.M12 * m.M21) - m.M01 * (m.M10 * m.M22 - m.M12 * m.M20) +
+         m.M02 * (m.M10 * m.M21 - m.M11 * m.M20);
+}
+
+[[nodiscard]] constexpr f32 Determinant(const Float4x4& m) noexcept
+{
+  const f32 subFactor00 = m.M22 * m.M33 - m.M23 * m.M32;
+  const f32 subFactor01 = m.M21 * m.M33 - m.M23 * m.M31;
+  const f32 subFactor02 = m.M21 * m.M32 - m.M22 * m.M31;
+  const f32 subFactor03 = m.M20 * m.M33 - m.M23 * m.M30;
+  const f32 subFactor04 = m.M20 * m.M32 - m.M22 * m.M30;
+  const f32 subFactor05 = m.M20 * m.M31 - m.M21 * m.M30;
+
+  return m.M00 * (m.M11 * subFactor00 - m.M12 * subFactor01 + m.M13 * subFactor02) -
+         m.M01 * (m.M10 * subFactor00 - m.M12 * subFactor03 + m.M13 * subFactor04) +
+         m.M02 * (m.M10 * subFactor01 - m.M11 * subFactor03 + m.M13 * subFactor05) -
+         m.M03 * (m.M10 * subFactor02 - m.M11 * subFactor04 + m.M12 * subFactor05);
+}
+
+[[nodiscard]] constexpr Float2x2 Inversed(const Float2x2& m) noexcept
+{
+  const f32 det = Determinant(m);
+  if (Abs(det) <= Epsilon)
+  {
+    return Float2x2::Identity();
+  }
+
+  const f32 invDet = 1.0f / det;
+  return {m.M11 * invDet, -m.M01 * invDet, -m.M10 * invDet, m.M00 * invDet};
+}
+
+[[nodiscard]] constexpr Float3x3 Inversed(const Float3x3& m) noexcept
+{
+  const f32 det = Determinant(m);
+  if (Abs(det) <= Epsilon)
+  {
+    return Float3x3::Identity();
+  }
+
+  const f32 invDet = 1.0f / det;
+  return {(m.M11 * m.M22 - m.M12 * m.M21) * invDet, (m.M02 * m.M21 - m.M01 * m.M22) * invDet,
+          (m.M01 * m.M12 - m.M02 * m.M11) * invDet, (m.M12 * m.M20 - m.M10 * m.M22) * invDet,
+          (m.M00 * m.M22 - m.M02 * m.M20) * invDet, (m.M02 * m.M10 - m.M00 * m.M12) * invDet,
+          (m.M10 * m.M21 - m.M11 * m.M20) * invDet, (m.M01 * m.M20 - m.M00 * m.M21) * invDet,
+          (m.M00 * m.M11 - m.M01 * m.M10) * invDet};
+}
+
+[[nodiscard]] constexpr Float4x4 Inversed(const Float4x4& m) noexcept
+{
+  Float4x4 inv {m.M11 * m.M22 * m.M33 - m.M11 * m.M23 * m.M32 - m.M21 * m.M12 * m.M33 + m.M21 * m.M13 * m.M32 +
+                    m.M31 * m.M12 * m.M23 - m.M31 * m.M13 * m.M22,
+                -m.M01 * m.M22 * m.M33 + m.M01 * m.M23 * m.M32 + m.M21 * m.M02 * m.M33 - m.M21 * m.M03 * m.M32 -
+                    m.M31 * m.M02 * m.M23 + m.M31 * m.M03 * m.M22,
+                m.M01 * m.M12 * m.M33 - m.M01 * m.M13 * m.M32 - m.M11 * m.M02 * m.M33 + m.M11 * m.M03 * m.M32 +
+                    m.M31 * m.M02 * m.M13 - m.M31 * m.M03 * m.M12,
+                -m.M01 * m.M12 * m.M23 + m.M01 * m.M13 * m.M22 + m.M11 * m.M02 * m.M23 - m.M11 * m.M03 * m.M22 -
+                    m.M21 * m.M02 * m.M13 + m.M21 * m.M03 * m.M12,
+                -m.M10 * m.M22 * m.M33 + m.M10 * m.M23 * m.M32 + m.M20 * m.M12 * m.M33 - m.M20 * m.M13 * m.M32 -
+                    m.M30 * m.M12 * m.M23 + m.M30 * m.M13 * m.M22,
+                m.M00 * m.M22 * m.M33 - m.M00 * m.M23 * m.M32 - m.M20 * m.M02 * m.M33 + m.M20 * m.M03 * m.M32 +
+                    m.M30 * m.M02 * m.M23 - m.M30 * m.M03 * m.M22,
+                -m.M00 * m.M12 * m.M33 + m.M00 * m.M13 * m.M32 + m.M10 * m.M02 * m.M33 - m.M10 * m.M03 * m.M32 -
+                    m.M30 * m.M02 * m.M13 + m.M30 * m.M03 * m.M12,
+                m.M00 * m.M12 * m.M23 - m.M00 * m.M13 * m.M22 - m.M10 * m.M02 * m.M23 + m.M10 * m.M03 * m.M22 +
+                    m.M20 * m.M02 * m.M13 - m.M20 * m.M03 * m.M12,
+                m.M10 * m.M21 * m.M33 - m.M10 * m.M23 * m.M31 - m.M20 * m.M11 * m.M33 + m.M20 * m.M13 * m.M31 +
+                    m.M30 * m.M11 * m.M23 - m.M30 * m.M13 * m.M21,
+                -m.M00 * m.M21 * m.M33 + m.M00 * m.M23 * m.M31 + m.M20 * m.M01 * m.M33 - m.M20 * m.M03 * m.M31 -
+                    m.M30 * m.M01 * m.M23 + m.M30 * m.M03 * m.M21,
+                m.M00 * m.M11 * m.M33 - m.M00 * m.M13 * m.M31 - m.M10 * m.M01 * m.M33 + m.M10 * m.M03 * m.M31 +
+                    m.M30 * m.M01 * m.M13 - m.M30 * m.M03 * m.M11,
+                -m.M00 * m.M11 * m.M23 + m.M00 * m.M13 * m.M21 + m.M10 * m.M01 * m.M23 - m.M10 * m.M03 * m.M21 -
+                    m.M20 * m.M01 * m.M13 + m.M20 * m.M03 * m.M11,
+                -m.M10 * m.M21 * m.M32 + m.M10 * m.M22 * m.M31 + m.M20 * m.M11 * m.M32 - m.M20 * m.M12 * m.M31 -
+                    m.M30 * m.M11 * m.M22 + m.M30 * m.M12 * m.M21,
+                m.M00 * m.M21 * m.M32 - m.M00 * m.M22 * m.M31 - m.M20 * m.M01 * m.M32 + m.M20 * m.M02 * m.M31 +
+                    m.M30 * m.M01 * m.M22 - m.M30 * m.M02 * m.M21,
+                -m.M00 * m.M11 * m.M32 + m.M00 * m.M12 * m.M31 + m.M10 * m.M01 * m.M32 - m.M10 * m.M02 * m.M31 -
+                    m.M30 * m.M01 * m.M12 + m.M30 * m.M02 * m.M11,
+                m.M00 * m.M11 * m.M22 - m.M00 * m.M12 * m.M21 - m.M10 * m.M01 * m.M22 + m.M10 * m.M02 * m.M21 +
+                    m.M20 * m.M01 * m.M12 - m.M20 * m.M02 * m.M11};
+
+  const f32 det = m.M00 * inv.M00 + m.M01 * inv.M10 + m.M02 * inv.M20 + m.M03 * inv.M30;
+  if (Abs(det) <= Epsilon)
+  {
+    return Float4x4::Identity();
+  }
+
+  return inv * (1.0f / det);
+}
+
 /// Transform a 3D **point** by `m` (treats `v` as homogeneous `(v, 1)`).
 /// Use this for positions; translations are applied.
 [[nodiscard]] constexpr Float3 TransformPoint(const Float4x4& m, const Float3& v) noexcept
@@ -340,13 +505,56 @@ constexpr Float4 operator*(const Float4x4& m, const Float4& v) noexcept
   return {p.X, p.Y, p.Z};
 }
 
-// Rotor conversion functions (declarations)
-/// Convert a unit `Rotor` to its equivalent 3x3 rotation matrix.
-Float3x3 ToMatrix3(const Rotor& r) noexcept;
-/// Convert a unit `Rotor` to its equivalent 4x4 rotation matrix.
-Float4x4 ToMatrix4(const Rotor& r) noexcept;
-/// Recover a unit `Rotor` from a pure 3x3 rotation matrix.
-Rotor ToRotor(const Float3x3& m) noexcept;
+/// Convert a unit `Quat` to its equivalent 3x3 rotation matrix.
+[[nodiscard]] inline Float3x3 ToMatrix3(const Quat& r) noexcept
+{
+  const Quat q = Normalized(r);
+  const f32 xx = q.X * q.X;
+  const f32 yy = q.Y * q.Y;
+  const f32 zz = q.Z * q.Z;
+  const f32 xy = q.X * q.Y;
+  const f32 xz = q.X * q.Z;
+  const f32 yz = q.Y * q.Z;
+  const f32 wx = q.W * q.X;
+  const f32 wy = q.W * q.Y;
+  const f32 wz = q.W * q.Z;
+
+  return {1.0f - 2.0f * (yy + zz), 2.0f * (xy - wz), 2.0f * (xz + wy), 2.0f * (xy + wz),       1.0f - 2.0f * (xx + zz),
+          2.0f * (yz - wx),        2.0f * (xz - wy), 2.0f * (yz + wx), 1.0f - 2.0f * (xx + yy)};
+}
+
+/// Convert a unit `Quat` to its equivalent 4x4 rotation matrix.
+[[nodiscard]] inline Float4x4 ToMatrix4(const Quat& r) noexcept
+{
+  const Float3x3 m = ToMatrix3(r);
+  return {m.M00, m.M01, m.M02, 0.0f, m.M10, m.M11, m.M12, 0.0f, m.M20, m.M21, m.M22, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+}
+
+/// Recover a unit `Quat` from a pure 3x3 rotation matrix.
+[[nodiscard]] inline Quat ToQuat(const Float3x3& m) noexcept
+{
+  const f32 trace = m.M00 + m.M11 + m.M22;
+  if (trace > 0.0f)
+  {
+    const f32 s = Sqrt(trace + 1.0f) * 2.0f;
+    return Normalized(Quat {(m.M21 - m.M12) / s, (m.M02 - m.M20) / s, (m.M10 - m.M01) / s, 0.25f * s});
+  }
+
+  if (m.M00 > m.M11 && m.M00 > m.M22)
+  {
+    const f32 s = Sqrt(1.0f + m.M00 - m.M11 - m.M22) * 2.0f;
+    return Normalized(Quat {0.25f * s, (m.M01 + m.M10) / s, (m.M02 + m.M20) / s, (m.M21 - m.M12) / s});
+  }
+
+  if (m.M11 > m.M22)
+  {
+    const f32 s = Sqrt(1.0f + m.M11 - m.M00 - m.M22) * 2.0f;
+    return Normalized(Quat {(m.M01 + m.M10) / s, 0.25f * s, (m.M12 + m.M21) / s, (m.M02 - m.M20) / s});
+  }
+
+  const f32 s = Sqrt(1.0f + m.M22 - m.M00 - m.M11) * 2.0f;
+  return Normalized(Quat {(m.M02 + m.M20) / s, (m.M12 + m.M21) / s, 0.25f * s, (m.M10 - m.M01) / s});
+}
 
 /// Lowercase alias for `Float2x2`.
 using float2x2 = Float2x2;

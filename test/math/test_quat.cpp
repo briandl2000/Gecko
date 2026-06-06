@@ -135,6 +135,37 @@ TEST_CASE("Quat composition", "[quat][operations]")
   }
 }
 
+TEST_CASE("Quat arithmetic helpers", "[quat][operations]")
+{
+  Quat a {1.0f, 2.0f, 3.0f, 4.0f};
+  Quat b {2.0f, 3.0f, 4.0f, 5.0f};
+
+  REQUIRE(a + b == Quat {3.0f, 5.0f, 7.0f, 9.0f});
+  REQUIRE(b - a == Quat {1.0f, 1.0f, 1.0f, 1.0f});
+  REQUIRE(-a == Quat {-1.0f, -2.0f, -3.0f, -4.0f});
+  REQUIRE(a / 2.0f == Quat {0.5f, 1.0f, 1.5f, 2.0f});
+
+  Quat result = a;
+  result += b;
+  REQUIRE(result == Quat {3.0f, 5.0f, 7.0f, 9.0f});
+  result -= b;
+  REQUIRE(result == a);
+  result *= 2.0f;
+  REQUIRE(result == Quat {2.0f, 4.0f, 6.0f, 8.0f});
+  result /= 2.0f;
+  REQUIRE(result == a);
+}
+
+TEST_CASE("Quat LookRotation", "[quat][construction]")
+{
+  Quat q = Quat::LookRotation({1.0f, 0.0f, 0.0f});
+  Float3 result = Rotate(q, {0.0f, 0.0f, 1.0f});
+
+  REQUIRE_THAT(result.X, WithinAbs(1.0f, 0.00001f));
+  REQUIRE_THAT(result.Y, WithinAbs(0.0f, 0.00001f));
+  REQUIRE_THAT(result.Z, WithinAbs(0.0f, 0.00001f));
+}
+
 TEST_CASE("Quat conjugate", "[quat][operations]")
 {
   Quat q = Quat::AxisAngle({0.0f, 0.0f, 1.0f}, ToRadians(90.0f));

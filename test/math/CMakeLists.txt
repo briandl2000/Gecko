@@ -1,9 +1,12 @@
 add_executable(math_tests
+  test_scalar.cpp
   test_vector.cpp
   test_matrix.cpp
+  test_geometry.cpp
   test_aabb.cpp
   test_quat.cpp
   test_rect.cpp
+  test_transform.cpp
 )
 
 target_link_libraries(math_tests PRIVATE Catch2::Catch2WithMain)

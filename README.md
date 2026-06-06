@@ -38,7 +38,8 @@ gk run graphics_example    # Run the graphics demo
 | Command | Description |
 |---------|-------------|
 | `gk setup [--clean]` | Configure CMake |
-| `gk build [debug\|release\|all]` | Build the engine |
+| `gk build [debug\|release\|all]` | Build the engine libraries |
+| `gk build examples [debug\|release]` | Build example applications |
 | `gk test [debug\|release]` | Build and run tests |
 | `gk run <example> [debug\|release]` | Build and run an example |
 | `gk format` | `clang-format` all sources |
