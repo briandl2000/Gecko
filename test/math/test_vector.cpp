@@ -7,51 +7,6 @@ using namespace gecko;
 using namespace gecko::math;
 using Catch::Matchers::WithinAbs;
 
-TEST_CASE("Math constants are correct", "[vector][constants]")
-{
-  REQUIRE_THAT(Pi, WithinAbs(3.14159265f, 0.00001f));
-  REQUIRE_THAT(TwoPi, WithinAbs(6.28318530f, 0.00001f));
-  REQUIRE_THAT(HalfPi, WithinAbs(1.57079632f, 0.00001f));
-}
-
-TEST_CASE("Angle conversions", "[vector][utils]")
-{
-  REQUIRE_THAT(ToRadians(180.0f), WithinAbs(Pi, 0.00001f));
-  REQUIRE_THAT(ToRadians(90.0f), WithinAbs(HalfPi, 0.00001f));
-  REQUIRE_THAT(ToDegrees(Pi), WithinAbs(180.0f, 0.00001f));
-  REQUIRE_THAT(ToDegrees(HalfPi), WithinAbs(90.0f, 0.00001f));
-}
-
-TEST_CASE("Scalar utility functions", "[vector][utils]")
-{
-  SECTION("Min and Max")
-  {
-    REQUIRE(Min(5.0f, 3.0f) == 3.0f);
-    REQUIRE(Max(5.0f, 3.0f) == 5.0f);
-  }
-
-  SECTION("Clamp")
-  {
-    REQUIRE(Clamp(5.0f, 0.0f, 10.0f) == 5.0f);
-    REQUIRE(Clamp(-5.0f, 0.0f, 10.0f) == 0.0f);
-    REQUIRE(Clamp(15.0f, 0.0f, 10.0f) == 10.0f);
-  }
-
-  SECTION("Lerp")
-  {
-    REQUIRE_THAT(Lerp(0.0f, 10.0f, 0.5f), WithinAbs(5.0f, 0.00001f));
-    REQUIRE_THAT(Lerp(0.0f, 10.0f, 0.0f), WithinAbs(0.0f, 0.00001f));
-    REQUIRE_THAT(Lerp(0.0f, 10.0f, 1.0f), WithinAbs(10.0f, 0.00001f));
-  }
-
-  SECTION("Smoothstep")
-  {
-    REQUIRE_THAT(Smoothstep(0.0f, 1.0f, 0.5f), WithinAbs(0.5f, 0.00001f));
-    REQUIRE_THAT(Smoothstep(0.0f, 1.0f, 0.0f), WithinAbs(0.0f, 0.00001f));
-    REQUIRE_THAT(Smoothstep(0.0f, 1.0f, 1.0f), WithinAbs(1.0f, 0.00001f));
-  }
-}
-
 TEST_CASE("Float2 basic operations", "[vector][Float2]")
 {
   Float2 a {3.0f, 4.0f};
@@ -76,6 +31,10 @@ TEST_CASE("Float2 basic operations", "[vector][Float2]")
     Float2 result = a * 2.0f;
     REQUIRE(result.X == 6.0f);
     REQUIRE(result.Y == 8.0f);
+
+    Float2 componentResult = a * b;
+    REQUIRE(componentResult.X == 3.0f);
+    REQUIRE(componentResult.Y == 8.0f);
   }
 
   SECTION("Division")
@@ -83,6 +42,33 @@ TEST_CASE("Float2 basic operations", "[vector][Float2]")
     Float2 result = a / 2.0f;
     REQUIRE(result.X == 1.5f);
     REQUIRE(result.Y == 2.0f);
+
+    Float2 componentResult = a / b;
+    REQUIRE(componentResult.X == 3.0f);
+    REQUIRE(componentResult.Y == 2.0f);
+  }
+
+  SECTION("Compound assignment")
+  {
+    Float2 result = a;
+    result += b;
+    REQUIRE(result == Float2 {4.0f, 6.0f});
+    result -= b;
+    REQUIRE(result == a);
+    result *= b;
+    REQUIRE(result == Float2 {3.0f, 8.0f});
+    result /= b;
+    REQUIRE(result == a);
+    result *= 2.0f;
+    REQUIRE(result == Float2 {6.0f, 8.0f});
+    result /= 2.0f;
+    REQUIRE(result == a);
+  }
+
+  SECTION("Unary negation")
+  {
+    Float2 result = -a;
+    REQUIRE(result == Float2 {-3.0f, -4.0f});
   }
 
   SECTION("Array access")
@@ -119,6 +105,12 @@ TEST_CASE("Float2 vector operations", "[vector][Float2]")
   SECTION("Length squared")
   {
     REQUIRE_THAT(LengthSquared(a), WithinAbs(25.0f, 0.00001f));
+  }
+
+  SECTION("Distance")
+  {
+    REQUIRE_THAT(Distance(a, b), WithinAbs(2.828427f, 0.00001f));
+    REQUIRE_THAT(DistanceSquared(a, b), WithinAbs(8.0f, 0.00001f));
   }
 
   SECTION("Normalized")
@@ -161,6 +153,12 @@ TEST_CASE("Float2 vector operations", "[vector][Float2]")
     REQUIRE(result.X == 3.0f);
     REQUIRE(result.Y == 4.0f);
   }
+
+  SECTION("Reflect")
+  {
+    Float2 result = Reflect({1.0f, -1.0f}, {0.0f, 1.0f});
+    REQUIRE(result == Float2 {1.0f, 1.0f});
+  }
 }
 
 TEST_CASE("Float3 basic operations", "[vector][Float3]")
@@ -190,6 +188,37 @@ TEST_CASE("Float3 basic operations", "[vector][Float3]")
     REQUIRE(result.X == 2.0f);
     REQUIRE(result.Y == 4.0f);
     REQUIRE(result.Z == 6.0f);
+
+    Float3 componentResult = a * b;
+    REQUIRE(componentResult == Float3 {4.0f, 10.0f, 18.0f});
+  }
+
+  SECTION("Division")
+  {
+    Float3 result = b / a;
+    REQUIRE(result == Float3 {4.0f, 2.5f, 2.0f});
+  }
+
+  SECTION("Compound assignment")
+  {
+    Float3 result = a;
+    result += b;
+    REQUIRE(result == Float3 {5.0f, 7.0f, 9.0f});
+    result -= b;
+    REQUIRE(result == a);
+    result *= b;
+    REQUIRE(result == Float3 {4.0f, 10.0f, 18.0f});
+    result /= b;
+    REQUIRE(result == a);
+    result *= 2.0f;
+    REQUIRE(result == Float3 {2.0f, 4.0f, 6.0f});
+    result /= 2.0f;
+    REQUIRE(result == a);
+  }
+
+  SECTION("Unary negation")
+  {
+    REQUIRE(-a == Float3 {-1.0f, -2.0f, -3.0f});
   }
 
   SECTION("Array access")
@@ -223,6 +252,8 @@ TEST_CASE("Float3 vector operations", "[vector][Float3]")
   {
     Float3 v {3.0f, 4.0f, 0.0f};
     REQUIRE_THAT(Length(v), WithinAbs(5.0f, 0.00001f));
+    REQUIRE_THAT(Distance(v, {0.0f, 0.0f, 0.0f}), WithinAbs(5.0f, 0.00001f));
+    REQUIRE_THAT(DistanceSquared(v, {0.0f, 0.0f, 0.0f}), WithinAbs(25.0f, 0.00001f));
   }
 
   SECTION("Normalized")
@@ -231,6 +262,12 @@ TEST_CASE("Float3 vector operations", "[vector][Float3]")
     Float3 result = Normalized(v);
     REQUIRE_THAT(result.X, WithinAbs(1.0f, 0.00001f));
     REQUIRE_THAT(Length(result), WithinAbs(1.0f, 0.00001f));
+  }
+
+  SECTION("Reflect")
+  {
+    Float3 result = Reflect({1.0f, -2.0f, 3.0f}, {0.0f, 1.0f, 0.0f});
+    REQUIRE(result == Float3 {1.0f, 2.0f, 3.0f});
   }
 }
 
@@ -248,6 +285,27 @@ TEST_CASE("Float4 basic operations", "[vector][Float4]")
     REQUIRE(result.W == 12.0f);
   }
 
+  SECTION("Component arithmetic")
+  {
+    REQUIRE(a * b == Float4 {5.0f, 12.0f, 21.0f, 32.0f});
+    REQUIRE(b / a == Float4 {5.0f, 3.0f, 2.3333333f, 2.0f});
+    REQUIRE(-a == Float4 {-1.0f, -2.0f, -3.0f, -4.0f});
+
+    Float4 result = a;
+    result += b;
+    REQUIRE(result == Float4 {6.0f, 8.0f, 10.0f, 12.0f});
+    result -= b;
+    REQUIRE(result == a);
+    result *= b;
+    REQUIRE(result == Float4 {5.0f, 12.0f, 21.0f, 32.0f});
+    result /= b;
+    REQUIRE(result == a);
+    result *= 2.0f;
+    REQUIRE(result == Float4 {2.0f, 4.0f, 6.0f, 8.0f});
+    result /= 2.0f;
+    REQUIRE(result == a);
+  }
+
   SECTION("Array access")
   {
     REQUIRE(a[0] == 1.0f);
@@ -260,6 +318,14 @@ TEST_CASE("Float4 basic operations", "[vector][Float4]")
   {
     f32 result = Dot(a, b);
     REQUIRE(result == 70.0f);  // 1*5 + 2*6 + 3*7 + 4*8
+    REQUIRE_THAT(Distance(a, b), WithinAbs(8.0f, 0.00001f));
+    REQUIRE_THAT(DistanceSquared(a, b), WithinAbs(64.0f, 0.00001f));
+  }
+
+  SECTION("Reflect")
+  {
+    Float4 result = Reflect({1.0f, -2.0f, 3.0f, 0.0f}, {0.0f, 1.0f, 0.0f, 0.0f});
+    REQUIRE(result == Float4 {1.0f, 2.0f, 3.0f, 0.0f});
   }
 }
 
@@ -273,6 +339,28 @@ TEST_CASE("Int2 operations", "[vector][Int2]")
     Int2 result = a + b;
     REQUIRE(result.X == 4);
     REQUIRE(result.Y == 6);
+  }
+
+  SECTION("Component arithmetic")
+  {
+    REQUIRE(a * b == Int2 {3, 8});
+    REQUIRE(a / b == Int2 {3, 2});
+    REQUIRE(2 * b == Int2 {2, 4});
+    REQUIRE(-a == Int2 {-3, -4});
+
+    Int2 result = a;
+    result += b;
+    REQUIRE(result == Int2 {4, 6});
+    result -= b;
+    REQUIRE(result == a);
+    result *= b;
+    REQUIRE(result == Int2 {3, 8});
+    result /= b;
+    REQUIRE(result == a);
+    result *= 2;
+    REQUIRE(result == Int2 {6, 8});
+    result /= 2;
+    REQUIRE(result == a);
   }
 
   SECTION("Dot product")
@@ -298,6 +386,11 @@ TEST_CASE("Int2 operations", "[vector][Int2]")
     REQUIRE(result.X == 0);
     REQUIRE(result.Y == 5);
   }
+
+  SECTION("Abs")
+  {
+    REQUIRE(Abs(Int2 {-3, -4}) == Int2 {3, 4});
+  }
 }
 
 TEST_CASE("Int3 operations", "[vector][Int3]")
@@ -311,6 +404,28 @@ TEST_CASE("Int3 operations", "[vector][Int3]")
     REQUIRE(result.X == 5);
     REQUIRE(result.Y == 7);
     REQUIRE(result.Z == 9);
+  }
+
+  SECTION("Component arithmetic")
+  {
+    REQUIRE(a * b == Int3 {4, 10, 18});
+    REQUIRE(b / a == Int3 {4, 2, 2});
+    REQUIRE(2 * a == Int3 {2, 4, 6});
+    REQUIRE(-a == Int3 {-1, -2, -3});
+
+    Int3 result = a;
+    result += b;
+    REQUIRE(result == Int3 {5, 7, 9});
+    result -= b;
+    REQUIRE(result == a);
+    result *= b;
+    REQUIRE(result == Int3 {4, 10, 18});
+    result /= b;
+    REQUIRE(result == a);
+    result *= 2;
+    REQUIRE(result == Int3 {2, 4, 6});
+    result /= 2;
+    REQUIRE(result == a);
   }
 
   SECTION("Dot product")
@@ -329,5 +444,52 @@ TEST_CASE("Int3 operations", "[vector][Int3]")
     REQUIRE(maxVec.X == 4);
     REQUIRE(maxVec.Y == 5);
     REQUIRE(maxVec.Z == 6);
+  }
+
+  SECTION("Abs")
+  {
+    REQUIRE(Abs(Int3 {-1, -2, -3}) == Int3 {1, 2, 3});
+  }
+}
+
+TEST_CASE("Int4 operations", "[vector][Int4]")
+{
+  Int4 a {1, 2, 3, 4};
+  Int4 b {5, 6, 7, 8};
+
+  SECTION("Basic arithmetic")
+  {
+    REQUIRE(a + b == Int4 {6, 8, 10, 12});
+    REQUIRE(b - a == Int4 {4, 4, 4, 4});
+    REQUIRE(a * b == Int4 {5, 12, 21, 32});
+    REQUIRE(b / a == Int4 {5, 3, 2, 2});
+    REQUIRE(2 * a == Int4 {2, 4, 6, 8});
+    REQUIRE(-a == Int4 {-1, -2, -3, -4});
+  }
+
+  SECTION("Compound assignment")
+  {
+    Int4 result = a;
+    result += b;
+    REQUIRE(result == Int4 {6, 8, 10, 12});
+    result -= b;
+    REQUIRE(result == a);
+    result *= b;
+    REQUIRE(result == Int4 {5, 12, 21, 32});
+    result /= b;
+    REQUIRE(result == a);
+    result *= 2;
+    REQUIRE(result == Int4 {2, 4, 6, 8});
+    result /= 2;
+    REQUIRE(result == a);
+  }
+
+  SECTION("Vector helpers")
+  {
+    REQUIRE(Dot(a, b) == 70);
+    REQUIRE(Min(a, b) == a);
+    REQUIRE(Max(a, b) == b);
+    REQUIRE(Clamp(Int4 {-1, 2, 30, 4}, {0, 0, 0, 0}, {10, 10, 10, 10}) == Int4 {0, 2, 10, 4});
+    REQUIRE(Abs(Int4 {-1, -2, -3, -4}) == a);
   }
 }

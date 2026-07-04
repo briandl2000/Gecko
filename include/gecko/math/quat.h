@@ -19,8 +19,11 @@
 namespace gecko::math {
 
 // Forward declarations
+struct Quat;
 struct Float3x3;
 struct Float4x4;
+
+[[nodiscard]] inline Quat Normalized(const Quat& q) noexcept;
 
 /// Quaternion: a compact 4-float rotation representation
 /// (`W + Xi + Yj + Zk`). Default constructs to identity (`0,0,0,1`).
@@ -117,6 +120,51 @@ struct Quat
     return {cross.X * invS, cross.Y * invS, cross.Z * invS, s * 0.5f};
   }
 
+  /// Build a rotation whose local forward axis points along `forward` and
+  /// local up is as close as possible to `up`.
+  static inline Quat LookRotation(const Float3& forward, const Float3& up = {0.0f, 1.0f, 0.0f}) noexcept
+  {
+    const Float3 f = Normalized(forward);
+    if (LengthSquared(f) <= Epsilon)
+    {
+      return Identity();
+    }
+
+    Float3 r = Cross(up, f);
+    if (LengthSquared(r) <= Epsilon)
+    {
+      r = Cross({1.0f, 0.0f, 0.0f}, f);
+      if (LengthSquared(r) <= Epsilon)
+      {
+        r = Cross({0.0f, 0.0f, 1.0f}, f);
+      }
+    }
+    r = Normalized(r);
+    const Float3 u = Cross(f, r);
+
+    const f32 trace = r.X + u.Y + f.Z;
+    if (trace > 0.0f)
+    {
+      const f32 s = Sqrt(trace + 1.0f) * 2.0f;
+      return Normalized(Quat {(u.Z - f.Y) / s, (f.X - r.Z) / s, (r.Y - u.X) / s, 0.25f * s});
+    }
+
+    if (r.X > u.Y && r.X > f.Z)
+    {
+      const f32 s = Sqrt(1.0f + r.X - u.Y - f.Z) * 2.0f;
+      return Normalized(Quat {0.25f * s, (u.X + r.Y) / s, (f.X + r.Z) / s, (u.Z - f.Y) / s});
+    }
+
+    if (u.Y > f.Z)
+    {
+      const f32 s = Sqrt(1.0f + u.Y - r.X - f.Z) * 2.0f;
+      return Normalized(Quat {(u.X + r.Y) / s, 0.25f * s, (f.Y + u.Z) / s, (f.X - r.Z) / s});
+    }
+
+    const f32 s = Sqrt(1.0f + f.Z - r.X - u.Y) * 2.0f;
+    return Normalized(Quat {(f.X + r.Z) / s, (f.Y + u.Z) / s, 0.25f * s, (r.Y - u.X) / s});
+  }
+
   /// Build a rotation from intrinsic Tait-Bryan Euler angles in radians.
   /// @param pitch  Rotation around the X axis (pitch).
   /// @param yaw    Rotation around the Y axis (yaw).
@@ -157,6 +205,11 @@ struct Quat
           a.W * b.Z + a.X * b.Y - a.Y * b.X + a.Z * b.W, a.W * b.W - a.X * b.X - a.Y * b.Y - a.Z * b.Z};
 }
 
+[[nodiscard]] constexpr Quat operator-(const Quat& q) noexcept
+{
+  return {-q.X, -q.Y, -q.Z, -q.W};
+}
+
 // Scalar multiplication
 [[nodiscard]] constexpr Quat operator*(const Quat& q, f32 s) noexcept
 {
@@ -168,10 +221,50 @@ struct Quat
   return {q.X * s, q.Y * s, q.Z * s, q.W * s};
 }
 
+[[nodiscard]] constexpr Quat operator/(const Quat& q, f32 s) noexcept
+{
+  return {q.X / s, q.Y / s, q.Z / s, q.W / s};
+}
+
 // Addition
 [[nodiscard]] constexpr Quat operator+(const Quat& a, const Quat& b) noexcept
 {
   return {a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.W + b.W};
+}
+
+[[nodiscard]] constexpr Quat operator-(const Quat& a, const Quat& b) noexcept
+{
+  return {a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W};
+}
+
+constexpr Quat& operator+=(Quat& a, const Quat& b) noexcept
+{
+  a = a + b;
+  return a;
+}
+
+constexpr Quat& operator-=(Quat& a, const Quat& b) noexcept
+{
+  a = a - b;
+  return a;
+}
+
+constexpr Quat& operator*=(Quat& a, const Quat& b) noexcept
+{
+  a = a * b;
+  return a;
+}
+
+constexpr Quat& operator*=(Quat& q, f32 s) noexcept
+{
+  q = q * s;
+  return q;
+}
+
+constexpr Quat& operator/=(Quat& q, f32 s) noexcept
+{
+  q = q / s;
+  return q;
 }
 
 /// Quaternion dot product (treats `Quat` as a 4-vector).

@@ -3,7 +3,7 @@
 /// @file
 /// Axis-aligned bounding boxes (min/max representation).
 ///
-/// Provides 2D float (`Aabb2`) and 2D integer (`Aabb2i`) AABBs along with
+/// Provides 2D float (`Aabb2`), 2D integer (`Aabb2i`) and 3D float (`Aabb3`) AABBs along with
 /// free helpers (`Size`, `Center`, `Contains`, `Intersects`, `Expand`,
 /// `Union`, `Clamp`). For a position+size rectangle use `Rect2D` from
 /// `gecko/math/rect.h`. The aliases `RectF` / `RectI` are provided for
@@ -50,6 +50,27 @@ struct Aabb2i
   }
 
   [[nodiscard]] constexpr const Int2& operator[](usize index) const noexcept
+  {
+    return (&Min)[index];
+  }
+};
+
+/// 3D axis-aligned bounding box stored as inclusive `Min` / `Max`.
+struct Aabb3
+{
+  Float3 Min {};
+  Float3 Max {};
+
+  constexpr Aabb3() noexcept = default;
+  constexpr Aabb3(const Float3& min, const Float3& max) noexcept : Min(min), Max(max)
+  {}
+
+  [[nodiscard]] constexpr Float3& operator[](usize index) noexcept
+  {
+    return (&Min)[index];
+  }
+
+  [[nodiscard]] constexpr const Float3& operator[](usize index) const noexcept
   {
     return (&Min)[index];
   }
@@ -131,6 +152,70 @@ struct Aabb2i
 }
 
 [[nodiscard]] constexpr Int2 Clamp(const Aabb2i& box, const Int2& p) noexcept
+{
+  return ::gecko::math::Clamp(p, box.Min, box.Max);
+}
+
+[[nodiscard]] constexpr Float3 Size(const Aabb3& box) noexcept
+{
+  return box.Max - box.Min;
+}
+
+[[nodiscard]] constexpr Float3 Extents(const Aabb3& box) noexcept
+{
+  return Size(box) * 0.5f;
+}
+
+[[nodiscard]] constexpr Float3 Center(const Aabb3& box) noexcept
+{
+  return (box.Min + box.Max) * 0.5f;
+}
+
+[[nodiscard]] constexpr f32 Volume(const Aabb3& box) noexcept
+{
+  const Float3 size = Size(box);
+  return size.X * size.Y * size.Z;
+}
+
+[[nodiscard]] constexpr f32 SurfaceArea(const Aabb3& box) noexcept
+{
+  const Float3 size = Size(box);
+  return 2.0f * (size.X * size.Y + size.X * size.Z + size.Y * size.Z);
+}
+
+[[nodiscard]] constexpr bool Contains(const Aabb3& box, const Float3& p) noexcept
+{
+  return p.X >= box.Min.X && p.Y >= box.Min.Y && p.Z >= box.Min.Z && p.X <= box.Max.X && p.Y <= box.Max.Y &&
+         p.Z <= box.Max.Z;
+}
+
+[[nodiscard]] constexpr bool Contains(const Aabb3& outer, const Aabb3& inner) noexcept
+{
+  return Contains(outer, inner.Min) && Contains(outer, inner.Max);
+}
+
+[[nodiscard]] constexpr bool Intersects(const Aabb3& a, const Aabb3& b) noexcept
+{
+  return !(b.Max.X < a.Min.X || b.Min.X > a.Max.X || b.Max.Y < a.Min.Y || b.Min.Y > a.Max.Y || b.Max.Z < a.Min.Z ||
+           b.Min.Z > a.Max.Z);
+}
+
+[[nodiscard]] constexpr Aabb3 Expand(const Aabb3& box, f32 amount) noexcept
+{
+  return {box.Min - Float3 {amount, amount, amount}, box.Max + Float3 {amount, amount, amount}};
+}
+
+[[nodiscard]] constexpr Aabb3 Expand(const Aabb3& box, const Float3& p) noexcept
+{
+  return {::gecko::math::Min(box.Min, p), ::gecko::math::Max(box.Max, p)};
+}
+
+[[nodiscard]] constexpr Aabb3 Union(const Aabb3& a, const Aabb3& b) noexcept
+{
+  return {::gecko::math::Min(a.Min, b.Min), ::gecko::math::Max(a.Max, b.Max)};
+}
+
+[[nodiscard]] constexpr Float3 Clamp(const Aabb3& box, const Float3& p) noexcept
 {
   return ::gecko::math::Clamp(p, box.Min, box.Max);
 }
