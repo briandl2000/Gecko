@@ -12,6 +12,7 @@
 #include <gecko/math/math.h>
 #include <gecko/platform/platform_events.h>
 #include <gecko/platform/windows_interface.h>
+#include <string>
 #include <utility>
 
 namespace app::debug_renderer_example {
@@ -215,7 +216,7 @@ void App::RenderFrame()
   cmd->Begin();
   m_DebugRendererContext->NewFrame();
 
-  ::gecko::graphics::ClearValue clear = ::gecko::graphics::ClearValue::RenderTarget(0.05F, 0.05F, 0.08F, 1.0F);
+  ::gecko::graphics::ClearValue clear = ::gecko::graphics::ClearValue::RenderTarget(0.45F, 0.45F, 0.48F, 1.0F);
   cmd->BeginRendering(frame.BackBuffer, &clear);
   m_DebugRendererContext->SetFrame(frame.BackBuffer);
 
@@ -231,7 +232,25 @@ void App::RenderFrame()
   DrawCircle(mousePosF, 10.0F, {0.0F, 1.0F, 0.0F}, 4.0F);
   m_DebugRendererContext->DrawLine(center, mousePosF, {0.3f, 0.9f, 0.4f}, 2.f);
 
-  m_DebugRendererContext->DrawText("Hello World!", {100.0f, 100.0f}, {.9f, .9f, .9f}, 50.0f);
+  m_DebugRendererContext->DrawText("Hello World!", {300.0f, 300.0f}, {.9f, .9f, .9f}, 50.0f);
+  static gecko::u32 f = 0;
+  f++;
+  std::string FrameString = "Frame: " + std::to_string(f);
+  gecko::f32 size = 39.0f;
+  gecko::f32 sideSwipe = 0.0f;
+  gecko::f32 sideSwipeSize = size * 10.f;
+  gecko::f32 y = 0.0f;
+  for (gecko::u32 i = 0; i < 10000; i++)
+  {
+    if (y * size > 720)
+    {
+      sideSwipe += sideSwipeSize;
+      y = 0.0f;
+    }
+    m_DebugRendererContext->DrawText(FrameString.c_str(), {size / 2.f + sideSwipe, size / 2.f + y * size},
+                                     {.2f, .9f, .2f}, size);
+    y += 1.0f;
+  }
 
   m_DebugRendererContext->Submit(cmd.get());
   cmd->EndRendering();

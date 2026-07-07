@@ -43,6 +43,8 @@ enum class DataFormat : u16
   R8_INT,
   R16_INT,
   R32_INT,
+  R8_UNORM,
+  R16_UNORM,
   // Depth / depth-stencil
   D32_FLOAT,
   D24_UNORM_S8_UINT,

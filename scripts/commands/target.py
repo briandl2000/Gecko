@@ -1,6 +1,6 @@
 """`gk target` -- get/set the cached run/debug target.
 
-The cached target name is persisted at `.vscode/run_target` so VS Code
+The cached target name is persisted at `.vscode/run_target` so editor
 tasks and launch configs can resolve it without re-prompting.
 """
 from __future__ import annotations
@@ -33,17 +33,17 @@ def write_cached_target(name: str) -> None:
     f.write_text(name + "\n", encoding="utf-8")
 
 
-def refresh_symlink(target: str, config: str) -> Path:
-    """Refresh `.vscode/cached_<config>_bin` symlink to point at the exe.
+def refresh_symlink(target: str, config: str, link_dir: str = ".vscode") -> Path:
+    """Refresh the cached launch symlink to point at the exe.
 
-    Returns the symlink path.  This is what `launch.json` uses for `program`,
-    so the launch config never needs to know which target was picked.
+    Returns the symlink path.  Editor launch configs use this for `program`,
+    so they never need to know which target was picked.
     """
     cfg_dir = "Debug" if config == "debug" else "Release"
     exe_suffix = ".exe" if _is_windows() else ""
     exe = Path(OUTPUT_DIR) / "bin" / cfg_dir / f"{target}{exe_suffix}"
 
-    link = Path(_REPO_ROOT) / ".vscode" / f"cached_{config}_bin{exe_suffix}"
+    link = Path(_REPO_ROOT) / link_dir / f"cached_{config}_bin{exe_suffix}"
     link.parent.mkdir(parents=True, exist_ok=True)
 
     # Symlinks aren't reliable on Windows without admin -- write a copy there.

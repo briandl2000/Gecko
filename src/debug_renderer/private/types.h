@@ -12,7 +12,18 @@ struct DebugLinePushConstants
   ::gecko::math::float2 _Pad;
 };
 
+struct GlyphData
+{
+  uint GlyphWidth;
+  uint GlyphHeight;
+  uint NumberOfGlyphsPerRow;
+  uint NumberOfGlyphsPerColumn;
+};
+
 const ::gecko::graphics::GraphicsPipeline& GetDebugLinePipeline();
 const ::gecko::graphics::GraphicsPipeline& GetDebugTextPipeline();
+const graphics::Texture& GetGlyphTexture();
+const graphics::Sampler& GetGlyphSampler();
+const graphics::Buffer& GetGlyphDataBuffer();
 
 }  // namespace gecko::debug_renderer

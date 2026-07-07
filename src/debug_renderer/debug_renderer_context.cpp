@@ -51,7 +51,7 @@ DebugRendererContext::DebugRendererContext(::gecko::u32 lineCapacity, ::gecko::u
   }
 
   {
-    m_CharCapacity = 100;
+    m_CharCapacity = DefaultCharCapacity;
     ::gecko::graphics::StructuredBufferDesc desc {};
     desc.ElementSize = sizeof(Char2D);
     desc.NumElements = m_CharCapacity;
@@ -164,7 +164,7 @@ void DebugRendererContext::DrawText(const char* text, ::gecko::math::float2 pos,
     }
 
     auto& slot = m_FrameSlots[m_CurrentSlot];
-    slot.CPU_chars[m_CharCursor++] = Char2D {.Position = c_pos, .size = scale, ._Pad = 0, .Color = color, ._Pad2 = 0};
+    slot.CPU_chars[m_CharCursor++] = Char2D {.Position = c_pos, .size = scale, .GlyphIndex = static_cast<u32>(c), .Color = color, ._Pad2 = 0};
     c_pos.X += scale;
     c = text[++idx];
   }
@@ -192,11 +192,9 @@ void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
 
   auto& slot = m_FrameSlots[m_CurrentSlot];
 
+  const ::gecko::u32 lineBatchSize = m_LineCursor - m_BatchStart;
+  if (lineBatchSize != 0)
   {
-    const ::gecko::u32 batchSize = m_LineCursor - m_BatchStart;
-    if (batchSize == 0)
-      return;
-
     cmd->BindPipeline(GetDebugLinePipeline());
     cmd->BindStructuredBuffer(0, slot.GPU);
 
@@ -207,17 +205,18 @@ void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
     cmd->SetConstants(0, ::gecko::Span<const ::gecko::byte> {reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)});
 
     // 6 vertices per line (2 triangles).
-    cmd->Draw(batchSize * 6u, 1, m_BatchStart * 6u, 0);
+    cmd->Draw(lineBatchSize * 6u, 1, m_BatchStart * 6u, 0);
     m_BatchStart = m_LineCursor;
   }
 
+  const u32 charBatchSize = m_CharCursor - m_CharBatchStart;
+  if (charBatchSize != 0)
   {
-    const ::gecko::u32 batchSize = m_CharCursor - m_CharBatchStart;
-    if (batchSize == 0)
-      return;
-
     cmd->BindPipeline(GetDebugTextPipeline());
     cmd->BindStructuredBuffer(0, slot.GPU_chars);
+    cmd->BindConstantBuffer(1, GetGlyphDataBuffer());
+    cmd->BindTexture(2, GetGlyphTexture());
+    cmd->BindSampler(3, GetGlyphSampler());
 
     DebugLinePushConstants pc {
         .ViewportPx = {static_cast<::gecko::f32>(w), static_cast<::gecko::f32>(h)},
@@ -226,7 +225,7 @@ void DebugRendererContext::Submit(::gecko::graphics::ICommandList* cmd)
     cmd->SetConstants(0, ::gecko::Span<const ::gecko::byte> {reinterpret_cast<const ::gecko::byte*>(&pc), sizeof(pc)});
 
     // 6 vertices per line (2 triangles).
-    cmd->Draw(batchSize * 6u, 1, m_CharBatchStart * 6u, 0);
+    cmd->Draw(charBatchSize * 6u, 1, m_CharBatchStart * 6u, 0);
     m_CharBatchStart = m_CharCursor;
   }
 }

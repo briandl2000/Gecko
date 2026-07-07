@@ -1,8 +1,8 @@
-"""`gk debug-prep` -- preLaunchTask helper for VS Code cached debug config.
+"""`gk debug-prep` -- preLaunchTask/build helper for cached debug configs.
 
 Reads the cached target, builds it, and refreshes the
-`.vscode/cached_<config>_bin` symlink so launch.json's static `program`
-path resolves to the chosen exe.
+`cached_<config>_bin` symlink so an editor's static `program` path resolves
+to the chosen exe.
 """
 from __future__ import annotations
 
@@ -24,6 +24,11 @@ def register(subparsers) -> None:
         choices=["debug", "release"],
         default="debug",
         nargs="?",
+    )
+    parser.add_argument(
+        "--link-dir",
+        default=".vscode",
+        help="Repo-relative directory for cached launch symlink",
     )
     parser.set_defaults(handler=_handle)
 
@@ -54,6 +59,6 @@ def _handle(args) -> int:
         return rc
     print(f"[gk debug-prep] built {target} ({cmake_cfg}) in {elapsed:.2f}s")
 
-    link = refresh_symlink(target, args.config)
+    link = refresh_symlink(target, args.config, args.link_dir)
     print(f"[gk debug-prep] launch program -> {link}")
     return 0

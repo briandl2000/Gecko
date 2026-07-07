@@ -47,6 +47,7 @@ class DebugRendererContext
 public:
   /// Default per-frame line capacity (~4 MB at `sizeof(Line2D) == 32`).
   static constexpr ::gecko::u32 DefaultLineCapacity = 128u * 1024u;
+  static constexpr ::gecko::u32 DefaultCharCapacity = 128u * 1024u;
 
   /// Default ring size. Should match the swapchain's frames-in-flight.
   static constexpr ::gecko::u32 DefaultFramesInFlight = 2;
@@ -151,7 +152,7 @@ private:
   {
     ::gecko::math::float2 Position;
     ::gecko::f32 size;
-    ::gecko::f32 _Pad;
+    ::gecko::u32 GlyphIndex;
     ::gecko::math::float3 Color;
     ::gecko::f32 _Pad2;
   };

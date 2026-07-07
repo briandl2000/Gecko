@@ -42,6 +42,10 @@ namespace gecko::graphics {
     return VK_FORMAT_R16_SINT;
   case DataFormat::R32_INT:
     return VK_FORMAT_R32_SINT;
+  case DataFormat::R8_UNORM:
+    return VK_FORMAT_R8_UNORM;
+  case DataFormat::R16_UNORM:
+    return VK_FORMAT_R16_UNORM;
   case DataFormat::D32_FLOAT:
     return VK_FORMAT_D32_SFLOAT;
   case DataFormat::D24_UNORM_S8_UINT:
