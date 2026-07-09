@@ -117,9 +117,9 @@ WindowHandle WindowEventInput::HoveredWindow() const noexcept
   return m_HoveredWindow;
 }
 
-::std::string_view WindowEventInput::GetTypedText() const noexcept
+::gecko::StringView WindowEventInput::GetTypedText() const noexcept
 {
-  return m_TypedText;
+  return {m_TypedText.data(), m_TypedText.size()};
 }
 
 // -- Event handlers ----------------------------------------------

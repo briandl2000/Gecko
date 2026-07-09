@@ -116,7 +116,7 @@ void EnsureWindowsConsoleConfigured() noexcept
 
 #endif
 
-void WriteUtf8(::std::FILE* f, ::std::string_view text) noexcept
+void WriteUtf8(::std::FILE* f, ::gecko::StringView text) noexcept
 {
   if (text.empty())
     return;
@@ -133,7 +133,7 @@ bool IsTerminal(TermStream stream) noexcept
   return StreamIsTtyImpl(stream);
 }
 
-void Print(TermStream stream, TermColor fg, ::std::string_view text) noexcept
+void Print(TermStream stream, TermColor fg, ::gecko::StringView text) noexcept
 {
 #if defined(GECKO_PLATFORM_WINDOWS)
   EnsureWindowsConsoleConfigured();
@@ -152,7 +152,7 @@ void Print(TermStream stream, TermColor fg, ::std::string_view text) noexcept
   ::std::fflush(f);
 }
 
-void PrintLine(TermStream stream, TermColor fg, ::std::string_view text) noexcept
+void PrintLine(TermStream stream, TermColor fg, ::gecko::StringView text) noexcept
 {
   Print(stream, fg, text);
   ::std::fputc('\n', StreamFile(stream));

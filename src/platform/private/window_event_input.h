@@ -5,7 +5,6 @@
 
 #include <array>
 #include <string>
-#include <string_view>
 
 namespace gecko::platform {
 
@@ -52,7 +51,7 @@ public:
   [[nodiscard]] WindowHandle FocusedWindow() const noexcept override;
   [[nodiscard]] WindowHandle HoveredWindow() const noexcept override;
 
-  [[nodiscard]] ::std::string_view GetTypedText() const noexcept override;
+  [[nodiscard]] ::gecko::StringView GetTypedText() const noexcept override;
 
 private:
   // Event handlers (registered as static C-style callbacks).

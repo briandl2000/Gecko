@@ -97,9 +97,9 @@ public:
   {
     return m_HoveredWindow;
   }
-  [[nodiscard]] ::std::string_view GetTypedText() const noexcept override
+  [[nodiscard]] ::gecko::StringView GetTypedText() const noexcept override
   {
-    return m_TypedText;
+    return {m_TypedText.data(), m_TypedText.size()};
   }
 
   // ── Test mutators ──────────────────────────────────────────

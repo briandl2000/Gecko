@@ -21,9 +21,9 @@
 ///   empty / no-op.
 
 #include "gecko/core/api.h"
+#include "gecko/core/string_view.h"
 
 #include <string>
-#include <string_view>
 
 namespace gecko::platform {
 
@@ -35,6 +35,6 @@ namespace gecko::platform {
 /// @param utf8  The text to copy.
 /// @return `true` on success, `false` on backend failure or when writes
 ///         are unsupported (e.g. current Wayland backend).
-GECKO_API bool SetClipboardText(::std::string_view utf8) noexcept;
+GECKO_API bool SetClipboardText(::gecko::StringView utf8) noexcept;
 
 }  // namespace gecko::platform

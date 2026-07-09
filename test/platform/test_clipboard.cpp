@@ -18,7 +18,7 @@ TEST_CASE("Clipboard: round-trip ASCII text", "[.clipboard][platform][clipboard]
   const ::std::string original = GetClipboardText();
   const ::std::string payload = "Gecko clipboard ASCII roundtrip";
 
-  const bool ok = SetClipboardText(payload);
+  const bool ok = SetClipboardText({payload.data(), payload.size()});
   if (!ok)
     SKIP("Clipboard not available on this platform/backend");
 
@@ -26,7 +26,7 @@ TEST_CASE("Clipboard: round-trip ASCII text", "[.clipboard][platform][clipboard]
   REQUIRE(read == payload);
 
   // Best-effort restore.
-  (void)SetClipboardText(original);
+  (void)SetClipboardText({original.data(), original.size()});
 }
 
 TEST_CASE("Clipboard: round-trip UTF-8 text", "[.clipboard][platform][clipboard]")
@@ -39,14 +39,14 @@ TEST_CASE("Clipboard: round-trip UTF-8 text", "[.clipboard][platform][clipboard]
                                 "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E"
                                 " \xE2\x80\x94 \xF0\x9F\x98\x80";
 
-  const bool ok = SetClipboardText(payload);
+  const bool ok = SetClipboardText({payload.data(), payload.size()});
   if (!ok)
     SKIP("Clipboard not available on this platform/backend");
 
   const ::std::string read = GetClipboardText();
   REQUIRE(read == payload);
 
-  (void)SetClipboardText(original);
+  (void)SetClipboardText({original.data(), original.size()});
 }
 
 TEST_CASE("Clipboard: empty string is valid input", "[.clipboard][platform][clipboard]")
@@ -61,5 +61,5 @@ TEST_CASE("Clipboard: empty string is valid input", "[.clipboard][platform][clip
   const ::std::string read = GetClipboardText();
   REQUIRE(read.empty());
 
-  (void)SetClipboardText(original);
+  (void)SetClipboardText({original.data(), original.size()});
 }

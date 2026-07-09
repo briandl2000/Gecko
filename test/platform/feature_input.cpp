@@ -141,7 +141,8 @@ TEST_CASE("Live backend: visible IInput typed-text showcase", "[.visible][featur
   {
     PumpEvents();
     (void)::gecko::DispatchEvents();
-    accumulated.append(in->GetTypedText());
+    const auto typed = in->GetTypedText();
+    accumulated.append(typed.Data(), typed.Size());
     ::std::this_thread::sleep_for(::std::chrono::milliseconds(16));
   }
 

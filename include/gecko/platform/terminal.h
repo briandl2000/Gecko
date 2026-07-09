@@ -9,9 +9,8 @@
 /// automatically when the destination is not a TTY.
 
 #include "gecko/core/api.h"
+#include "gecko/core/string_view.h"
 #include "gecko/core/types.h"
-
-#include <string_view>
 
 namespace gecko::platform {
 
@@ -53,18 +52,18 @@ enum class TermStream : ::gecko::u8
 /// and virtual-terminal mode is enabled where supported. When `stream`
 /// is not a TTY (redirection or pipe) colour is suppressed so captured
 /// output never contains raw escape sequences.
-GECKO_API void Print(TermStream stream, TermColor fg, ::std::string_view text) noexcept;
+GECKO_API void Print(TermStream stream, TermColor fg, ::gecko::StringView text) noexcept;
 
 /// Convenience: write `text` followed by a newline.
-GECKO_API void PrintLine(TermStream stream, TermColor fg, ::std::string_view text) noexcept;
+GECKO_API void PrintLine(TermStream stream, TermColor fg, ::gecko::StringView text) noexcept;
 
 /// Default-colour overload.
-inline void Print(TermStream stream, ::std::string_view text) noexcept
+inline void Print(TermStream stream, ::gecko::StringView text) noexcept
 {
   Print(stream, TermColor::Default, text);
 }
 /// Default-colour overload.
-inline void PrintLine(TermStream stream, ::std::string_view text) noexcept
+inline void PrintLine(TermStream stream, ::gecko::StringView text) noexcept
 {
   PrintLine(stream, TermColor::Default, text);
 }

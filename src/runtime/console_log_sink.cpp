@@ -69,7 +69,7 @@ void ConsoleLogSink::Write(const LogMessage& message) noexcept
     payload = heap;
   }
 
-  ::gecko::platform::PrintLine(stream, LevelColor(message.Level), payload);
+  ::gecko::platform::PrintLine(stream, LevelColor(message.Level), {payload.data(), payload.size()});
 }
 
 }  // namespace gecko::runtime

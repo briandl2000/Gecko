@@ -40,7 +40,7 @@ namespace gecko::platform {
   return out;
 }
 
-bool SetClipboardText(::std::string_view utf8) noexcept
+bool SetClipboardText(::gecko::StringView utf8) noexcept
 {
   if (!::OpenClipboard(nullptr))
     return false;
@@ -187,7 +187,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
   return out;
 }
 
-bool SetClipboardText(::std::string_view utf8) noexcept
+bool SetClipboardText(::gecko::StringView utf8) noexcept
 {
   ::Display* display = OpenDisplayLocal();
   if (display == nullptr)
@@ -195,7 +195,7 @@ bool SetClipboardText(::std::string_view utf8) noexcept
 
   const ::Atom clipboard = ::XInternAtom(display, "CLIPBOARD", False);
   auto& s = OwnerState();
-  s.Payload.assign(utf8);
+  s.Payload.assign(utf8.Data(), utf8.Size());
   s.Display = display;
   const ::Window window = EnsureHelperWindow(display);
   ::XSetSelectionOwner(display, clipboard, window, CurrentTime);
@@ -225,7 +225,7 @@ namespace gecko::platform {
   return {};
 }
 
-bool SetClipboardText(::std::string_view) noexcept
+bool SetClipboardText(::gecko::StringView) noexcept
 {
   GECKO_WARN("gecko.platform.clipboard", "SetClipboardText: Wayland clipboard not yet implemented");
   return false;
@@ -242,7 +242,7 @@ namespace gecko::platform {
   return {};
 }
 
-bool SetClipboardText(::std::string_view) noexcept
+bool SetClipboardText(::gecko::StringView) noexcept
 {
   return false;
 }
