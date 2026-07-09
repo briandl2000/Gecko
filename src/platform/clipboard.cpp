@@ -14,7 +14,7 @@
 
 namespace gecko::platform {
 
-::std::string GetClipboardText() noexcept
+::gecko::String GetClipboardText() noexcept
 {
   if (!::OpenClipboard(nullptr))
     return {};
@@ -37,7 +37,7 @@ namespace gecko::platform {
     }
   }
   ::CloseClipboard();
-  return out;
+  return ::gecko::String {::gecko::StringView {out.data(), out.size()}};
 }
 
 bool SetClipboardText(::gecko::StringView utf8) noexcept
@@ -131,7 +131,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
 
 }  // namespace
 
-::std::string GetClipboardText() noexcept
+::gecko::String GetClipboardText() noexcept
 {
   ::Display* display = OpenDisplayLocal();
   if (display == nullptr)
@@ -145,7 +145,10 @@ X11ClipboardOwnerState& OwnerState() noexcept
   // If we own the selection ourselves, return our cached payload.
   ::Window owner = ::XGetSelectionOwner(display, clipboard);
   if (owner == window)
-    return OwnerState().Payload;
+  {
+    const auto& payload = OwnerState().Payload;
+    return ::gecko::String {::gecko::StringView {payload.data(), payload.size()}};
+  }
   if (owner == None)
     return {};
 
@@ -184,7 +187,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
     out.assign(reinterpret_cast<const char*>(data), nItems);
     ::XFree(data);
   }
-  return out;
+  return ::gecko::String {::gecko::StringView {out.data(), out.size()}};
 }
 
 bool SetClipboardText(::gecko::StringView utf8) noexcept
@@ -219,7 +222,7 @@ bool SetClipboardText(::gecko::StringView utf8) noexcept
 // public API will gain a real impl once that's wired up.
 namespace gecko::platform {
 
-::std::string GetClipboardText() noexcept
+::gecko::String GetClipboardText() noexcept
 {
   GECKO_WARN("gecko.platform.clipboard", "GetClipboardText: Wayland clipboard not yet implemented");
   return {};
@@ -237,7 +240,7 @@ bool SetClipboardText(::gecko::StringView) noexcept
 
 namespace gecko::platform {
 
-::std::string GetClipboardText() noexcept
+::gecko::String GetClipboardText() noexcept
 {
   return {};
 }

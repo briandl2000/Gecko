@@ -4,13 +4,13 @@
 #include "gecko/core/array.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/span.h"
+#include "gecko/core/string.h"
 #include "gecko/core/string_view.h"
 #include "gecko/core/types.h"
 #include "gecko/platform/path_view.h"
 
 #include <cstddef>
 #include <optional>
-#include <string>
 
 // Filesystem and process-info utilities.
 //
@@ -53,7 +53,7 @@ struct WriteResult
 
 struct DirEntry
 {
-  ::std::string Name {};
+  ::gecko::String Name {};
   bool IsDirectory {false};
 };
 
@@ -228,8 +228,8 @@ GECKO_API bool Remove(PathView path) noexcept;
 
 // Well-known paths (forward-slash, owning string; empty on failure).
 // ExePath includes the executable name; WorkingDir does not.
-[[nodiscard]] GECKO_API ::std::string ExePath() noexcept;
-[[nodiscard]] GECKO_API ::std::string WorkingDir() noexcept;
-[[nodiscard]] GECKO_API ::std::string UserDataDir(::gecko::StringView appName) noexcept;
+[[nodiscard]] GECKO_API ::gecko::String ExePath() noexcept;
+[[nodiscard]] GECKO_API ::gecko::String WorkingDir() noexcept;
+[[nodiscard]] GECKO_API ::gecko::String UserDataDir(::gecko::StringView appName) noexcept;
 
 }  // namespace gecko::platform

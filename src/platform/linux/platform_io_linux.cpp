@@ -69,7 +69,8 @@ bool DirIterNext(void* handle, DirEntry* out) noexcept
       continue;
     try
     {
-      out->Name = e->d_name;
+      if (!out->Name.Assign(::gecko::StringView {e->d_name, ::std::strlen(e->d_name)}))
+        return false;
     }
     catch (...)
     {
@@ -363,38 +364,24 @@ DirIter IterateDir(PathView path) noexcept
   return DirIter {d, &DirIterNext, &DirIterClose};
 }
 
-::std::string ExePath() noexcept
+::gecko::String ExePath() noexcept
 {
   char buf[PATH_MAX];
   ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf));
   if (n <= 0)
     return {};
-  try
-  {
-    return ::std::string {buf, static_cast<::std::size_t>(n)};
-  }
-  catch (...)
-  {
-    return {};
-  }
+  return ::gecko::String {::gecko::StringView {buf, static_cast<::gecko::usize>(n)}};
 }
 
-::std::string WorkingDir() noexcept
+::gecko::String WorkingDir() noexcept
 {
   char buf[PATH_MAX];
   if (!::getcwd(buf, sizeof(buf)))
     return {};
-  try
-  {
-    return ::std::string {buf};
-  }
-  catch (...)
-  {
-    return {};
-  }
+  return ::gecko::String {::gecko::StringView {buf, ::std::strlen(buf)}};
 }
 
-::std::string UserDataDir(::gecko::StringView appName) noexcept
+::gecko::String UserDataDir(::gecko::StringView appName) noexcept
 {
   ::std::string base;
   try
@@ -421,7 +408,7 @@ DirIter IterateDir(PathView path) noexcept
   {
     return {};
   }
-  return base;
+  return ::gecko::String {::gecko::StringView {base.data(), base.size()}};
 }
 
 }  // namespace gecko::platform

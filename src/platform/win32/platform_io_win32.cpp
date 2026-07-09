@@ -452,7 +452,9 @@ DirIter IterateDir(PathView path) noexcept
         ++len;
       try
       {
-        out->Name = FromWide(st->Data.cFileName, len);
+        auto name = FromWide(st->Data.cFileName, len);
+        if (!out->Name.Assign(::gecko::StringView {name.data(), name.size()}))
+          return false;
       }
       catch (...)
       {
@@ -470,16 +472,17 @@ DirIter IterateDir(PathView path) noexcept
   return DirIter {state, next, close};
 }
 
-::std::string ExePath() noexcept
+::gecko::String ExePath() noexcept
 {
   wchar_t buf[MAX_PATH];
   DWORD n = ::GetModuleFileNameW(nullptr, buf, MAX_PATH);
   if (n == 0 || n == MAX_PATH)
     return {};
-  return FromWide(buf, n);
+  auto path = FromWide(buf, n);
+  return ::gecko::String {::gecko::StringView {path.data(), path.size()}};
 }
 
-::std::string WorkingDir() noexcept
+::gecko::String WorkingDir() noexcept
 {
   DWORD n = ::GetCurrentDirectoryW(0, nullptr);
   if (n == 0)
@@ -496,10 +499,11 @@ DirIter IterateDir(PathView path) noexcept
   DWORD got = ::GetCurrentDirectoryW(n, buf.data());
   if (got == 0 || got >= n)
     return {};
-  return FromWide(buf.data(), got);
+  auto path = FromWide(buf.data(), got);
+  return ::gecko::String {::gecko::StringView {path.data(), path.size()}};
 }
 
-::std::string UserDataDir(::gecko::StringView appName) noexcept
+::gecko::String UserDataDir(::gecko::StringView appName) noexcept
 {
   PWSTR rawPath = nullptr;
   HRESULT hr = ::SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &rawPath);
@@ -528,7 +532,7 @@ DirIter IterateDir(PathView path) noexcept
       return {};
     }
   }
-  return base;
+  return ::gecko::String {::gecko::StringView {base.data(), base.size()}};
 }
 
 }  // namespace gecko::platform

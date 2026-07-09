@@ -131,14 +131,15 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
 
   SECTION("exe path and working dir are non-empty")
   {
-    REQUIRE_FALSE(ExePath().empty());
-    REQUIRE_FALSE(WorkingDir().empty());
+    REQUIRE_FALSE(ExePath().Empty());
+    REQUIRE_FALSE(WorkingDir().Empty());
   }
 
   SECTION("user data dir contains app name")
   {
     auto u = UserDataDir("gecko-test");
-    REQUIRE(u.find("gecko-test") != ::std::string::npos);
+    ::std::string_view view {u.Data(), u.Size()};
+    REQUIRE(view.find("gecko-test") != ::std::string_view::npos);
   }
 
   SECTION("map round-trip")

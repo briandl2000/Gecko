@@ -15,25 +15,25 @@ TEST_CASE("Clipboard: round-trip ASCII text", "[.clipboard][platform][clipboard]
 {
   using namespace gecko::platform;
 
-  const ::std::string original = GetClipboardText();
+  auto original = GetClipboardText();
   const ::std::string payload = "Gecko clipboard ASCII roundtrip";
 
   const bool ok = SetClipboardText({payload.data(), payload.size()});
   if (!ok)
     SKIP("Clipboard not available on this platform/backend");
 
-  const ::std::string read = GetClipboardText();
-  REQUIRE(read == payload);
+  const auto read = GetClipboardText();
+  REQUIRE(::std::string_view {read.Data(), read.Size()} == payload);
 
   // Best-effort restore.
-  (void)SetClipboardText({original.data(), original.size()});
+  (void)SetClipboardText(original.View());
 }
 
 TEST_CASE("Clipboard: round-trip UTF-8 text", "[.clipboard][platform][clipboard]")
 {
   using namespace gecko::platform;
 
-  const ::std::string original = GetClipboardText();
+  auto original = GetClipboardText();
   // 'Café — 日本語 — 😀'  (mixes 1/2/3/4-byte UTF-8 sequences)
   const ::std::string payload = "Caf\xC3\xA9 \xE2\x80\x94 "
                                 "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E"
@@ -43,23 +43,23 @@ TEST_CASE("Clipboard: round-trip UTF-8 text", "[.clipboard][platform][clipboard]
   if (!ok)
     SKIP("Clipboard not available on this platform/backend");
 
-  const ::std::string read = GetClipboardText();
-  REQUIRE(read == payload);
+  const auto read = GetClipboardText();
+  REQUIRE(::std::string_view {read.Data(), read.Size()} == payload);
 
-  (void)SetClipboardText({original.data(), original.size()});
+  (void)SetClipboardText(original.View());
 }
 
 TEST_CASE("Clipboard: empty string is valid input", "[.clipboard][platform][clipboard]")
 {
   using namespace gecko::platform;
 
-  const ::std::string original = GetClipboardText();
+  auto original = GetClipboardText();
   const bool ok = SetClipboardText("");
   if (!ok)
     SKIP("Clipboard not available on this platform/backend");
 
-  const ::std::string read = GetClipboardText();
-  REQUIRE(read.empty());
+  const auto read = GetClipboardText();
+  REQUIRE(read.Empty());
 
-  (void)SetClipboardText({original.data(), original.size()});
+  (void)SetClipboardText(original.View());
 }

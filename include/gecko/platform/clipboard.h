@@ -21,15 +21,14 @@
 ///   empty / no-op.
 
 #include "gecko/core/api.h"
+#include "gecko/core/string.h"
 #include "gecko/core/string_view.h"
-
-#include <string>
 
 namespace gecko::platform {
 
 /// Read UTF-8 text from the system clipboard.
 /// @return The clipboard text, or an empty string on failure / non-text data.
-[[nodiscard]] GECKO_API ::std::string GetClipboardText() noexcept;
+[[nodiscard]] GECKO_API ::gecko::String GetClipboardText() noexcept;
 
 /// Place UTF-8 text on the system clipboard.
 /// @param utf8  The text to copy.
