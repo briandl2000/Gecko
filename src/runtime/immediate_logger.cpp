@@ -8,6 +8,8 @@
 #include <cstdarg>
 #include <cstdio>
 #include <mutex>
+#include <new>
+#include <vector>
 
 namespace gecko::runtime {
 
@@ -25,48 +27,63 @@ u32 ThreadId() noexcept
   return HashThreadId();
 }
 
+struct ImmediateLogger::Impl
+{
+  std::vector<ILogSink*> Sinks;
+  std::mutex Mutex;
+  LogLevel Level {LogLevel::Info};
+  bool ThreadSafe {false};
+};
+
+ImmediateLogger::ImmediateLogger() noexcept : m_Impl(new (::std::nothrow) Impl())
+{}
+
+ImmediateLogger::~ImmediateLogger() noexcept = default;
+
 void ImmediateLogger::AddSink(ILogSink* sink) noexcept
 {
-  if (!sink)
+  if (!sink || !m_Impl)
     return;
 
-  if (m_ThreadSafe)
+  if (m_Impl->ThreadSafe)
   {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    m_Sinks.push_back(sink);
+    std::lock_guard<std::mutex> lock(m_Impl->Mutex);
+    m_Impl->Sinks.push_back(sink);
   }
   else
   {
-    m_Sinks.push_back(sink);
+    m_Impl->Sinks.push_back(sink);
   }
 }
 
 void ImmediateLogger::RemoveSink(ILogSink* sink) noexcept
 {
-  if (!sink)
+  if (!sink || !m_Impl)
     return;
 
-  if (m_ThreadSafe)
+  if (m_Impl->ThreadSafe)
   {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
-    if (it != m_Sinks.end())
-      m_Sinks.erase(it);
+    std::lock_guard<std::mutex> lock(m_Impl->Mutex);
+    auto it = std::find(m_Impl->Sinks.begin(), m_Impl->Sinks.end(), sink);
+    if (it != m_Impl->Sinks.end())
+      m_Impl->Sinks.erase(it);
   }
   else
   {
-    auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
-    if (it != m_Sinks.end())
-      m_Sinks.erase(it);
+    auto it = std::find(m_Impl->Sinks.begin(), m_Impl->Sinks.end(), sink);
+    if (it != m_Impl->Sinks.end())
+      m_Impl->Sinks.erase(it);
   }
 }
 
 void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt, va_list apIn) noexcept
 {
   GECKO_ASSERT(fmt && "Format string cannot be null");
+  if (!m_Impl)
+    return;
 
   // Check log level filter
-  if (static_cast<int>(level) < static_cast<int>(m_Level))
+  if (static_cast<int>(level) < static_cast<int>(m_Impl->Level))
   {
     return;
   }
@@ -90,10 +107,10 @@ void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt, va_list
   message.Text = buffer;
 
   // Write to all sinks immediately
-  if (m_ThreadSafe)
+  if (m_Impl->ThreadSafe)
   {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    for (auto* sink : m_Sinks)
+    std::lock_guard<std::mutex> lock(m_Impl->Mutex);
+    for (auto* sink : m_Impl->Sinks)
     {
       if (sink)
         sink->Write(message);
@@ -101,7 +118,7 @@ void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt, va_list
   }
   else
   {
-    for (auto* sink : m_Sinks)
+    for (auto* sink : m_Impl->Sinks)
     {
       if (sink)
         sink->Write(message);
@@ -116,6 +133,23 @@ bool ImmediateLogger::Init() noexcept
 
 void ImmediateLogger::Shutdown() noexcept
 {}
+
+void ImmediateLogger::SetLevel(LogLevel level) noexcept
+{
+  if (m_Impl)
+    m_Impl->Level = level;
+}
+
+LogLevel ImmediateLogger::Level() const noexcept
+{
+  return m_Impl ? m_Impl->Level : LogLevel::Info;
+}
+
+void ImmediateLogger::SetThreadSafe(bool on) noexcept
+{
+  if (m_Impl)
+    m_Impl->ThreadSafe = on;
+}
 
 void ImmediateLogger::Flush() noexcept
 {
