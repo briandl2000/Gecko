@@ -6,9 +6,6 @@
 
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/profiler.h"
-#include "gecko/platform/platform_io.h"
-
-#include <atomic>
 
 namespace gecko::runtime {
 
@@ -23,21 +20,15 @@ public:
   ~CrashSafeTraceProfilerSink();
 
   /// `true` if the underlying file was opened successfully.
-  bool IsOpen() const noexcept
-  {
-    return m_Writer != nullptr;
-  }
+  bool IsOpen() const noexcept;
 
   virtual void Write(const ProfEvent& event) noexcept override;
   virtual void WriteBatch(::gecko::Span<const ProfEvent> events) noexcept override;
   virtual void Flush() noexcept override;
 
 private:
-  ::gecko::Unique<::gecko::platform::FileWriter> m_Writer {};
-  bool m_First {true};
-  u64 m_Time0Ns {0};
-  std::atomic<size_t> m_EventCount {0};
-  static constexpr size_t FLUSH_INTERVAL = 100;
+  struct Impl;
+  ::gecko::Unique<Impl> m_Impl;
 
   void WriteEvent(const ProfEvent& event) noexcept;
   void WriteSeparator() noexcept;

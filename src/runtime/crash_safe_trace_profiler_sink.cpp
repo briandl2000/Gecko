@@ -5,6 +5,9 @@
 #include "private/chrome_trace_format.h"
 #include "private/file_writer_format.h"
 
+#include <atomic>
+#include <new>
+
 namespace gecko::runtime {
 
 namespace {
@@ -14,80 +17,98 @@ using ::gecko::runtime::detail::WriteFmt;
 
 }  // namespace
 
+struct CrashSafeTraceProfilerSink::Impl
+{
+  ::gecko::Unique<::gecko::platform::FileWriter> Writer {};
+  bool First {true};
+  u64 Time0Ns {0};
+  std::atomic<size_t> EventCount {0};
+  static constexpr size_t FlushInterval = 100;
+};
+
 CrashSafeTraceProfilerSink::CrashSafeTraceProfilerSink(const char* path)
 {
   GECKO_ASSERT(path && "Trace file path cannot be null");
 
-  m_Writer = ::gecko::platform::OpenWrite(path, ::gecko::platform::WriteMode::Truncate);
+  m_Impl.reset(new (::std::nothrow) Impl());
+  if (!m_Impl)
+    return;
 
-  if (m_Writer)
+  m_Impl->Writer = ::gecko::platform::OpenWrite(path, ::gecko::platform::WriteMode::Truncate);
+
+  if (m_Impl->Writer)
   {
-    m_Writer->WriteString("{\"traceEvents\":[]}");
-    m_Writer->Flush();
-    m_First = true;
-    m_Time0Ns = 0;
-    m_EventCount.store(0, std::memory_order_relaxed);
+    m_Impl->Writer->WriteString("{\"traceEvents\":[]}");
+    m_Impl->Writer->Flush();
+    m_Impl->First = true;
+    m_Impl->Time0Ns = 0;
+    m_Impl->EventCount.store(0, std::memory_order_relaxed);
   }
 }
 
 CrashSafeTraceProfilerSink::~CrashSafeTraceProfilerSink()
 {
   Unregister();
-  if (m_Writer)
+  if (m_Impl && m_Impl->Writer)
   {
     EnsureValidJson();
-    m_Writer.reset();
+    m_Impl->Writer.reset();
   }
+}
+
+bool CrashSafeTraceProfilerSink::IsOpen() const noexcept
+{
+  return m_Impl && m_Impl->Writer;
 }
 
 void CrashSafeTraceProfilerSink::Write(const ProfEvent& event) noexcept
 {
-  if (!m_Writer)
+  if (!m_Impl || !m_Impl->Writer)
     return;
 
   WriteEvent(event);
 
-  size_t count = m_EventCount.fetch_add(1, std::memory_order_relaxed) + 1;
-  if (count % FLUSH_INTERVAL == 0)
+  size_t count = m_Impl->EventCount.fetch_add(1, std::memory_order_relaxed) + 1;
+  if (count % Impl::FlushInterval == 0)
     EnsureValidJson();
 }
 
 void CrashSafeTraceProfilerSink::WriteBatch(::gecko::Span<const ProfEvent> events) noexcept
 {
-  if (!m_Writer || events.empty())
+  if (!m_Impl || !m_Impl->Writer || events.empty())
     return;
 
   for (const ProfEvent& e : events)
     WriteEvent(e);
 
-  m_EventCount.fetch_add(events.size(), std::memory_order_relaxed);
+  m_Impl->EventCount.fetch_add(events.size(), std::memory_order_relaxed);
   EnsureValidJson();
 }
 
 void CrashSafeTraceProfilerSink::WriteEvent(const ProfEvent& event) noexcept
 {
-  if (m_Time0Ns == 0)
-    m_Time0Ns = event.TimestampNs;
+  if (m_Impl->Time0Ns == 0)
+    m_Impl->Time0Ns = event.TimestampNs;
 
   // Seek back to overwrite the closing ]} and insert new event.
-  m_Writer->Seek(-2, /*fromEnd=*/true);
+  m_Impl->Writer->Seek(-2, /*fromEnd=*/true);
 
   WriteSeparator();
-  WriteChromeTraceEvent(m_Writer.get(), event, m_Time0Ns);
-  m_Writer->WriteString("]}");
+  WriteChromeTraceEvent(m_Impl->Writer.get(), event, m_Impl->Time0Ns);
+  m_Impl->Writer->WriteString("]}");
 }
 
 void CrashSafeTraceProfilerSink::WriteSeparator() noexcept
 {
-  if (!m_First)
-    m_Writer->WriteString(",");
-  m_First = false;
+  if (!m_Impl->First)
+    m_Impl->Writer->WriteString(",");
+  m_Impl->First = false;
 }
 
 void CrashSafeTraceProfilerSink::EnsureValidJson() noexcept
 {
-  if (m_Writer)
-    m_Writer->Flush();
+  if (m_Impl && m_Impl->Writer)
+    m_Impl->Writer->Flush();
 }
 
 void CrashSafeTraceProfilerSink::Flush() noexcept
