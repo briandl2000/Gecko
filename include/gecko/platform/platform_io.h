@@ -9,7 +9,6 @@
 #include "gecko/core/types.h"
 #include "gecko/platform/path_view.h"
 
-#include <cstddef>
 #include <utility>
 
 // Filesystem and process-info utilities.
@@ -179,7 +178,7 @@ public:
   using Deleter = void (*)(void* handle) noexcept;
 
   MappedFile() noexcept = default;
-  MappedFile(const ::std::byte* data, ::std::size_t size, void* handle, Deleter deleter) noexcept;
+  MappedFile(const ::gecko::byte* data, ::gecko::usize size, void* handle, Deleter deleter) noexcept;
 
   MappedFile(const MappedFile&) = delete;
   MappedFile& operator=(const MappedFile&) = delete;
@@ -207,8 +206,8 @@ public:
 private:
   void Reset() noexcept;
 
-  const ::std::byte* m_Data {nullptr};
-  ::std::size_t m_Size {0};
+  const ::gecko::byte* m_Data {nullptr};
+  ::gecko::usize m_Size {0};
   void* m_Handle {nullptr};
   Deleter m_Deleter {nullptr};
 };

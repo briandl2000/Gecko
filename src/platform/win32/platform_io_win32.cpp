@@ -276,7 +276,7 @@ MappedFile Map(PathView path) noexcept
     delete mapping;
   };
 
-  return MappedFile {static_cast<const ::std::byte*>(view), static_cast<::std::size_t>(size.QuadPart), m, deleter};
+  return MappedFile {static_cast<const ::gecko::byte*>(view), static_cast<::gecko::usize>(size.QuadPart), m, deleter};
 }
 
 WriteResult Write(PathView path, ::gecko::ConstByteSpan data, WriteMode mode) noexcept

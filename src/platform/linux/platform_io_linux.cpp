@@ -26,7 +26,8 @@ namespace linux_io {
 
 ::std::string ToCString(PathView path) noexcept
 {
-  return ::std::string {path.View()};
+  auto view = path.View();
+  return ::std::string {view.Data(), view.Size()};
 }
 
 }  // namespace linux_io
@@ -238,7 +239,7 @@ MappedFile Map(PathView path) noexcept
     ::close(fd);
     return {};
   }
-  return MappedFile {static_cast<const ::std::byte*>(addr), size, h, &UnmapLinux};
+  return MappedFile {static_cast<const ::gecko::byte*>(addr), size, h, &UnmapLinux};
 }
 
 WriteResult Write(PathView path, ::gecko::ConstByteSpan data, WriteMode mode) noexcept

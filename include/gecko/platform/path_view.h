@@ -6,21 +6,18 @@
 /// `PathView` is the Gecko-wide convention for passing filesystem paths.
 /// Backends normalise at syscall boundaries (Win32 converts to
 /// backslashes / wide strings; Linux passes through). Implicit
-/// construction from `const char*`, `std::string_view`, and
-/// `std::string` keeps call sites natural:
+/// construction from `const char*` keeps literal call sites natural:
 ///
 /// @code
 /// io.Read("config/game.toml");
-/// io.AtomicWrite(myStdString, bytes);
+/// io.AtomicWrite(PathView {myString.Data(), myString.Size()}, bytes);
 /// @endcode
 ///
 /// Construction from `std::filesystem::path` is deliberately omitted so
 /// that callers convert explicitly and preserve the forward-slash form.
 
+#include "gecko/core/string_view.h"
 #include "gecko/core/types.h"
-
-#include <string>
-#include <string_view>
 
 namespace gecko::platform {
 
@@ -31,14 +28,12 @@ class PathView
 public:
   constexpr PathView() noexcept = default;
   constexpr PathView(const char* str) noexcept
-      : m_View(str == nullptr ? ::std::string_view {} : ::std::string_view {str})
+      : m_View(str == nullptr ? ::gecko::StringView {} : ::gecko::StringView {str, Length(str)})
   {}
-  constexpr PathView(::std::string_view view) noexcept : m_View(view)
-  {}
-  PathView(const ::std::string& s) noexcept : m_View(s)
+  constexpr PathView(::gecko::StringView view) noexcept : m_View(view)
   {}
 
-  [[nodiscard]] constexpr ::std::string_view View() const noexcept
+  [[nodiscard]] constexpr ::gecko::StringView View() const noexcept
   {
     return m_View;
   }
@@ -46,13 +41,13 @@ public:
   {
     return m_View.data();
   }
-  [[nodiscard]] constexpr ::std::size_t Size() const noexcept
+  [[nodiscard]] constexpr ::gecko::usize Size() const noexcept
   {
-    return m_View.size();
+    return m_View.Size();
   }
   [[nodiscard]] constexpr bool Empty() const noexcept
   {
-    return m_View.empty();
+    return m_View.Empty();
   }
 
   /// `true` if the path begins with `/` (POSIX-absolute) or with a
@@ -60,16 +55,16 @@ public:
   /// The Windows backend honours all three; the Linux backend only the first.
   [[nodiscard]] constexpr bool IsAbsolute() const noexcept
   {
-    if (m_View.empty())
+    if (m_View.Empty())
       return false;
-    if (m_View.front() == '/')
+    if (m_View[0] == '/')
       return true;
     // Drive-letter form: "C:/...". Engine paths are forward-slash so we
     // do not check for backslash. The Win32 backend re-normalises before
     // syscalls.
-    if (m_View.size() >= 3 && m_View[1] == ':' && m_View[2] == '/')
+    if (m_View.Size() >= 3 && m_View[1] == ':' && m_View[2] == '/')
     {
-      char c = m_View.front();
+      char c = m_View[0];
       return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
     }
     return false;
@@ -79,26 +74,26 @@ public:
   /// empty view if there is no `/`, or `"/"` if the path is just `"/"`.
   [[nodiscard]] constexpr PathView ParentDir() const noexcept
   {
-    if (m_View.empty())
+    if (m_View.Empty())
       return PathView {};
-    auto pos = m_View.find_last_of('/');
-    if (pos == ::std::string_view::npos)
+    auto pos = FindLast(m_View, '/');
+    if (pos == NPos)
       return PathView {};
     if (pos == 0)
-      return PathView {::std::string_view {"/"}};
-    return PathView {m_View.substr(0, pos)};
+      return PathView {"/"};
+    return PathView {Substr(m_View, 0, pos)};
   }
 
   /// Everything after the final `/`. Returns the whole view if there
   /// is no `/`.
   [[nodiscard]] constexpr PathView Filename() const noexcept
   {
-    if (m_View.empty())
+    if (m_View.Empty())
       return PathView {};
-    auto pos = m_View.find_last_of('/');
-    if (pos == ::std::string_view::npos)
+    auto pos = FindLast(m_View, '/');
+    if (pos == NPos)
       return PathView {m_View};
-    return PathView {m_View.substr(pos + 1)};
+    return PathView {Substr(m_View, pos + 1, m_View.Size() - (pos + 1))};
   }
 
   /// Filename minus its extension. Leading dots on the basename do not
@@ -106,19 +101,19 @@ public:
   [[nodiscard]] constexpr PathView Stem() const noexcept
   {
     auto fn = Filename().View();
-    if (fn.empty())
+    if (fn.Empty())
       return PathView {};
-    if (fn.front() == '.')
+    if (fn[0] == '.')
     {
-      auto dot = fn.find_last_of('.');
+      auto dot = FindLast(fn, '.');
       if (dot == 0)
         return PathView {};
-      return PathView {fn.substr(0, dot)};
+      return PathView {Substr(fn, 0, dot)};
     }
-    auto dot = fn.find_last_of('.');
-    if (dot == ::std::string_view::npos)
+    auto dot = FindLast(fn, '.');
+    if (dot == NPos)
       return PathView {fn};
-    return PathView {fn.substr(0, dot)};
+    return PathView {Substr(fn, 0, dot)};
   }
 
   /// Last `.`-suffix of the basename including the dot, or empty view
@@ -126,12 +121,12 @@ public:
   [[nodiscard]] constexpr PathView Extension() const noexcept
   {
     auto fn = Filename().View();
-    if (fn.empty())
+    if (fn.Empty())
       return PathView {};
-    auto dot = fn.find_last_of('.');
-    if (dot == ::std::string_view::npos || dot == 0)
+    auto dot = FindLast(fn, '.');
+    if (dot == NPos || dot == 0)
       return PathView {};
-    return PathView {fn.substr(dot)};
+    return PathView {Substr(fn, dot, fn.Size() - dot)};
   }
 
   friend constexpr bool operator==(PathView a, PathView b) noexcept
@@ -140,7 +135,33 @@ public:
   }
 
 private:
-  ::std::string_view m_View {};
+  static constexpr ::gecko::usize NPos = static_cast<::gecko::usize>(-1);
+
+  [[nodiscard]] static constexpr ::gecko::usize Length(const char* str) noexcept
+  {
+    ::gecko::usize len = 0;
+    while (str[len] != '\0')
+      ++len;
+    return len;
+  }
+
+  [[nodiscard]] static constexpr ::gecko::usize FindLast(::gecko::StringView view, char c) noexcept
+  {
+    for (::gecko::usize i = view.Size(); i > 0; --i)
+    {
+      if (view[i - 1] == c)
+        return i - 1;
+    }
+    return NPos;
+  }
+
+  [[nodiscard]] static constexpr ::gecko::StringView Substr(::gecko::StringView view, ::gecko::usize offset,
+                                                            ::gecko::usize count) noexcept
+  {
+    return {view.Data() + offset, count};
+  }
+
+  ::gecko::StringView m_View {};
 };
 
 }  // namespace gecko::platform

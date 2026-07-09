@@ -36,6 +36,11 @@ struct ScratchDir
   return {reinterpret_cast<const ::gecko::byte*>(s.data()), s.size()};
 }
 
+PathView ToPath(const ::std::string& path) noexcept
+{
+  return PathView {::gecko::StringView {path.data(), path.size()}};
+}
+
 }  // namespace
 
 // ── PathView ───────────────────────────────────────────────────────────
@@ -75,12 +80,12 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
 
   SECTION("write then read")
   {
-    auto wr = Write(target, ToBytes("hello, world"), WriteMode::Truncate);
+    auto wr = Write(ToPath(target), ToBytes("hello, world"), WriteMode::Truncate);
     REQUIRE(wr.Ok);
     REQUIRE(wr.BytesWritten == 12);
-    REQUIRE(Exists(target));
+    REQUIRE(Exists(ToPath(target)));
 
-    auto rr = Read(target);
+    auto rr = Read(ToPath(target));
     REQUIRE(rr.Ok());
     ::std::string back {reinterpret_cast<const char*>(rr.Data().data()), rr.Size()};
     REQUIRE(back == "hello, world");
@@ -88,9 +93,9 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
 
   SECTION("atomic write replaces existing file")
   {
-    REQUIRE(AtomicWrite(target, ToBytes("first")));
-    REQUIRE(AtomicWrite(target, ToBytes("second")));
-    auto rr = Read(target);
+    REQUIRE(AtomicWrite(ToPath(target), ToBytes("first")));
+    REQUIRE(AtomicWrite(ToPath(target), ToBytes("second")));
+    auto rr = Read(ToPath(target));
     REQUIRE(rr.Ok());
     ::std::string back {reinterpret_cast<const char*>(rr.Data().data()), rr.Size()};
     REQUIRE(back == "second");
@@ -98,17 +103,17 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
 
   SECTION("append mode adds")
   {
-    REQUIRE(Write(target, ToBytes("aaa"), WriteMode::Truncate).Ok);
-    REQUIRE(Write(target, ToBytes("bbb"), WriteMode::Append).Ok);
-    auto rr = Read(target);
+    REQUIRE(Write(ToPath(target), ToBytes("aaa"), WriteMode::Truncate).Ok);
+    REQUIRE(Write(ToPath(target), ToBytes("bbb"), WriteMode::Append).Ok);
+    auto rr = Read(ToPath(target));
     ::std::string back {reinterpret_cast<const char*>(rr.Data().data()), rr.Size()};
     REQUIRE(back == "aaabbb");
   }
 
   SECTION("stat reports size and is-not-directory")
   {
-    REQUIRE(AtomicWrite(target, ToBytes("12345")));
-    auto st = Stat(target);
+    REQUIRE(AtomicWrite(ToPath(target), ToBytes("12345")));
+    auto st = Stat(ToPath(target));
     REQUIRE(st.has_value());
     REQUIRE(st->Size == 5);
     REQUIRE_FALSE(st->IsDirectory);
@@ -117,16 +122,17 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
   SECTION("create dir recursive then remove")
   {
     auto deepPath = (scratch.Path / "a" / "b" / "c").string();
-    REQUIRE(CreateDir(deepPath, true));
-    auto st = Stat(deepPath);
+    REQUIRE(CreateDir(ToPath(deepPath), true));
+    auto st = Stat(ToPath(deepPath));
     REQUIRE(st.has_value());
     REQUIRE(st->IsDirectory);
-    REQUIRE(Remove(deepPath));
+    REQUIRE(Remove(ToPath(deepPath)));
   }
 
   SECTION("remove non-existent file fails cleanly")
   {
-    REQUIRE_FALSE(Remove((scratch.Path / "nope").string()));
+    auto missing = (scratch.Path / "nope").string();
+    REQUIRE_FALSE(Remove(ToPath(missing)));
   }
 
   SECTION("exe path and working dir are non-empty")
@@ -144,8 +150,8 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
 
   SECTION("map round-trip")
   {
-    REQUIRE(AtomicWrite(target, ToBytes("mappable bytes")));
-    auto m = Map(target);
+    REQUIRE(AtomicWrite(ToPath(target), ToBytes("mappable bytes")));
+    auto m = Map(ToPath(target));
     REQUIRE(m.Ok());
     REQUIRE(m.Size() == 14);
     ::std::string back {reinterpret_cast<const char*>(m.Data().data()), m.Size()};
@@ -154,9 +160,12 @@ TEST_CASE("Read/Write/Stat round-trip on real fs", "[platform][io]")
 
   SECTION("iterate directory finds written files")
   {
-    REQUIRE(AtomicWrite((scratch.Path / "a.txt").string(), ToBytes("a")));
-    REQUIRE(AtomicWrite((scratch.Path / "b.txt").string(), ToBytes("b")));
-    auto it = IterateDir(scratch.Path.string());
+    auto a = (scratch.Path / "a.txt").string();
+    auto b = (scratch.Path / "b.txt").string();
+    auto dir = scratch.Path.string();
+    REQUIRE(AtomicWrite(ToPath(a), ToBytes("a")));
+    REQUIRE(AtomicWrite(ToPath(b), ToBytes("b")));
+    auto it = IterateDir(ToPath(dir));
     REQUIRE(it.Ok());
     int found = 0;
     while (auto entry = it.Next())
@@ -177,31 +186,31 @@ TEST_CASE("OpenWrite streaming round-trip", "[platform][io][stream]")
 
   // Truncate
   {
-    auto w = OpenWrite(path, WriteMode::Truncate);
+    auto w = OpenWrite(ToPath(path), WriteMode::Truncate);
     REQUIRE(w);
     REQUIRE(w->WriteString("alpha"));
     REQUIRE(w->WriteString("\n"));
     REQUIRE(w->Flush());
   }
-  REQUIRE(Read(path).Size() == 6);
+  REQUIRE(Read(ToPath(path)).Size() == 6);
 
   // Append
   {
-    auto w = OpenWrite(path, WriteMode::Append);
+    auto w = OpenWrite(ToPath(path), WriteMode::Append);
     REQUIRE(w);
     REQUIRE(w->WriteString("beta"));
   }
-  REQUIRE(Read(path).Size() == 10);
+  REQUIRE(Read(ToPath(path)).Size() == 10);
 
   // Seek-back overwrite (mirrors crash-safe sink usage)
   {
-    auto w = OpenWrite(path, WriteMode::Append);
+    auto w = OpenWrite(ToPath(path), WriteMode::Append);
     REQUIRE(w);
     auto pos = w->Seek(-2, /*fromEnd=*/true);
     REQUIRE(pos == 8);
     REQUIRE(w->WriteString("xx"));
   }
-  auto r = Read(path);
+  auto r = Read(ToPath(path));
   REQUIRE(r.Size() == 10);
   auto sp = r.Data();
   REQUIRE(static_cast<char>(sp[8]) == 'x');

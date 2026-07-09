@@ -35,7 +35,7 @@ ReadResult::~ReadResult() noexcept = default;
 
 // -- MappedFile ------------------------------------------------------
 
-MappedFile::MappedFile(const ::std::byte* data, ::std::size_t size, void* handle, Deleter deleter) noexcept
+MappedFile::MappedFile(const ::gecko::byte* data, ::gecko::usize size, void* handle, Deleter deleter) noexcept
     : m_Data(data), m_Size(size), m_Handle(handle), m_Deleter(deleter)
 {}
 
