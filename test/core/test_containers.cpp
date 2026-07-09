@@ -174,6 +174,23 @@ TEST_CASE("Array destroys non-trivial elements", "[core][containers][array]")
   REQUIRE(LifetimeProbe::Live == 0);
 }
 
+TEST_CASE("Array resize constructs and destroys elements", "[core][containers][array]")
+{
+  LifetimeProbe::Live = 0;
+
+  Array<LifetimeProbe> values;
+  REQUIRE(values.Resize(3));
+  REQUIRE(values.Count() == 3);
+  REQUIRE(LifetimeProbe::Live == 3);
+
+  REQUIRE(values.Resize(1));
+  REQUIRE(values.Count() == 1);
+  REQUIRE(LifetimeProbe::Live == 1);
+
+  values.Clear();
+  REQUIRE(LifetimeProbe::Live == 0);
+}
+
 TEST_CASE("String stores allocator and remains null-terminated", "[core][containers][string]")
 {
   CountingAllocator alloc;

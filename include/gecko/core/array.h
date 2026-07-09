@@ -138,6 +138,27 @@ public:
     return Reallocate(capacity);
   }
 
+  bool Resize(usize count) noexcept
+  {
+    if (count < m_Count)
+    {
+      DestroyRange(m_Data + count, m_Count - count);
+      m_Count = count;
+      return true;
+    }
+
+    if (count == m_Count)
+      return true;
+
+    if (!Reserve(count))
+      return false;
+
+    for (usize i = m_Count; i < count; ++i)
+      new (m_Data + i) T();
+    m_Count = count;
+    return true;
+  }
+
   template <class... Args>
   T* EmplaceBack(Args&&... args) noexcept
   {
