@@ -8,7 +8,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstring>
-#include <optional>
 
 using namespace gecko;
 using namespace gecko::platform;
@@ -24,7 +23,7 @@ struct TestServiceScope
   runtime::EventBus events;
   runtime::RuntimeModule runtimeMod;
   PlatformModule platformMod;
-  ::std::optional<::gecko::Engine> engine;
+  ::gecko::EngineResult engine;
 
   static PlatformConfig MakeNullConfig() noexcept
   {
@@ -36,7 +35,8 @@ struct TestServiceScope
   TestServiceScope() : runtimeMod(jobs, profiler, logger, events), platformMod(MakeNullConfig())
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
+    ::gecko::IModule* modules[] = {&runtimeMod, &platformMod};
+    engine = ::gecko::Engine::Create(modules);
     REQUIRE(engine.has_value());
   }
 
@@ -473,7 +473,8 @@ TEST_CASE("PlatformModule publishes injected backends", "[platform][context][inj
                                    }};
 
   REQUIRE(SetAllocator(&alloc));
-  auto engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
+  ::gecko::IModule* modules[] = {&runtimeMod, &platformMod};
+  auto engine = ::gecko::Engine::Create(modules);
   REQUIRE(engine.has_value());
 
   // Injected pointers must be the ones published as services.

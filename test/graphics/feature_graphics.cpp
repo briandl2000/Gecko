@@ -23,7 +23,6 @@
 #include "gecko/runtime/thread_pool_job_system.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <optional>
 
 using namespace gecko;
 using namespace gecko::graphics;
@@ -40,12 +39,13 @@ struct FullStack
   ::gecko::runtime::RuntimeModule runtime {jobs, profiler, logger, events};
   ::gecko::platform::PlatformModule platform {};
   GraphicsModule graphics {GraphicsConfig {}};
-  ::std::optional<Engine> engine;
+  EngineResult engine;
 
   FullStack()
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = Engine::Create({&runtime, &platform, &graphics});
+    IModule* modules[] = {&runtime, &platform, &graphics};
+    engine = Engine::Create(modules);
     REQUIRE(engine.has_value());
   }
   ~FullStack()
@@ -109,7 +109,8 @@ TEST_CASE("Full stack: GraphicsModule honours Backends injection", "[feature][gr
   REQUIRE(injected != nullptr);
   GraphicsModule graphics {GraphicsConfig {}, GraphicsModule::Backends {injected.get()}};
 
-  auto engine = Engine::Create({&runtime, &platform, &graphics});
+  IModule* modules[] = {&runtime, &platform, &graphics};
+  auto engine = Engine::Create(modules);
   REQUIRE(engine.has_value());
   REQUIRE(GetGraphicsDevice() == injected.get());
 
@@ -159,7 +160,8 @@ TEST_CASE("Visible: window + Vulkan device + swapchain bind", "[.visible][featur
   cfg.AppName = "gecko-visible-test";
   GraphicsModule graphics {cfg};
 
-  auto engine = Engine::Create({&runtime, &platform, &graphics});
+  IModule* modules[] = {&runtime, &platform, &graphics};
+  auto engine = Engine::Create(modules);
   REQUIRE(engine.has_value());
 
   auto* device = GetGraphicsDevice();

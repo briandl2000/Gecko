@@ -25,7 +25,6 @@
 
 #include <atomic>
 #include <catch2/catch_test_macros.hpp>
-#include <optional>
 #include <thread>
 #include <vector>
 
@@ -50,7 +49,8 @@ TEST_CASE("RuntimeModule publishes the four foundational services in order", "[f
   EventBus events;
   RuntimeModule runtime(jobs, profiler, logger, events);
 
-  auto engine = Engine::Create({&runtime});
+  IModule* modules[] = {&runtime};
+  auto engine = Engine::Create(modules);
   REQUIRE(engine.has_value());
 
   auto& reg = engine->Modules();
@@ -81,7 +81,8 @@ TEST_CASE("Job system dispatches work end-to-end through the registry", "[featur
   EventBus events;
   RuntimeModule runtime(jobs, profiler, logger, events);
 
-  auto engine = Engine::Create({&runtime});
+  IModule* modules[] = {&runtime};
+  auto engine = Engine::Create(modules);
   REQUIRE(engine.has_value());
 
   ::std::atomic<int> counter {0};
@@ -111,7 +112,8 @@ TEST_CASE("Event bus delivers events through the runtime stack", "[feature][runt
   EventBus events;
   RuntimeModule runtime(jobs, profiler, logger, events);
 
-  auto engine = Engine::Create({&runtime});
+  IModule* modules[] = {&runtime};
+  auto engine = Engine::Create(modules);
   REQUIRE(engine.has_value());
 
   auto* bus = GetEventBus();
@@ -149,7 +151,8 @@ TEST_CASE("Module restart works repeatedly with the runtime stack", "[feature][r
     EventBus events;
     RuntimeModule runtime(jobs, profiler, logger, events);
 
-    auto engine = Engine::Create({&runtime});
+    IModule* modules[] = {&runtime};
+    auto engine = Engine::Create(modules);
     REQUIRE(engine.has_value());
     REQUIRE(GetJobSystem() == &jobs);
 

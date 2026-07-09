@@ -8,19 +8,19 @@
 
 namespace gecko {
 
-::std::optional<Engine> Engine::Create(::std::initializer_list<IModule*> modules) noexcept
+EngineResult Engine::Create(::gecko::Span<IModule*> modules) noexcept
 {
   GECKO_PROFILE_NAMED(::gecko::core::labels::Modules, "Engine::Create");
   Engine engine;
-  engine.m_registry = ::std::unique_ptr<IModuleRegistry>(new (::std::nothrow)::gecko::core::detail::ModuleRegistry());
+  engine.m_registry = ::gecko::Unique<IModuleRegistry>(new (::std::nothrow)::gecko::core::detail::ModuleRegistry());
   if (!engine.m_registry)
   {
-    return ::std::nullopt;
+    return {};
   }
 
   if (!engine.m_registry->Init())
   {
-    return ::std::nullopt;
+    return {};
   }
 
   // Register every user module. Skip nulls silently -- some app code
@@ -33,7 +33,7 @@ namespace gecko {
     if (!reg.Ok())
     {
       engine.m_registry->Shutdown();
-      return ::std::nullopt;
+      return {};
     }
     // Engine owns the lifecycle; release the handle so the registry
     // doesn't try to unregister via RAII.
@@ -48,10 +48,19 @@ namespace gecko {
   {
     detail::SetActiveModuleRegistry(nullptr);
     engine.m_registry->Shutdown();
-    return ::std::nullopt;
+    return {};
   }
 
-  return engine;
+  return EngineResult {::std::move(engine)};
+}
+
+EngineResult::EngineResult(Engine engine) noexcept : m_Engine(::std::move(engine)), m_Ok(true)
+{}
+
+void EngineResult::reset() noexcept
+{
+  m_Engine = Engine {};
+  m_Ok = false;
 }
 
 Engine::~Engine() noexcept

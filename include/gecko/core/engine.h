@@ -4,13 +4,13 @@
 /// `Engine` -- RAII owner of the module / service lifecycle.
 
 #include "gecko/core/api.h"
+#include "gecko/core/ptr.h"
 #include "gecko/core/services/modules.h"
-
-#include <initializer_list>
-#include <memory>
-#include <optional>
+#include "gecko/core/span.h"
 
 namespace gecko {
+
+class EngineResult;
 
 /// RAII owner for the engine's module / service lifecycle.
 ///
@@ -36,8 +36,8 @@ namespace gecko {
 /// ::gecko::platform::PlatformModule platformModule;
 /// MyAppModule  app;
 ///
-/// auto engine = ::gecko::Engine::Create(
-///     {&servicesModule, &platformModule, &app});
+/// ::gecko::IModule* modules[] = {&servicesModule, &platformModule, &app};
+/// auto engine = ::gecko::Engine::Create(modules);
 /// if (!engine)
 ///   return 1;
 ///
@@ -54,17 +54,10 @@ public:
   ///
   /// @param modules Modules to install. Order is irrelevant; the
   ///        registry topologically sorts them.
-  /// @return The engine on success; `std::nullopt` if any module fails
+  /// @return The engine on success; empty result if any module fails
   ///         to start or the dependency graph is invalid (cycle,
   ///         missing publisher, duplicate publisher).
-  ///
-  /// abi-ok: `std::optional<Engine>` and `std::initializer_list` cross the
-  /// CoreServices DLL boundary. Same-toolchain-per-process is required;
-  /// crossing this with a mismatched STL would corrupt. If cross-toolchain
-  /// plugins ever need to construct an Engine, switch this to
-  /// `Engine* Create(IModule* const* modules, usize count)` and an
-  /// out-pointer/`bool` failure path.
-  GECKO_API static ::std::optional<Engine> Create(::std::initializer_list<IModule*> modules) noexcept;
+  GECKO_API static EngineResult Create(::gecko::Span<IModule*> modules) noexcept;
 
   /// Runs `Shutdown` on every module in reverse topological order.
   GECKO_API ~Engine() noexcept;
@@ -81,13 +74,54 @@ public:
   [[nodiscard]] GECKO_API IModuleRegistry& Modules() noexcept;
 
 private:
+  friend class EngineResult;
+
   Engine() noexcept = default;
 
-  // abi-ok: Engine is moved across the CoreServices DLL boundary by the
-  // factory return; this member's layout must match between producer and
-  // consumer. Safe under the one-toolchain-per-process rule. A cross-
-  // toolchain refactor would PIMPL this behind an opaque `void* m_impl`.
-  ::std::unique_ptr<IModuleRegistry> m_registry;
+  ::gecko::Unique<IModuleRegistry> m_registry;
+};
+
+class EngineResult
+{
+public:
+  EngineResult() noexcept = default;
+  GECKO_API explicit EngineResult(Engine engine) noexcept;
+
+  EngineResult(const EngineResult&) = delete;
+  EngineResult& operator=(const EngineResult&) = delete;
+  EngineResult(EngineResult&&) noexcept = default;
+  EngineResult& operator=(EngineResult&&) noexcept = default;
+  ~EngineResult() noexcept = default;
+
+  [[nodiscard]] bool has_value() const noexcept
+  {
+    return m_Ok;
+  }
+  explicit operator bool() const noexcept
+  {
+    return m_Ok;
+  }
+  [[nodiscard]] Engine* operator->() noexcept
+  {
+    return &m_Engine;
+  }
+  [[nodiscard]] const Engine* operator->() const noexcept
+  {
+    return &m_Engine;
+  }
+  [[nodiscard]] Engine& operator*() noexcept
+  {
+    return m_Engine;
+  }
+  [[nodiscard]] const Engine& operator*() const noexcept
+  {
+    return m_Engine;
+  }
+  GECKO_API void reset() noexcept;
+
+private:
+  Engine m_Engine {};
+  bool m_Ok {false};
 };
 
 }  // namespace gecko

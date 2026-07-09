@@ -155,7 +155,8 @@ TEST_CASE("Profiler feature: real ThreadPoolJobSystem drives the consumer", "[ru
   RuntimeModule coreMod(jobs, nullProf, logger, eventBus);
 
   {
-    auto engine = ::gecko::Engine::Create({&coreMod});
+    ::gecko::IModule* modules[] = {&coreMod};
+    auto engine = ::gecko::Engine::Create(modules);
 
     RingProfiler prof(1 << 13);
     REQUIRE(prof.Init());

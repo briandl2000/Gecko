@@ -6,7 +6,6 @@
 #include "gecko/runtime/runtime_module.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <optional>
 
 using namespace gecko;
 using namespace gecko::runtime;
@@ -21,12 +20,13 @@ struct TestServiceScope
   NullLogger logger;
   EventBus eventBus;
   RuntimeModule runtimeMod;
-  ::std::optional<::gecko::Engine> engine;
+  ::gecko::EngineResult engine;
 
   TestServiceScope() : runtimeMod(jobs, profiler, logger, eventBus)
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = ::gecko::Engine::Create({&runtimeMod});
+    ::gecko::IModule* modules[] = {&runtimeMod};
+    engine = ::gecko::Engine::Create(modules);
   }
 
   ~TestServiceScope()
@@ -247,7 +247,8 @@ TEST_CASE("Topological sort starts services-publisher before a Requires()-declar
   RuntimeModule services(jobs, profiler, logger, events);
   ServiceSpyModule spy {"test.spy"};
 
-  auto engine = ::gecko::Engine::Create({&spy, &services});
+  ::gecko::IModule* modules[] = {&spy, &services};
+  auto engine = ::gecko::Engine::Create(modules);
   REQUIRE(engine.has_value());
 
   // The four service pointers observed during spy.Startup must point
@@ -283,7 +284,8 @@ TEST_CASE("Topological sort orders Platform and Graphics after Runtime", "[runti
 
   // Register graphics first to prove ordering is driven by the
   // dependency graph, not registration order.
-  auto engine = ::gecko::Engine::Create({&graphics, &platform, &runtime});
+  ::gecko::IModule* modules[] = {&graphics, &platform, &runtime};
+  auto engine = ::gecko::Engine::Create(modules);
   REQUIRE(engine.has_value());
 
   // All published services must be visible after Startup.

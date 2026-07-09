@@ -5,7 +5,6 @@
 #include "gecko/runtime/runtime_module.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <optional>
 
 using namespace gecko;
 using namespace gecko::graphics;
@@ -20,7 +19,7 @@ struct ServiceScope
   NullLogger logger;
   runtime::EventBus events;
   runtime::RuntimeModule runtime;
-  ::std::optional<Engine> engine;
+  EngineResult engine;
 
   ServiceScope() : runtime(jobs, profiler, logger, events)
   {
@@ -58,7 +57,8 @@ TEST_CASE("GraphicsModule with default config publishes GraphicsDevice via "
   GraphicsModule module {GraphicsConfig {}};
   ServiceScope scope;
 
-  scope.engine = Engine::Create({&scope.runtime, &module});
+  IModule* modules[] = {&scope.runtime, &module};
+  scope.engine = Engine::Create(modules);
   REQUIRE(scope.engine.has_value());
 
   auto& reg = scope.engine->Modules();
@@ -76,7 +76,8 @@ TEST_CASE("GraphicsModule clears accessors after Shutdown", "[graphics][module]"
   GraphicsModule module {GraphicsConfig {}};
   ServiceScope scope;
 
-  scope.engine = Engine::Create({&scope.runtime, &module});
+  IModule* modules[] = {&scope.runtime, &module};
+  scope.engine = Engine::Create(modules);
   REQUIRE(scope.engine.has_value());
   REQUIRE(GetGraphicsDevice() != nullptr);
 
@@ -93,7 +94,8 @@ TEST_CASE("GraphicsModule respects Backends injection", "[graphics][module]")
   GraphicsModule module {GraphicsConfig {}, GraphicsModule::Backends {injected.get()}};
   ServiceScope scope;
 
-  scope.engine = Engine::Create({&scope.runtime, &module});
+  IModule* modules[] = {&scope.runtime, &module};
+  scope.engine = Engine::Create(modules);
   REQUIRE(scope.engine.has_value());
   REQUIRE(GetGraphicsDevice() == injected.get());
 
@@ -109,7 +111,8 @@ TEST_CASE("GraphicsModule restart is idempotent", "[graphics][module]")
   {
     GraphicsModule module {GraphicsConfig {}};
     ServiceScope scope;
-    scope.engine = Engine::Create({&scope.runtime, &module});
+    IModule* modules[] = {&scope.runtime, &module};
+    scope.engine = Engine::Create(modules);
     REQUIRE(scope.engine.has_value());
     REQUIRE(GetGraphicsDevice() != nullptr);
   }

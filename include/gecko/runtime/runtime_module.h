@@ -34,7 +34,7 @@ inline constexpr ::gecko::Label Runtime = ::gecko::MakeLabel("gecko.runtime");
 /// and `GraphicsModule`.
 ///
 /// Required by every engine instance: pass `&runtimeModule` as the
-/// first module to `Engine::Create({...})`.
+/// first module to `Engine::Create(modules)`.
 class RuntimeModule final : public ::gecko::IModule
 {
 public:

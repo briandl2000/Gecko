@@ -10,7 +10,6 @@
 #include "gecko/runtime/runtime_module.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <optional>
 
 using namespace gecko;
 using namespace gecko::platform;
@@ -28,7 +27,7 @@ struct InputTestScope
   runtime::EventBus events;
   runtime::RuntimeModule runtimeMod;
   PlatformModule platformMod;
-  ::std::optional<::gecko::Engine> engine;
+  ::gecko::EngineResult engine;
 
   static PlatformConfig MakeNullConfig() noexcept
   {
@@ -40,7 +39,8 @@ struct InputTestScope
   InputTestScope() : runtimeMod(jobs, profiler, logger, events), platformMod(MakeNullConfig())
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = ::gecko::Engine::Create({&runtimeMod, &platformMod});
+    ::gecko::IModule* modules[] = {&runtimeMod, &platformMod};
+    engine = ::gecko::Engine::Create(modules);
     REQUIRE(engine.has_value());
   }
 

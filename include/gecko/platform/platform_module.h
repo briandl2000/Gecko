@@ -5,7 +5,7 @@
 ///
 /// `PlatformModule` is the engine module that owns the windowing and
 /// monitor backends. Stack-construct one (optionally with a custom
-/// `PlatformConfig`) and pass `&platform` to `Engine::Create({...})`.
+/// `PlatformConfig`) and pass `&platform` to `Engine::Create(modules)`.
 /// Filesystem and threading APIs are stateless namespace functions
 /// (e.g. `gecko::platform::Read`, `gecko::platform::HardwareThreadCount`)
 /// rather than services; see `copilot_context/MODULE_API_SHAPING.md`.

@@ -4,7 +4,6 @@
 #include "gecko/runtime/runtime_module.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <optional>
 
 using namespace gecko;
 using namespace gecko::runtime;
@@ -19,12 +18,13 @@ struct TestServiceScope
   NullLogger logger;
   EventBus eventBus;
   RuntimeModule runtimeMod;
-  ::std::optional<::gecko::Engine> engine;
+  ::gecko::EngineResult engine;
 
   TestServiceScope() : runtimeMod(jobs, profiler, logger, eventBus)
   {
     REQUIRE(SetAllocator(&alloc));
-    engine = ::gecko::Engine::Create({&runtimeMod});
+    ::gecko::IModule* modules[] = {&runtimeMod};
+    engine = ::gecko::Engine::Create(modules);
   }
 
   ~TestServiceScope()

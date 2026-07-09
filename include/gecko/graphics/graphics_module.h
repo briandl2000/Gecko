@@ -58,7 +58,7 @@ struct GraphicsConfig
 ///   not published.
 /// - Publishes `GraphicsDevice` and (when available) `IGpuSampler`.
 ///
-/// Stack-construct one and pass it to `Engine::Create({...})`.
+/// Stack-construct one and pass it to `Engine::Create(modules)`.
 class GraphicsModule final : public ::gecko::IModule
 {
 public:

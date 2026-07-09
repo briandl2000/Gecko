@@ -9,7 +9,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstdlib>
-#include <optional>
 
 namespace gecko::test {
 
@@ -48,7 +47,7 @@ struct FeaturePlatformScope
   runtime::EventBus Events;
   runtime::RuntimeModule Runtime;
   platform::PlatformModule Platform;
-  ::std::optional<::gecko::Engine> EngineHandle;
+  ::gecko::EngineResult EngineHandle;
 
   static platform::PlatformConfig MakeAutoConfig() noexcept
   {
@@ -62,7 +61,8 @@ struct FeaturePlatformScope
     if (!HasLiveDisplay())
       SKIP("No live display server available");
     REQUIRE(SetAllocator(&Alloc));
-    EngineHandle = ::gecko::Engine::Create({&Runtime, &Platform});
+    ::gecko::IModule* modules[] = {&Runtime, &Platform};
+    EngineHandle = ::gecko::Engine::Create(modules);
     REQUIRE(EngineHandle.has_value());
   }
 

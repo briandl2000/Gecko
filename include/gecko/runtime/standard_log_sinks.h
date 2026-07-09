@@ -23,7 +23,7 @@ namespace gecko::runtime {
 /// Typical use:
 ///
 /// ```cpp
-/// auto engine = Engine::Create({...});
+/// auto engine = Engine::Create(modules);
 /// runtime::StandardLogSinks sinks;       // log.txt, LogLevel::Info
 /// // ... run ...
 /// // sinks goes out of scope before engine.reset().
