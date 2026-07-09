@@ -13,6 +13,7 @@ For the canonical, non-scattered overview of how Gecko is structured and how to 
 - [API Usage Guide](#api-usage-guide)
 - [Best Practices](#best-practices)
 - [Common Patterns](#common-patterns)
+- [Boundary Type Rules](#boundary-type-rules)
 - [Module API Shaping](#module-api-shaping)
 
 ## Coding Standards
@@ -132,6 +133,80 @@ platform::Window
 - **Prevents collisions**: If you add a `malloc` to `gecko`, `::malloc` still refers to the global one
 - **Explicit intent**: `::std::` means "std from global namespace, not some nested std"
 - **Consistency**: Works for C functions, C++ stdlib, OS-specific APIs, and external library types
+
+### Boundary Type Rules
+
+Gecko engine code is C++. The immediate goal is not to design a full C
+ABI for every engine API. The goal is to keep Gecko's public C++ API
+surfaces under Gecko's control so engine modules, shared libraries, and
+future loaded game objects are not coupled directly to a particular
+standard-library implementation, compiler version, allocator behavior,
+or container layout.
+
+`std` is allowed as an implementation tool. It should usually be hidden
+behind Gecko-owned APIs before a type crosses an engine-facing boundary.
+
+#### Boundary Categories
+
+When adding or changing a header, classify each `std` use:
+
+- **Public API signature**: function parameters, return values, virtual
+  methods, public data fields, descriptor structs, and result structs
+  visible to engine consumers. Avoid raw `std` here. Prefer Gecko
+  views, Gecko owning containers, handles, raw pointer/count pairs, or
+  explicit result structs.
+- **Public concrete layout**: private members of public concrete classes.
+  This is acceptable short term for classes that are constructed and
+  destroyed inside one toolchain boundary, but prefer PIMPL before the
+  type is used across loaded-module or shared-library boundaries.
+- **Header-only helper/template**: allowed when the `std` object is
+  created, consumed, and destroyed in the caller's translation unit.
+  Mark non-obvious cases with `// abi-ok: <reason>` or an
+  `abi-ok-begin` / `abi-ok-end` region.
+- **Private implementation detail**: `.cpp` files and private headers may
+  use `std` freely unless allocation control, hot-path behavior, or
+  module lifetime makes a Gecko container materially better.
+
+#### Preferred Public Types
+
+- Text views: use `gecko::StringView` once it exists. Until then,
+  existing `std::string_view` APIs should be treated as migration
+  candidates, not copied into new APIs.
+- Array/byte views: use `gecko::Span<T>`, especially on virtual methods
+  and shared-library/module boundaries.
+- Owning text/buffers: use future allocator-aware `gecko::String` and
+  `gecko::Array<T>`; until those exist, avoid adding new owning string or
+  vector returns to public APIs.
+- Optional/result values: prefer explicit result structs for public
+  boundaries when the result owns memory or crosses a shared-library
+  boundary.
+- Smart pointers: `gecko::Unique`, `gecko::Shared`, and `gecko::Weak`
+  are currently aliases over `std` smart pointers. They improve naming
+  but do not by themselves solve ABI or allocation ownership. Do not use
+  them for future C ABI surfaces.
+
+#### Hard Rules
+
+- Do not add new public `GECKO_API virtual` methods with raw
+  `std::string`, `std::string_view`, `std::vector`, `std::span`,
+  `std::optional`, `std::function`, or standard smart pointers unless the
+  line is explicitly marked `abi-ok` with a concrete reason.
+- Do not create Gecko aliases to `std` containers and call them boundary
+  safe. A `using String = std::string` alias still has `std::string`'s
+  ABI, allocator, and layout properties.
+- Owning Gecko containers must store the allocator used to create their
+  storage. Destruction and reallocation must use that stored allocator,
+  not whatever allocator is current later.
+- Implicit allocator lookup is a creation-time convenience only. Use
+  explicit allocator parameters for persistent or lifetime-sensitive
+  results.
+- Thread-local allocator scopes must not be assumed to follow work onto
+  job-system worker threads. Jobs that allocate persistent results should
+  capture allocator intent explicitly.
+
+The current tooling only enforces the narrow `CoreServices` ABI rule via
+[`scripts/lint_abi.py`](../scripts/lint_abi.py). Broader module API
+cleanup is a migration target, not an already-enforced invariant.
 
 ### Formatting Standards
 

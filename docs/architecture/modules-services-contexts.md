@@ -209,14 +209,20 @@ the same process, it's a context.
 
 - **Plugin loader**: Platform-side `ILibraryLoader` service for
   `dlopen`/`LoadLibrary`. Lands when there's an actual plugin.
-- **Plugin ABI rule**: today plugins must be built with the **same
-  compiler and same C++ ABI** as the host (one toolchain per process).
-  Vtable layout (Itanium vs MSVC ABI) and exception model (DWARF vs
-  SEH) are implementation-defined and not stable across toolchains.
+- **C++ boundary type rule**: Gecko engine APIs are C++ APIs. The current
+  concern is controlling the types that cross engine-facing public
+  headers, module interfaces, and shared-library boundaries so they are
+  not tied directly to a particular `std` implementation, compiler
+  version, allocator behavior, or container layout.
 
-  What we *do* control across toolchains is the data shapes that cross
-  the `CoreServices` shared-library boundary. The rule on every virtual
-  in `include/gecko/core/services/*.h`:
+  Today, dynamically loaded plugins must still be built with the **same
+  C++ ABI family** as the host. Vtable layout (Itanium vs MSVC ABI),
+  exception model (DWARF vs SEH), RTTI, and name mangling are not stable
+  across unrelated C++ ABIs. Gecko-owned data shapes reduce STL coupling;
+  they do not make arbitrary C++ ABIs binary-compatible.
+
+  The narrow rule currently enforced by tooling is on every virtual in
+  `include/gecko/core/services/*.h`:
 
   - Allowed parameter / return types: primitives, raw pointers,
     `const char*`, Gecko PODs, and `gecko::Span<T>`
@@ -233,10 +239,19 @@ the same process, it's a context.
   into `gk test` (it runs as a pre-step before the test executables).
   CI does not currently invoke `gk test`; it builds and runs test
   binaries directly, so the lint is enforced locally via `gk test`
-  rather than by GitHub Actions today. A future cross-toolchain plugin would also
-  need a separate C ABI shim (`extern "C" gecko_plugin_register(...)`
-  with POD-only types and function pointers); that's deferred until a
-  plugin loader exists to validate it.
+  rather than by GitHub Actions today.
+
+  The broader design target is documented in
+  [`docs/engine_core_containers_allocators_formatting_plan.md`](../engine_core_containers_allocators_formatting_plan.md):
+  public engine APIs should migrate away from raw `std` views/containers
+  in signatures and result objects, even outside `CoreServices`, while
+  private implementation code may keep using `std` where it is useful.
+
+  A future language-binding or game-code boundary that must support
+  non-C++ callers will need a separate C ABI shim (`extern "C"
+  gecko_plugin_register(...)` with handles, POD-only types, pointers,
+  counts, caller-provided buffers, and function pointers). That is
+  deferred until a plugin/game-code loader exists to validate it.
 - **Core-as-shared**: Currently `Core` is `STATIC` and `CoreServices`
   is `SHARED`. The split is plugin-compatible: plugins link `Core`
   statically (utilities, no globals) and `CoreServices` dynamically
