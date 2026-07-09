@@ -159,14 +159,14 @@ bool Exists(PathView path) noexcept
   return attrs != INVALID_FILE_ATTRIBUTES;
 }
 
-::std::optional<FileStat> Stat(PathView path) noexcept
+StatResult Stat(PathView path) noexcept
 {
   auto w = ToWide(path);
   if (w.empty())
-    return ::std::nullopt;
+    return {};
   WIN32_FILE_ATTRIBUTE_DATA data {};
   if (!::GetFileAttributesExW(w.c_str(), GetFileExInfoStandard, &data))
-    return ::std::nullopt;
+    return {};
   FileStat fs {};
   ULARGE_INTEGER size {};
   size.LowPart = data.nFileSizeLow;

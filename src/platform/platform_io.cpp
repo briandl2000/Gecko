@@ -113,14 +113,14 @@ DirIter::~DirIter() noexcept
   Close();
 }
 
-::std::optional<DirEntry> DirIter::Next() noexcept
+DirEntryResult DirIter::Next() noexcept
 {
   if (!m_Handle || !m_Next)
-    return ::std::nullopt;
+    return {};
   DirEntry entry;
   if (!m_Next(m_Handle, &entry))
-    return ::std::nullopt;
-  return entry;
+    return {};
+  return DirEntryResult {::std::move(entry)};
 }
 
 void DirIter::Close() noexcept

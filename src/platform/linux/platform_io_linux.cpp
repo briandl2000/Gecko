@@ -157,12 +157,12 @@ bool Exists(PathView path) noexcept
   return ::access(p.c_str(), F_OK) == 0;
 }
 
-::std::optional<FileStat> Stat(PathView path) noexcept
+StatResult Stat(PathView path) noexcept
 {
   auto p = ToCString(path);
   struct stat st {};
   if (::stat(p.c_str(), &st) != 0)
-    return ::std::nullopt;
+    return {};
   FileStat fs {};
   fs.Size = static_cast<::gecko::u64>(st.st_size);
   fs.MTimeEpoch = static_cast<::gecko::i64>(st.st_mtime);

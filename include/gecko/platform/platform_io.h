@@ -10,7 +10,7 @@
 #include "gecko/platform/path_view.h"
 
 #include <cstddef>
-#include <optional>
+#include <utility>
 
 // Filesystem and process-info utilities.
 //
@@ -55,6 +55,84 @@ struct DirEntry
 {
   ::gecko::String Name {};
   bool IsDirectory {false};
+};
+
+struct StatResult
+{
+  bool Ok {false};
+  FileStat Value {};
+
+  constexpr StatResult() noexcept = default;
+  constexpr StatResult(FileStat value) noexcept : Ok(true), Value(value)
+  {}
+
+  [[nodiscard]] constexpr bool has_value() const noexcept
+  {
+    return Ok;
+  }
+  [[nodiscard]] constexpr const FileStat* operator->() const noexcept
+  {
+    return &Value;
+  }
+  [[nodiscard]] constexpr FileStat* operator->() noexcept
+  {
+    return &Value;
+  }
+  [[nodiscard]] constexpr const FileStat& operator*() const noexcept
+  {
+    return Value;
+  }
+  [[nodiscard]] constexpr FileStat& operator*() noexcept
+  {
+    return Value;
+  }
+  constexpr explicit operator bool() const noexcept
+  {
+    return Ok;
+  }
+};
+
+class DirEntryResult
+{
+public:
+  DirEntryResult() noexcept = default;
+  explicit DirEntryResult(DirEntry entry) noexcept : m_Value(::std::move(entry)), m_Ok(true)
+  {}
+
+  DirEntryResult(const DirEntryResult&) = delete;
+  DirEntryResult& operator=(const DirEntryResult&) = delete;
+  DirEntryResult(DirEntryResult&&) noexcept = default;
+  DirEntryResult& operator=(DirEntryResult&&) noexcept = default;
+  ~DirEntryResult() noexcept = default;
+
+  [[nodiscard]] bool has_value() const noexcept
+  {
+    return m_Ok;
+  }
+  [[nodiscard]] const DirEntry* operator->() const noexcept
+  {
+    return &m_Value;
+  }
+  [[nodiscard]] DirEntry* operator->() noexcept
+  {
+    return &m_Value;
+  }
+  [[nodiscard]] const DirEntry& operator*() const noexcept
+  {
+    return m_Value;
+  }
+  [[nodiscard]] DirEntry& operator*() noexcept
+  {
+    return m_Value;
+  }
+  explicit operator bool() const noexcept
+  {
+    return m_Ok;
+  }
+
+private:
+  DirEntry m_Value {};
+  bool m_Ok {false};
 };
 
 // -- Move-only owning result types -----------------------------------
@@ -160,7 +238,7 @@ public:
     return Ok();
   }
 
-  [[nodiscard]] ::std::optional<DirEntry> Next() noexcept;
+  [[nodiscard]] DirEntryResult Next() noexcept;
   void Close() noexcept;
 
 private:
@@ -197,11 +275,11 @@ public:
 // -- Public API: stateless free functions ----------------------------
 //
 // All paths are forward-slash PathView. All functions are noexcept and
-// return false / empty / nullopt on error.
+// return false, empty objects, or !Ok result objects on error.
 
 // Existence and metadata
 [[nodiscard]] GECKO_API bool Exists(PathView path) noexcept;
-[[nodiscard]] GECKO_API ::std::optional<FileStat> Stat(PathView path) noexcept;
+[[nodiscard]] GECKO_API StatResult Stat(PathView path) noexcept;
 
 // Whole-file read
 [[nodiscard]] GECKO_API ReadResult Read(PathView path) noexcept;
