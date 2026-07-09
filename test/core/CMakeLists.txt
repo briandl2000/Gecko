@@ -11,6 +11,7 @@ add_executable(core_tests
   test_version.cpp
   test_memory.cpp
   test_events.cpp
+  test_format.cpp
   test_services.cpp
 )
 
