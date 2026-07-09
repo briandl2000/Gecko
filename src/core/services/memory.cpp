@@ -62,7 +62,7 @@ void* SystemAllocator::Alloc(u64 size, u32 alignment) noexcept
   if (!rawPtr)
     return nullptr;
 
-  return PlaceAllocHeader(rawPtr, size, alignment, SystemAllocMagic);
+  return PlaceAllocHeader(rawPtr, size, alignment, SystemAllocMagic, {}, this);
 }
 
 void SystemAllocator::Free(void* ptr) noexcept

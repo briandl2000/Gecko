@@ -86,7 +86,7 @@ void* TrackingAllocator::Alloc(u64 size, u32 alignment) noexcept
   if (!rawPtr)
     return nullptr;
 
-  void* userPtr = PlaceAllocHeader(rawPtr, size, alignment, TrackingAllocMagic, label);
+  void* userPtr = PlaceAllocHeader(rawPtr, size, alignment, TrackingAllocMagic, label, this);
 
   m_TotalLive.fetch_add(size, std::memory_order_relaxed);
 

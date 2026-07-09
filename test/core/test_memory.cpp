@@ -47,7 +47,8 @@ TEST_CASE("AllocHeader roundtrip", "[core][memory]")
   void* raw = PlatformAlloc(TotalAllocSize(64, 16), EffectiveAlignment(16));
   REQUIRE(raw != nullptr);
 
-  void* user = PlaceAllocHeader(raw, 64, 16, SystemAllocMagic);
+  SystemAllocator owner;
+  void* user = PlaceAllocHeader(raw, 64, 16, SystemAllocMagic, {}, &owner);
   REQUIRE(user != nullptr);
 
   AllocHeader* header = HeaderFromUserPtr(user);
@@ -55,6 +56,7 @@ TEST_CASE("AllocHeader roundtrip", "[core][memory]")
   REQUIRE(IsAllocHeaderValid(header));
   REQUIRE(header->Magic == SystemAllocMagic);
   REQUIRE(header->RequestedSize == 64);
+  REQUIRE(header->Owner == &owner);
 
   void* recovered = RawPtrFromHeader(header);
   REQUIRE(recovered == raw);

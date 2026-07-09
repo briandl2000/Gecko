@@ -2,6 +2,7 @@ add_executable(core_tests
   test_hash.cpp
   test_labels.cpp
   test_bit.cpp
+  test_containers.cpp
   test_time.cpp
   test_random.cpp
   test_thread.cpp

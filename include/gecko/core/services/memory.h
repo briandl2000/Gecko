@@ -18,6 +18,7 @@
 
 namespace gecko {
 
+struct IAllocator;
 struct LabelScope;
 
 // ------------------------------------------------------------
@@ -42,6 +43,7 @@ struct AllocHeader
   u64 RequestedSize;  ///< Size requested by the caller.
   Label AllocLabel;   ///< Label active when the allocation was made.
   u64 RawOffset;      ///< Bytes from this header back to the raw platform ptr.
+  IAllocator* Owner;  ///< Allocator that created the allocation, if known.
 };
 
 /// Recover the header for a user pointer returned by `IAllocator::Alloc`.
@@ -98,7 +100,8 @@ inline u32 EffectiveAlignment(u32 userAlignment) noexcept
 /// @param magic Allocator magic to record in the header.
 /// @param label Label active at the call site.
 /// @return Aligned user pointer immediately after the placed header.
-inline void* PlaceAllocHeader(void* rawPtr, u64 size, u32 userAlignment, u32 magic, Label label = {}) noexcept
+inline void* PlaceAllocHeader(void* rawPtr, u64 size, u32 userAlignment, u32 magic, Label label = {},
+                              IAllocator* owner = nullptr) noexcept
 {
   const u32 effAlign = EffectiveAlignment(userAlignment);
   auto rawAddr = reinterpret_cast<uintptr_t>(rawPtr);
@@ -112,6 +115,7 @@ inline void* PlaceAllocHeader(void* rawPtr, u64 size, u32 userAlignment, u32 mag
   header->RequestedSize = size;
   header->AllocLabel = label;
   header->RawOffset = reinterpret_cast<uintptr_t>(header) - rawAddr;
+  header->Owner = owner;
 
   return reinterpret_cast<void*>(userAddr);
 }
@@ -169,6 +173,10 @@ struct IAllocator
 
 /// @return Reference to the active allocator. Never null.
 GECKO_API IAllocator& Allocator() noexcept;
+
+/// @return Thread-local current allocator. Falls back to `Allocator()`
+///         when no allocator scope is active on this thread.
+GECKO_API IAllocator& CurrentAllocator() noexcept;
 
 /// Install a custom allocator.
 ///
@@ -232,6 +240,48 @@ private:
   bool m_Ok;
 };
 
+namespace detail {
+
+GECKO_API bool PushCurrentAllocator(IAllocator* allocator) noexcept;
+GECKO_API void PopCurrentAllocator() noexcept;
+
+}  // namespace detail
+
+/// Thread-local allocator scope used by convenience constructors and
+/// formatting helpers. This does not replace the process-global
+/// allocator installed with `SetAllocator`; it only changes
+/// `CurrentAllocator()` on the calling thread.
+class AllocatorPushScope
+{
+public:
+  explicit AllocatorPushScope(IAllocator& allocator) noexcept : m_Ok(detail::PushCurrentAllocator(&allocator))
+  {}
+
+  ~AllocatorPushScope() noexcept
+  {
+    if (m_Ok)
+      detail::PopCurrentAllocator();
+  }
+
+  AllocatorPushScope(const AllocatorPushScope&) = delete;
+  AllocatorPushScope& operator=(const AllocatorPushScope&) = delete;
+  AllocatorPushScope(AllocatorPushScope&&) = delete;
+  AllocatorPushScope& operator=(AllocatorPushScope&&) = delete;
+
+  [[nodiscard]] bool Ok() const noexcept
+  {
+    return m_Ok;
+  }
+
+  [[nodiscard]] explicit operator bool() const noexcept
+  {
+    return m_Ok;
+  }
+
+private:
+  bool m_Ok {false};
+};
+
 /// Allocate bytes from the active allocator.
 /// Asserts on zero size and non-power-of-two alignment in debug.
 /// @param size Number of bytes to allocate.
@@ -245,14 +295,20 @@ inline void* AllocBytes(u64 size,
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
-  return Allocator().Alloc(size, alignment);
+  return CurrentAllocator().Alloc(size, alignment);
 }
 
 /// Free a pointer obtained from `AllocBytes`. Null is a no-op.
 inline void DeallocBytes(void* ptr) noexcept
 {
   if (ptr)
-    Allocator().Free(ptr);
+  {
+    auto* header = HeaderFromUserPtr(ptr);
+    if (IsAllocHeaderValid(header) && header->Owner != nullptr)
+      header->Owner->Free(ptr);
+    else
+      CurrentAllocator().Free(ptr);
+  }
 }
 
 /// Typed array allocator.

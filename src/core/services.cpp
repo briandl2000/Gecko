@@ -40,6 +40,16 @@ static std::atomic<IAllocator*> g_UserAllocator {nullptr};
 // of truth for which implementation is live.
 static std::atomic<IModuleRegistry*> g_Modules {nullptr};
 
+constexpr u32 MaxAllocatorStackDepth = 32;
+
+struct ThreadAllocatorContext
+{
+  IAllocator* Stack[MaxAllocatorStackDepth] {};
+  u32 Depth {0};
+};
+
+thread_local ThreadAllocatorContext g_AllocatorContext;
+
 namespace detail {
 
 void SetActiveModuleRegistry(IModuleRegistry* registry) noexcept
@@ -55,6 +65,38 @@ IAllocator& Allocator() noexcept
     return *alloc;
   return DefaultAllocator();
 }
+
+IAllocator& CurrentAllocator() noexcept
+{
+  if (g_AllocatorContext.Depth > 0)
+  {
+    if (auto* alloc = g_AllocatorContext.Stack[g_AllocatorContext.Depth - 1])
+      return *alloc;
+  }
+  return Allocator();
+}
+
+namespace detail {
+
+bool PushCurrentAllocator(IAllocator* allocator) noexcept
+{
+  if (allocator == nullptr || g_AllocatorContext.Depth >= MaxAllocatorStackDepth)
+    return false;
+  g_AllocatorContext.Stack[g_AllocatorContext.Depth] = allocator;
+  ++g_AllocatorContext.Depth;
+  return true;
+}
+
+void PopCurrentAllocator() noexcept
+{
+  GECKO_ASSERT(g_AllocatorContext.Depth > 0 && "AllocatorPushScope pop without matching push");
+  if (g_AllocatorContext.Depth == 0)
+    return;
+  --g_AllocatorContext.Depth;
+  g_AllocatorContext.Stack[g_AllocatorContext.Depth] = nullptr;
+}
+
+}  // namespace detail
 
 bool SetAllocator(IAllocator* allocator) noexcept
 {
