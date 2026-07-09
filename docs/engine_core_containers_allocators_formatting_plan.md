@@ -8,12 +8,12 @@ The near-term concern is not a broad C ABI. Gecko's engine-facing code is C++, a
 
 The allocator system is process-global infrastructure, not a normal service. `gecko::Allocator()` returns either a user-installed allocator from `SetAllocator()` or a process-lifetime `SystemAllocator`. `TrackingAllocator` already uses a thread-local label stack, so the codebase has precedent for thread-local scoped allocation context, but there is not yet a thread-local allocator stack.
 
-The current formatting branch has experimental headers:
+The formatting branch initially had experimental headers:
 
-- `include/gecko/core/utility/string.h`: aliases `gecko::String` to `std::string` and `gecko::StringView` to `std::string_view`.
-- `include/gecko/core/utility/format.h`: wraps `std::format`/`std::vformat` and returns that aliased `String`.
+- `include/gecko/core/utility/string.h`: aliased `gecko::String` to `std::string` and `gecko::StringView` to `std::string_view`.
+- `include/gecko/core/utility/format.h`: wrapped `std::format`/`std::vformat` and returned that aliased `String`.
 
-Those aliases are useful as a sketch but should not become the long-term public model because they preserve the same ABI/allocation problems under Gecko names.
+Those aliases were useful as a sketch but should not become the long-term public model because they preserve the same ABI/allocation problems under Gecko names. Phase 1 replaces the `StringView` alias with a real non-owning Gecko view and removes the experimental formatting wrapper until allocator-aware `String` exists.
 
 ## Categorized `std` Usage
 
@@ -56,7 +56,8 @@ These are public API signatures that allocate or borrow using standard-library t
 - `include/gecko/platform/input.h`: `IInput::GetTypedText()` and `platform::GetTypedText()` return `std::string_view`.
 - `include/gecko/platform/path_view.h`: `PathView` stores `std::string_view` and accepts `std::string`.
 - `include/gecko/graphics/command_list.h`, `include/gecko/graphics/graphics_device.h`, and `include/gecko/graphics/graphics_types.h`: graphics virtual APIs use `std::span` for push constants, frame presentation, timestamp reads, uploads, and shader bytes.
-- `include/gecko/core/utility/string.h` and `include/gecko/core/utility/format.h`: the new aliases/wrappers should be redesigned before use spreads.
+- `include/gecko/core/utility/string.h`: the old alias header should remain only as a compatibility include for real Gecko text types.
+- `include/gecko/core/utility/format.h`: the experimental wrapper should stay removed/deferred until allocator-aware `String` exists.
 
 ### ABI / Public-Header Risk
 

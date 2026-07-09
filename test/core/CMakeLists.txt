@@ -6,6 +6,7 @@ add_executable(core_tests
   test_random.cpp
   test_thread.cpp
   test_ptr.cpp
+  test_string_view.cpp
   test_version.cpp
   test_memory.cpp
   test_events.cpp

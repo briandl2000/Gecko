@@ -102,4 +102,7 @@ private:
 
 static_assert(::std::is_trivially_copyable_v<Span<const int>>, "Span<T> must be trivially copyable to be ABI-stable.");
 
+using ByteSpan = Span<byte>;
+using ConstByteSpan = Span<const byte>;
+
 }  // namespace gecko
