@@ -96,7 +96,7 @@ public:
       ::CloseHandle(m_Handle);
   }
 
-  bool Write(::std::span<const ::std::byte> data) noexcept override
+  bool Write(::gecko::ConstByteSpan data) noexcept override
   {
     if (m_Handle == INVALID_HANDLE_VALUE)
       return false;
@@ -197,29 +197,25 @@ ReadResult Read(PathView path) noexcept
     ::CloseHandle(h);
     return {};
   }
-  ::std::vector<::std::byte> buf;
-  try
-  {
-    buf.resize(static_cast<::std::size_t>(size.QuadPart));
-  }
-  catch (...)
+  ::gecko::Array<::gecko::byte> buf;
+  if (!buf.Resize(static_cast<::gecko::usize>(size.QuadPart)))
   {
     ::CloseHandle(h);
     return {};
   }
-  ::std::size_t total = 0;
-  while (total < buf.size())
+  ::gecko::usize total = 0;
+  while (total < buf.Count())
   {
-    DWORD chunk = static_cast<DWORD>(::std::min<::std::size_t>(buf.size() - total, 1u << 24));
+    DWORD chunk = static_cast<DWORD>(::std::min<::std::size_t>(buf.Count() - total, 1u << 24));
     DWORD got = 0;
-    if (!::ReadFile(h, buf.data() + total, chunk, &got, nullptr))
+    if (!::ReadFile(h, buf.Data() + total, chunk, &got, nullptr))
     {
       ::CloseHandle(h);
       return {};
     }
     if (got == 0)
     {
-      buf.resize(total);
+      (void)buf.Resize(total);
       break;
     }
     total += got;
@@ -283,7 +279,7 @@ MappedFile Map(PathView path) noexcept
   return MappedFile {static_cast<const ::std::byte*>(view), static_cast<::std::size_t>(size.QuadPart), m, deleter};
 }
 
-WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode mode) noexcept
+WriteResult Write(PathView path, ::gecko::ConstByteSpan data, WriteMode mode) noexcept
 {
   auto w = ToWide(path);
   if (w.empty())
@@ -311,7 +307,7 @@ WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode 
   return WriteResult {.Ok = true, .BytesWritten = static_cast<::gecko::u64>(total)};
 }
 
-bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept
+bool AtomicWrite(PathView path, ::gecko::ConstByteSpan data) noexcept
 {
   auto target = ToWide(path);
   if (target.empty())
@@ -503,7 +499,7 @@ DirIter IterateDir(PathView path) noexcept
   return FromWide(buf.data(), got);
 }
 
-::std::string UserDataDir(::std::string_view appName) noexcept
+::std::string UserDataDir(::gecko::StringView appName) noexcept
 {
   PWSTR rawPath = nullptr;
   HRESULT hr = ::SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, nullptr, &rawPath);
@@ -525,7 +521,7 @@ DirIter IterateDir(PathView path) noexcept
     try
     {
       base.push_back('/');
-      base.append(appName);
+      base.append(appName.Data(), appName.Size());
     }
     catch (...)
     {

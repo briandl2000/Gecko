@@ -5,7 +5,6 @@
 #include <chrono>
 #include <cstring>
 #include <filesystem>
-#include <span>
 #include <string>
 #include <string_view>
 
@@ -32,9 +31,9 @@ struct ScratchDir
   }
 };
 
-::std::span<const ::std::byte> ToBytes(::std::string_view s) noexcept
+::gecko::ConstByteSpan ToBytes(::std::string_view s) noexcept
 {
-  return {reinterpret_cast<const ::std::byte*>(s.data()), s.size()};
+  return {reinterpret_cast<const ::gecko::byte*>(s.data()), s.size()};
 }
 
 }  // namespace

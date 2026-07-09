@@ -98,7 +98,7 @@ public:
       ::close(m_Fd);
   }
 
-  bool Write(::std::span<const ::std::byte> data) noexcept override
+  bool Write(::gecko::ConstByteSpan data) noexcept override
   {
     if (m_Fd < 0)
       return false;
@@ -183,21 +183,17 @@ ReadResult Read(PathView path) noexcept
     return {};
   }
 
-  ::std::vector<::std::byte> bytes;
-  try
-  {
-    bytes.resize(static_cast<::std::size_t>(st.st_size));
-  }
-  catch (...)
+  ::gecko::Array<::gecko::byte> bytes;
+  if (!bytes.Resize(static_cast<::gecko::usize>(st.st_size)))
   {
     ::close(fd);
     return {};
   }
 
-  ::std::size_t total = 0;
-  while (total < bytes.size())
+  ::gecko::usize total = 0;
+  while (total < bytes.Count())
   {
-    ssize_t n = ::read(fd, bytes.data() + total, bytes.size() - total);
+    ssize_t n = ::read(fd, bytes.Data() + total, bytes.Count() - total);
     if (n < 0)
     {
       if (errno == EINTR)
@@ -207,10 +203,10 @@ ReadResult Read(PathView path) noexcept
     }
     if (n == 0)
       break;
-    total += static_cast<::std::size_t>(n);
+    total += static_cast<::gecko::usize>(n);
   }
   ::close(fd);
-  bytes.resize(total);
+  (void)bytes.Resize(total);
   return ReadResult {::std::move(bytes)};
 }
 
@@ -244,7 +240,7 @@ MappedFile Map(PathView path) noexcept
   return MappedFile {static_cast<const ::std::byte*>(addr), size, h, &UnmapLinux};
 }
 
-WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode mode) noexcept
+WriteResult Write(PathView path, ::gecko::ConstByteSpan data, WriteMode mode) noexcept
 {
   auto p = ToCString(path);
   int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
@@ -271,7 +267,7 @@ WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode 
   return WriteResult {.Ok = true, .BytesWritten = static_cast<::gecko::u64>(total)};
 }
 
-bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept
+bool AtomicWrite(PathView path, ::gecko::ConstByteSpan data) noexcept
 {
   auto target = ToCString(path);
   auto tmp = target + ".tmp";
@@ -398,7 +394,7 @@ DirIter IterateDir(PathView path) noexcept
   }
 }
 
-::std::string UserDataDir(::std::string_view appName) noexcept
+::std::string UserDataDir(::gecko::StringView appName) noexcept
 {
   ::std::string base;
   try
@@ -418,7 +414,7 @@ DirIter IterateDir(PathView path) noexcept
     if (!appName.empty())
     {
       base.push_back('/');
-      base.append(appName);
+      base.append(appName.Data(), appName.Size());
     }
   }
   catch (...)

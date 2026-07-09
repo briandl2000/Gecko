@@ -1,16 +1,16 @@
 #pragma once
 
 #include "gecko/core/api.h"
+#include "gecko/core/array.h"
 #include "gecko/core/ptr.h"
+#include "gecko/core/span.h"
+#include "gecko/core/string_view.h"
 #include "gecko/core/types.h"
 #include "gecko/platform/path_view.h"
 
 #include <cstddef>
 #include <optional>
-#include <span>
 #include <string>
-#include <string_view>
-#include <vector>
 
 // Filesystem and process-info utilities.
 //
@@ -63,7 +63,7 @@ class GECKO_API ReadResult
 {
 public:
   ReadResult() noexcept = default;
-  explicit ReadResult(::std::vector<::std::byte> bytes) noexcept;
+  explicit ReadResult(::gecko::Array<::gecko::byte> bytes) noexcept;
 
   ReadResult(const ReadResult&) = delete;
   ReadResult& operator=(const ReadResult&) = delete;
@@ -79,18 +79,18 @@ public:
   {
     return m_Ok;
   }
-  [[nodiscard]] ::std::span<const ::std::byte> Data() const noexcept
+  [[nodiscard]] ::gecko::ConstByteSpan Data() const noexcept
   {
-    return {m_Bytes.data(), m_Bytes.size()};
+    return m_Bytes.AsSpan();
   }
-  [[nodiscard]] ::std::size_t Size() const noexcept
+  [[nodiscard]] ::gecko::usize Size() const noexcept
   {
-    return m_Bytes.size();
+    return m_Bytes.Count();
   }
-  [[nodiscard]] ::std::vector<::std::byte> Take() noexcept;
+  [[nodiscard]] ::gecko::Array<::gecko::byte> Take() noexcept;
 
 private:
-  ::std::vector<::std::byte> m_Bytes {};
+  ::gecko::Array<::gecko::byte> m_Bytes {};
   bool m_Ok {false};
 };
 
@@ -117,11 +117,11 @@ public:
   {
     return Ok();
   }
-  [[nodiscard]] ::std::span<const ::std::byte> Data() const noexcept
+  [[nodiscard]] ::gecko::ConstByteSpan Data() const noexcept
   {
     return {m_Data, m_Size};
   }
-  [[nodiscard]] ::std::size_t Size() const noexcept
+  [[nodiscard]] ::gecko::usize Size() const noexcept
   {
     return m_Size;
   }
@@ -178,10 +178,10 @@ public:
   virtual ~FileWriter() = default;
 
   // Write the full span; returns false on partial-write or error.
-  virtual bool Write(::std::span<const ::std::byte> data) noexcept = 0;
+  virtual bool Write(::gecko::ConstByteSpan data) noexcept = 0;
 
   // Convenience for text payloads.
-  bool WriteString(::std::string_view text) noexcept;
+  bool WriteString(::gecko::StringView text) noexcept;
 
   // Flush buffered bytes to the OS (no fsync).
   virtual bool Flush() noexcept = 0;
@@ -210,11 +210,11 @@ public:
 [[nodiscard]] GECKO_API MappedFile Map(PathView path) noexcept;
 
 // Whole-file write (truncate or append)
-GECKO_API WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode mode) noexcept;
+GECKO_API WriteResult Write(PathView path, ::gecko::ConstByteSpan data, WriteMode mode) noexcept;
 
 // Atomic replace via tmp+rename (with fsync on Linux, MOVEFILE_REPLACE
 // on Win32). Returns false on any step failure.
-[[nodiscard]] GECKO_API bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept;
+[[nodiscard]] GECKO_API bool AtomicWrite(PathView path, ::gecko::ConstByteSpan data) noexcept;
 
 // Streaming write handle. Append mode positions cursor at EOF but does
 // NOT enable POSIX O_APPEND; subsequent Seek+Write may overwrite
@@ -230,6 +230,6 @@ GECKO_API bool Remove(PathView path) noexcept;
 // ExePath includes the executable name; WorkingDir does not.
 [[nodiscard]] GECKO_API ::std::string ExePath() noexcept;
 [[nodiscard]] GECKO_API ::std::string WorkingDir() noexcept;
-[[nodiscard]] GECKO_API ::std::string UserDataDir(::std::string_view appName) noexcept;
+[[nodiscard]] GECKO_API ::std::string UserDataDir(::gecko::StringView appName) noexcept;
 
 }  // namespace gecko::platform

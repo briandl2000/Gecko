@@ -6,7 +6,7 @@ namespace gecko::platform {
 
 // -- ReadResult ------------------------------------------------------
 
-ReadResult::ReadResult(::std::vector<::std::byte> bytes) noexcept : m_Bytes(::std::move(bytes)), m_Ok(true)
+ReadResult::ReadResult(::gecko::Array<::gecko::byte> bytes) noexcept : m_Bytes(::std::move(bytes)), m_Ok(true)
 {}
 
 ReadResult::ReadResult(ReadResult&& other) noexcept : m_Bytes(::std::move(other.m_Bytes)), m_Ok(other.m_Ok)
@@ -27,7 +27,7 @@ ReadResult& ReadResult::operator=(ReadResult&& other) noexcept
 
 ReadResult::~ReadResult() noexcept = default;
 
-::std::vector<::std::byte> ReadResult::Take() noexcept
+::gecko::Array<::gecko::byte> ReadResult::Take() noexcept
 {
   m_Ok = false;
   return ::std::move(m_Bytes);
@@ -134,9 +134,9 @@ void DirIter::Close() noexcept
 
 // -- FileWriter helpers ----------------------------------------------
 
-bool FileWriter::WriteString(::std::string_view text) noexcept
+bool FileWriter::WriteString(::gecko::StringView text) noexcept
 {
-  return Write({reinterpret_cast<const ::std::byte*>(text.data()), text.size()});
+  return Write({reinterpret_cast<const ::gecko::byte*>(text.Data()), text.Size()});
 }
 
 }  // namespace gecko::platform

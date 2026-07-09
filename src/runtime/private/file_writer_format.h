@@ -4,7 +4,6 @@
 
 #include <cstdarg>
 #include <cstdio>
-#include <string_view>
 
 namespace gecko::runtime::detail {
 
@@ -42,7 +41,7 @@ inline void WriteFmt(::gecko::platform::FileWriter* w, const char* fmt, ...) noe
   if (len >= StackSize)
     len = StackSize - 1;
 
-  w->WriteString(::std::string_view {stack, len});
+  w->WriteString(::gecko::StringView {stack, len});
 }
 
 }  // namespace gecko::runtime::detail

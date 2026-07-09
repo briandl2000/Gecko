@@ -32,9 +32,9 @@ public:
     return m_Buf;
   }
 
-  bool Write(::std::span<const ::std::byte> data) noexcept override
+  bool Write(::gecko::ConstByteSpan data) noexcept override
   {
-    m_Buf.append(reinterpret_cast<const char*>(data.data()), data.size());
+    m_Buf.append(reinterpret_cast<const char*>(data.Data()), data.Count());
     return true;
   }
   bool Flush() noexcept override
@@ -247,7 +247,7 @@ void AsyncTraceProfilerSink::DrainAndWrite(::std::vector<ProfEvent>& batch) noex
   }
 
   if (!buf.Buffer().empty())
-    m_Writer->WriteString(buf.Buffer());
+    m_Writer->WriteString(::gecko::StringView {buf.Buffer().data(), buf.Buffer().size()});
 
   batch.clear();
 }

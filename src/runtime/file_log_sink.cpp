@@ -34,7 +34,7 @@ void FileLogSink::Write(const LogMessage& message) noexcept
   if (n <= 0)
     return;
   ::std::size_t len = (n >= static_cast<int>(sizeof(buf))) ? sizeof(buf) - 1 : static_cast<::std::size_t>(n);
-  m_Writer->WriteString(::std::string_view {buf, len});
+  m_Writer->WriteString(::gecko::StringView {buf, len});
   {
     GECKO_PROFILE_NAMED(labels::Logger, "FileLogSink::Flush");
     m_Writer->Flush();
