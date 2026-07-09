@@ -723,7 +723,7 @@ void VulkanCommandList::BindRWStructuredBuffer(u32 slot, const Buffer& buffer) n
   BindStorageBuffer(this, m_Device, m_CmdBuffer, m_DescPool, m_CurrentPipeline, m_CurrentDescSet, slot, buffer);
 }
 
-void VulkanCommandList::SetConstants(u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept
+void VulkanCommandList::SetConstants(u32 offset, ::gecko::ConstByteSpan bytes) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanCommandList::SetConstants");
   if (m_CurrentPipeline == nullptr || m_CurrentPipeline->PushConstantBytes == 0 || bytes.empty())

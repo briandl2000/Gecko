@@ -53,7 +53,7 @@ public:
   {}
   void BindSampler(u32, const Sampler&) noexcept override
   {}
-  void SetConstants(u32, ::std::span<const ::gecko::byte>) noexcept override
+  void SetConstants(u32, ::gecko::ConstByteSpan) noexcept override
   {}
 
   void Draw(u32, u32, u32, u32) noexcept override
@@ -105,7 +105,7 @@ public:
   void ResizeSwapchain(Swapchain&) noexcept override;
 
   FrameContext BeginFrame(Swapchain&) noexcept override;
-  void Present(::std::span<const FrameContext>) noexcept override;
+  void Present(::gecko::Span<const FrameContext>) noexcept override;
 
   Unique<ICommandList> CreateGraphicsCommandList() noexcept override;
   Unique<ICommandList> CreateComputeCommandList() noexcept override;
@@ -122,15 +122,15 @@ public:
   GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc&) noexcept override;
   ComputePipeline CreateComputePipeline(const ComputePipelineDesc&) noexcept override;
   QueryPool CreateTimestampQueryPool(const QueryPoolDesc&) noexcept override;
-  u32 ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept override;
+  u32 ReadTimestamps(const QueryPool&, u32, ::gecko::Span<u64>) noexcept override;
 
   ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc&) noexcept override
   {
     return nullptr;
   }
 
-  void UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32, u32) noexcept override;
-  void UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>, u32) noexcept override;
+  void UploadTextureData(Texture&, ::gecko::ConstByteSpan, u32, u32) noexcept override;
+  void UploadBufferData(Buffer&, ::gecko::ConstByteSpan, u32) noexcept override;
 };
 
 }  // namespace gecko::graphics

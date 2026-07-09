@@ -886,7 +886,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   return ctx;
 }
 
-void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
+void VulkanDevice::Present(::gecko::Span<const FrameContext> frames) noexcept
 {
   GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan, "VulkanDevice::Present");
 
@@ -1885,7 +1885,7 @@ QueryPool VulkanDevice::CreateTimestampQueryPool(const QueryPoolDesc& desc) noex
   return q;
 }
 
-u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept
+u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::gecko::Span<u64> out) noexcept
 {
   if (!pool.IsValid() || out.empty())
     return 0;
@@ -2016,8 +2016,7 @@ void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*), void* c
   vkFreeCommandBuffers(m_Device, pool, 1, &cmdBuf);
 }
 
-void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip,
-                                     u32 slice) noexcept
+void VulkanDevice::UploadTextureData(Texture& texture, ::gecko::ConstByteSpan data, u32 mip, u32 slice) noexcept
 {
   if (!texture.IsValid() || data.empty())
     return;
@@ -2100,7 +2099,7 @@ void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko
   vmaDestroyBuffer(m_Allocator, staging, stagingAlloc);
 }
 
-void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data, u32 offset) noexcept
+void VulkanDevice::UploadBufferData(Buffer& buffer, ::gecko::ConstByteSpan data, u32 offset) noexcept
 {
   if (!buffer.IsValid() || data.empty())
     return;

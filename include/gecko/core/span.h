@@ -55,6 +55,11 @@ public:
   {
     return m_Count;
   }
+  /// @returns Number of bytes covered by the view.
+  [[nodiscard]] constexpr usize SizeBytes() const noexcept
+  {
+    return m_Count * sizeof(T);
+  }
   /// @returns `true` when the view contains zero elements.
   [[nodiscard]] constexpr bool Empty() const noexcept
   {
@@ -70,6 +75,11 @@ public:
   [[nodiscard]] constexpr usize size() const noexcept
   {
     return m_Count;
+  }
+  /// `std::span`-compatible alias for `SizeBytes()`.
+  [[nodiscard]] constexpr usize size_bytes() const noexcept
+  {
+    return SizeBytes();
   }
   /// `std::span`-compatible alias for `Empty()`.
   [[nodiscard]] constexpr bool empty() const noexcept

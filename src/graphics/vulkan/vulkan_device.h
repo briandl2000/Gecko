@@ -30,7 +30,7 @@ public:
   void ResizeSwapchain(Swapchain& swapchain) noexcept override;
 
   FrameContext BeginFrame(Swapchain& swapchain) noexcept override;
-  void Present(::std::span<const FrameContext> frames) noexcept override;
+  void Present(::gecko::Span<const FrameContext> frames) noexcept override;
 
   // -- Command lists ----------------------------------------------
 
@@ -51,14 +51,14 @@ public:
   GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) noexcept override;
   ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) noexcept override;
   QueryPool CreateTimestampQueryPool(const QueryPoolDesc& desc) noexcept override;
-  u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept override;
+  u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::gecko::Span<u64> out) noexcept override;
 
   ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc& desc) noexcept override;
 
   // -- Data upload ------------------------------------------------
 
-  void UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip, u32 slice) noexcept override;
-  void UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data, u32 offset) noexcept override;
+  void UploadTextureData(Texture& texture, ::gecko::ConstByteSpan data, u32 mip, u32 slice) noexcept override;
+  void UploadBufferData(Buffer& buffer, ::gecko::ConstByteSpan data, u32 offset) noexcept override;
 
   // -- Internal accessors used by VulkanCommandList --------------
 

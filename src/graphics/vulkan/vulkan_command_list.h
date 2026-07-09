@@ -59,7 +59,7 @@ public:
   void BindTexture(u32 slot, const Texture& texture) noexcept override;
   void BindRWTexture(u32 slot, const Texture& texture) noexcept override;
   void BindSampler(u32 slot, const Sampler& sampler) noexcept override;
-  void SetConstants(u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept override;
+  void SetConstants(u32 offset, ::gecko::ConstByteSpan bytes) noexcept override;
 
   void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) noexcept override;
   void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset,

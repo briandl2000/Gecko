@@ -175,7 +175,7 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
   // Pull all timestamps in one shot. ReadTimestamps converts ticks->ns
   // internally using the device timestamp period.
   std::vector<u64> ts(slot.NextQuery, 0);
-  const u32 got = m_Device->ReadTimestamps(slot.Pool, 0, std::span<u64>(ts.data(), ts.size()));
+  const u32 got = m_Device->ReadTimestamps(slot.Pool, 0, ::gecko::Span<u64>(ts.data(), ts.size()));
   if (got == 0)
   {
     m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);

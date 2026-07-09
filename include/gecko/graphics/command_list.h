@@ -7,8 +7,6 @@
 #include "gecko/core/labels.h"
 #include "gecko/graphics/graphics_types.h"
 
-#include <span>
-
 namespace gecko::graphics {
 
 class IGpuSampler;
@@ -98,7 +96,7 @@ public:
   /// Upload `bytes` into the currently-bound pipeline's push-constant
   /// block starting at `offset`. `offset + bytes.size_bytes()` must be
   /// <= the pipeline's declared `PushConstantBytes`.
-  GECKO_API virtual void SetConstants(u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept = 0;
+  GECKO_API virtual void SetConstants(u32 offset, ::gecko::ConstByteSpan bytes) noexcept = 0;
 
   /// Issue a non-indexed draw.
   GECKO_API virtual void Draw(u32 vertexCount, u32 instanceCount = 1, u32 firstVertex = 0,

@@ -4,8 +4,6 @@
 #include "gecko/core/span.h"
 #include "gecko/core/types.h"
 
-#include <span>
-
 namespace gecko::graphics {
 
 // -- Named constants -------------------------------------------------------
@@ -758,8 +756,8 @@ struct BeginRenderingInfo
 struct ShaderCode
 {
   ShaderFormat Format {ShaderFormat::None};
-  ::std::span<const ::gecko::byte> Bytes {};  ///< inline (e.g. #embed)
-  const char* Path {nullptr};                 ///< on-disk fallback
+  ::gecko::ConstByteSpan Bytes {};  ///< inline (e.g. #embed)
+  const char* Path {nullptr};       ///< on-disk fallback
   const char* Entry {"main"};
 
   [[nodiscard]] bool IsValid() const noexcept

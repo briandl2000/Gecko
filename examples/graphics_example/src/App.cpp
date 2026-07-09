@@ -593,7 +593,7 @@ void App::RenderFrame()
   for (::gecko::u32 i = 0; i < 2; ++i)
     if (frames[i].Valid)
       toPresent[presentCount++] = ::std::move(frames[i]);
-  m_Device->Present(::std::span<const FrameContext> {toPresent, presentCount});
+  m_Device->Present(::gecko::Span<const FrameContext> {toPresent, presentCount});
 
   ::gecko::u32 drawCalls = 1u;
   for (const auto& f : frames)

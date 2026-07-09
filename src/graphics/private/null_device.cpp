@@ -20,7 +20,7 @@ FrameContext NullDevice::BeginFrame(Swapchain&) noexcept
   return FrameContext {};
 }
 
-void NullDevice::Present(::std::span<const FrameContext>) noexcept
+void NullDevice::Present(::gecko::Span<const FrameContext>) noexcept
 {}
 
 Unique<ICommandList> NullDevice::CreateGraphicsCommandList() noexcept
@@ -88,15 +88,15 @@ QueryPool NullDevice::CreateTimestampQueryPool(const QueryPoolDesc&) noexcept
   return QueryPool {};
 }
 
-u32 NullDevice::ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept
+u32 NullDevice::ReadTimestamps(const QueryPool&, u32, ::gecko::Span<u64>) noexcept
 {
   return 0;
 }
 
-void NullDevice::UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32, u32) noexcept
+void NullDevice::UploadTextureData(Texture&, ::gecko::ConstByteSpan, u32, u32) noexcept
 {}
 
-void NullDevice::UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>, u32) noexcept
+void NullDevice::UploadBufferData(Buffer&, ::gecko::ConstByteSpan, u32) noexcept
 {}
 
 }  // namespace gecko::graphics
