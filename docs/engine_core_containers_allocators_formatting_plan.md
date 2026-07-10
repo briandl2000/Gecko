@@ -2,7 +2,7 @@
 
 ## Current Situation
 
-Gecko already has a clear architectural split between public module/service boundaries and implementation internals. `include/gecko/core/span.h` explicitly exists to avoid `std::span` on the `CoreServices` shared-library boundary, but that rule is not yet applied consistently to strings, byte buffers, platform I/O, graphics APIs, and some runtime implementation classes.
+Gecko already has a clear architectural split between public module/service boundaries and implementation internals. `include/gecko/core/span.h` explicitly exists to avoid `std::span` on the `CoreServices` shared-library boundary. This branch extends that rule to text views, byte buffers, platform I/O, graphics APIs, engine creation, formatting, and several runtime implementation classes.
 
 The near-term concern is not a broad C ABI. Gecko's engine-facing code is C++, and that is fine. The practical problem is that public engine APIs, module interfaces, and loaded shared objects may be built with different compiler versions, standard-library versions, or build flags. Exposing Gecko-owned data structures gives the engine more control over layout, allocation, version checks, and migration. A C ABI can be designed later for specific language/game-code integration points.
 
@@ -13,84 +13,63 @@ The formatting branch initially had experimental headers:
 - `include/gecko/core/utility/string.h`: aliased `gecko::String` to `std::string` and `gecko::StringView` to `std::string_view`.
 - `include/gecko/core/utility/format.h`: wrapped `std::format`/`std::vformat` and returned that aliased `String`.
 
-Those aliases were useful as a sketch but should not become the long-term public model because they preserve the same ABI/allocation problems under Gecko names. Phase 1 replaces the `StringView` alias with a real non-owning Gecko view and removes the experimental formatting wrapper until allocator-aware `String` exists.
+Those aliases were useful as a sketch but should not become the long-term public model because they preserve the same ABI/allocation problems under Gecko names. They have been replaced with real Gecko text/container types and an allocator-aware formatting wrapper.
+
+## Implementation Status
+
+Completed on `feature/core-boundary-types`:
+
+- Added `gecko::StringView`, `gecko::Span<T>` usage, `ByteSpan` aliases, allocator-aware `gecko::String`, and allocator-aware `gecko::Array<T>`.
+- Added explicit/implicit allocator paths for formatting through `gecko/core/utility/format.h`.
+- Migrated public graphics APIs from `std::span` to `gecko::Span`.
+- Migrated platform terminal, input, clipboard, path, and file I/O public APIs from `std::string_view`, `std::string`, `std::vector`, `std::span`, and `std::optional` to Gecko views, owning strings/arrays, and explicit result structs.
+- Changed `Engine::Create()` to return `EngineResult` and accept `Span<IModule*>`.
+- Hid STL-heavy runtime implementation state behind PIMPL for logger/profiler/job/event/trace/tracking allocator classes.
+- `scripts/lint_abi.py` passes and the focused core/runtime/platform/graphics test targets pass.
 
 ## Categorized `std` Usage
 
 ### Safe / Private
 
-These are mostly acceptable implementation details, especially before Gecko containers exist:
+These are acceptable implementation details under the current policy:
 
 - `src/core/services/module_registry.cpp`: `std::unordered_map` and `std::vector` for registry bookkeeping.
-- `src/core/services.cpp`: `std::atomic` for global service pointers and `std::string`/`std::unordered_map`/`std::mutex` for profiler thread-name storage.
-- `src/platform/linux/platform_io_linux.cpp` and `src/platform/win32/platform_io_win32.cpp`: temporary `std::string`/`std::vector` for OS conversion and file reads.
-- `src/graphics/vulkan/vulkan_device.cpp`: many temporary `std::vector` allocations for Vulkan enumeration and staging.
-- Backend/private headers under `src/platform/*` and `src/graphics/vulkan/*`: `std::vector`, `std::string`, `std::unordered_map`, `std::mutex`, `std::thread::id` for backend state.
-- Tests and examples: broad `std` use is fine unless the example is meant to demonstrate public API style.
+- `src/core/services.cpp`: `std::atomic` for global service pointers and private profiler thread-name state.
+- Platform backends under `src/platform/linux`, `src/platform/win32`, and `src/platform/sdl`: `std::string`, `std::vector`, synchronization primitives, and OS conversion helpers.
+- Graphics/Vulkan internals under `src/graphics/vulkan`: `std::vector`, `std::mutex`, and related helpers for Vulkan enumeration, staging, and backend state.
+- Runtime `.cpp` files: STL containers and synchronization primitives inside PIMPL `Impl` structs.
+- Tests and examples, unless the example is intentionally demonstrating public Gecko API style.
 
-### Questionable
+### Intentional Public-Header Exceptions
 
-These are public headers, but mostly concrete implementation classes rather than pure ABI interfaces:
+These headers still mention or include `std`, but do not expose raw standard containers/views as engine API signatures:
 
-- `include/gecko/runtime/ring_logger.h`: exposes `std::vector`, `std::mutex`, and `std::atomic` in public class layout.
-- `include/gecko/runtime/ring_profiler.h`: exposes `std::vector`, `std::string`, `std::unique_ptr`, `std::mutex`, and `std::atomic` in public class layout.
-- `include/gecko/runtime/thread_pool_job_system.h`: exposes `std::thread`, `std::condition_variable`, `std::priority_queue`, `std::shared_ptr`, `std::unordered_map`, and `std::vector`.
-- `include/gecko/runtime/event_bus.h`: exposes `std::unique_ptr` to STL containers and synchronization members.
-- `include/gecko/runtime/tracking_allocator.h`: exposes `std::unordered_map`, `std::mutex`, and `std::atomic`; `Snapshot(std::unordered_map<...>&)` is a real API leak.
-- `include/gecko/core/ptr.h`: aliases `Unique`, `Shared`, and `Weak` to standard smart pointers. This improves call sites but does not solve ABI, allocation, or cross-toolchain issues.
-- `include/gecko/core/engine.h`: `Engine::Create()` returns `std::optional<Engine>` and stores `std::unique_ptr<IModuleRegistry>`. The file already documents this as ABI-ok only under the same-toolchain-per-process rule.
+- `include/gecko/core/types.h`: wraps fixed-width integer, byte, and size types from the standard library.
+- `include/gecko/core/ptr.h`: defines `gecko::Unique`, `gecko::Shared`, and `gecko::Weak` as Gecko smart-pointer aliases over standard smart pointers. This is acceptable for the current same-toolchain C++ engine model, but it is not a future C ABI shape.
+- `include/gecko/core/utility/format.h`: intentionally includes `<format>`, `<string>`, and `<string_view>` for templated formatting glue while returning Gecko `String`.
+- `include/gecko/core/utility/thread.h`: wraps `std::thread` sleep/yield/hardware-concurrency helpers.
+- Header-only template helpers in core containers and services use standard traits, forwarding, and move utilities as implementation details.
+- Comments in `span.h`, `modules.h`, and `platform/threading.h` mention standard counterparts to explain the boundary rule.
 
-### Should Probably Be Replaced / Wrapped
+### Should Stay Wrapped / Hidden
 
-These are public API signatures that allocate or borrow using standard-library types:
+These areas should continue to use Gecko-facing APIs even when their implementation uses `std`:
 
-- `include/gecko/platform/platform_io.h`:
-  - `DirEntry::Name` is `std::string`.
-  - `ReadResult` owns `std::vector<std::byte>`, returns `std::span`, and exposes `Take()` as `std::vector`.
-  - `DirIter::Next()` returns `std::optional<DirEntry>`.
-  - `FileWriter::Write(std::span<const std::byte>)` and `WriteString(std::string_view)`.
-  - `Read`, `Write`, `AtomicWrite`, `Map` use `std::span`.
-  - `ExePath`, `WorkingDir`, and `UserDataDir` return `std::string`.
-- `include/gecko/platform/clipboard.h`: `GetClipboardText()` returns `std::string`, `SetClipboardText()` accepts `std::string_view`.
-- `include/gecko/platform/terminal.h`: `Print`/`PrintLine` accept `std::string_view`.
-- `include/gecko/platform/input.h`: `IInput::GetTypedText()` and `platform::GetTypedText()` return `std::string_view`.
-- `include/gecko/platform/path_view.h`: `PathView` stores `std::string_view` and accepts `std::string`.
-- `include/gecko/graphics/command_list.h`, `include/gecko/graphics/graphics_device.h`, and `include/gecko/graphics/graphics_types.h`: graphics virtual APIs use `std::span` for push constants, frame presentation, timestamp reads, uploads, and shader bytes.
-- `include/gecko/core/utility/string.h`: the old alias header should remain only as a compatibility include for real Gecko text types.
-- `include/gecko/core/utility/format.h`: the experimental wrapper should stay removed/deferred until allocator-aware `String` exists.
+- Public graphics APIs should keep accepting `Span`/`ConstByteSpan`, not `std::span`.
+- Public platform APIs should keep accepting/returning `StringView`, `String`, `Array<byte>`, and explicit result structs, not standard strings, vectors, spans, or optionals.
+- Runtime systems that are likely to be created in one binary and used in another should keep STL state behind PIMPL or another opaque implementation boundary.
+- Formatting should keep returning Gecko `String` and should offer explicit allocator overloads for persistent results.
 
 ### ABI / Public-Header Risk
 
 Highest-risk items if Gecko moves toward loaded modules, shared libraries, or mixed compiler/STL versions:
 
-- Any `GECKO_API virtual` method using `std::span`, `std::string_view`, `std::optional`, `std::string`, `std::vector`, `std::unique_ptr`, or `std::shared_ptr`.
-- Public owning return values allocated by callee and destroyed by caller, especially `std::string`, `std::vector`, `std::optional<Engine>`, and smart pointers.
-- Public classes with STL members in their object layout when constructed in one binary and used/destroyed in another.
-- `std::format` wrappers in headers, because `std::format_string`, `std::make_format_args`, and `std::vformat` force `<format>` and standard formatting machinery into every consumer translation unit.
+- Any `GECKO_API virtual` method using raw `std::span`, `std::string_view`, `std::optional`, `std::string`, `std::vector`, `std::unique_ptr`, or `std::shared_ptr`.
+- Public owning return values allocated by callee and destroyed by caller through a standard-library type.
+- Public concrete class layouts that contain STL containers or synchronization primitives.
+- Header-only `std::format` wrappers if they become pervasive in hot/public APIs; keep them isolated in formatting headers.
 
-### Phase 0 Public Header Audit
-
-Current public-header `std` categories that need decisions before migration:
-
-- **Views in public signatures**:
-  - `std::span`: graphics command/device/shader APIs and platform I/O byte APIs.
-  - `std::string_view`: platform terminal, input typed text, clipboard, path view, and platform I/O text helpers.
-- **Owning public results**:
-  - `std::string`: clipboard text, executable/working/user-data paths, directory entry names.
-  - `std::vector`: `ReadResult` byte ownership and `Take()`.
-  - `std::optional`: `Engine::Create`, `platform::Stat`, and `DirIter::Next`.
-- **Public concrete implementation layouts**:
-  - Runtime logger/profiler/job/event/trace classes expose `std::vector`, `std::mutex`, `std::atomic`, `std::thread`, `std::condition_variable`, `std::queue`, `std::deque`, `std::unordered_map`, `std::unordered_set`, `std::unique_ptr`, and `std::shared_ptr` in class layout.
-  - These are not all immediate replacements. They should be PIMPL candidates if/when those concrete classes become loaded-module/shared-library boundary types.
-- **Aliases that hide but do not remove `std`**:
-  - `gecko::Unique`, `gecko::Shared`, and `gecko::Weak` are aliases over standard smart pointers.
-  - The current formatting branch aliases `gecko::String`/`StringView` to standard string types.
-- **Threading/atomic primitives**:
-  - `std::atomic`, `std::mutex`, `std::thread`, and `std::condition_variable` should not be rewritten just to remove `std`.
-  - They are acceptable private/concrete implementation details, but should not appear in stable binary layouts that cross a loaded-module boundary without an explicit decision.
-- **Formatting**:
-  - Public templated compile-time-checked formatting will need `<format>` in an opt-in header if `std::format` remains the backend.
-  - Runtime formatting can be hidden behind `.cpp` implementation once Gecko `String` exists.
+Current audit result: `scripts/lint_abi.py` is clean. A public-header search for standard strings, vectors, spans, optionals, smart pointers, mutexes, atomics, threads, and condition variables now reports only the intentional exceptions above.
 
 ## Allocator Assessment
 
@@ -170,9 +149,11 @@ This is not the main migration target right now. The immediate target is C++ eng
 
 ### Phase 0: Notes / Design Only
 
+Status: complete.
+
 - Keep this document as the design anchor.
-- Do not expand the current `std::string` alias experiment.
-- Add coding rules to `docs/CODING_STANDARDS.md` after the direction is approved.
+- Do not expand the current `std::string` alias experiment. The alias experiment has been replaced by real Gecko types.
+- Add coding rules to `docs/CODING_STANDARDS.md` when the rules need to be enforced outside this plan.
 - Treat the immediate goal as "Gecko C++ APIs own their boundary types", not "design the whole future C ABI now".
 - Audit all `std` in public headers and classify each occurrence as one of:
   - Public API signature: replace or wrap.
@@ -182,12 +163,16 @@ This is not the main migration target right now. The immediate target is C++ eng
 
 ### Phase 1: Add Views / Types
 
+Status: complete.
+
 - Add `gecko::StringView` with stable `{ const char*, usize }` layout.
 - Keep `gecko::Span<T>` and migrate public `std::span` signatures to it.
 - Update `PathView` either to use `StringView` internally or to become a path-specific wrapper over it.
 - Add adapters in separate headers, not in the core ABI headers.
 
 ### Phase 2: Add Allocator-Aware Owning Types
+
+Status: complete for the initial container set.
 
 - Add `String` storing `IAllocator*`.
 - Add `Array<T>` storing `IAllocator*`.
@@ -196,6 +181,8 @@ This is not the main migration target right now. The immediate target is C++ eng
 - Add tests for allocator provenance, cross-scope destruction, move, reserve, append, and failure behavior.
 
 ### Phase 3: Formatting Wrapper
+
+Status: complete for the `std::format`-backed wrapper.
 
 - Replace the current branch's aliases with real Gecko `String`/`StringView`.
 - Add explicit and implicit allocator overloads:
@@ -207,14 +194,16 @@ This is not the main migration target right now. The immediate target is C++ eng
 
 ### Phase 4: Migrate Public APIs
 
-Start with high-value, low-conceptual-risk replacements:
+Status: complete for the initially identified public API leaks.
 
-- Graphics: replace public `std::span` with `gecko::Span` in command/device/shader APIs.
-- Platform terminal/input/clipboard: replace `std::string_view` returns/params with `StringView`.
-- Platform I/O: replace `ReadResult`'s `std::vector` ownership with `Array<byte>` or a dedicated `Buffer`; replace `std::optional` returns with explicit result structs.
-- Engine creation can remain documented for now, but add an ABI-clean alternative before plugin work: `bool Engine::Create(Span<IModule*> modules, Engine* out)` or an opaque handle-style factory.
+- Graphics: public command/device/shader APIs use `gecko::Span`.
+- Platform terminal/input/clipboard/path APIs use `StringView`/`String`.
+- Platform I/O uses `Array<byte>`, `ConstByteSpan`, `String`, and explicit result structs.
+- Engine creation returns `EngineResult` and accepts `Span<IModule*>`.
 
 ### Phase 5: Migrate Private Internals Where Worth It
+
+Status: partially complete; continue only where the boundary or allocator behavior matters.
 
 - Keep `std` in OS/Vulkan glue and tests until there is a clear benefit.
 - Migrate hot-path persistent containers in runtime systems if allocator tracking, frame allocators, or allocation control matter.
