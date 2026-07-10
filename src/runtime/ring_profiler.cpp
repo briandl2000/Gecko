@@ -10,6 +10,11 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <memory>
+#include <mutex>
+#include <new>
+#include <string>
 #include <vector>
 
 namespace gecko::runtime {
@@ -48,27 +53,105 @@ u64 RingProfiler::MonotonicNowNs() noexcept
   return MonotonicTimeNs();
 }
 
-RingProfiler::RingProfiler(size_t capacityPow2) noexcept
-    : m_Capacity(capacityPow2), m_Head(0), m_Tail(0), m_Run(true), m_ProfilerLabel(labels::Profiler)
+struct RingProfiler::Impl
+{
+  struct Slot
+  {
+    std::atomic<u64> Sequence {0};
+    ProfEvent ProfileEvent {};
+
+    Slot() = default;
+
+    Slot(const Impl::Slot&) = delete;
+    Impl::Slot& operator=(const Impl::Slot&) = delete;
+    Slot(Impl::Slot&&) = delete;
+    Impl::Slot& operator=(Impl::Slot&&) = delete;
+  };
+
+  std::vector<Impl::Slot> Ring {};
+  size_t Capacity {1u << 20};
+  size_t Mask {0};
+  std::atomic<u64> Head {0};
+  std::atomic<u64> Tail {0};
+
+  std::vector<IProfilerSink*> Sinks {};
+  std::mutex SinkMu {};
+
+  std::atomic<bool> Run {true};
+  std::mutex JobMu {};
+  JobHandle ConsumerJob {};
+  std::atomic<u64> LastScheduleNs {0};
+  std::atomic<bool> AutoSchedule {true};
+  Label ProfilerLabel {labels::Profiler};
+  std::atomic<ProfLevel> MinLevel {ProfLevel::Detailed};
+  std::atomic<u64> DroppedEvents {0};
+  std::atomic<u64> ReentrantDrops {0};
+  std::atomic<u64> AggregatorOverflow {0};
+
+  std::atomic<bool> TraceEnabled {true};
+  std::atomic<u32> DetailedSampleRate {1};
+  std::atomic<u64> DetailedCounter {0};
+
+  std::atomic<u32> StatsResetIntervalMs {1000};
+  std::atomic<u64> LastStatsResetNs {0};
+
+  static constexpr size_t AggregatorCapacity = 1024;
+  struct AggSlot
+  {
+    std::atomic<u32> NameHash {0};
+    std::atomic<u8> Source {0};
+    std::atomic<u64> LastNs {0};
+    std::atomic<u64> MinNs {~u64 {0}};
+    std::atomic<u64> MaxNs {0};
+    std::atomic<u32> Count {0};
+    std::atomic<u32> WatchIdx {~u32 {0}};
+    std::atomic<const char*> Name {nullptr};
+  };
+  std::vector<Impl::AggSlot> Aggregator {};
+
+  struct WatchEntry
+  {
+    std::vector<u64> Samples;
+    std::atomic<u32> Head {0};
+    std::atomic<u32> Filled {0};
+    std::mutex Mu;
+  };
+  std::vector<std::unique_ptr<WatchEntry>> Watch {};
+  mutable std::mutex WatchMu {};
+
+  static constexpr u8 CategoryCapacity = ProfMaxCategories;
+  std::atomic<u64> CategoryMask {~u64 {0}};
+  mutable std::mutex CategoryMu {};
+  std::vector<std::string> CategoryNames {};
+};
+
+RingProfiler::RingProfiler(size_t capacityPow2) noexcept : m_Impl(new (::std::nothrow) Impl())
 {
   GECKO_ASSERT(capacityPow2 > 0 && "Ring buffer capacity must be greater than 0");
+  if (!m_Impl)
+    return;
+
+  m_Impl->Capacity = capacityPow2;
+  m_Impl->Head.store(0, std::memory_order_relaxed);
+  m_Impl->Tail.store(0, std::memory_order_relaxed);
+  m_Impl->Run.store(true, std::memory_order_relaxed);
+  m_Impl->ProfilerLabel = labels::Profiler;
 
   // Ensure capacity is power of 2
-  if ((m_Capacity & (m_Capacity - 1)) != 0)
+  if ((m_Impl->Capacity & (m_Impl->Capacity - 1)) != 0)
   {
-    m_Capacity = Bit(20);
+    m_Impl->Capacity = Bit(20);
   }
-  m_Mask = m_Capacity - 1;
+  m_Impl->Mask = m_Impl->Capacity - 1;
 }
 
-RingProfiler::RingProfiler() noexcept : m_Head(0), m_Tail(0), m_Run(true), m_ProfilerLabel(labels::Profiler)
-{
-  m_Mask = m_Capacity - 1;
-}
+RingProfiler::RingProfiler() noexcept : RingProfiler(1u << 20)
+{}
 
 RingProfiler::~RingProfiler()
 {
-  m_Run.store(false, std::memory_order_relaxed);
+  if (m_Impl)
+    m_Impl->Run.store(false, std::memory_order_relaxed);
 }
 
 u64 RingProfiler::NowNs() const noexcept
@@ -78,42 +161,42 @@ u64 RingProfiler::NowNs() const noexcept
 
 void RingProfiler::SetMinLevel(ProfLevel level) noexcept
 {
-  m_MinLevel.store(level, std::memory_order_relaxed);
+  m_Impl->MinLevel.store(level, std::memory_order_relaxed);
 }
 
 ProfLevel RingProfiler::GetMinLevel() const noexcept
 {
-  return m_MinLevel.load(std::memory_order_relaxed);
+  return m_Impl->MinLevel.load(std::memory_order_relaxed);
 }
 
 bool RingProfiler::IsLevelEnabled(ProfLevel level) const noexcept
 {
-  return level <= m_MinLevel.load(std::memory_order_relaxed);
+  return level <= m_Impl->MinLevel.load(std::memory_order_relaxed);
 }
 
 void RingProfiler::Emit(const ProfEvent& event) noexcept
 {
-  if (!m_Run.load(std::memory_order_relaxed)) [[unlikely]]
+  if (!m_Impl->Run.load(std::memory_order_relaxed)) [[unlikely]]
     return;
 
-  // Guard against emitting before Init (m_Ring is empty)
-  if (m_Ring.empty()) [[unlikely]]
+  // Guard against emitting before Init (m_Impl->Ring is empty)
+  if (m_Impl->Ring.empty()) [[unlikely]]
     return;
 
   // Auto-reset stats on a timer (independent of FrameMark).
-  if (u32 interval = m_StatsResetIntervalMs.load(std::memory_order_relaxed); interval > 0)
+  if (u32 interval = m_Impl->StatsResetIntervalMs.load(std::memory_order_relaxed); interval > 0)
   {
     u64 nowNs = event.TimestampNs;
-    u64 lastNs = m_LastStatsResetNs.load(std::memory_order_relaxed);
+    u64 lastNs = m_Impl->LastStatsResetNs.load(std::memory_order_relaxed);
     if (lastNs == 0)
     {
-      m_LastStatsResetNs.store(nowNs, std::memory_order_relaxed);
+      m_Impl->LastStatsResetNs.store(nowNs, std::memory_order_relaxed);
     }
     else if (nowNs - lastNs >= u64 {interval} * 1'000'000ULL)
     {
       // Try to claim the reset; only one Emit succeeds per interval.
-      if (m_LastStatsResetNs.compare_exchange_strong(lastNs, nowNs, std::memory_order_acq_rel,
-                                                     std::memory_order_relaxed))
+      if (m_Impl->LastStatsResetNs.compare_exchange_strong(lastNs, nowNs, std::memory_order_acq_rel,
+                                                           std::memory_order_relaxed))
         ResetAggregator();
     }
   }
@@ -132,19 +215,19 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   if (event.Level == ProfLevel::Detailed &&
       (event.Kind == ProfEventKind::ZoneBegin || event.Kind == ProfEventKind::ZoneEnd))
   {
-    u32 rate = m_DetailedSampleRate.load(std::memory_order_relaxed);
+    u32 rate = m_Impl->DetailedSampleRate.load(std::memory_order_relaxed);
     if (rate == 0)
       return;
     if (rate > 1)
     {
-      u64 c = m_DetailedCounter.fetch_add(1, std::memory_order_relaxed);
+      u64 c = m_Impl->DetailedCounter.fetch_add(1, std::memory_order_relaxed);
       if (c % rate != 0)
         return;
     }
   }
 
-  u64 pos = m_Head.fetch_add(1, std::memory_order_acq_rel);
-  Slot& slot = m_Ring[pos & m_Mask];
+  u64 pos = m_Impl->Head.fetch_add(1, std::memory_order_acq_rel);
+  Impl::Slot& slot = m_Impl->Ring[pos & m_Impl->Mask];
 
   u64 sequence = slot.Sequence.load(std::memory_order_acquire);
   i64 diff = (i64)sequence - (i64)pos;
@@ -162,7 +245,7 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   else
   {
     // overflow -- drop event (cheap fallback)
-    m_DroppedEvents.fetch_add(1, std::memory_order_relaxed);
+    m_Impl->DroppedEvents.fetch_add(1, std::memory_order_relaxed);
   }
 }
 
@@ -172,18 +255,18 @@ bool RingProfiler::TryPop(ProfEvent& event) noexcept
   // running after engine.reset() -- they Unregister, which calls Flush, which
   // calls TryPop). Shutdown swaps the backing storage out, so without this
   // we'd indexing into an empty vector.
-  if (m_Ring.empty())
+  if (m_Impl->Ring.empty())
     return false;
 
-  u64 pos = m_Tail.load(std::memory_order_relaxed);
-  Slot& slot = m_Ring[pos & m_Mask];
+  u64 pos = m_Impl->Tail.load(std::memory_order_relaxed);
+  Impl::Slot& slot = m_Impl->Ring[pos & m_Impl->Mask];
   u64 sequence = slot.Sequence.load(std::memory_order_acquire);
   i64 diff = (i64)sequence - (i64)(pos + 1);
   if (diff == 0)
   {
     event = slot.ProfileEvent;
-    slot.Sequence.store(pos + m_Ring.size(), std::memory_order_release);
-    m_Tail.store(pos + 1, std::memory_order_relaxed);
+    slot.Sequence.store(pos + m_Impl->Ring.size(), std::memory_order_release);
+    m_Impl->Tail.store(pos + 1, std::memory_order_relaxed);
     return true;
   }
   return false;
@@ -193,8 +276,8 @@ void RingProfiler::AddSink(IProfilerSink* sink) noexcept
 {
   if (sink)
   {
-    std::lock_guard<std::mutex> lk(m_SinkMu);
-    m_Sinks.push_back(sink);
+    std::lock_guard<std::mutex> lk(m_Impl->SinkMu);
+    m_Impl->Sinks.push_back(sink);
   }
 }
 
@@ -209,9 +292,9 @@ void RingProfiler::RemoveSink(IProfilerSink* sink) noexcept
   // zones).
   JobHandle jobToWait;
   {
-    std::lock_guard<std::mutex> lock(m_JobMu);
-    jobToWait = m_ConsumerJob;
-    m_ConsumerJob = JobHandle {};
+    std::lock_guard<std::mutex> lock(m_Impl->JobMu);
+    jobToWait = m_Impl->ConsumerJob;
+    m_Impl->ConsumerJob = JobHandle {};
   }
   if (jobToWait.IsValid())
     WaitForJob(jobToWait);
@@ -220,10 +303,10 @@ void RingProfiler::RemoveSink(IProfilerSink* sink) noexcept
   Flush();
 
   // Now safe to remove the sink
-  std::lock_guard<std::mutex> lk(m_SinkMu);
-  auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
-  if (it != m_Sinks.end())
-    m_Sinks.erase(it);
+  std::lock_guard<std::mutex> lk(m_Impl->SinkMu);
+  auto it = std::find(m_Impl->Sinks.begin(), m_Impl->Sinks.end(), sink);
+  if (it != m_Impl->Sinks.end())
+    m_Impl->Sinks.erase(it);
 }
 
 void RingProfiler::Flush() noexcept
@@ -231,11 +314,11 @@ void RingProfiler::Flush() noexcept
   // Copy sinks vector once to avoid holding lock during I/O
   std::vector<IProfilerSink*> sinks;
   {
-    std::lock_guard<std::mutex> lk(m_SinkMu);
-    sinks = m_Sinks;
+    std::lock_guard<std::mutex> lk(m_Impl->SinkMu);
+    sinks = m_Impl->Sinks;
   }
 
-  const bool trace = m_TraceEnabled.load(std::memory_order_relaxed);
+  const bool trace = m_Impl->TraceEnabled.load(std::memory_order_relaxed);
 
   // Process all pending events synchronously
   ProfEvent event {};
@@ -260,17 +343,17 @@ void RingProfiler::Flush() noexcept
 
 void RingProfiler::ProcessProfEvents() noexcept
 {
-  if (!m_Run.load(std::memory_order_acquire))
+  if (!m_Impl->Run.load(std::memory_order_acquire))
     return;
 
   // Copy sinks vector once to avoid holding lock during I/O
   std::vector<IProfilerSink*> sinks;
   {
-    std::lock_guard<std::mutex> lk(m_SinkMu);
-    sinks = m_Sinks;
+    std::lock_guard<std::mutex> lk(m_Impl->SinkMu);
+    sinks = m_Impl->Sinks;
   }
 
-  const bool trace = m_TraceEnabled.load(std::memory_order_relaxed);
+  const bool trace = m_Impl->TraceEnabled.load(std::memory_order_relaxed);
 
   ProfEvent event {};
   const int maxBatchSize = 4096;  // Process events in batches for efficiency
@@ -293,7 +376,7 @@ void RingProfiler::ProcessProfEvents() noexcept
   }
 
   // Report dropped events if any occurred (only when tracing).
-  u64 dropped = m_DroppedEvents.exchange(0, std::memory_order_relaxed);
+  u64 dropped = m_Impl->DroppedEvents.exchange(0, std::memory_order_relaxed);
   if (dropped && trace)
   {
     // Emit a counter event to mark dropped events in the trace
@@ -314,7 +397,7 @@ void RingProfiler::ProcessProfEvents() noexcept
   }
 
   // Continue processing if more events are pending
-  if (HasPendingEvents() && m_Run.load(std::memory_order_acquire))
+  if (HasPendingEvents() && m_Impl->Run.load(std::memory_order_acquire))
   {
     ScheduleNextConsumerJob();
   }
@@ -330,11 +413,11 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
     return;
 
   // Fast path: check if we're still running without acquiring mutex
-  if (!m_Run.load(std::memory_order_acquire))
+  if (!m_Impl->Run.load(std::memory_order_acquire))
     return;
 
   // Test/explicit-flush hook: caller has opted out of auto-draining.
-  if (!m_AutoSchedule.load(std::memory_order_relaxed))
+  if (!m_Impl->AutoSchedule.load(std::memory_order_relaxed))
     return;
 
   // Rate-limit scheduling to avoid job spam (check BEFORE mutex). Per-
@@ -343,23 +426,23 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   // back-to-back test cases ran their first Emit() inside the same 10us
   // window and the second one silently no-op'd).
   u64 now = NowNs();
-  u64 lastTime = m_LastScheduleNs.load(std::memory_order_relaxed);
+  u64 lastTime = m_Impl->LastScheduleNs.load(std::memory_order_relaxed);
 
   // Don't schedule too frequently (at most every 10us)
   if (now - lastTime < 10000)  // 10 microseconds
     return;
 
   // Try to claim the scheduling slot atomically (still no mutex)
-  if (!m_LastScheduleNs.compare_exchange_weak(lastTime, now, std::memory_order_relaxed))
+  if (!m_Impl->LastScheduleNs.compare_exchange_weak(lastTime, now, std::memory_order_relaxed))
     return;
 
   // Now we need to check if a job is already running - this needs the mutex
   JobHandle currentJob;
   {
-    std::lock_guard<std::mutex> lock(m_JobMu);
-    if (!m_Run.load(std::memory_order_acquire))
+    std::lock_guard<std::mutex> lock(m_Impl->JobMu);
+    if (!m_Impl->Run.load(std::memory_order_acquire))
       return;
-    currentJob = m_ConsumerJob;
+    currentJob = m_Impl->ConsumerJob;
   }
 
   // Only schedule if there's no active consumer job
@@ -380,14 +463,14 @@ void RingProfiler::TryScheduleConsumerJob() noexcept
   }
 
   {
-    std::lock_guard<std::mutex> lock(m_JobMu);
-    // Check m_Run again while holding the lock to prevent shutdown race
-    if (!m_Run.load(std::memory_order_acquire))
+    std::lock_guard<std::mutex> lock(m_Impl->JobMu);
+    // Check m_Impl->Run again while holding the lock to prevent shutdown race
+    if (!m_Impl->Run.load(std::memory_order_acquire))
       return;
     // Same reasoning as above: NullJobSystem inline-runs Submit, so set the
     // guard around the Submit call as well.
     g_InsideProfiler = true;
-    m_ConsumerJob = jobSystem->Submit([this]() { ProcessProfEvents(); }, JobPriority::Low, m_ProfilerLabel);
+    m_Impl->ConsumerJob = jobSystem->Submit([this]() { ProcessProfEvents(); }, JobPriority::Low, m_Impl->ProfilerLabel);
     g_InsideProfiler = false;
   }
 }
@@ -399,8 +482,8 @@ void RingProfiler::ScheduleNextConsumerJob() noexcept
 
 bool RingProfiler::HasPendingEvents() const noexcept
 {
-  u64 head = m_Head.load(std::memory_order_relaxed);
-  u64 tail = m_Tail.load(std::memory_order_relaxed);
+  u64 head = m_Impl->Head.load(std::memory_order_relaxed);
+  u64 tail = m_Impl->Tail.load(std::memory_order_relaxed);
   return head != tail;
 }
 
@@ -409,28 +492,28 @@ bool RingProfiler::Init() noexcept
   // Allocate ring buffer now that allocator is available
   // Use GECKO_PUSH_LABEL so the profiler's own memory is tracked under its
   // label
-  if (m_Ring.empty())
+  if (m_Impl->Ring.empty())
   {
-    GECKO_PUSH_LABEL(m_ProfilerLabel);
+    GECKO_PUSH_LABEL(m_Impl->ProfilerLabel);
     // Direct resize with default construction avoids moves
-    m_Ring = std::vector<Slot>(m_Capacity);
-    for (u64 i = 0; i < m_Capacity; ++i)
+    m_Impl->Ring = std::vector<Impl::Slot>(m_Impl->Capacity);
+    for (u64 i = 0; i < m_Impl->Capacity; ++i)
     {
-      m_Ring[i].Sequence.store(i, std::memory_order_relaxed);
+      m_Impl->Ring[i].Sequence.store(i, std::memory_order_relaxed);
     }
   }
 
-  if (m_Aggregator.empty())
+  if (m_Impl->Aggregator.empty())
   {
-    GECKO_PUSH_LABEL(m_ProfilerLabel);
-    m_Aggregator = std::vector<AggSlot>(AggregatorCapacity);
+    GECKO_PUSH_LABEL(m_Impl->ProfilerLabel);
+    m_Impl->Aggregator = std::vector<Impl::AggSlot>(Impl::AggregatorCapacity);
   }
 
-  if (m_CategoryNames.empty())
+  if (m_Impl->CategoryNames.empty())
   {
-    GECKO_PUSH_LABEL(m_ProfilerLabel);
-    m_CategoryNames.reserve(CategoryCapacity);
-    m_CategoryNames.push_back("default");  // category id 0
+    GECKO_PUSH_LABEL(m_Impl->ProfilerLabel);
+    m_Impl->CategoryNames.reserve(Impl::CategoryCapacity);
+    m_Impl->CategoryNames.push_back("default");  // category id 0
   }
 
   return true;
@@ -462,10 +545,10 @@ void RingProfiler::Shutdown() noexcept
 
   JobHandle jobToWait;
   {
-    std::lock_guard<std::mutex> lock(m_JobMu);
-    m_Run.store(false, std::memory_order_release);
-    jobToWait = m_ConsumerJob;
-    m_ConsumerJob = JobHandle {};
+    std::lock_guard<std::mutex> lock(m_Impl->JobMu);
+    m_Impl->Run.store(false, std::memory_order_release);
+    jobToWait = m_Impl->ConsumerJob;
+    m_Impl->ConsumerJob = JobHandle {};
   }
 
   if (jobToWait.IsValid())
@@ -473,34 +556,34 @@ void RingProfiler::Shutdown() noexcept
     WaitForJob(jobToWait);
   }
 
-  decltype(m_Ring)().swap(m_Ring);
-  decltype(m_Aggregator)().swap(m_Aggregator);
+  decltype(m_Impl->Ring)().swap(m_Impl->Ring);
+  decltype(m_Impl->Aggregator)().swap(m_Impl->Aggregator);
   {
-    std::lock_guard<std::mutex> lk(m_WatchMu);
-    decltype(m_Watch)().swap(m_Watch);
+    std::lock_guard<std::mutex> lk(m_Impl->WatchMu);
+    decltype(m_Impl->Watch)().swap(m_Impl->Watch);
   }
   {
-    std::lock_guard<std::mutex> lk(m_CategoryMu);
-    decltype(m_CategoryNames)().swap(m_CategoryNames);
+    std::lock_guard<std::mutex> lk(m_Impl->CategoryMu);
+    decltype(m_Impl->CategoryNames)().swap(m_Impl->CategoryNames);
   }
 
   {
-    std::lock_guard<std::mutex> lk(m_SinkMu);
-    decltype(m_Sinks)().swap(m_Sinks);
+    std::lock_guard<std::mutex> lk(m_Impl->SinkMu);
+    decltype(m_Impl->Sinks)().swap(m_Impl->Sinks);
   }
 }
 
 ScopeStats RingProfiler::GetStats(u32 nameHash, ProfSource source) const noexcept
 {
-  if (m_Aggregator.empty() || nameHash == 0)
+  if (m_Impl->Aggregator.empty() || nameHash == 0)
     return {};
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  constexpr size_t cap = AggregatorCapacity;
+  constexpr size_t cap = Impl::AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
-    const AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    const Impl::AggSlot& slot = m_Impl->Aggregator[(idx + probe) & (cap - 1)];
     u32 key = slot.NameHash.load(std::memory_order_acquire);
     if (key == 0)
       return {};
@@ -516,10 +599,10 @@ ScopeStats RingProfiler::GetStats(u32 nameHash, ProfSource source) const noexcep
       u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
       if (wIdx != ~u32 {0})
       {
-        std::lock_guard<std::mutex> lk(m_WatchMu);
-        if (wIdx < m_Watch.size() && m_Watch[wIdx])
+        std::lock_guard<std::mutex> lk(m_Impl->WatchMu);
+        if (wIdx < m_Impl->Watch.size() && m_Impl->Watch[wIdx])
         {
-          WatchEntry& w = *m_Watch[wIdx];
+          Impl::WatchEntry& w = *m_Impl->Watch[wIdx];
           std::lock_guard<std::mutex> wlk(w.Mu);
           u32 filled = w.Filled.load(std::memory_order_relaxed);
           if (filled > 0)
@@ -542,46 +625,46 @@ u8 RingProfiler::RegisterCategory(const char* name) noexcept
   if (!name)
     return ProfInvalidCategory;
 
-  std::lock_guard<std::mutex> lk(m_CategoryMu);
-  for (size_t i = 0; i < m_CategoryNames.size(); ++i)
+  std::lock_guard<std::mutex> lk(m_Impl->CategoryMu);
+  for (size_t i = 0; i < m_Impl->CategoryNames.size(); ++i)
   {
-    if (m_CategoryNames[i] == name)
+    if (m_Impl->CategoryNames[i] == name)
       return static_cast<u8>(i);
   }
-  if (m_CategoryNames.size() >= CategoryCapacity)
+  if (m_Impl->CategoryNames.size() >= Impl::CategoryCapacity)
     return ProfInvalidCategory;
-  u8 id = static_cast<u8>(m_CategoryNames.size());
+  u8 id = static_cast<u8>(m_Impl->CategoryNames.size());
   // Copy into owned storage; callers are free to pass temporaries.
-  m_CategoryNames.emplace_back(name);
+  m_Impl->CategoryNames.emplace_back(name);
   return id;
 }
 
 void RingProfiler::SetCategoryEnabled(u8 id, bool on) noexcept
 {
-  if (id >= CategoryCapacity)
+  if (id >= Impl::CategoryCapacity)
     return;
   u64 bit = u64 {1} << id;
   if (on)
-    m_CategoryMask.fetch_or(bit, std::memory_order_relaxed);
+    m_Impl->CategoryMask.fetch_or(bit, std::memory_order_relaxed);
   else
-    m_CategoryMask.fetch_and(~bit, std::memory_order_relaxed);
+    m_Impl->CategoryMask.fetch_and(~bit, std::memory_order_relaxed);
 }
 
 bool RingProfiler::IsCategoryEnabled(u8 id) const noexcept
 {
-  if (id >= CategoryCapacity)
+  if (id >= Impl::CategoryCapacity)
     return false;
-  return (m_CategoryMask.load(std::memory_order_relaxed) & (u64 {1} << id)) != 0;
+  return (m_Impl->CategoryMask.load(std::memory_order_relaxed) & (u64 {1} << id)) != 0;
 }
 
 u8 RingProfiler::FindCategory(const char* name) const noexcept
 {
   if (!name)
     return ProfInvalidCategory;
-  std::lock_guard<std::mutex> lk(m_CategoryMu);
-  for (size_t i = 0; i < m_CategoryNames.size(); ++i)
+  std::lock_guard<std::mutex> lk(m_Impl->CategoryMu);
+  for (size_t i = 0; i < m_Impl->CategoryNames.size(); ++i)
   {
-    if (m_CategoryNames[i] == name)
+    if (m_Impl->CategoryNames[i] == name)
       return static_cast<u8>(i);
   }
   return ProfInvalidCategory;
@@ -589,43 +672,43 @@ u8 RingProfiler::FindCategory(const char* name) const noexcept
 
 const char* RingProfiler::GetCategoryName(u8 id) const noexcept
 {
-  std::lock_guard<std::mutex> lk(m_CategoryMu);
-  if (id >= m_CategoryNames.size())
+  std::lock_guard<std::mutex> lk(m_Impl->CategoryMu);
+  if (id >= m_Impl->CategoryNames.size())
     return nullptr;
-  return m_CategoryNames[id].c_str();
+  return m_Impl->CategoryNames[id].c_str();
 }
 
 void RingProfiler::SetTraceEnabled(bool enabled) noexcept
 {
-  m_TraceEnabled.store(enabled, std::memory_order_relaxed);
+  m_Impl->TraceEnabled.store(enabled, std::memory_order_relaxed);
 }
 
 bool RingProfiler::IsTraceEnabled() const noexcept
 {
-  return m_TraceEnabled.load(std::memory_order_relaxed);
+  return m_Impl->TraceEnabled.load(std::memory_order_relaxed);
 }
 
 void RingProfiler::SetDetailedSampleRate(u32 nthEvent) noexcept
 {
-  m_DetailedSampleRate.store(nthEvent, std::memory_order_relaxed);
+  m_Impl->DetailedSampleRate.store(nthEvent, std::memory_order_relaxed);
 }
 
 u32 RingProfiler::GetDetailedSampleRate() const noexcept
 {
-  return m_DetailedSampleRate.load(std::memory_order_relaxed);
+  return m_Impl->DetailedSampleRate.load(std::memory_order_relaxed);
 }
 
 void RingProfiler::WatchScope(u32 nameHash, u32 windowSize, ProfSource source) noexcept
 {
-  if (m_Aggregator.empty() || nameHash == 0 || windowSize == 0)
+  if (m_Impl->Aggregator.empty() || nameHash == 0 || windowSize == 0)
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  constexpr size_t cap = AggregatorCapacity;
+  constexpr size_t cap = Impl::AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
-    AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    Impl::AggSlot& slot = m_Impl->Aggregator[(idx + probe) & (cap - 1)];
     u32 expected = slot.NameHash.load(std::memory_order_acquire);
     if (expected == 0)
     {
@@ -642,19 +725,19 @@ void RingProfiler::WatchScope(u32 nameHash, u32 windowSize, ProfSource source) n
     if (expected == nameHash)
     {
       // (Re)allocate watcher entry.
-      std::lock_guard<std::mutex> lk(m_WatchMu);
+      std::lock_guard<std::mutex> lk(m_Impl->WatchMu);
       u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
-      if (wIdx == ~u32 {0} || wIdx >= m_Watch.size() || !m_Watch[wIdx])
+      if (wIdx == ~u32 {0} || wIdx >= m_Impl->Watch.size() || !m_Impl->Watch[wIdx])
       {
-        auto entry = std::make_unique<WatchEntry>();
+        auto entry = std::make_unique<Impl::WatchEntry>();
         entry->Samples.assign(windowSize, 0);
-        m_Watch.push_back(std::move(entry));
-        wIdx = static_cast<u32>(m_Watch.size() - 1);
+        m_Impl->Watch.push_back(std::move(entry));
+        wIdx = static_cast<u32>(m_Impl->Watch.size() - 1);
         slot.WatchIdx.store(wIdx, std::memory_order_relaxed);
       }
       else
       {
-        WatchEntry& w = *m_Watch[wIdx];
+        Impl::WatchEntry& w = *m_Impl->Watch[wIdx];
         std::lock_guard<std::mutex> wlk(w.Mu);
         w.Samples.assign(windowSize, 0);
         w.Head.store(0, std::memory_order_relaxed);
@@ -668,15 +751,15 @@ void RingProfiler::WatchScope(u32 nameHash, u32 windowSize, ProfSource source) n
 
 void RingProfiler::UnwatchScope(u32 nameHash, ProfSource source) noexcept
 {
-  if (m_Aggregator.empty() || nameHash == 0)
+  if (m_Impl->Aggregator.empty() || nameHash == 0)
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(source) + 1);
-  constexpr size_t cap = AggregatorCapacity;
+  constexpr size_t cap = Impl::AggregatorCapacity;
   size_t idx = nameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
-    AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    Impl::AggSlot& slot = m_Impl->Aggregator[(idx + probe) & (cap - 1)];
     u32 key = slot.NameHash.load(std::memory_order_acquire);
     if (key == 0)
       return;
@@ -691,37 +774,37 @@ void RingProfiler::UnwatchScope(u32 nameHash, ProfSource source) noexcept
 void RingProfiler::ResetStats() noexcept
 {
   ResetAggregator();
-  m_LastStatsResetNs.store(MonotonicNowNs(), std::memory_order_relaxed);
+  m_Impl->LastStatsResetNs.store(MonotonicNowNs(), std::memory_order_relaxed);
 }
 
 void RingProfiler::SetStatsResetIntervalMs(u32 ms) noexcept
 {
-  m_StatsResetIntervalMs.store(ms, std::memory_order_relaxed);
-  m_LastStatsResetNs.store(MonotonicNowNs(), std::memory_order_relaxed);
+  m_Impl->StatsResetIntervalMs.store(ms, std::memory_order_relaxed);
+  m_Impl->LastStatsResetNs.store(MonotonicNowNs(), std::memory_order_relaxed);
 }
 
 u32 RingProfiler::GetStatsResetIntervalMs() const noexcept
 {
-  return m_StatsResetIntervalMs.load(std::memory_order_relaxed);
+  return m_Impl->StatsResetIntervalMs.load(std::memory_order_relaxed);
 }
 
 void RingProfiler::SetAutoScheduleEnabled(bool enabled) noexcept
 {
-  m_AutoSchedule.store(enabled, std::memory_order_relaxed);
+  m_Impl->AutoSchedule.store(enabled, std::memory_order_relaxed);
 }
 
 bool RingProfiler::IsAutoScheduleEnabled() const noexcept
 {
-  return m_AutoSchedule.load(std::memory_order_relaxed);
+  return m_Impl->AutoSchedule.load(std::memory_order_relaxed);
 }
 
 void RingProfiler::ForEachScope(ForEachScopeFn fn, void* user) const noexcept
 {
-  if (!fn || m_Aggregator.empty())
+  if (!fn || m_Impl->Aggregator.empty())
     return;
-  for (size_t i = 0; i < m_Aggregator.size(); ++i)
+  for (size_t i = 0; i < m_Impl->Aggregator.size(); ++i)
   {
-    const AggSlot& slot = m_Aggregator[i];
+    const Impl::AggSlot& slot = m_Impl->Aggregator[i];
     u32 key = slot.NameHash.load(std::memory_order_acquire);
     if (key == 0)
       continue;
@@ -755,9 +838,9 @@ void DumpCallback(const char* name, u32 hash, ProfSource source, const ScopeStat
 void RingProfiler::DumpStats(Label label) const noexcept
 {
   GECKO_INFO(label, "----- Profiler stats (interval={}ms, sample-rate=1/{}, trace={}) -----",
-             m_StatsResetIntervalMs.load(std::memory_order_relaxed),
-             m_DetailedSampleRate.load(std::memory_order_relaxed),
-             m_TraceEnabled.load(std::memory_order_relaxed) ? "on" : "off");
+             m_Impl->StatsResetIntervalMs.load(std::memory_order_relaxed),
+             m_Impl->DetailedSampleRate.load(std::memory_order_relaxed),
+             m_Impl->TraceEnabled.load(std::memory_order_relaxed) ? "on" : "off");
   DumpCtx ctx {label};
   ForEachScope(&DumpCallback, &ctx);
   ProfilerDiagnostics d = GetDiagnostics();
@@ -768,15 +851,15 @@ void RingProfiler::DumpStats(Label label) const noexcept
 ProfilerDiagnostics RingProfiler::GetDiagnostics() const noexcept
 {
   ProfilerDiagnostics d {};
-  d.DroppedEvents = m_DroppedEvents.load(std::memory_order_relaxed);
-  d.ReentrantDrops = m_ReentrantDrops.load(std::memory_order_relaxed);
-  d.AggregatorOverflow = m_AggregatorOverflow.load(std::memory_order_relaxed);
+  d.DroppedEvents = m_Impl->DroppedEvents.load(std::memory_order_relaxed);
+  d.ReentrantDrops = m_Impl->ReentrantDrops.load(std::memory_order_relaxed);
+  d.AggregatorOverflow = m_Impl->AggregatorOverflow.load(std::memory_order_relaxed);
   return d;
 }
 
 void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
 {
-  if (m_Aggregator.empty() || ev.NameHash == 0) [[unlikely]]
+  if (m_Impl->Aggregator.empty() || ev.NameHash == 0) [[unlikely]]
     return;
 
   const u8 srcKey = static_cast<u8>(static_cast<u8>(ev.Source) + 1);
@@ -818,11 +901,11 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
   const u64 dur = ev.TimestampNs - beginTs;
 
   // Update / claim aggregator slot for this (NameHash, Source).
-  constexpr size_t cap = AggregatorCapacity;
+  constexpr size_t cap = Impl::AggregatorCapacity;
   size_t idx = ev.NameHash & (cap - 1);
   for (size_t probe = 0; probe < cap; ++probe)
   {
-    AggSlot& slot = m_Aggregator[(idx + probe) & (cap - 1)];
+    Impl::AggSlot& slot = m_Impl->Aggregator[(idx + probe) & (cap - 1)];
     u32 expected = slot.NameHash.load(std::memory_order_acquire);
     if (expected == 0)
     {
@@ -863,10 +946,10 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
       u32 wIdx = slot.WatchIdx.load(std::memory_order_relaxed);
       if (wIdx != ~u32 {0})
       {
-        std::lock_guard<std::mutex> lk(m_WatchMu);
-        if (wIdx < m_Watch.size() && m_Watch[wIdx])
+        std::lock_guard<std::mutex> lk(m_Impl->WatchMu);
+        if (wIdx < m_Impl->Watch.size() && m_Impl->Watch[wIdx])
         {
-          WatchEntry& w = *m_Watch[wIdx];
+          Impl::WatchEntry& w = *m_Impl->Watch[wIdx];
           std::lock_guard<std::mutex> wlk(w.Mu);
           if (!w.Samples.empty())
           {
@@ -883,7 +966,7 @@ void RingProfiler::UpdateAggregator(const ProfEvent& ev) noexcept
       return;
     }
   }
-  m_AggregatorOverflow.fetch_add(1, std::memory_order_relaxed);
+  m_Impl->AggregatorOverflow.fetch_add(1, std::memory_order_relaxed);
 }
 
 void RingProfiler::ResetAggregator() noexcept
@@ -894,7 +977,7 @@ void RingProfiler::ResetAggregator() noexcept
   // most recent observation" and a reset that happens between two
   // zone-ends should not make HUD readers see 0 ms until the next
   // zone-end fires.
-  for (auto& slot : m_Aggregator)
+  for (auto& slot : m_Impl->Aggregator)
   {
     slot.MinNs.store(~u64 {0}, std::memory_order_relaxed);
     slot.MaxNs.store(0, std::memory_order_relaxed);
