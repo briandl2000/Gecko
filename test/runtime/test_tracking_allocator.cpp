@@ -66,13 +66,13 @@ TEST_CASE("TrackingAllocator label tracking", "[runtime][allocator]")
 
   MemLabelStats texStats;
   REQUIRE(alloc.StatsFor(textures, texStats));
-  REQUIRE(texStats.Allocs.load() == 2);
-  REQUIRE(texStats.LiveBytes.load() >= 1024 + 2048);
+  REQUIRE(texStats.Allocs == 2);
+  REQUIRE(texStats.LiveBytes >= 1024 + 2048);
 
   MemLabelStats meshStats;
   REQUIRE(alloc.StatsFor(meshes, meshStats));
-  REQUIRE(meshStats.Allocs.load() == 1);
-  REQUIRE(meshStats.LiveBytes.load() >= 512);
+  REQUIRE(meshStats.Allocs == 1);
+  REQUIRE(meshStats.LiveBytes >= 512);
 
   alloc.Free(t1);
   alloc.Free(t2);
@@ -108,9 +108,11 @@ TEST_CASE("TrackingAllocator snapshot", "[runtime][allocator]")
   void* ptr = alloc.Alloc(128, 16);
   alloc.PopLabel();
 
-  ::std::unordered_map<u64, MemLabelStats> snapshot;
-  alloc.Snapshot(snapshot);
-  REQUIRE(snapshot.count(audio.Id) == 1);
+  auto snapshot = alloc.Snapshot();
+  bool found = false;
+  for (const MemLabelStats& stats : snapshot)
+    found = found || stats.StatsLabel.Id == audio.Id;
+  REQUIRE(found);
 
   alloc.Free(ptr);
   alloc.Shutdown();
