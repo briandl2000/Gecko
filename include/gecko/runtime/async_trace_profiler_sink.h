@@ -6,14 +6,6 @@
 
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/profiler.h"
-#include "gecko/platform/platform_io.h"
-
-#include <atomic>
-#include <condition_variable>
-#include <cstddef>
-#include <mutex>
-#include <thread>
-#include <vector>
 
 namespace gecko::runtime {
 
@@ -37,53 +29,26 @@ public:
   AsyncTraceProfilerSink& operator=(const AsyncTraceProfilerSink&) = delete;
 
   /// `true` if the underlying file was opened successfully.
-  bool IsOpen() const noexcept
-  {
-    return m_Writer != nullptr;
-  }
+  bool IsOpen() const noexcept;
 
   /// Drop any event whose level is more verbose than `level` before
   /// queueing for the worker. Stats / aggregates inside `IProfiler`
   /// are unaffected -- this only thins the Chrome-trace JSON.
   /// Default: `Detailed` (no filtering).
-  void SetMinLevel(ProfLevel level) noexcept
-  {
-    m_MinLevel.store(level, ::std::memory_order_relaxed);
-  }
+  void SetMinLevel(ProfLevel level) noexcept;
 
   /// Current minimum-level filter.
-  ProfLevel GetMinLevel() const noexcept
-  {
-    return m_MinLevel.load(::std::memory_order_relaxed);
-  }
+  ProfLevel GetMinLevel() const noexcept;
 
   void Write(const ProfEvent& event) noexcept override;
   void WriteBatch(::gecko::Span<const ProfEvent> events) noexcept override;
   void Flush() noexcept override;
 
 private:
-  ::gecko::Unique<::gecko::platform::FileWriter> m_Writer {};
-  bool m_First {true};
-  u64 m_Time0Ns {0};
-
-  std::mutex m_Mu {};
-  std::condition_variable m_Cv {};
-  std::vector<ProfEvent> m_Pending {};
-  std::atomic<bool> m_Run {true};
-  std::thread m_Worker {};
-  std::atomic<ProfLevel> m_MinLevel {ProfLevel::Detailed};
-
-  // Serialises every write to m_Writer (worker drain, Flush(), destructor).
-  // Without this, concurrent DrainAndWrite calls from the worker and the
-  // main thread produced double-comma corruption in the JSON.
-  std::mutex m_WriteMu {};
-
-  // Already-emitted thread_name metadata (TID -> done). Worker-only.
-  std::vector<u32> m_NamedThreads {};
+  struct Impl;
+  ::gecko::Unique<Impl> m_Impl;
 
   void WorkerLoop() noexcept;
-  void DrainAndWrite(std::vector<ProfEvent>& batch) noexcept;
-  void EmitThreadNameOnce(u32 tid, const char* name) noexcept;
 };
 
 }  // namespace gecko::runtime
