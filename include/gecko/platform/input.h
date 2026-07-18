@@ -11,10 +11,9 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/types.h"
+#include "gecko/core/string.h"
 #include "gecko/platform/input_codes.h"
 #include "gecko/platform/window.h"
-
-#include <string_view>
 
 namespace gecko::platform {
 
@@ -86,7 +85,7 @@ public:
   /// Reflects modifiers and IME composition (e.g. Shift+a -> "A",
   /// AltGr -> currency glyphs). The view is valid until the next
   /// `IInput` call; copy if you need to retain it across frames.
-  [[nodiscard]] GECKO_API virtual ::std::string_view GetTypedText() const noexcept = 0;
+  [[nodiscard]] GECKO_API virtual StringView GetTypedText() const noexcept = 0;
 };
 
 /// Service accessor. Returns the published `IInput`, or `nullptr` when
@@ -130,6 +129,6 @@ public:
 [[nodiscard]] GECKO_API WindowHandle HoveredWindow() noexcept;
 
 /// `IInput::GetTypedText` via `GetInput()`. Returns empty when no service.
-[[nodiscard]] GECKO_API ::std::string_view GetTypedText() noexcept;
+[[nodiscard]] GECKO_API StringView GetTypedText() noexcept;
 
 }  // namespace gecko::platform

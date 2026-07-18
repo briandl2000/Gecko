@@ -9,7 +9,6 @@
 #include "gecko/core/services/log.h"
 #include "gecko/platform/input_codes.h"
 
-#include <cstdint>
 #include <poll.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -384,26 +383,26 @@ WaylandWindowsBackend::~WaylandWindowsBackend() noexcept
 void WaylandWindowsBackend::OnRegistryGlobal(::wl_registry* registry, u32 name, const char* interface,
                                              u32 version) noexcept
 {
-  if (::std::strcmp(interface, wl_compositor_interface.name) == 0)
+  if (StringCompare(interface, wl_compositor_interface.name) == 0)
   {
     m_Compositor = static_cast<::wl_compositor*>(::wl_registry_bind(registry, name, &wl_compositor_interface, 4));
   }
-  else if (::std::strcmp(interface, wl_shm_interface.name) == 0)
+  else if (StringCompare(interface, wl_shm_interface.name) == 0)
   {
     m_Shm = static_cast<::wl_shm*>(::wl_registry_bind(registry, name, &wl_shm_interface, 1));
   }
-  else if (::std::strcmp(interface, xdg_wm_base_interface.name) == 0)
+  else if (StringCompare(interface, xdg_wm_base_interface.name) == 0)
   {
     m_WmBase = static_cast<::xdg_wm_base*>(::wl_registry_bind(registry, name, &xdg_wm_base_interface, 1));
     ::xdg_wm_base_add_listener(m_WmBase, &kWmBaseListener, this);
   }
-  else if (::std::strcmp(interface, wl_seat_interface.name) == 0)
+  else if (StringCompare(interface, wl_seat_interface.name) == 0)
   {
     m_Seat = static_cast<::wl_seat*>(::wl_registry_bind(registry, name, &wl_seat_interface, 5));
     ::wl_seat_add_listener(m_Seat, &kSeatListener, this);
   }
 #ifdef GECKO_HAVE_XDG_DECORATION
-  else if (::std::strcmp(interface, zxdg_decoration_manager_v1_interface.name) == 0)
+  else if (StringCompare(interface, zxdg_decoration_manager_v1_interface.name) == 0)
   {
     m_DecorationManager = static_cast<::zxdg_decoration_manager_v1*>(
         ::wl_registry_bind(registry, name, &zxdg_decoration_manager_v1_interface, 1));
@@ -535,7 +534,7 @@ WindowHandle WaylandWindowsBackend::CreateWindow(const WindowDesc& desc) noexcep
 
   // Store listener data for toplevel callbacks.
   // We use a static map to keep listener data alive.
-  static ::std::unordered_map<u64, ToplevelListenerData> s_ToplevelData;
+  static HashMap<u64, ToplevelListenerData> s_ToplevelData;
   s_ToplevelData[id] = {this, &ws};
   ::xdg_toplevel_add_listener(ws.Toplevel, &kToplevelListener, &s_ToplevelData[id]);
 
@@ -1042,7 +1041,7 @@ void WaylandWindowsBackend::AttachBlankBuffer(WaylandWindowState& ws) noexcept
     return;
   }
 
-  void* data = mmap(nullptr, static_cast<size_t>(size), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  void* data = mmap(nullptr, static_cast<usize>(size), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (data == MAP_FAILED)
   {
     close(fd);
@@ -1058,7 +1057,7 @@ void WaylandWindowsBackend::AttachBlankBuffer(WaylandWindowState& ws) noexcept
   ::wl_shm_pool* pool = wl_shm_create_pool(m_Shm, fd, size);
   ::wl_buffer* buffer = ::wl_shm_pool_create_buffer(pool, 0, w, h, stride, WL_SHM_FORMAT_ARGB8888);
   ::wl_shm_pool_destroy(pool);
-  munmap(data, static_cast<size_t>(size));
+  munmap(data, static_cast<usize>(size));
   close(fd);
 
   ::wl_surface_attach(ws.Surface, buffer, 0, 0);
@@ -1218,7 +1217,7 @@ void WaylandWindowsBackend::OnKeyboardKey(::wl_keyboard* /*kb*/, u32 /*serial*/,
 
   if (down && m_XkbState)
   {
-    const ::gecko::u32 cp = ::xkb_state_key_get_utf32(m_XkbState, xkbCode);
+    const gecko::u32 cp = ::xkb_state_key_get_utf32(m_XkbState, xkbCode);
     // Skip C0 controls except tab/CR/LF, and DEL.
     const bool keep = cp != 0 && !(cp < 32 && cp != '\t' && cp != '\n' && cp != '\r') && cp != 127;
     if (keep)

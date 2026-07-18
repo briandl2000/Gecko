@@ -1,348 +1,410 @@
 #include "gecko/runtime/thread_pool_job_system.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/scope.h"
-#include "gecko/core/services/log.h"
+#include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
+#include "gecko/platform/threading.h"
 #include "private/labels.h"
 
-#include <algorithm>
-#include <chrono>
-#include <functional>
-#include <thread>
+#include <new>
+
+#if defined(GECKO_PLATFORM_WINDOWS)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#elif defined(GECKO_PLATFORM_LINUX)
+#include <pthread.h>
+#endif
 
 namespace gecko::runtime {
 
+namespace {
+
+constexpr u32 MaxWorkers = 16;
+constexpr u32 MaxJobs = 4096;
+constexpr u32 MaxDependencies = 16;
+
+enum class JobState : u8
+{
+  Free,
+  Queued,
+  Running,
+};
+
+struct JobSlot
+{
+  JobFn Function {};
+  JobHandle Handle {};
+  JobHandle Dependencies[MaxDependencies] {};
+  Label JobLabel {};
+  u32 DependencyCount {0};
+  JobPriority Priority {JobPriority::Normal};
+  JobState State {JobState::Free};
+};
+
+struct WorkerStart
+{
+  ThreadPoolJobSystem* Owner {nullptr};
+  u32 Index {0};
+};
+
+}  // namespace
+
+struct ThreadPoolState
+{
+  JobSlot Jobs[MaxJobs] {};
+  WorkerStart Starts[MaxWorkers] {};
+#if defined(GECKO_PLATFORM_WINDOWS)
+  HANDLE Threads[MaxWorkers] {};
+  SRWLOCK Mutex = SRWLOCK_INIT;
+  CONDITION_VARIABLE Wake = CONDITION_VARIABLE_INIT;
+  CONDITION_VARIABLE Complete = CONDITION_VARIABLE_INIT;
+#elif defined(GECKO_PLATFORM_LINUX)
+  pthread_t Threads[MaxWorkers] {};
+  pthread_mutex_t Mutex = PTHREAD_MUTEX_INITIALIZER;
+  pthread_cond_t Wake = PTHREAD_COND_INITIALIZER;
+  pthread_cond_t Complete = PTHREAD_COND_INITIALIZER;
+#endif
+  u64 NextJobId {1};
+  u32 WorkerCount {0};
+  bool ShuttingDown {false};
+};
+
+namespace {
+
+void Lock(ThreadPoolState& state) noexcept
+{
+#if defined(GECKO_PLATFORM_WINDOWS)
+  ::AcquireSRWLockExclusive(&state.Mutex);
+#elif defined(GECKO_PLATFORM_LINUX)
+  (void)::pthread_mutex_lock(&state.Mutex);
+#endif
+}
+
+void Unlock(ThreadPoolState& state) noexcept
+{
+#if defined(GECKO_PLATFORM_WINDOWS)
+  ::ReleaseSRWLockExclusive(&state.Mutex);
+#elif defined(GECKO_PLATFORM_LINUX)
+  (void)::pthread_mutex_unlock(&state.Mutex);
+#endif
+}
+
+void WakeOne(ThreadPoolState& state) noexcept
+{
+#if defined(GECKO_PLATFORM_WINDOWS)
+  ::WakeConditionVariable(&state.Wake);
+#elif defined(GECKO_PLATFORM_LINUX)
+  (void)::pthread_cond_signal(&state.Wake);
+#endif
+}
+
+void WakeAll(ThreadPoolState& state) noexcept
+{
+#if defined(GECKO_PLATFORM_WINDOWS)
+  ::WakeAllConditionVariable(&state.Wake);
+  ::WakeAllConditionVariable(&state.Complete);
+#elif defined(GECKO_PLATFORM_LINUX)
+  (void)::pthread_cond_broadcast(&state.Wake);
+  (void)::pthread_cond_broadcast(&state.Complete);
+#endif
+}
+
+void SignalComplete(ThreadPoolState& state) noexcept
+{
+#if defined(GECKO_PLATFORM_WINDOWS)
+  ::WakeAllConditionVariable(&state.Complete);
+#elif defined(GECKO_PLATFORM_LINUX)
+  (void)::pthread_cond_broadcast(&state.Complete);
+#endif
+}
+
+void WaitForWake(ThreadPoolState& state) noexcept
+{
+#if defined(GECKO_PLATFORM_WINDOWS)
+  (void)::SleepConditionVariableSRW(&state.Wake, &state.Mutex, 100, 0);
+#elif defined(GECKO_PLATFORM_LINUX)
+  timespec deadline {};
+  (void)::clock_gettime(CLOCK_REALTIME, &deadline);
+  deadline.tv_nsec += 100'000'000;
+  if (deadline.tv_nsec >= 1'000'000'000)
+  {
+    ++deadline.tv_sec;
+    deadline.tv_nsec -= 1'000'000'000;
+  }
+  (void)::pthread_cond_timedwait(&state.Wake, &state.Mutex, &deadline);
+#endif
+}
+
+void WaitForCompletion(ThreadPoolState& state) noexcept
+{
+#if defined(GECKO_PLATFORM_WINDOWS)
+  (void)::SleepConditionVariableSRW(&state.Complete, &state.Mutex, INFINITE, 0);
+#elif defined(GECKO_PLATFORM_LINUX)
+  (void)::pthread_cond_wait(&state.Complete, &state.Mutex);
+#endif
+}
+
+JobSlot* FindJob(ThreadPoolState& state, JobHandle handle) noexcept
+{
+  for (JobSlot& slot : state.Jobs)
+  {
+    if (slot.State != JobState::Free && slot.Handle == handle)
+      return &slot;
+  }
+  return nullptr;
+}
+
+bool DependenciesComplete(ThreadPoolState& state, const JobSlot& slot) noexcept
+{
+  for (u32 index = 0; index < slot.DependencyCount; ++index)
+  {
+    if (FindJob(state, slot.Dependencies[index]) != nullptr)
+      return false;
+  }
+  return true;
+}
+
+JobSlot* TakeReadyJob(ThreadPoolState& state) noexcept
+{
+  JobSlot* best = nullptr;
+  for (JobSlot& slot : state.Jobs)
+  {
+    if (slot.State != JobState::Queued || !DependenciesComplete(state, slot))
+      continue;
+    if (best == nullptr || static_cast<u8>(slot.Priority) > static_cast<u8>(best->Priority))
+      best = &slot;
+  }
+  if (best != nullptr)
+    best->State = JobState::Running;
+  return best;
+}
+
+}  // namespace
+
 bool ThreadPoolJobSystem::Init() noexcept
 {
-  // NOTE: Cannot profile Init() - profiler is initialized AFTER job system
-  GECKO_ASSERT(!m_Initialized && "ThreadPoolJobSystem already initialized");
+  GECKO_ASSERT(m_State == nullptr, "ThreadPoolJobSystem already initialized");
+  void* storage = AllocBytes(sizeof(ThreadPoolState), alignof(ThreadPoolState));
+  auto* state = new (storage) ThreadPoolState {};
 
-  // Determine worker thread count
-  u32 workerCount = m_RequestedWorkerCount;
+  u32 workerCount = m_RequestedWorkerCount == 0 ? platform::HardwareThreadCount() : m_RequestedWorkerCount;
   if (workerCount == 0)
-  {
-    workerCount = std::max(1u, std::thread::hardware_concurrency());
-  }
+    workerCount = 1;
+  if (workerCount > MaxWorkers)
+    workerCount = MaxWorkers;
 
-  try
+  m_State = state;
+  for (u32 index = 0; index < workerCount; ++index)
   {
-    m_WorkerThreads.reserve(workerCount);
-    for (u32 i = 0; i < workerCount; ++i)
-    {
-      m_WorkerThreads.emplace_back(&ThreadPoolJobSystem::WorkerThreadFunction, this, i);
-    }
-
-    m_Initialized = true;
-    return true;
+    state->Starts[index] = WorkerStart {.Owner = this, .Index = index};
+#if defined(GECKO_PLATFORM_WINDOWS)
+    state->Threads[index] = ::CreateThread(
+        nullptr, 0,
+        [](void* user) -> DWORD {
+          auto* start = static_cast<WorkerStart*>(user);
+          start->Owner->WorkerThreadFunction(start->Index);
+          return 0;
+        },
+        &state->Starts[index], 0, nullptr);
+    if (state->Threads[index] == nullptr)
+      break;
+#elif defined(GECKO_PLATFORM_LINUX)
+    const int result = ::pthread_create(
+        &state->Threads[index], nullptr,
+        [](void* user) -> void* {
+          auto* start = static_cast<WorkerStart*>(user);
+          start->Owner->WorkerThreadFunction(start->Index);
+          return nullptr;
+        },
+        &state->Starts[index]);
+    if (result != 0)
+      break;
+#endif
+    ++state->WorkerCount;
   }
-  catch (...)
-  {
-    // Use direct fprintf during Init() since Logger may not be available yet
-    std::fprintf(stderr, "[Gecko] Failed to create worker threads for ThreadPoolJobSystem\n");
-    Shutdown();
-    return false;
-  }
+  return state->WorkerCount != 0;
 }
 
 void ThreadPoolJobSystem::Shutdown() noexcept
 {
-  if (!m_Initialized)
+  ThreadPoolState* state = m_State;
+  if (state == nullptr)
     return;
 
-  m_Shutdown.store(true, std::memory_order_release);
-  m_JobAvailable.notify_all();
+  Lock(*state);
+  state->ShuttingDown = true;
+  WakeAll(*state);
+  Unlock(*state);
 
-  for (auto& thread : m_WorkerThreads)
+  for (u32 index = 0; index < state->WorkerCount; ++index)
   {
-    if (thread.joinable())
-      thread.join();
+#if defined(GECKO_PLATFORM_WINDOWS)
+    (void)::WaitForSingleObject(state->Threads[index], INFINITE);
+    (void)::CloseHandle(state->Threads[index]);
+#elif defined(GECKO_PLATFORM_LINUX)
+    (void)::pthread_join(state->Threads[index], nullptr);
+#endif
   }
 
-  // Force complete deallocation before allocator shutdown
-  decltype(m_WorkerThreads)().swap(m_WorkerThreads);
-
+  for (JobSlot& slot : state->Jobs)
   {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    decltype(m_JobQueue)().swap(m_JobQueue);
-    decltype(m_ActiveJobs)().swap(m_ActiveJobs);
+    if (slot.Function.Free != nullptr && slot.Function.User != nullptr)
+      slot.Function.Free(slot.Function.User);
   }
-
-  m_Initialized = false;
+#if defined(GECKO_PLATFORM_LINUX)
+  (void)::pthread_cond_destroy(&state->Complete);
+  (void)::pthread_cond_destroy(&state->Wake);
+  (void)::pthread_mutex_destroy(&state->Mutex);
+#endif
+  state->~ThreadPoolState();
+  DeallocBytes(state);
+  m_State = nullptr;
 }
 
 JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, JobPriority priority, Label label) noexcept
 {
-  // Profiler/logger may not exist yet at very early startup; the macros
-  // route through GetProfiler()/GetLogger() which fall back to Null impls.
-  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit");
-
-  if (!m_Initialized || !job.IsValid())
-  {
-    if (job.Free && job.User)
-      job.Free(job.User);
-    return JobHandle {};
-  }
-
-  JobHandle handle = GenerateJobHandle();
-  auto jobPtr = std::make_shared<Job>(job, priority, label, handle);
-
-  {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    m_ActiveJobs[handle.Id] = jobPtr;
-    m_JobQueue.push(jobPtr);
-  }
-
-  m_JobAvailable.notify_one();
-  return handle;
+  return SubmitRaw(job, nullptr, 0, priority, label);
 }
 
 JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, const JobHandle* dependencies, u32 dependencyCount,
                                          JobPriority priority, Label label) noexcept
 {
-  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Submit(deps)");
-
-  if (!m_Initialized || !job.IsValid())
+  if (m_State == nullptr || !job.IsValid() || dependencyCount > MaxDependencies ||
+      (dependencyCount != 0 && dependencies == nullptr))
   {
-    if (job.Free && job.User)
+    if (job.Free != nullptr && job.User != nullptr)
       job.Free(job.User);
-    return JobHandle {};
+    return {};
   }
 
-  JobHandle handle = GenerateJobHandle();
-  auto jobPtr = std::make_shared<Job>(job, priority, label, handle);
-
-  // Copy dependencies
-  if (dependencies && dependencyCount > 0)
+  ThreadPoolState& state = *m_State;
+  Lock(state);
+  JobSlot* destination = nullptr;
+  for (JobSlot& slot : state.Jobs)
   {
-    jobPtr->Dependencies.reserve(dependencyCount);
-    for (u32 i = 0; i < dependencyCount; ++i)
+    if (slot.State == JobState::Free)
     {
-      if (dependencies[i].IsValid())
-      {
-        jobPtr->Dependencies.push_back(dependencies[i]);
-      }
+      destination = &slot;
+      break;
     }
   }
-
+  if (destination == nullptr || state.ShuttingDown)
   {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    m_ActiveJobs[handle.Id] = jobPtr;
-    m_JobQueue.push(jobPtr);
+    Unlock(state);
+    if (job.Free != nullptr && job.User != nullptr)
+      job.Free(job.User);
+    return {};
   }
 
-  m_JobAvailable.notify_one();
+  const JobHandle handle {state.NextJobId++};
+  *destination = JobSlot {
+      .Function = job,
+      .Handle = handle,
+      .JobLabel = label,
+      .DependencyCount = dependencyCount,
+      .Priority = priority,
+      .State = JobState::Queued,
+  };
+  for (u32 index = 0; index < dependencyCount; ++index)
+    destination->Dependencies[index] = dependencies[index];
+  WakeOne(state);
+  Unlock(state);
   return handle;
 }
 
 void ThreadPoolJobSystem::Wait(JobHandle handle) noexcept
 {
-  if (!handle.IsValid())
+  if (m_State == nullptr || !handle.IsValid())
     return;
-
-  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Wait");
-  std::unique_lock<std::mutex> lock(m_Mutex);
-  m_JobCompleted.wait(lock, [this, handle]() {
-    auto it = m_ActiveJobs.find(handle.Id);
-    return it == m_ActiveJobs.end() || it->second->Completed.load(std::memory_order_acquire);
-  });
+  ThreadPoolState& state = *m_State;
+  Lock(state);
+  while (FindJob(state, handle) != nullptr)
+    WaitForCompletion(state);
+  Unlock(state);
 }
 
 void ThreadPoolJobSystem::WaitAll(const JobHandle* handles, u32 count) noexcept
 {
-  if (!handles || count == 0)
+  if (m_State == nullptr || handles == nullptr)
     return;
-
-  GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::WaitAll");
-  std::unique_lock<std::mutex> lock(m_Mutex);
-  m_JobCompleted.wait(lock, [this, handles, count]() {
-    for (u32 i = 0; i < count; ++i)
-    {
-      if (!handles[i].IsValid())
-        continue;
-
-      auto it = m_ActiveJobs.find(handles[i].Id);
-      if (it != m_ActiveJobs.end() && !it->second->Completed.load(std::memory_order_acquire))
-      {
-        return false;
-      }
-    }
-    return true;
-  });
+  for (u32 index = 0; index < count; ++index)
+    Wait(handles[index]);
 }
 
 bool ThreadPoolJobSystem::IsComplete(JobHandle handle) noexcept
 {
-  if (!handle.IsValid())
+  if (m_State == nullptr || !handle.IsValid())
     return true;
-
-  // Fast path: try to find the job and check completion without holding
-  // the lock for the entire duration. We use a lock to safely get the
-  // shared_ptr, then check the atomic outside the lock.
-  std::shared_ptr<Job> job;
-  {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    auto it = m_ActiveJobs.find(handle.Id);
-    if (it == m_ActiveJobs.end())
-      return true;  // Job not found = completed and cleaned up
-    job = it->second;
-  }
-
-  // Check completion flag outside the lock
-  return job->Completed.load(std::memory_order_acquire);
+  ThreadPoolState& state = *m_State;
+  Lock(state);
+  const bool complete = FindJob(state, handle) == nullptr;
+  Unlock(state);
+  return complete;
 }
 
 u32 ThreadPoolJobSystem::WorkerThreadCount() const noexcept
 {
-  return static_cast<u32>(m_WorkerThreads.size());
+  return m_State != nullptr ? m_State->WorkerCount : 0;
 }
 
 void ThreadPoolJobSystem::ProcessJobs(u32 maxJobs) noexcept
 {
-  for (u32 processed = 0; processed < maxJobs; ++processed)
-  {
-    auto job = GetNextReadyJob();
-    if (!job)
-      break;
+  for (u32 index = 0; index < maxJobs && RunOneJob(); ++index)
+  {}
+}
 
-    try
-    {
-      if (job->Function.Invoke)
-        job->Function.Invoke(job->Function.User);
-      if (job->Function.Free && job->Function.User)
-        job->Function.Free(job->Function.User);
-      job->Function = JobFn {};
-      job->Completed.store(true, std::memory_order_release);
-    }
-    catch (...)
-    {
-      if (job->Function.Free && job->Function.User)
-        job->Function.Free(job->Function.User);
-      job->Function = JobFn {};
-      job->Completed.store(true, std::memory_order_release);
-    }
+bool ThreadPoolJobSystem::RunOneJob() noexcept
+{
+  if (m_State == nullptr)
+    return false;
+  ThreadPoolState& state = *m_State;
+  Lock(state);
+  JobSlot* slot = TakeReadyJob(state);
+  Unlock(state);
+  if (slot == nullptr)
+    return false;
 
-    {
-      std::lock_guard<std::mutex> lock(m_Mutex);
-      m_ActiveJobs.erase(job->Handle.Id);
-    }
+  PushMemoryLabel(slot->JobLabel);
+  slot->Function.Invoke(slot->Function.User);
+  PopMemoryLabel();
+  if (slot->Function.Free != nullptr && slot->Function.User != nullptr)
+    slot->Function.Free(slot->Function.User);
 
-    m_JobCompleted.notify_all();
-  }
+  Lock(state);
+  slot->Function = {};
+  slot->State = JobState::Free;
+  SignalComplete(state);
+  WakeAll(state);
+  Unlock(state);
+  return true;
 }
 
 void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
 {
-  // NOTE: Cannot use profiling/logging - JobSystem is Layer 1, comes before
-  // Profiler (Layer 2) and Logger (Layer 3)
-
-  // Profiler thread-name registration is layer-independent (it just stores a
-  // pointer in a process-global table) and lets trace sinks emit
-  // chrome-trace `thread_name` records for these workers.
-  static constexpr const char* WorkerNames[] = {
-      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",  "job-worker-4",  "job-worker-5",
-      "job-worker-6",  "job-worker-7",  "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
+  static constexpr const char* WorkerNames[MaxWorkers] = {
+      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",
+      "job-worker-4",  "job-worker-5",  "job-worker-6",  "job-worker-7",
+      "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
       "job-worker-12", "job-worker-13", "job-worker-14", "job-worker-15",
   };
-  const char* name =
-      (workerIndex < (sizeof(WorkerNames) / sizeof(WorkerNames[0]))) ? WorkerNames[workerIndex] : "job-worker-N";
-  ::gecko::SetThreadProfilerName(name);
+  SetThreadProfilerName(WorkerNames[workerIndex]);
 
-  while (!m_Shutdown.load(std::memory_order_acquire))
+  ThreadPoolState& state = *m_State;
+  for (;;)
   {
-    auto job = GetNextReadyJob();
-    if (!job)
-    {
-      // No jobs available, wait for notification
-      GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::WorkerIdle");
-      std::unique_lock<std::mutex> lock(m_Mutex);
-      m_JobAvailable.wait_for(lock, std::chrono::milliseconds(100),
-                              [this]() { return m_Shutdown.load(std::memory_order_acquire) || !m_JobQueue.empty(); });
+    if (RunOneJob())
       continue;
-    }
-
-    try
+    Lock(state);
+    if (state.ShuttingDown)
     {
-      GECKO_PROFILE_NAMED(labels::JobSystem, "JobSystem::Run");
-      if (job->Function.Invoke)
-        job->Function.Invoke(job->Function.User);
-      if (job->Function.Free && job->Function.User)
-        job->Function.Free(job->Function.User);
-      job->Function = JobFn {};
-      job->Completed.store(true, std::memory_order_release);
+      Unlock(state);
+      break;
     }
-    catch (...)
-    {
-      if (job->Function.Free && job->Function.User)
-        job->Function.Free(job->Function.User);
-      job->Function = JobFn {};
-      job->Completed.store(true, std::memory_order_release);
-    }
-
-    {
-      std::lock_guard<std::mutex> lock(m_Mutex);
-      m_ActiveJobs.erase(job->Handle.Id);
-    }
-
-    m_JobCompleted.notify_all();
+    WaitForWake(state);
+    Unlock(state);
   }
-
-  // NOTE: Cannot use profiling/logging - JobSystem is Layer 1, comes before
-  // Profiler (Layer 2) and Logger (Layer 3)
-}
-
-std::shared_ptr<Job> ThreadPoolJobSystem::GetNextReadyJob() noexcept
-{
-  std::lock_guard<std::mutex> lock(m_Mutex);
-
-  if (m_JobQueue.empty())
-    return nullptr;
-
-  // Find a job whose dependencies are complete
-  std::priority_queue<std::shared_ptr<Job>, std::vector<std::shared_ptr<Job>>, JobCompare> tempQueue;
-  std::shared_ptr<Job> candidateJob = nullptr;
-
-  while (!m_JobQueue.empty() && !candidateJob)
-  {
-    auto job = m_JobQueue.top();
-    m_JobQueue.pop();
-
-    if (AreJobDependenciesComplete(job))
-    {
-      candidateJob = job;
-    }
-    else
-    {
-      tempQueue.push(job);
-    }
-  }
-
-  // Put back jobs that weren't ready
-  while (!tempQueue.empty())
-  {
-    m_JobQueue.push(tempQueue.top());
-    tempQueue.pop();
-  }
-
-  return candidateJob;
-}
-
-bool ThreadPoolJobSystem::AreJobDependenciesComplete(const std::shared_ptr<Job>& job) noexcept
-{
-  for (const auto& dependency : job->Dependencies)
-  {
-    auto it = m_ActiveJobs.find(dependency.Id);
-    if (it != m_ActiveJobs.end() && !it->second->Completed.load(std::memory_order_acquire))
-    {
-      return false;
-    }
-  }
-  return true;
-}
-
-JobHandle ThreadPoolJobSystem::GenerateJobHandle() noexcept
-{
-  return JobHandle {m_NextJobId.fetch_add(1, std::memory_order_relaxed)};
 }
 
 }  // namespace gecko::runtime

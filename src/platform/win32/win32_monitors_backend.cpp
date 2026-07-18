@@ -10,8 +10,6 @@
 #include "gecko/core/services/log.h"
 #include "gecko/platform/platform_events.h"
 
-#include <cmath>
-#include <cstring>
 #include <shellscalingapi.h>
 
 namespace gecko::platform {
@@ -93,7 +91,7 @@ void Win32MonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexce
 
   MonitorEntry entry;
   entry.HMonitor = hMonitor;
-  entry.Handle = MonitorHandle {static_cast<u64>(reinterpret_cast<uintptr_t>(hMonitor))};
+  entry.Handle = MonitorHandle {static_cast<u64>(reinterpret_cast<usize>(hMonitor))};
 
   MonitorInfo& info = entry.Info;
   info.SetName(mi.szDevice);

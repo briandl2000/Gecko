@@ -10,11 +10,11 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/labels.h"
+#include "gecko/core/services/memory.h"
 #include "gecko/core/types.h"
+#include "gecko/core/utility/move.h"
 
 #include <new>
-#include <type_traits>
-#include <utility>
 
 namespace gecko {
 
@@ -81,46 +81,25 @@ enum class JobPriority : u8
 
 namespace detail {
 
-// abi-ok-begin: header-only template, instantiated per consumer TU. The
-// closure is allocated and freed by the same toolchain that produced it,
-// so std:: type uses below never appear in CoreServices.dll itself.
-
 /// Boxes any callable into an ABI-stable `JobFn`. Stateful callables
-/// are heap-allocated in the caller's TU so allocation, invocation, and
-/// deallocation all use the same toolchain's runtime. Stateless
-/// callables that decay to a function pointer are also heap-boxed: a
-/// raw `void(*)()` cannot be portably round-tripped through `void*`
-/// (object<->function pointer conversions are UB in standard C++), and
-/// the alternative -- adding a function-pointer slot to `JobFn` -- is
-/// not worth the ABI churn for the few stateless cases we have.
-///
-/// Returns an empty (`!IsValid()`) `JobFn` on allocation failure so
-/// callers can keep `noexcept` semantics.
+/// are allocated from the process-wide Gecko arena shared by the engine,
+/// game, and plugins.
 template <class F>
 inline JobFn MakeJobFn(F&& f) noexcept
 {
-  using Fn = ::std::decay_t<F>;
-  Fn* state = nullptr;
-  try
-  {
-    state = new (::std::nothrow) Fn(::std::forward<F>(f));
-  }
-  catch (...)
-  {
-    // Fn's copy/move constructor threw; treat like an allocation
-    // failure so callers see an empty JobFn rather than terminate.
-    return JobFn {};
-  }
-  if (!state)
-    return JobFn {};
+  using Fn = RemoveCVRef<F>;
+  void* storage = AllocBytes(sizeof(Fn), alignof(Fn));
+  auto* state = new (storage) Fn(Forward<F>(f));
   JobFn job {};
   job.Invoke = [](void* u) { (*static_cast<Fn*>(u))(); };
-  job.Free = [](void* u) noexcept { delete static_cast<Fn*>(u); };
+  job.Free = [](void* u) noexcept {
+    auto* value = static_cast<Fn*>(u);
+    value->~Fn();
+    DeallocBytes(value);
+  };
   job.User = state;
   return job;
 }
-
-// abi-ok-end
 
 }  // namespace detail
 
@@ -147,17 +126,14 @@ struct IJobSystem
   GECKO_API virtual JobHandle SubmitRaw(JobFn job, const JobHandle* dependencies, u32 dependencyCount,
                                         JobPriority priority = JobPriority::Normal, Label label = {}) noexcept = 0;
 
-  /// Convenience overload that boxes any callable (lambda, function
-  /// pointer, `std::function`, ...) into a `JobFn` and forwards to
+  /// Convenience overload that boxes any callable into a `JobFn` and forwards to
   /// `SubmitRaw`. Boxing happens in the caller's TU, so the closure's
   /// memory is allocated and freed by the same toolchain that produced
   /// it -- safe to call across the CoreServices DLL boundary.
-  // abi-ok-begin: header-only templates; std:: forwarding refs are
-  // resolved per consumer TU and never reach the dispatched virtual.
   template <class F>
   JobHandle Submit(F&& f, JobPriority priority = JobPriority::Normal, Label label = {}) noexcept
   {
-    JobFn job = detail::MakeJobFn(::std::forward<F>(f));
+    JobFn job = detail::MakeJobFn(Forward<F>(f));
     if (!job.IsValid())
       return JobHandle {};
     return SubmitRaw(job, priority, label);
@@ -169,7 +145,7 @@ struct IJobSystem
   JobHandle Submit(F&& f, const JobHandle* dependencies, u32 dependencyCount,
                    JobPriority priority = JobPriority::Normal, Label label = {}) noexcept
   {
-    JobFn job = detail::MakeJobFn(::std::forward<F>(f));
+    JobFn job = detail::MakeJobFn(Forward<F>(f));
     if (!job.IsValid())
       return JobHandle {};
     return SubmitRaw(job, dependencies, dependencyCount, priority, label);
@@ -216,7 +192,7 @@ template <class F>
 inline JobHandle SubmitJob(F&& f, JobPriority priority = JobPriority::Normal, Label label = {}) noexcept
 {
   auto* jobSystem = GetJobSystem();
-  return jobSystem ? jobSystem->Submit(::std::forward<F>(f), priority, label) : JobHandle {};
+  return jobSystem ? jobSystem->Submit(Forward<F>(f), priority, label) : JobHandle {};
 }
 
 /// Convenience wrapper that submits a job with explicit dependencies.
@@ -227,7 +203,7 @@ inline JobHandle SubmitJob(F&& f, const JobHandle* dependencies, u32 dependencyC
   auto* jobSystem = GetJobSystem();
   if (!jobSystem)
     return JobHandle {};
-  return jobSystem->Submit(::std::forward<F>(f), dependencies, dependencyCount, priority, label);
+  return jobSystem->Submit(Forward<F>(f), dependencies, dependencyCount, priority, label);
 }
 
 // abi-ok-end

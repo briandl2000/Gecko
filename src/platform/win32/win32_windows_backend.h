@@ -8,10 +8,6 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <cstring>
-#include <string>
-#include <unordered_map>
-#include <vector>
 #include <Windows.h>
 
 // Windows.h defines CreateWindow as a macro (CreateWindowA/W), which collides
@@ -85,13 +81,13 @@ private:
     bool AlwaysOnTop {false};
     bool Alive {true};
     bool MouseInside {false};
-    ::std::string TitleStorage;
+    String TitleStorage;
     // Saved style/position for fullscreen restoration.
     ::DWORD SavedStyle {0};
     ::DWORD SavedExStyle {0};
     ::RECT SavedRect {};
     // High surrogate held for the next WM_CHAR (UTF-16 -> codepoint).
-    ::gecko::u16 PendingHighSurrogate {0};
+    gecko::u16 PendingHighSurrogate {0};
   };
 
   struct StagedEvent
@@ -136,8 +132,8 @@ private:
 
   u64 m_NextId {0};
   ::ATOM m_WndClass {0};
-  ::std::unordered_map<u64, Win32WindowEntry> m_Windows;
-  ::std::vector<StagedEvent> m_Staged;
+  HashMap<u64, Win32WindowEntry> m_Windows;
+  Array<StagedEvent> m_Staged;
 
   // Emitter pointer held during PumpEvents so WM_TIMER can flush events
   // while Windows runs its internal modal drag/resize loop.

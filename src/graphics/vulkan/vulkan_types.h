@@ -51,7 +51,7 @@ struct VulkanSwapchainData
   u32 FrameIndex {0};     ///< wraps mod MaxFramesInFlight
   u32 AcquiredIndex {0};  ///< last image returned by vkAcquireNextImageKHR
 
-  ::gecko::platform::NativeWindowHandle Native {};
+  gecko::platform::NativeWindowHandle Native {};
   SwapchainDesc Desc {};
 };
 

@@ -311,7 +311,7 @@ constexpr Float2& operator/=(Float2& v, f32 s) noexcept
 /// Euclidean length (magnitude) of a vector. Overloaded per vector type.
 [[nodiscard]] inline f32 Length(const Float2& v) noexcept
 {
-  return ::std::sqrt(LengthSquared(v));
+  return Sqrt(LengthSquared(v));
 }
 
 /// Euclidean distance between two points/vectors.
@@ -468,7 +468,7 @@ constexpr Float3& operator/=(Float3& v, f32 s) noexcept
 
 [[nodiscard]] inline f32 Length(const Float3& v) noexcept
 {
-  return ::std::sqrt(LengthSquared(v));
+  return Sqrt(LengthSquared(v));
 }
 
 [[nodiscard]] inline f32 Distance(const Float3& a, const Float3& b) noexcept
@@ -616,7 +616,7 @@ constexpr Float4& operator/=(Float4& v, f32 s) noexcept
 
 [[nodiscard]] inline f32 Length(const Float4& v) noexcept
 {
-  return ::std::sqrt(LengthSquared(v));
+  return Sqrt(LengthSquared(v));
 }
 
 [[nodiscard]] inline f32 Distance(const Float4& a, const Float4& b) noexcept

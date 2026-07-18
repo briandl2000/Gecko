@@ -66,6 +66,8 @@ fi
 CommonFlags=(
   -std=c++23
   -fPIC
+  -fno-exceptions
+  -fno-rtti
   -Wall
   -Wextra
   -Wpedantic
@@ -85,6 +87,10 @@ CommonFlags=(
   -I"$Root/src/core"
   -I"$Root/src/graphics"
   -I"$GeneratedDir"
+)
+
+CommonLinkFlags=(
+  -nostdlib++
 )
 
 EngineSources=(
@@ -113,7 +119,7 @@ for Source in "${EngineSources[@]}"; do
   Object="$ObjectDir/${ObjectName%.cpp}.o"
   Objects+=("$Object")
   if [[ -f "$Object" && "$Root/$Source" -ot "$Object" ]] &&
-     ! find "$Root/include" "$Root/src" -type f -name '*.h' -newer "$Object" -print -quit | grep -q .; then
+     ! find "$Root/include" "$Root/src" -type f \( -name '*.h' -o -name '*.cpp' \) -newer "$Object" -print -quit | grep -q .; then
     continue
   fi
   echo "  CXX $Source"
@@ -155,7 +161,7 @@ else
 fi
 if [[ "$LinkEngine" == true ]]; then
   echo "  LINK libGecko.so"
-  "$Cxx" -shared -fuse-ld=lld -Wl,-soname,libGecko.so \
+  "$Cxx" "${CommonLinkFlags[@]}" -shared -fuse-ld=lld -Wl,-soname,libGecko.so \
     "${Objects[@]}" "${ProtocolObjects[@]}" \
     "${PlatformLibraries[@]}" -pthread -ldl -lm \
     -o "$EngineLibrary"
@@ -165,7 +171,7 @@ GameLibrary="$BinaryDir/libgecko_game.so"
 if [[ ! -f "$GameLibrary" || "$Root/projects/sandbox/game.cpp" -nt "$GameLibrary" || "$EngineLibrary" -nt "$GameLibrary" ]] ||
    find "$Root/include" -type f -name '*.h' -newer "$GameLibrary" -print -quit | grep -q .; then
   echo "  LINK libgecko_game.so"
-  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" -shared \
+  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" -shared \
     "$Root/projects/sandbox/game.cpp" \
     -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
     -o "$GameLibrary"
@@ -175,7 +181,7 @@ Launcher="$BinaryDir/gecko_launcher"
 if [[ ! -f "$Launcher" || "$Root/projects/launcher/main.cpp" -nt "$Launcher" || "$EngineLibrary" -nt "$Launcher" ]] ||
    find "$Root/include" -type f -name '*.h' -newer "$Launcher" -print -quit | grep -q .; then
   echo "  LINK gecko_launcher"
-  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" \
+  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" \
     "$Root/projects/launcher/main.cpp" \
     -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
     -o "$Launcher"

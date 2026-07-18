@@ -52,8 +52,9 @@ set Sources=^
  "%Root%src\gecko_engine.cpp"
 
 echo Building Gecko %ConfigName%
-cl /nologo /std:c++latest /MP /LD /W4 /WX /wd4201 /wd4324 ^
+cl /nologo /std:c++latest /MP /LD /W4 /WX /wd4201 /wd4324 /EHs-c- /GR- ^
  %ConfigFlags% /DGECKO_BUILD_SHARED=1 /DGECKO_BUILDING=1 ^
+ /D_HAS_EXCEPTIONS=0 ^
  /DGECKO_PLATFORM_WINDOWS=1 /DGECKO_GRAPHICS_VULKAN=1 ^
  /DGECKO_GRAPHICS_VULKAN_WIN32=1 /D_CRT_SECURE_NO_WARNINGS ^
  /I"%Root%include" /I"%Root%src\core" /I"%Root%src\graphics" %VulkanInclude% ^
@@ -62,14 +63,16 @@ cl /nologo /std:c++latest /MP /LD /W4 /WX /wd4201 /wd4324 ^
 if errorlevel 1 exit /b 1
 
 echo Building gecko_game.dll
-cl /nologo /std:c++latest /LD /W4 /WX %ConfigFlags% ^
+cl /nologo /std:c++latest /LD /W4 /WX /EHs-c- /GR- %ConfigFlags% ^
+ /D_HAS_EXCEPTIONS=0 ^
  /DGECKO_BUILD_SHARED=1 /DGECKO_PLATFORM_WINDOWS=1 /D_CRT_SECURE_NO_WARNINGS ^
  /I"%Root%include" "%Root%projects\sandbox\game.cpp" ^
  "%BinaryDir%\Gecko.lib" /Fe"%BinaryDir%\gecko_game.dll"
 if errorlevel 1 exit /b 1
 
 echo Building gecko_launcher
-cl /nologo /std:c++latest /W4 /WX %ConfigFlags% ^
+cl /nologo /std:c++latest /W4 /WX /EHs-c- /GR- %ConfigFlags% ^
+ /D_HAS_EXCEPTIONS=0 ^
  /DGECKO_BUILD_SHARED=1 /DGECKO_PLATFORM_WINDOWS=1 /D_CRT_SECURE_NO_WARNINGS ^
  /I"%Root%include" "%Root%projects\launcher\main.cpp" ^
  "%BinaryDir%\Gecko.lib" /Fe"%BinaryDir%\gecko_launcher.exe"

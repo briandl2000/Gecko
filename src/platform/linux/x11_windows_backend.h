@@ -6,10 +6,6 @@
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/windows_interface.h"
 
-#include <cstring>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 // Forward-declare X11 types to avoid macro conflicts (X11 defines "Always"
 // which clashes with gecko enums).  The actual headers are included in the
@@ -26,7 +22,7 @@ namespace gecko::platform {
 struct X11WindowState
 {
   WindowDesc Desc {};
-  ::std::string TitleStorage;
+  String TitleStorage;
   Extent2D ClientSize {};
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
@@ -57,7 +53,7 @@ StagedEvent MakeStagedEvent(gecko::EventCode code, const T& payload) noexcept
   StagedEvent ev;
   ev.Code = code;
   ev.PayloadSize = static_cast<u32>(sizeof(T));
-  ::std::memcpy(ev.PayloadStorage, &payload, sizeof(T));
+  MemoryCopy(ev.PayloadStorage, &payload, sizeof(T));
   return ev;
 }
 
@@ -146,9 +142,9 @@ private:
   Atom m_MotifWmHints {0};
   u64 m_NextId {0};
 
-  ::std::unordered_map<u64, X11WindowState> m_Windows;
-  ::std::unordered_map<::Window, u64> m_WindowByXid;
-  ::std::vector<StagedEvent> m_Staged;
+  HashMap<u64, X11WindowState> m_Windows;
+  HashMap<::Window, u64> m_WindowByXid;
+  Array<StagedEvent> m_Staged;
 };
 
 Unique<IWindowsBackend> CreateXlibWindowsBackend() noexcept;

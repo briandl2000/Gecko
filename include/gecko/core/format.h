@@ -2,6 +2,7 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/span.h"
+#include "gecko/core/string.h"
 #include "gecko/core/types.h"
 
 namespace gecko {
@@ -12,6 +13,7 @@ enum class FormatArgKind : u8
   Unsigned,
   Float,
   String,
+  StringView,
   Pointer,
   Character,
   Boolean,
@@ -19,6 +21,12 @@ enum class FormatArgKind : u8
 
 struct FormatArg
 {
+  struct ViewValue
+  {
+    const char* Data;
+    usize Count;
+  };
+
   FormatArgKind Kind {FormatArgKind::String};
   union
   {
@@ -26,6 +34,7 @@ struct FormatArg
     u64 Unsigned;
     f64 Float;
     const char* String;
+    ViewValue View;
     const void* Pointer;
     char Character;
     bool Boolean;
@@ -105,6 +114,23 @@ template <FormattableInteger T>
 [[nodiscard]] constexpr FormatArg MakeFormatArg(const char* value) noexcept
 {
   return FormatArg {.Kind = FormatArgKind::String, .Value = {.String = value}};
+}
+
+[[nodiscard]] constexpr FormatArg MakeFormatArg(StringView value) noexcept
+{
+  return FormatArg {.Kind = FormatArgKind::StringView,
+                    .Value = {.View = {.Data = value.Data(), .Count = value.Count()}}};
+}
+
+[[nodiscard]] inline FormatArg MakeFormatArg(const String& value) noexcept
+{
+  return MakeFormatArg(value.View());
+}
+
+template <usize Capacity>
+[[nodiscard]] FormatArg MakeFormatArg(const StaticString<Capacity>& value) noexcept
+{
+  return MakeFormatArg(value.View());
 }
 
 [[nodiscard]] constexpr FormatArg MakeFormatArg(char* value) noexcept

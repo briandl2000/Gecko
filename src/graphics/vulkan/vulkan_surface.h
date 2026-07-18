@@ -3,7 +3,6 @@
 
 #include "gecko/platform/window.h"
 
-#include <span>
 #include <vulkan/vulkan.h>
 
 namespace gecko::graphics {
@@ -15,11 +14,11 @@ namespace gecko::graphics {
 
 /// Returns the instance extensions required by the enabled surface backends
 /// (always includes VK_KHR_surface). Pointer lifetime is static.
-[[nodiscard]] ::std::span<const char* const> GetRequiredSurfaceExtensions() noexcept;
+[[nodiscard]] Span<const char* const> GetRequiredSurfaceExtensions() noexcept;
 
 /// Create a `VkSurfaceKHR` for the given native window. Returns VK_SUCCESS
 /// on success and writes the surface to `*out`.
-[[nodiscard]] VkResult CreateSurface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+[[nodiscard]] VkResult CreateSurface(VkInstance instance, const gecko::platform::NativeWindowHandle& native,
                                      VkSurfaceKHR* out) noexcept;
 
 }  // namespace gecko::graphics

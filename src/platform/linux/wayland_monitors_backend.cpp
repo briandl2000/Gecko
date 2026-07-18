@@ -11,10 +11,6 @@
 #include "gecko/core/services/log.h"
 #include "gecko/platform/platform_events.h"
 
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-#include <iterator>
 
 namespace gecko::platform {
 
@@ -36,9 +32,9 @@ static void OutputGeometry(void* data, ::wl_output* /*output*/, i32 x, i32 y, i3
     FormatTo(buffer, "{} {}", make, model);
   }
   else if (make)
-    ::std::strncpy(name, make, sizeof(name) - 1);
+    StringCopy(name, sizeof(name), make);
   else if (model)
-    ::std::strncpy(name, model, sizeof(name) - 1);
+    StringCopy(name, sizeof(name), model);
   entry->PendingName[sizeof(entry->PendingName) - 1] = '\0';
   FormatBuffer buffer {.Data = entry->PendingName, .Capacity = sizeof(entry->PendingName)};
   FormatTo(buffer, "{}", name);
@@ -68,7 +64,7 @@ static void OutputDone(void* data, ::wl_output* /*output*/)
   if (entry->PendingPhysicalW > 0 && entry->PendingModeW > 0)
   {
     double dpi = static_cast<double>(entry->PendingModeW) * 25.4 / static_cast<double>(entry->PendingPhysicalW);
-    info.Dpi = static_cast<u32>(::std::round(dpi));
+    info.Dpi = static_cast<u32>(math::Round(static_cast<f32>(dpi)));
     info.DpiScale = static_cast<float>(info.Dpi) / 96.0F;
   }
   else
@@ -88,7 +84,7 @@ static void OutputName(void* data, ::wl_output* /*output*/, const char* name)
 {
   auto* entry = static_cast<WaylandMonitorEntry*>(data);
   if (name)
-    ::std::strncpy(entry->PendingName, name, MaxMonitorNameLength - 1);
+    StringCopy(entry->PendingName, MaxMonitorNameLength, name);
 }
 
 static void OutputDescription(void* /*data*/, ::wl_output* /*output*/, const char* /*description*/)
@@ -122,7 +118,7 @@ WaylandMonitorsBackend::WaylandMonitorsBackend() noexcept
 
 WaylandMonitorsBackend::~WaylandMonitorsBackend() noexcept
 {
-  for (auto& entry : m_Monitors)
+  for (auto& [name, entry] : m_Monitors)
   {
     if (entry.Output)
       ::wl_output_destroy(entry.Output);
@@ -147,7 +143,7 @@ void WaylandMonitorsBackend::EnumerateMonitors() noexcept
 
   // Mark first monitor as primary (Wayland has no primary concept)
   if (!m_Monitors.empty())
-    m_Monitors.front().Info.IsPrimary = true;
+    m_Monitors.begin()->second.Info.IsPrimary = true;
 
   GECKO_INFO(labels::General, "WaylandMonitorsBackend: enumerated {} monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
@@ -161,16 +157,18 @@ MonitorHandle WaylandMonitorsBackend::GetMonitorHandle(u32 index) const noexcept
 {
   if (index >= static_cast<u32>(m_Monitors.size()))
     return {};
-  auto it = m_Monitors.begin();
-  ::std::advance(it, index);
-  return it->Handle;
+  u32 current = 0;
+  for (const auto& [name, entry] : m_Monitors)
+    if (current++ == index)
+      return entry.Handle;
+  return {};
 }
 
 MonitorInfo WaylandMonitorsBackend::GetMonitorProperties(MonitorHandle handle) const noexcept
 {
   if (!handle.IsValid())
     return {};
-  for (const auto& entry : m_Monitors)
+  for (const auto& [name, entry] : m_Monitors)
   {
     if (entry.Handle == handle)
       return entry.Info;
@@ -180,13 +178,13 @@ MonitorInfo WaylandMonitorsBackend::GetMonitorProperties(MonitorHandle handle) c
 
 MonitorHandle WaylandMonitorsBackend::GetPrimaryMonitor() const noexcept
 {
-  for (const auto& entry : m_Monitors)
+  for (const auto& [name, entry] : m_Monitors)
   {
     if (entry.Info.IsPrimary)
       return entry.Handle;
   }
   if (!m_Monitors.empty())
-    return m_Monitors.front().Handle;
+    return m_Monitors.begin()->second.Handle;
   return {};
 }
 
@@ -215,7 +213,7 @@ void WaylandMonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noex
 
 void WaylandMonitorsBackend::HandleGlobal(::wl_registry* registry, u32 name, const char* interface) noexcept
 {
-  if (::std::strcmp(interface, wl_output_interface.name) != 0)
+  if (StringCompare(interface, wl_output_interface.name) != 0)
     return;
 
   auto* output = static_cast<::wl_output*>(::wl_registry_bind(registry, name, &wl_output_interface, 4));
@@ -227,23 +225,25 @@ void WaylandMonitorsBackend::HandleGlobal(::wl_registry* registry, u32 name, con
   entry.GlobalName = name;
   entry.Handle = MonitorHandle {static_cast<u64>(name) + 1};
 
-  m_Monitors.push_back(entry);
-
-  // Listener data points into the list -- stable through insert and erase.
-  ::wl_output_add_listener(output, &OutputListener, &m_Monitors.back());
+  auto [iterator, inserted] = m_Monitors.emplace(name, Move(entry));
+  if (!inserted)
+  {
+    ::wl_output_destroy(output);
+    return;
+  }
+  ::wl_output_add_listener(output, &OutputListener, &iterator->second);
 
   m_Dirty = true;
 }
 
 void WaylandMonitorsBackend::HandleGlobalRemove(u32 name) noexcept
 {
-  auto it = ::std::find_if(m_Monitors.begin(), m_Monitors.end(),
-                           [name](const WaylandMonitorEntry& e) { return e.GlobalName == name; });
+  auto it = m_Monitors.find(name);
   if (it != m_Monitors.end())
   {
-    m_RemovedHandles.push_back(it->Handle);
-    if (it->Output)
-      ::wl_output_destroy(it->Output);
+    m_RemovedHandles.push_back(it->second.Handle);
+    if (it->second.Output)
+      ::wl_output_destroy(it->second.Output);
     m_Monitors.erase(it);
     m_Dirty = true;
   }
@@ -259,7 +259,7 @@ void WaylandMonitorsBackend::EmitChanges(const gecko::EventEmitter& emitter) noe
   }
   m_RemovedHandles.clear();
 
-  for (auto& entry : m_Monitors)
+  for (auto& [name, entry] : m_Monitors)
   {
     if (!entry.Done)
       continue;

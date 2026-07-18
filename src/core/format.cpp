@@ -146,6 +146,14 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
     AppendField(output, value, length, spec, false);
     return;
   }
+  case FormatArgKind::StringView:
+  {
+    usize length = argument.Value.View.Count;
+    if (spec.HasPrecision && length > spec.Precision)
+      length = spec.Precision;
+    AppendField(output, argument.Value.View.Data, length, spec, false);
+    return;
+  }
   case FormatArgKind::Character:
     text[length++] = argument.Value.Character;
     break;

@@ -11,11 +11,6 @@
 #include "vulkan_surface.h"
 #include "vulkan_util.h"
 
-#include <cstdint>
-#include <cstring>
-#include <string_view>
-#include <vector>
-
 namespace gecko::graphics {
 
 // -- Small allocation helpers (route through Gecko allocator) -------------
@@ -23,7 +18,7 @@ namespace gecko::graphics {
 template <typename T>
 [[nodiscard]] static T* AllocObject() noexcept
 {
-  void* mem = ::gecko::AllocBytes(sizeof(T), alignof(T));
+  void* mem = gecko::AllocBytes(sizeof(T), alignof(T));
   if (mem == nullptr)
     return nullptr;
   return new (mem) T();
@@ -35,7 +30,7 @@ static void FreeObject(T* obj) noexcept
   if (obj == nullptr)
     return;
   obj->~T();
-  ::gecko::DeallocBytes(obj);
+  gecko::DeallocBytes(obj);
 }
 
 // -- Debug messenger callback ---------------------------------------------
@@ -73,7 +68,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   auto surfaceExts = GetRequiredSurfaceExtensions();
 
   // -- Enumerate available layers / extensions (for graceful fallback) --
-  ::std::vector<VkExtensionProperties> availableExts;
+  Array<VkExtensionProperties> availableExts;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkEnumerateInstanceExtensionProperties");
     u32 n = 0;
@@ -83,12 +78,12 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   }
   auto hasExt = [&](const char* name) {
     for (auto& e : availableExts)
-      if (::std::string_view(e.extensionName) == name)
+      if (StringView(e.extensionName) == name)
         return true;
     return false;
   };
 
-  ::std::vector<const char*> instanceExts;
+  Array<const char*> instanceExts;
   for (auto* e : surfaceExts)
   {
     if (hasExt(e))
@@ -97,7 +92,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
       GECKO_WARN(labels::Vulkan, "VulkanDevice: instance extension '{}' unavailable", e);
   }
 
-  ::std::vector<VkLayerProperties> availableLayers;
+  Array<VkLayerProperties> availableLayers;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkEnumerateInstanceLayerProperties");
     u32 n = 0;
@@ -107,7 +102,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   }
   auto hasLayer = [&](const char* name) {
     for (auto& l : availableLayers)
-      if (::std::string_view(l.layerName) == name)
+      if (StringView(l.layerName) == name)
         return true;
     return false;
   };
@@ -119,7 +114,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     GECKO_WARN(labels::Vulkan, "VulkanDevice: VK_EXT_debug_utils not available; "
                                "debug messenger disabled");
 
-  ::std::vector<const char*> layers;
+  Array<const char*> layers;
   if (desc.Debug && hasLayer("VK_LAYER_KHRONOS_validation"))
     layers.push_back("VK_LAYER_KHRONOS_validation");
   else if (desc.Debug)
@@ -181,7 +176,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: no Vulkan physical devices");
     return;
   }
-  ::std::vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
+  Array<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
   vkEnumeratePhysicalDevices(m_Instance, &physicalDeviceCount, physicalDevices.data());
 
   // Prefer discrete GPU
@@ -206,7 +201,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   // Find graphics queue family
   u32 queueFamilyCount = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, nullptr);
-  ::std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+  Array<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
   vkGetPhysicalDeviceQueueFamilyProperties(m_PhysicalDevice, &queueFamilyCount, queueFamilies.data());
   m_GraphicsQueueFamily = UINT32_MAX;
   for (u32 i = 0; i < queueFamilyCount; ++i)
@@ -233,7 +228,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   queueCreateInfo.queueCount = 1;
   queueCreateInfo.pQueuePriorities = &queuePriority;
 
-  ::std::vector<const char*> deviceExts = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+  Array<const char*> deviceExts;
+  deviceExts.PushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
   // Query supported features so we only enable what the physical device
   // actually exposes.
@@ -352,7 +348,7 @@ VulkanDevice::~VulkanDevice()
 
   // Destroy any lazily-created per-thread command pools.
   {
-    ::std::lock_guard<::std::mutex> lock(m_ThreadPoolsMutex);
+    LockGuard lock(m_ThreadPoolsMutex);
     for (auto& kv : m_ThreadPools)
     {
       if (kv.second != VK_NULL_HANDLE)
@@ -378,9 +374,9 @@ VulkanDevice::~VulkanDevice()
 
 VkCommandPool VulkanDevice::AcquireThreadCommandPool() noexcept
 {
-  const ::std::thread::id tid = ::std::this_thread::get_id();
+  const platform::ThreadId tid = platform::CurrentThreadId();
   {
-    ::std::lock_guard<::std::mutex> lock(m_ThreadPoolsMutex);
+    LockGuard lock(m_ThreadPoolsMutex);
     auto it = m_ThreadPools.find(tid);
     if (it != m_ThreadPools.end())
       return it->second;
@@ -399,7 +395,7 @@ VkCommandPool VulkanDevice::AcquireThreadCommandPool() noexcept
     return VK_NULL_HANDLE;
   }
 
-  ::std::lock_guard<::std::mutex> lock(m_ThreadPoolsMutex);
+  LockGuard lock(m_ThreadPoolsMutex);
   m_ThreadPools[tid] = pool;
   return pool;
 }
@@ -408,14 +404,14 @@ void VulkanDevice::WaitIdleLocked() noexcept
 {
   if (m_Device == VK_NULL_HANDLE)
     return;
-  ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+  LockGuard lock(m_QueueMutex);
   vkDeviceWaitIdle(m_Device);
 }
 
 VkFence VulkanDevice::AcquireTrackerFence() noexcept
 {
   {
-    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    LockGuard lock(m_PendingMutex);
     if (!m_FreeFences.empty())
     {
       VkFence f = m_FreeFences.back();
@@ -439,20 +435,20 @@ void VulkanDevice::ReleaseTrackerFence(VkFence fence) noexcept
 {
   if (fence == VK_NULL_HANDLE)
     return;
-  ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+  LockGuard lock(m_PendingMutex);
   m_FreeFences.push_back(fence);
 }
 
 void VulkanDevice::ReapPending() noexcept
 {
-  ::std::vector<PendingSubmit> completed;
+  Array<PendingSubmit> completed;
   {
-    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    LockGuard lock(m_PendingMutex);
     for (auto it = m_Pending.begin(); it != m_Pending.end();)
     {
       if (it->Fence != VK_NULL_HANDLE && vkGetFenceStatus(m_Device, it->Fence) == VK_SUCCESS)
       {
-        completed.emplace_back(::std::move(*it));
+        completed.emplace_back(Move(*it));
         it = m_Pending.erase(it);
       }
       else
@@ -473,9 +469,9 @@ void VulkanDevice::ReapPending() noexcept
 void VulkanDevice::DrainPending() noexcept
 {
   // Caller must have already ensured the GPU is idle (vkDeviceWaitIdle).
-  ::std::vector<PendingSubmit> pending;
+  Array<PendingSubmit> pending;
   {
-    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
+    LockGuard lock(m_PendingMutex);
     pending.swap(m_Pending);
   }
   for (auto& entry : pending)
@@ -522,7 +518,7 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchai
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: surface reports zero supported formats");
     return false;
   }
-  ::std::vector<VkSurfaceFormatKHR> surfaceFormats(formatCount);
+  Array<VkSurfaceFormatKHR> surfaceFormats(formatCount);
   vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface, &formatCount, surfaceFormats.data());
 
   VkFormat wanted = ToVkFormat(data.Desc.Format);
@@ -543,7 +539,7 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchai
   {
     u32 presentModeCount = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount, nullptr);
-    ::std::vector<VkPresentModeKHR> presentModes(presentModeCount);
+    Array<VkPresentModeKHR> presentModes(presentModeCount);
     vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount, presentModes.data());
     for (VkPresentModeKHR m : presentModes)
     {
@@ -683,7 +679,7 @@ void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data, bool des
   }
 }
 
-Swapchain VulkanDevice::CreateSwapchain(const ::gecko::platform::NativeWindowHandle& native,
+Swapchain VulkanDevice::CreateSwapchain(const gecko::platform::NativeWindowHandle& native,
                                         const SwapchainDesc& desc) noexcept
 {
   GECKO_PROFILE_NAMED(labels::Vulkan, "VulkanDevice::CreateSwapchain");
@@ -844,12 +840,12 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   ctx.SC = &swapchain;
   ctx.FrameIndex = frame;
   ctx.ImageIndex = imageIndex;
-  ctx.BackBuffer = ::std::move(rt);
+  ctx.BackBuffer = Move(rt);
   ctx.Valid = true;
   return ctx;
 }
 
-void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
+void VulkanDevice::Present(Span<const FrameContext> frames) noexcept
 {
   GECKO_PROFILE_ALWAYS_NAMED(labels::Vulkan, "VulkanDevice::Present");
 
@@ -891,7 +887,7 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
   VkResult presentResult;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "Present::QueueLock");
-    ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    LockGuard lock(m_QueueMutex);
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueuePresentKHR");
     presentResult = vkQueuePresentKHR(m_PresentQueue, &presentInfo);
   }
@@ -988,7 +984,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(Unique<ICommandList> commandList) 
 
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "ExecuteGraphics::QueueLock");
-    ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    LockGuard lock(m_QueueMutex);
     {
       GECKO_PROFILE_NAMED(labels::Vulkan, "vkQueueSubmit");
       // Notify any attached GPU sampler that the cmd list is about to
@@ -997,7 +993,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(Unique<ICommandList> commandList) 
       // vkQueueSubmit call on the CPU timeline.
       if (auto* sampler = cl->GetAttachedGpuSampler(); sampler != nullptr)
       {
-        if (auto* p = ::gecko::GetProfiler(); p != nullptr)
+        if (auto* p = gecko::GetProfiler(); p != nullptr)
           sampler->OnSubmit(p->NowNs());
       }
       VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
@@ -1024,14 +1020,14 @@ void VulkanDevice::ExecuteGraphicsCommandList(Unique<ICommandList> commandList) 
 
   // Defer destruction until trackerFence signals (reaped by BeginFrame).
   {
-    ::std::lock_guard<::std::mutex> lock(m_PendingMutex);
-    m_Pending.push_back({trackerFence, ::std::move(commandList)});
+    LockGuard lock(m_PendingMutex);
+    m_Pending.push_back({trackerFence, Move(commandList)});
   }
 }
 
 void VulkanDevice::ExecuteComputeCommandList(Unique<ICommandList> commandList) noexcept
 {
-  ExecuteGraphicsCommandList(::std::move(commandList));
+  ExecuteGraphicsCommandList(Move(commandList));
 }
 
 // ------------------------------------------------------------
@@ -1208,7 +1204,7 @@ RenderTarget VulkanDevice::CreateRenderTarget(const RenderTargetDesc& desc) noex
 
   RenderTarget rt;
   rt.Desc = desc;
-  rt.BackingTexture = ::std::move(t);
+  rt.BackingTexture = Move(t);
   rt.Data = Shared<void>(rtd, [](void* p) noexcept { FreeObject(static_cast<VulkanRTData*>(p)); });
   return rt;
 }
@@ -1466,8 +1462,8 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
   shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
   shaderModuleCreateInfo.codeSize = byteCount;
 
-  ::std::vector<u32> alignedCopy;
-  const bool isAligned = (reinterpret_cast<::std::uintptr_t>(rawBytes) % alignof(u32)) == 0;
+  Array<u32> alignedCopy;
+  const bool isAligned = (reinterpret_cast<usize>(rawBytes) % alignof(u32)) == 0;
   if (isAligned)
   {
     shaderModuleCreateInfo.pCode = reinterpret_cast<const u32*>(rawBytes);
@@ -1475,7 +1471,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
   else
   {
     alignedCopy.resize(byteCount / sizeof(u32));
-    ::std::memcpy(alignedCopy.data(), rawBytes, byteCount);
+    MemoryCopy(alignedCopy.data(), rawBytes, byteCount);
     shaderModuleCreateInfo.pCode = alignedCopy.data();
   }
 
@@ -1964,18 +1960,18 @@ QueryPool VulkanDevice::CreateTimestampQueryPool(const QueryPoolDesc& desc) noex
   return q;
 }
 
-u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept
+u32 VulkanDevice::ReadTimestamps(const QueryPool& pool, u32 firstQuery, Span<u64> out) noexcept
 {
   if (!pool.IsValid() || out.empty())
     return 0;
   auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
   if (firstQuery >= qd->Count)
     return 0;
-  const u32 count = static_cast<u32>(::std::min<::std::size_t>(out.size(), qd->Count - firstQuery));
+  const u32 count = static_cast<u32>(out.size() < qd->Count - firstQuery ? out.size() : qd->Count - firstQuery);
 
-  ::std::size_t stagingCount = count;
+  usize stagingCount = count;
   u64 staging[64];
-  ::std::vector<u64> heapStaging;
+  Array<u64> heapStaging;
   u64* ticks = staging;
   if (stagingCount > 64)
   {
@@ -2005,7 +2001,7 @@ void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery, u32
   auto* qd = static_cast<VulkanQueryPoolData*>(pool.Data.get());
   if (firstQuery >= qd->Count)
     return;
-  const u32 c = ::std::min(count, qd->Count - firstQuery);
+  const u32 c = count < qd->Count - firstQuery ? count : qd->Count - firstQuery;
   if (m_HasHostQueryReset)
   {
     vkResetQueryPool(m_Device, qd->QueryPool, firstQuery, c);
@@ -2027,11 +2023,11 @@ void VulkanDevice::HostResetQueryPool(const QueryPool& pool, u32 firstQuery, u32
   }
 }
 
-::gecko::Unique<IGpuSampler> VulkanDevice::CreateGpuSampler(const GpuSamplerDesc& desc) noexcept
+gecko::Unique<IGpuSampler> VulkanDevice::CreateGpuSampler(const GpuSamplerDesc& desc) noexcept
 {
   if (!m_Valid)
     return nullptr;
-  auto sampler = ::gecko::CreateUnique<VulkanGpuSampler>(*this, desc);
+  auto sampler = gecko::CreateUnique<VulkanGpuSampler>(*this, desc);
   if (sampler == nullptr || !sampler->IsValid())
     return nullptr;
   return sampler;
@@ -2088,14 +2084,14 @@ void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*), void* c
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &cmdBuf;
   {
-    ::std::lock_guard<::std::mutex> lock(m_QueueMutex);
+    LockGuard lock(m_QueueMutex);
     vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(m_GraphicsQueue);
   }
   vkFreeCommandBuffers(m_Device, pool, 1, &cmdBuf);
 }
 
-void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip,
+void VulkanDevice::UploadTextureData(Texture& texture, Span<const gecko::byte> data, u32 mip,
                                      u32 slice) noexcept
 {
   if (!texture.IsValid() || data.empty())
@@ -2117,7 +2113,7 @@ void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko
     GECKO_ERROR(labels::Vulkan, "VulkanDevice::UploadTextureData staging allocation failed");
     return;
   }
-  ::std::memcpy(stagingAllocation.Mapped, data.data(), data.size());
+  MemoryCopy(stagingAllocation.Mapped, data.data(), data.size());
 
   struct Ctx
   {
@@ -2175,7 +2171,7 @@ void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko
   DestroyBuffer(staging, stagingAllocation);
 }
 
-void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data, u32 offset) noexcept
+void VulkanDevice::UploadBufferData(Buffer& buffer, Span<const gecko::byte> data, u32 offset) noexcept
 {
   if (!buffer.IsValid() || data.empty())
     return;
@@ -2197,7 +2193,7 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
     return;
   }
 
-  ::std::memcpy(stagingAllocation.Mapped, data.data(), data.size());
+  MemoryCopy(stagingAllocation.Mapped, data.data(), data.size());
 
   struct Ctx
   {

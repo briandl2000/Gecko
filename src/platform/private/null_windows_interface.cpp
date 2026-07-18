@@ -27,7 +27,7 @@ WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   entry.State = desc.Visible ? platform::WindowState::Normal : platform::WindowState::Hidden;
   entry.Alive = true;
 
-  auto [it, ok] = m_Windows.emplace(id, ::std::move(entry));
+  auto [it, ok] = m_Windows.emplace(id, Move(entry));
   it->second.Desc.Title = it->second.TitleStorage.c_str();
 
   GECKO_INFO(labels::General, "Created null window id={}", static_cast<unsigned long long>(id));

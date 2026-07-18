@@ -3,7 +3,7 @@
 #include "gecko/core/services/log.h"
 #include "private/labels.h"
 
-#include <cstdlib>
+#include <stdlib.h>
 
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
 #include <X11/Xlib.h>

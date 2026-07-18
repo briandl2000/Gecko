@@ -10,7 +10,6 @@
 #include "gecko/platform/input_codes.h"
 #include "x11_key_map.h"
 
-#include <cstdint>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 
@@ -135,7 +134,7 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   st.State = desc.Visible ? platform::WindowState::Normal : platform::WindowState::Hidden;
   st.WindowId = w;
 
-  auto [it, ok] = m_Windows.emplace(id, ::std::move(st));
+  auto [it, ok] = m_Windows.emplace(id, Move(st));
   it->second.Desc.Title = it->second.TitleStorage.c_str();
   m_WindowByXid.emplace(w, id);
 
@@ -287,7 +286,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
           int i = 0;
           while (i < len)
           {
-            ::gecko::u32 cp = 0;
+            gecko::u32 cp = 0;
             int consumed = 1;
             const unsigned char b0 = bytes[i];
             if (b0 < 0x80)
@@ -296,19 +295,19 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
             }
             else if ((b0 & 0xE0) == 0xC0 && i + 1 < len)
             {
-              cp = ::gecko::u32(b0 & 0x1F) << 6 | ::gecko::u32(bytes[i + 1] & 0x3F);
+              cp = gecko::u32(b0 & 0x1F) << 6 | gecko::u32(bytes[i + 1] & 0x3F);
               consumed = 2;
             }
             else if ((b0 & 0xF0) == 0xE0 && i + 2 < len)
             {
-              cp = ::gecko::u32(b0 & 0x0F) << 12 | ::gecko::u32(bytes[i + 1] & 0x3F) << 6 |
-                   ::gecko::u32(bytes[i + 2] & 0x3F);
+              cp = gecko::u32(b0 & 0x0F) << 12 | gecko::u32(bytes[i + 1] & 0x3F) << 6 |
+                   gecko::u32(bytes[i + 2] & 0x3F);
               consumed = 3;
             }
             else if ((b0 & 0xF8) == 0xF0 && i + 3 < len)
             {
-              cp = ::gecko::u32(b0 & 0x07) << 18 | ::gecko::u32(bytes[i + 1] & 0x3F) << 12 |
-                   ::gecko::u32(bytes[i + 2] & 0x3F) << 6 | ::gecko::u32(bytes[i + 3] & 0x3F);
+              cp = gecko::u32(b0 & 0x07) << 18 | gecko::u32(bytes[i + 1] & 0x3F) << 12 |
+                   gecko::u32(bytes[i + 2] & 0x3F) << 6 | gecko::u32(bytes[i + 3] & 0x3F);
               consumed = 4;
             }
             else
@@ -456,7 +455,7 @@ NativeWindowHandle X11WindowsBackend::GetNativeWindowHandle(WindowHandle window)
   NativeWindowHandle nh;
   nh.Backend = DisplayBackendKind::Xlib;
   nh.Display = m_Display;
-  nh.Handle = reinterpret_cast<void*>(static_cast<uintptr_t>(it->second.WindowId));
+  nh.Handle = reinterpret_cast<void*>(static_cast<usize>(it->second.WindowId));
   return nh;
 }
 
@@ -840,11 +839,11 @@ void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons, b
   unsigned long funcs = MwmFuncMove;
   if (resizable)
     funcs |= MwmFuncResize;
-  if (::gecko::Any(buttons & WindowButtons::Minimize))
+  if (gecko::Any(buttons & WindowButtons::Minimize))
     funcs |= MwmFuncMinimize;
-  if (::gecko::Any(buttons & WindowButtons::Maximize))
+  if (gecko::Any(buttons & WindowButtons::Maximize))
     funcs |= MwmFuncMaximize;
-  if (::gecko::Any(buttons & WindowButtons::Close))
+  if (gecko::Any(buttons & WindowButtons::Close))
     funcs |= MwmFuncClose;
   hints.functions = funcs;
 

@@ -12,8 +12,6 @@
 #include "gecko/core/assert.h"
 #include "gecko/core/types.h"
 
-#include <cstddef>
-
 namespace gecko {
 
 struct Label;

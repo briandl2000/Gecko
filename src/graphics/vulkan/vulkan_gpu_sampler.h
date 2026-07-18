@@ -6,7 +6,6 @@
 #include "gecko/graphics/graphics_device.h"
 #include "gecko/graphics/graphics_types.h"
 
-#include <vector>
 
 namespace gecko::graphics {
 
@@ -33,7 +32,7 @@ public:
 
   void BeginFrame(ICommandList& cmd) noexcept override;
   void EndFrame(ICommandList& cmd) noexcept override;
-  void BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name, ::gecko::ProfLevel level) noexcept override;
+  void BeginZone(ICommandList& cmd, gecko::Label label, const char* name, gecko::ProfLevel level) noexcept override;
   void EndZone(ICommandList& cmd) noexcept override;
   void OnSubmit(u64 cpuNowNs) noexcept override;
 
@@ -47,18 +46,18 @@ private:
 
   struct ZoneRecord
   {
-    ::gecko::Label ScopeLabel {};
+    gecko::Label ScopeLabel {};
     const char* Name {nullptr};
     u32 NameHash {0};
     u32 BeginQuery {0};
     u32 EndQuery {0};
-    ::gecko::ProfLevel Level {::gecko::ProfLevel::Normal};
+    gecko::ProfLevel Level {gecko::ProfLevel::Normal};
   };
 
   struct FrameSlot
   {
     QueryPool Pool {};
-    std::vector<ZoneRecord> Zones {};
+    Array<ZoneRecord> Zones {};
     u32 NextQuery {0};
     bool Pending {false};     // submitted, awaiting resolve
     u64 CpuFrameStartNs {0};  // CPU NowNs sampled at BeginFrame
@@ -69,7 +68,7 @@ private:
 
   VulkanDevice* m_Device {nullptr};
   GpuSamplerDesc m_Desc {};
-  std::vector<FrameSlot> m_Frames;
+  Array<FrameSlot> m_Frames;
   u32 m_Current {0};
 
   // Open-zone stack, holds indices into the current FrameSlot's Zones.

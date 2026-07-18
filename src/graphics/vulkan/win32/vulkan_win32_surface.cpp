@@ -14,7 +14,7 @@
 
 namespace gecko::graphics {
 
-VkResult CreateWin32Surface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateWin32Surface(VkInstance instance, const gecko::platform::NativeWindowHandle& native,
                             VkSurfaceKHR* out) noexcept
 {
   VkWin32SurfaceCreateInfoKHR sci {};

@@ -1,125 +1,105 @@
 #include "gecko/core/utility/random.h"
 
 #include "gecko/core/assert.h"
-
-#include <cstring>
-#include <random>
+#include "gecko/core/utility/time.h"
+#include "gecko/platform/threading.h"
 
 namespace gecko {
 
-struct ThreadRandomState
-{
-  ::std::mt19937_64 generator;
-  ::std::uniform_real_distribution<f32> dist01_f32 {0.0f, 1.0f};
-  ::std::uniform_real_distribution<f64> dist01_f64 {0.0, 1.0};
-  ::std::bernoulli_distribution distBool {0.5};
-  bool initialized = false;
+namespace {
 
-  ThreadRandomState()
+thread_local u64 g_RandomState = 0;
+
+u64 NextRandom() noexcept
+{
+  if (g_RandomState == 0)
+    g_RandomState = MonotonicTimeNs() ^ (platform::CurrentThreadId() * 0x9E3779B97F4A7C15ULL);
+  u64 value = g_RandomState;
+  value ^= value >> 12U;
+  value ^= value << 25U;
+  value ^= value >> 27U;
+  g_RandomState = value;
+  return value * 0x2545F4914F6CDD1DULL;
+}
+
+u64 RandomRange(u64 range) noexcept
+{
+  if (range == 0)
+    return NextRandom();
+  const u64 threshold = static_cast<u64>(-range) % range;
+  for (;;)
   {
-    ::std::random_device rd;
-    generator.seed(rd());
-    initialized = true;
+    const u64 value = NextRandom();
+    if (value >= threshold)
+      return value % range;
   }
-};
-
-static thread_local ThreadRandomState g_ThreadRandomState;
-
-static ::std::mt19937_64& GetGenerator() noexcept
-{
-  if (!g_ThreadRandomState.initialized)
-    g_ThreadRandomState = ThreadRandomState();
-  return g_ThreadRandomState.generator;
 }
 
-u32 RandomU32(u32 min, u32 max) noexcept
+}  // namespace
+
+u32 RandomU32(u32 minimum, u32 maximum) noexcept
 {
-  GECKO_ASSERT(min <= max && "Random range: min must be <= max");
-  if (min == max)
-    return min;
-  ::std::uniform_int_distribution<u32> dist(min, max);
-  return dist(GetGenerator());
+  GECKO_ASSERT(minimum <= maximum, "Random range minimum exceeds maximum");
+  return minimum == maximum ? minimum : minimum + static_cast<u32>(RandomRange(static_cast<u64>(maximum) - minimum + 1U));
 }
 
-u64 RandomU64(u64 min, u64 max) noexcept
+u64 RandomU64(u64 minimum, u64 maximum) noexcept
 {
-  GECKO_ASSERT(min <= max && "Random range: min must be <= max");
-  if (min == max)
-    return min;
-  ::std::uniform_int_distribution<u64> dist(min, max);
-  return dist(GetGenerator());
+  GECKO_ASSERT(minimum <= maximum, "Random range minimum exceeds maximum");
+  return minimum == maximum ? minimum : minimum + RandomRange(maximum - minimum + 1U);
 }
 
-i32 RandomI32(i32 min, i32 max) noexcept
+i32 RandomI32(i32 minimum, i32 maximum) noexcept
 {
-  GECKO_ASSERT(min <= max && "Random range: min must be <= max");
-  if (min == max)
-    return min;
-  ::std::uniform_int_distribution<i32> dist(min, max);
-  return dist(GetGenerator());
+  GECKO_ASSERT(minimum <= maximum, "Random range minimum exceeds maximum");
+  const u64 range = static_cast<u64>(static_cast<i64>(maximum) - minimum) + 1U;
+  return static_cast<i32>(static_cast<i64>(minimum) + static_cast<i64>(RandomRange(range)));
 }
 
-i64 RandomI64(i64 min, i64 max) noexcept
+i64 RandomI64(i64 minimum, i64 maximum) noexcept
 {
-  GECKO_ASSERT(min <= max && "Random range: min must be <= max");
-  if (min == max)
-    return min;
-  ::std::uniform_int_distribution<i64> dist(min, max);
-  return dist(GetGenerator());
+  GECKO_ASSERT(minimum <= maximum, "Random range minimum exceeds maximum");
+  const u64 range = static_cast<u64>(maximum) - static_cast<u64>(minimum) + 1U;
+  return static_cast<i64>(static_cast<u64>(minimum) + RandomRange(range));
 }
 
-f32 RandomF32(f32 min, f32 max) noexcept
+f32 RandomF32(f32 minimum, f32 maximum) noexcept
 {
-  GECKO_ASSERT(min <= max && "Random range: min must be <= max");
-  GECKO_ASSERT(::std::isfinite(min) && ::std::isfinite(max));
-  if (min == max)
-    return min;
-  f32 t = g_ThreadRandomState.dist01_f32(GetGenerator());
-  return min + t * (max - min);
+  GECKO_ASSERT(minimum <= maximum, "Random range minimum exceeds maximum");
+  const f32 normalized = static_cast<f32>(NextRandom() >> 40U) * (1.0F / 16777216.0F);
+  return minimum + normalized * (maximum - minimum);
 }
 
-f64 RandomF64(f64 min, f64 max) noexcept
+f64 RandomF64(f64 minimum, f64 maximum) noexcept
 {
-  GECKO_ASSERT(min <= max && "Random range: min must be <= max");
-  GECKO_ASSERT(::std::isfinite(min) && ::std::isfinite(max));
-  if (min == max)
-    return min;
-  f64 t = g_ThreadRandomState.dist01_f64(GetGenerator());
-  return min + t * (max - min);
+  GECKO_ASSERT(minimum <= maximum, "Random range minimum exceeds maximum");
+  const f64 normalized = static_cast<f64>(NextRandom() >> 11U) * (1.0 / 9007199254740992.0);
+  return minimum + normalized * (maximum - minimum);
 }
 
 bool RandomBool() noexcept
 {
-  return g_ThreadRandomState.distBool(GetGenerator());
+  return (NextRandom() & 1U) != 0;
 }
 
 void RandomBytes(void* buffer, usize size) noexcept
 {
-  GECKO_ASSERT(buffer && "Buffer cannot be null");
-  if (size == 0)
-    return;
-
-  auto* bytes = static_cast<u8*>(buffer);
-  auto& gen = GetGenerator();
-
-  while (size >= 8)
+  GECKO_ASSERT(buffer != nullptr || size == 0, "Random byte buffer cannot be null");
+  auto* output = static_cast<u8*>(buffer);
+  while (size != 0)
   {
-    u64 val = gen();
-    ::std::memcpy(bytes, &val, 8);
-    bytes += 8;
-    size -= 8;
-  }
-
-  if (size > 0)
-  {
-    u64 val = gen();
-    ::std::memcpy(bytes, &val, size);
+    u64 value = NextRandom();
+    for (u32 index = 0; index < 8 && size != 0; ++index, --size)
+    {
+      *output++ = static_cast<u8>(value);
+      value >>= 8U;
+    }
   }
 }
 
 void SeedRandom(u64 seed) noexcept
 {
-  GetGenerator().seed(seed);
+  g_RandomState = seed != 0 ? seed : 0xA5A5A5A5A5A5A5A5ULL;
 }
 
 }  // namespace gecko

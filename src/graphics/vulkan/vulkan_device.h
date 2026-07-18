@@ -2,12 +2,10 @@
 #pragma once
 
 #include "gecko/graphics/graphics_device.h"
+#include "gecko/core/hash_map.h"
+#include "gecko/core/sync.h"
+#include "gecko/platform/threading.h"
 #include "vulkan_types.h"
-
-#include <mutex>
-#include <thread>
-#include <unordered_map>
-#include <vector>
 
 namespace gecko::graphics {
 
@@ -24,13 +22,13 @@ public:
 
   // -- Swapchain -------------------------------------------------
 
-  Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle& native,
+  Swapchain CreateSwapchain(const gecko::platform::NativeWindowHandle& native,
                             const SwapchainDesc& desc) noexcept override;
   void DestroySwapchain(Swapchain& swapchain) noexcept override;
   void ResizeSwapchain(Swapchain& swapchain) noexcept override;
 
   FrameContext BeginFrame(Swapchain& swapchain) noexcept override;
-  void Present(::std::span<const FrameContext> frames) noexcept override;
+  void Present(Span<const FrameContext> frames) noexcept override;
 
   // -- Command lists ----------------------------------------------
 
@@ -51,14 +49,14 @@ public:
   GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc& desc) noexcept override;
   ComputePipeline CreateComputePipeline(const ComputePipelineDesc& desc) noexcept override;
   QueryPool CreateTimestampQueryPool(const QueryPoolDesc& desc) noexcept override;
-  u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept override;
+  u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, Span<u64> out) noexcept override;
 
-  ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc& desc) noexcept override;
+  gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc& desc) noexcept override;
 
   // -- Data upload ------------------------------------------------
 
-  void UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip, u32 slice) noexcept override;
-  void UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data, u32 offset) noexcept override;
+  void UploadTextureData(Texture& texture, Span<const gecko::byte> data, u32 mip, u32 slice) noexcept override;
+  void UploadBufferData(Buffer& buffer, Span<const gecko::byte> data, u32 offset) noexcept override;
 
   // -- Internal accessors used by VulkanCommandList --------------
 
@@ -152,12 +150,12 @@ private:
   // Per-thread command pools for thread-safe command-list recording.
   // Protected by m_ThreadPoolsMutex. Entries are never removed during the
   // device's lifetime -- freed together in the destructor.
-  ::std::mutex m_ThreadPoolsMutex;
-  ::std::unordered_map<::std::thread::id, VkCommandPool> m_ThreadPools;
+  SpinMutex m_ThreadPoolsMutex;
+  HashMap<platform::ThreadId, VkCommandPool> m_ThreadPools;
 
   // Serialises vkQueueSubmit / vkQueuePresentKHR since Vulkan queues are
   // externally synchronised and may be touched from any thread.
-  ::std::mutex m_QueueMutex;
+  SpinMutex m_QueueMutex;
 
   // Deferred command-list destruction: each Execute* submits with a tracker
   // fence and pushes the owning Unique here. ReapPending() runs each frame
@@ -168,9 +166,9 @@ private:
     VkFence Fence;
     Unique<ICommandList> Cmd;
   };
-  ::std::mutex m_PendingMutex;
-  ::std::vector<PendingSubmit> m_Pending;
-  ::std::vector<VkFence> m_FreeFences;
+  SpinMutex m_PendingMutex;
+  Array<PendingSubmit> m_Pending;
+  Array<VkFence> m_FreeFences;
 
   [[nodiscard]] VkFence AcquireTrackerFence() noexcept;
   void ReleaseTrackerFence(VkFence fence) noexcept;

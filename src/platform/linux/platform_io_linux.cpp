@@ -2,31 +2,29 @@
 
 #include "platform_io_linux.h"
 
-#include "gecko/core/ptr.h"
-#include "gecko/platform/path_view.h"
+#include "gecko/core/services/memory.h"
 #include "gecko/platform/platform_io.h"
 
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/limits.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <string>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <vector>
+
+#include <new>
 
 namespace gecko::platform {
 
 namespace linux_io {
 
-::std::string ToCString(PathView path) noexcept
+String ToCString(PathView path) noexcept
 {
-  return ::std::string {path.View()};
+  return String {path.View()};
 }
 
 }  // namespace linux_io
@@ -35,399 +33,312 @@ namespace {
 
 using linux_io::ToCString;
 
-// Map deleter for MappedFile. Frees the (size, addr) pair stored in
-// the heap handle and then closes the underlying fd.
 struct LinuxMapHandle
 {
-  void* Address;
-  ::std::size_t Size;
-  int Fd;
+  void* Address {nullptr};
+  usize Size {0};
+  int File {-1};
 };
 
 void UnmapLinux(void* opaque) noexcept
 {
-  auto* h = static_cast<LinuxMapHandle*>(opaque);
-  if (!h)
+  auto* handle = static_cast<LinuxMapHandle*>(opaque);
+  if (handle == nullptr)
     return;
-  if (h->Address && h->Size > 0)
-    ::munmap(h->Address, h->Size);
-  if (h->Fd >= 0)
-    ::close(h->Fd);
-  delete h;
+  if (handle->Address != nullptr && handle->Size != 0)
+    (void)::munmap(handle->Address, handle->Size);
+  if (handle->File >= 0)
+    (void)::close(handle->File);
+  handle->~LinuxMapHandle();
+  DeallocBytes(handle);
 }
 
-bool DirIterNext(void* handle, DirEntry* out) noexcept
+bool DirIterNext(void* handle, DirEntry* output) noexcept
 {
-  auto* d = static_cast<DIR*>(handle);
-  while (true)
+  auto* directory = static_cast<DIR*>(handle);
+  for (;;)
   {
     errno = 0;
-    struct dirent* e = ::readdir(d);
-    if (!e)
+    dirent* entry = ::readdir(directory);
+    if (entry == nullptr)
       return false;
-    if (e->d_name[0] == '.' && (e->d_name[1] == '\0' || (e->d_name[1] == '.' && e->d_name[2] == '\0')))
+    if (entry->d_name[0] == '.' &&
+        (entry->d_name[1] == '\0' || (entry->d_name[1] == '.' && entry->d_name[2] == '\0')))
       continue;
-    try
-    {
-      out->Name = e->d_name;
-    }
-    catch (...)
-    {
-      return false;
-    }
-    out->IsDirectory = (e->d_type == DT_DIR);
+    output->Name.Assign(StringView {entry->d_name});
+    output->IsDirectory = entry->d_type == DT_DIR;
     return true;
   }
 }
 
 void DirIterClose(void* handle) noexcept
 {
-  if (handle)
-    ::closedir(static_cast<DIR*>(handle));
+  if (handle != nullptr)
+    (void)::closedir(static_cast<DIR*>(handle));
 }
 
 class LinuxFileWriter final : public FileWriter
 {
 public:
-  explicit LinuxFileWriter(int fd) noexcept : m_Fd(fd)
+  explicit LinuxFileWriter(int file) noexcept : m_File(file)
   {}
-
   ~LinuxFileWriter() noexcept override
   {
-    if (m_Fd >= 0)
-      ::close(m_Fd);
+    if (m_File >= 0)
+      (void)::close(m_File);
   }
 
-  bool Write(::std::span<const ::std::byte> data) noexcept override
+  bool Write(Span<const byte> data) noexcept override
   {
-    if (m_Fd < 0)
-      return false;
-    ::std::size_t total = 0;
-    while (total < data.size())
+    usize total = 0;
+    while (m_File >= 0 && total < data.Count())
     {
-      ssize_t n = ::write(m_Fd, data.data() + total, data.size() - total);
-      if (n < 0)
+      const ssize_t count = ::write(m_File, data.Data() + total, data.Count() - total);
+      if (count < 0)
       {
         if (errno == EINTR)
           continue;
         return false;
       }
-      total += static_cast<::std::size_t>(n);
+      total += static_cast<usize>(count);
     }
-    return true;
+    return total == data.Count();
   }
-
   bool Flush() noexcept override
   {
-    return m_Fd >= 0;
+    return m_File >= 0;
   }
-
-  ::gecko::u64 Seek(::gecko::i64 offset, bool fromEnd) noexcept override
+  u64 Seek(i64 offset, bool fromEnd) noexcept override
   {
-    if (m_Fd < 0)
-      return static_cast<::gecko::u64>(-1);
-    off_t r = ::lseek(m_Fd, static_cast<off_t>(offset), fromEnd ? SEEK_END : SEEK_SET);
-    if (r < 0)
-      return static_cast<::gecko::u64>(-1);
-    return static_cast<::gecko::u64>(r);
+    const off_t result = m_File >= 0 ? ::lseek(m_File, static_cast<off_t>(offset), fromEnd ? SEEK_END : SEEK_SET) : -1;
+    return result >= 0 ? static_cast<u64>(result) : U64Max;
   }
-
-  ::gecko::u64 Tell() noexcept override
+  u64 Tell() noexcept override
   {
-    if (m_Fd < 0)
-      return static_cast<::gecko::u64>(-1);
-    off_t r = ::lseek(m_Fd, 0, SEEK_CUR);
-    if (r < 0)
-      return static_cast<::gecko::u64>(-1);
-    return static_cast<::gecko::u64>(r);
+    const off_t result = m_File >= 0 ? ::lseek(m_File, 0, SEEK_CUR) : -1;
+    return result >= 0 ? static_cast<u64>(result) : U64Max;
   }
 
 private:
-  int m_Fd {-1};
+  int m_File {-1};
 };
+
+bool WriteFileContents(int file, Span<const byte> data) noexcept
+{
+  usize total = 0;
+  while (total < data.Count())
+  {
+    const ssize_t count = ::write(file, data.Data() + total, data.Count() - total);
+    if (count < 0)
+    {
+      if (errno == EINTR)
+        continue;
+      return false;
+    }
+    total += static_cast<usize>(count);
+  }
+  return true;
+}
 
 }  // namespace
 
-// -- Public free-function impls --------------------------------------
-
 bool Exists(PathView path) noexcept
 {
-  auto p = ToCString(path);
-  return ::access(p.c_str(), F_OK) == 0;
+  const String native = ToCString(path);
+  return ::access(native.CStr(), F_OK) == 0;
 }
 
-::std::optional<FileStat> Stat(PathView path) noexcept
+Optional<FileStat> Stat(PathView path) noexcept
 {
-  auto p = ToCString(path);
-  struct stat st {};
-  if (::stat(p.c_str(), &st) != 0)
-    return ::std::nullopt;
-  FileStat fs {};
-  fs.Size = static_cast<::gecko::u64>(st.st_size);
-  fs.MTimeEpoch = static_cast<::gecko::i64>(st.st_mtime);
-  fs.IsDirectory = S_ISDIR(st.st_mode);
-  return fs;
+  const String native = ToCString(path);
+  struct stat info {};
+  if (::stat(native.CStr(), &info) != 0)
+    return {};
+  return FileStat {
+      .Size = static_cast<u64>(info.st_size),
+      .MTimeEpoch = static_cast<i64>(info.st_mtime),
+      .IsDirectory = S_ISDIR(info.st_mode),
+  };
 }
 
 ReadResult Read(PathView path) noexcept
 {
-  auto p = ToCString(path);
-  int fd = ::open(p.c_str(), O_RDONLY | O_CLOEXEC);
-  if (fd < 0)
+  const String native = ToCString(path);
+  const int file = ::open(native.CStr(), O_RDONLY | O_CLOEXEC);
+  if (file < 0)
     return {};
-
-  struct stat st {};
-  if (::fstat(fd, &st) != 0)
+  struct stat info {};
+  if (::fstat(file, &info) != 0 || info.st_size < 0)
   {
-    ::close(fd);
-    return {};
-  }
-
-  ::std::vector<::std::byte> bytes;
-  try
-  {
-    bytes.resize(static_cast<::std::size_t>(st.st_size));
-  }
-  catch (...)
-  {
-    ::close(fd);
+    (void)::close(file);
     return {};
   }
 
-  ::std::size_t total = 0;
-  while (total < bytes.size())
+  Array<byte> bytes(static_cast<usize>(info.st_size));
+  usize total = 0;
+  while (total < bytes.Count())
   {
-    ssize_t n = ::read(fd, bytes.data() + total, bytes.size() - total);
-    if (n < 0)
+    const ssize_t count = ::read(file, bytes.Data() + total, bytes.Count() - total);
+    if (count < 0)
     {
       if (errno == EINTR)
         continue;
-      ::close(fd);
+      (void)::close(file);
       return {};
     }
-    if (n == 0)
+    if (count == 0)
       break;
-    total += static_cast<::std::size_t>(n);
+    total += static_cast<usize>(count);
   }
-  ::close(fd);
-  bytes.resize(total);
-  return ReadResult {::std::move(bytes)};
+  (void)::close(file);
+  bytes.Resize(total);
+  return ReadResult {Move(bytes)};
 }
 
 MappedFile Map(PathView path) noexcept
 {
-  auto p = ToCString(path);
-  int fd = ::open(p.c_str(), O_RDONLY | O_CLOEXEC);
-  if (fd < 0)
+  const String native = ToCString(path);
+  const int file = ::open(native.CStr(), O_RDONLY | O_CLOEXEC);
+  if (file < 0)
     return {};
-
-  struct stat st {};
-  if (::fstat(fd, &st) != 0 || st.st_size == 0)
+  struct stat info {};
+  if (::fstat(file, &info) != 0 || info.st_size <= 0)
   {
-    ::close(fd);
+    (void)::close(file);
     return {};
   }
-  auto size = static_cast<::std::size_t>(st.st_size);
-  void* addr = ::mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (addr == MAP_FAILED)
+  const usize size = static_cast<usize>(info.st_size);
+  void* address = ::mmap(nullptr, size, PROT_READ, MAP_PRIVATE, file, 0);
+  if (address == MAP_FAILED)
   {
-    ::close(fd);
+    (void)::close(file);
     return {};
   }
-  auto* h = new (::std::nothrow) LinuxMapHandle {addr, size, fd};
-  if (!h)
-  {
-    ::munmap(addr, size);
-    ::close(fd);
-    return {};
-  }
-  return MappedFile {static_cast<const ::std::byte*>(addr), size, h, &UnmapLinux};
+  void* storage = AllocBytes(sizeof(LinuxMapHandle), alignof(LinuxMapHandle));
+  auto* handle = new (storage) LinuxMapHandle {.Address = address, .Size = size, .File = file};
+  return MappedFile {static_cast<const byte*>(address), size, handle, &UnmapLinux};
 }
 
-WriteResult Write(PathView path, ::std::span<const ::std::byte> data, WriteMode mode) noexcept
+WriteResult Write(PathView path, Span<const byte> data, WriteMode mode) noexcept
 {
-  auto p = ToCString(path);
+  const String native = ToCString(path);
   int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
-  flags |= (mode == WriteMode::Append) ? O_APPEND : O_TRUNC;
-
-  int fd = ::open(p.c_str(), flags, 0644);
-  if (fd < 0)
+  flags |= mode == WriteMode::Append ? O_APPEND : O_TRUNC;
+  const int file = ::open(native.CStr(), flags, 0644);
+  if (file < 0)
     return {};
-
-  ::std::size_t total = 0;
-  while (total < data.size())
-  {
-    ssize_t n = ::write(fd, data.data() + total, data.size() - total);
-    if (n < 0)
-    {
-      if (errno == EINTR)
-        continue;
-      ::close(fd);
-      return {};
-    }
-    total += static_cast<::std::size_t>(n);
-  }
-  ::close(fd);
-  return WriteResult {.Ok = true, .BytesWritten = static_cast<::gecko::u64>(total)};
+  const bool ok = WriteFileContents(file, data);
+  (void)::close(file);
+  return WriteResult {.Ok = ok, .BytesWritten = ok ? static_cast<u64>(data.Count()) : 0};
 }
 
-bool AtomicWrite(PathView path, ::std::span<const ::std::byte> data) noexcept
+bool AtomicWrite(PathView path, Span<const byte> data) noexcept
 {
-  auto target = ToCString(path);
-  auto tmp = target + ".tmp";
-
-  int fd = ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
-  if (fd < 0)
+  const String target = ToCString(path);
+  String temporary = target;
+  temporary.Append(".tmp");
+  const int file = ::open(temporary.CStr(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+  if (file < 0)
     return false;
-
-  ::std::size_t total = 0;
-  while (total < data.size())
+  const bool written = WriteFileContents(file, data);
+  const bool synced = written && ::fsync(file) == 0;
+  (void)::close(file);
+  const long renamed = synced ? ::syscall(SYS_renameat, AT_FDCWD, temporary.CStr(), AT_FDCWD, target.CStr()) : -1;
+  if (renamed != 0)
   {
-    ssize_t n = ::write(fd, data.data() + total, data.size() - total);
-    if (n < 0)
-    {
-      if (errno == EINTR)
-        continue;
-      ::close(fd);
-      ::unlink(tmp.c_str());
-      return false;
-    }
-    total += static_cast<::std::size_t>(n);
-  }
-
-  if (::fsync(fd) != 0)
-  {
-    ::close(fd);
-    ::unlink(tmp.c_str());
-    return false;
-  }
-  ::close(fd);
-
-  if (::rename(tmp.c_str(), target.c_str()) != 0)
-  {
-    ::unlink(tmp.c_str());
+    (void)::unlink(temporary.CStr());
     return false;
   }
   return true;
 }
 
-::gecko::Unique<FileWriter> OpenWrite(PathView path, WriteMode mode) noexcept
+Unique<FileWriter> OpenWrite(PathView path, WriteMode mode) noexcept
 {
-  auto p = ToCString(path);
+  const String native = ToCString(path);
   int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
   if (mode == WriteMode::Truncate)
     flags |= O_TRUNC;
-  int fd = ::open(p.c_str(), flags, 0644);
-  if (fd < 0)
+  const int file = ::open(native.CStr(), flags, 0644);
+  if (file < 0)
     return {};
   if (mode == WriteMode::Append)
-    ::lseek(fd, 0, SEEK_END);
-  return ::gecko::CreateUnique<LinuxFileWriter>(fd);
+    (void)::lseek(file, 0, SEEK_END);
+  return CreateUnique<LinuxFileWriter>(file);
 }
 
 bool CreateDir(PathView path, bool recursive) noexcept
 {
-  auto p = ToCString(path);
-  if (p.empty())
+  const String native = ToCString(path);
+  if (native.Empty())
     return false;
-
   if (!recursive)
-    return ::mkdir(p.c_str(), 0755) == 0 || errno == EEXIST;
+    return ::mkdir(native.CStr(), 0755) == 0 || errno == EEXIST;
 
-  for (::std::size_t i = 1; i <= p.size(); ++i)
+  const StringView full = native.View();
+  for (usize index = 1; index <= full.Size(); ++index)
   {
-    if (i == p.size() || p[i] == '/')
-    {
-      ::std::string sub(p, 0, i);
-      if (sub.empty() || sub == "/")
-        continue;
-      if (::mkdir(sub.c_str(), 0755) != 0 && errno != EEXIST)
-        return false;
-    }
+    if (index != full.Size() && full[index] != '/')
+      continue;
+    const StringView part = full.Substring(0, index);
+    if (part.Empty() || part == StringView {"/"})
+      continue;
+    const String directory(part);
+    if (::mkdir(directory.CStr(), 0755) != 0 && errno != EEXIST)
+      return false;
   }
   return true;
 }
 
 bool Remove(PathView path) noexcept
 {
-  auto p = ToCString(path);
-  if (::unlink(p.c_str()) == 0)
-    return true;
-  if (::rmdir(p.c_str()) == 0)
-    return true;
-  return false;
+  const String native = ToCString(path);
+  return ::unlink(native.CStr()) == 0 || ::rmdir(native.CStr()) == 0;
 }
 
 DirIter IterateDir(PathView path) noexcept
 {
-  auto p = ToCString(path);
-  DIR* d = ::opendir(p.c_str());
-  if (!d)
-    return {};
-  return DirIter {d, &DirIterNext, &DirIterClose};
+  const String native = ToCString(path);
+  DIR* directory = ::opendir(native.CStr());
+  return directory != nullptr ? DirIter {directory, DirIterNext, DirIterClose} : DirIter {};
 }
 
-::std::string ExePath() noexcept
+String ExePath() noexcept
 {
-  char buf[PATH_MAX];
-  ssize_t n = ::readlink("/proc/self/exe", buf, sizeof(buf));
-  if (n <= 0)
-    return {};
-  try
-  {
-    return ::std::string {buf, static_cast<::std::size_t>(n)};
-  }
-  catch (...)
-  {
-    return {};
-  }
+  char buffer[PATH_MAX];
+  const ssize_t count = ::readlink("/proc/self/exe", buffer, sizeof(buffer));
+  return count > 0 ? String {StringView {buffer, static_cast<usize>(count)}} : String {};
 }
 
-::std::string WorkingDir() noexcept
+String WorkingDir() noexcept
 {
-  char buf[PATH_MAX];
-  if (!::getcwd(buf, sizeof(buf)))
-    return {};
-  try
-  {
-    return ::std::string {buf};
-  }
-  catch (...)
-  {
-    return {};
-  }
+  char buffer[PATH_MAX];
+  return ::getcwd(buffer, sizeof(buffer)) != nullptr ? String {buffer} : String {};
 }
 
-::std::string UserDataDir(::std::string_view appName) noexcept
+String UserDataDir(StringView appName) noexcept
 {
-  ::std::string base;
-  try
+  String path;
+  const char* xdg = ::getenv("XDG_DATA_HOME");
+  if (xdg != nullptr && xdg[0] != '\0')
   {
-    if (const char* xdg = ::getenv("XDG_DATA_HOME"); xdg && xdg[0] != '\0')
-    {
-      base = xdg;
-    }
-    else
-    {
-      const char* home = ::getenv("HOME");
-      if (!home || home[0] == '\0')
-        return {};
-      base = home;
-      base.append("/.local/share");
-    }
-    if (!appName.empty())
-    {
-      base.push_back('/');
-      base.append(appName);
-    }
+    path.Assign(xdg);
   }
-  catch (...)
+  else
   {
-    return {};
+    const char* home = ::getenv("HOME");
+    if (home == nullptr || home[0] == '\0')
+      return {};
+    path.Assign(home);
+    path.Append("/.local/share");
   }
-  return base;
+  if (!appName.Empty())
+  {
+    path.Append('/');
+    path.Append(appName);
+  }
+  return path;
 }
 
 }  // namespace gecko::platform
 
-#endif  // GECKO_PLATFORM_LINUX
+#endif

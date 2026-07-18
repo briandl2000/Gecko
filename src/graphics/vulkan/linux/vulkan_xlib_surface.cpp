@@ -19,7 +19,7 @@
 
 namespace gecko::graphics {
 
-VkResult CreateXlibSurface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateXlibSurface(VkInstance instance, const gecko::platform::NativeWindowHandle& native,
                            VkSurfaceKHR* out) noexcept
 {
   VkXlibSurfaceCreateInfoKHR sci {};

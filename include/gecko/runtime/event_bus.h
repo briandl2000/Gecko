@@ -1,32 +1,12 @@
 #pragma once
 
-/// @file
-/// `EventBus` -- reference `IEventBus` implementation.
-///
-/// Supports both immediate and queued subscriber delivery, plus
-/// per-module emitter capability validation.
-
 #include "gecko/core/services/events.h"
-
-#include <atomic>
-#include <deque>
-#include <memory>
-#include <mutex>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
 
 namespace gecko::runtime {
 
-/// Reference event-bus implementation. Routes `Send()` calls to
-/// matching subscribers either immediately on the caller's thread or
-/// queued for `Dispatch()`.
 class EventBus final : public IEventBus
 {
 public:
-  EventBus();
-  ~EventBus() override;
-
   EventSubscription Subscribe(EventCode code, CallbackFn fn, void* user,
                               SubscriptionOptions options = {}) noexcept override;
   void Send(const EventEmitter& emitter, EventCode code, EventView payload) noexcept override;
@@ -44,32 +24,44 @@ protected:
   void Unsubscribe(u64 id) noexcept override;
 
 private:
+  static constexpr u32 MaxSubscribers = 1024;
+  static constexpr u32 MaxQueuedEvents = 1024;
+  static constexpr u32 MaxRegisteredModules = 64;
+  static constexpr u32 MaxPayloadSize = 256;
+
   struct Subscriber
   {
-    u64 id {0};
-    CallbackFn callback {nullptr};
-    void* user {nullptr};
-    SubscriptionDelivery delivery {SubscriptionDelivery::Queued};
+    EventCode Code {0};
+    u64 Id {0};
+    CallbackFn Callback {nullptr};
+    void* User {nullptr};
+    SubscriptionDelivery Delivery {SubscriptionDelivery::Queued};
+    bool Active {false};
   };
 
   struct QueuedEvent
   {
-    EventMeta meta {};
-    u8 payloadStorage[256] {};
-    u32 payloadSize {0};
+    EventMeta Meta {};
+    u8 Payload[MaxPayloadSize] {};
+    u32 PayloadSize {0};
   };
 
-  void NotifySubscribers(EventCode code, const EventMeta& meta, EventView payload, SubscriptionDelivery deliveryFilter);
+  void NotifySubscribers(EventCode code, const EventMeta& meta, EventView payload,
+                         SubscriptionDelivery delivery) noexcept;
+  void Lock() const noexcept;
+  void Unlock() const noexcept;
 
-  std::unique_ptr<std::unordered_map<EventCode, std::vector<Subscriber>>> m_Subscribers;
-  std::mutex m_SubscribersMutex;
-  std::unique_ptr<std::deque<QueuedEvent>> m_EventQueue;
-  std::mutex m_QueueMutex;
-  std::atomic<u64> m_NextSubscriptionId {1};
-  std::atomic<u64> m_NextSequence {0};
+  Subscriber m_Subscribers[MaxSubscribers] {};
+  QueuedEvent m_Queue[MaxQueuedEvents] {};
+  u64 m_Modules[MaxRegisteredModules] {};
+  mutable u32 m_Lock {0};
+  u32 m_QueueRead {0};
+  u32 m_QueueCount {0};
+  u32 m_ModuleCount {0};
+  u64 m_NextSubscriptionId {1};
+  u64 m_NextSequence {0};
   u64 m_CapabilitySecret {0};
-  std::unique_ptr<std::unordered_set<u64>> m_RegisteredModules;
-  std::mutex m_ModulesMutex;
+  bool m_Initialized {false};
 };
 
 }  // namespace gecko::runtime

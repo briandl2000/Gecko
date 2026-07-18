@@ -10,7 +10,6 @@
 #include "gecko/core/services/log.h"
 #include "gecko/platform/platform_events.h"
 
-#include <cmath>
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xlib.h>
 
@@ -116,7 +115,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
         {
           double rate = static_cast<double>(mode.dotClock) /
                         (static_cast<double>(mode.hTotal) * static_cast<double>(mode.vTotal));
-          info.RefreshRateMilliHz = static_cast<u32>(::std::round(rate * 1000.0));
+          info.RefreshRateMilliHz = static_cast<u32>(math::Round(static_cast<f32>(rate * 1000.0)));
         }
         break;
       }
@@ -126,7 +125,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     if (outInfo->mm_width > 0 && outInfo->mm_height > 0)
     {
       double dpiX = static_cast<double>(crtcInfo->width) * 25.4 / static_cast<double>(outInfo->mm_width);
-      info.Dpi = static_cast<u32>(::std::round(dpiX));
+      info.Dpi = static_cast<u32>(math::Round(static_cast<f32>(dpiX)));
       info.DpiScale = static_cast<float>(info.Dpi) / 96.0F;
     }
 

@@ -10,7 +10,7 @@
 
 namespace gecko::graphics {
 
-VkResult CreateWaylandSurface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateWaylandSurface(VkInstance instance, const gecko::platform::NativeWindowHandle& native,
                               VkSurfaceKHR* out) noexcept
 {
   VkWaylandSurfaceCreateInfoKHR sci {};

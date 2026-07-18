@@ -4,7 +4,6 @@
 
 #include "gecko/platform/monitors_interface.h"
 
-#include <vector>
 
 // Forward-declare X11/XRandR types to avoid macro conflicts (X11 defines
 // "Always" which clashes with gecko enums).
@@ -40,7 +39,7 @@ private:
 
   ::Display* m_Display {nullptr};
   int m_RREventBase {-1};
-  ::std::vector<MonitorEntry> m_Monitors;
+  Array<MonitorEntry> m_Monitors;
 };
 
 Unique<IMonitorsBackend> CreateXlibMonitorsBackend() noexcept;

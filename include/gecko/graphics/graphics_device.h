@@ -13,7 +13,6 @@
 #include "gecko/graphics/graphics_types.h"
 #include "gecko/platform/window.h"
 
-#include <span>
 
 namespace gecko::graphics {
 
@@ -73,7 +72,7 @@ public:
 
   /// Create a swapchain bound to `native` window with `desc`.
   [[nodiscard("Swapchain must be stored to present frames")]]
-  GECKO_API virtual Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle& native,
+  GECKO_API virtual Swapchain CreateSwapchain(const gecko::platform::NativeWindowHandle& native,
                                               const SwapchainDesc& desc) noexcept = 0;
 
   /// Destroy a swapchain. The handle is left in an invalid state.
@@ -89,12 +88,12 @@ public:
   GECKO_API virtual FrameContext BeginFrame(Swapchain& swapchain) noexcept = 0;
 
   /// Present one or more swapchains in a single driver call.
-  GECKO_API virtual void Present(::std::span<const FrameContext> frames) noexcept = 0;
+  GECKO_API virtual void Present(Span<const FrameContext> frames) noexcept = 0;
 
   /// Convenience overload for the common single-swapchain case.
   void Present(const FrameContext& frame) noexcept
   {
-    Present(::std::span<const FrameContext> {&frame, 1});
+    Present(Span<const FrameContext> {&frame, 1});
   }
 
   // Command lists ----------------------------------------------
@@ -151,7 +150,7 @@ public:
   /// Read `count` timestamps starting at `firstQuery` from the pool into
   /// `out` as nanoseconds. Returns the number of timestamps written (0 on
   /// failure or if results are not yet available on the implementation).
-  GECKO_API virtual u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, ::std::span<u64> out) noexcept = 0;
+  GECKO_API virtual u32 ReadTimestamps(const QueryPool& pool, u32 firstQuery, Span<u64> out) noexcept = 0;
 
   // GPU profiler -----------------------------------------------
 
@@ -159,17 +158,17 @@ public:
   /// timestamp queries (NullDevice).
   [[nodiscard("Discarding the returned IGpuSampler immediately releases the "
               "GPU resources backing it")]]
-  GECKO_API virtual ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc& desc) noexcept = 0;
+  GECKO_API virtual gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc& desc) noexcept = 0;
 
   // Data upload ------------------------------------------------
 
   /// Upload `data` into a mip+slice of `texture`. Stages through a
   /// CPU-visible buffer when the texture is `Dedicated`.
-  GECKO_API virtual void UploadTextureData(Texture& texture, ::std::span<const ::gecko::byte> data, u32 mip = 0,
+  GECKO_API virtual void UploadTextureData(Texture& texture, Span<const gecko::byte> data, u32 mip = 0,
                                            u32 slice = 0) noexcept = 0;
 
   /// Upload `data` into `buffer` starting at `offset` bytes.
-  GECKO_API virtual void UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data,
+  GECKO_API virtual void UploadBufferData(Buffer& buffer, Span<const gecko::byte> data,
                                           u32 offset = 0) noexcept = 0;
 
 protected:

@@ -1,4 +1,5 @@
 #include "assert.cpp"
+#include "cpp_runtime.cpp"
 #include "format.cpp"
 #include "services.cpp"
 #include "services/events.cpp"
@@ -9,4 +10,3 @@
 #include "utility/random.cpp"
 #include "utility/thread.cpp"
 #include "utility/time.cpp"
-#include "overwrite_new.cpp"

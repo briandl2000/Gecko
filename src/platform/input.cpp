@@ -93,7 +93,7 @@ WindowHandle HoveredWindow() noexcept
   return {};
 }
 
-::std::string_view GetTypedText() noexcept
+StringView GetTypedText() noexcept
 {
   if (auto* in = GetInput())
     return in->GetTypedText();
