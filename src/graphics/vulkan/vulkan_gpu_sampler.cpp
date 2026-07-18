@@ -75,10 +75,7 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   // only if no OnSubmit() arrives before ResolveSlot runs (e.g. cmd
   // lists were never submitted). When OnSubmit fires we prefer that
   // timestamp, since it lines up with the actual vkQueueSubmit call.
-  if (auto* p = gecko::GetProfiler(); p != nullptr)
-    slot.CpuFrameStartNs = p->NowNs();
-  else
-    slot.CpuFrameStartNs = 0;
+  slot.CpuFrameStartNs = gecko::ProfilerNowNs();
 
   // No cmd-side ResetTimestamps here -- the pool was reset from the host
   // either at creation (first use) or after ResolveSlot (subsequent
@@ -182,13 +179,6 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
     return;
   }
 
-  auto* p = gecko::GetProfiler();
-  if (p == nullptr)
-  {
-    m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
-    return;
-  }
-
   // Use the smallest valid GPU timestamp as the anchor. Recording order
   // does not match GPU execution order when cmd lists are submitted out
   // of recording order (e.g. compute cmds submitted before a graphics
@@ -234,11 +224,11 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
     ev.Kind = gecko::ProfEventKind::ZoneBegin;
     ev.Source = gecko::ProfSource::GPU;
     ev.Level = rec.Level;
-    p->Emit(ev);
+    gecko::EmitProfileEvent(ev);
 
     ev.TimestampNs = endNs;
     ev.Kind = gecko::ProfEventKind::ZoneEnd;
-    p->Emit(ev);
+    gecko::EmitProfileEvent(ev);
   }
 
   slot.Zones.clear();

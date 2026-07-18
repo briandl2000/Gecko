@@ -10,7 +10,7 @@ namespace gecko::graphics {
 // -- Platform surface creation ---------------------------------------------
 //
 // Implemented per-OS in `vulkan/<os>/vulkan_*_surface.cpp`. The
-// CMakeLists.txt only compiles the TUs whose platform was detected.
+// The unity source includes only the implementation for the active platform.
 
 /// Returns the instance extensions required by the enabled surface backends
 /// (always includes VK_KHR_surface). Pointer lifetime is static.

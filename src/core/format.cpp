@@ -8,6 +8,7 @@ struct FormatSpec
 {
   u32 Width {0};
   u32 Precision {3};
+  char Fill {' '};
   char Align {0};
   char Type {0};
   bool HasPrecision {false};
@@ -52,10 +53,10 @@ void AppendText(FormatBuffer& output, const char* text, usize length) noexcept
     AppendCharacter(output, text[index]);
 }
 
-void AppendPadding(FormatBuffer& output, usize count) noexcept
+void AppendPadding(FormatBuffer& output, usize count, char fill = ' ') noexcept
 {
   for (usize index = 0; index < count; ++index)
-    AppendCharacter(output, ' ');
+    AppendCharacter(output, fill);
 }
 
 usize UnsignedText(char* text, u64 value, u32 base, bool uppercase) noexcept
@@ -83,6 +84,7 @@ FormatSpec ParseSpec(const char*& cursor, const char* end) noexcept
 
   if (cursor + 1 < end && (cursor[1] == '<' || cursor[1] == '>'))
   {
+    spec.Fill = cursor[0];
     spec.Align = cursor[1];
     cursor += 2;
   }
@@ -95,6 +97,8 @@ FormatSpec ParseSpec(const char*& cursor, const char* end) noexcept
     spec.Alternate = true;
     ++cursor;
   }
+  if (cursor < end && *cursor == '0')
+    spec.Fill = '0';
   while (cursor < end && *cursor >= '0' && *cursor <= '9')
   {
     spec.Width = spec.Width * 10U + static_cast<u32>(*cursor - '0');
@@ -123,10 +127,26 @@ void AppendField(FormatBuffer& output, const char* text, usize length, const For
   const usize padding = spec.Width > length ? spec.Width - length : 0;
   const bool left = spec.Align == '<' || (spec.Align == 0 && !numeric);
   if (!left)
-    AppendPadding(output, padding);
+  {
+    if (numeric && spec.Fill == '0' && length != 0 && text[0] == '-')
+    {
+      AppendCharacter(output, '-');
+      AppendPadding(output, padding, '0');
+      AppendText(output, text + 1, length - 1U);
+      return;
+    }
+    if (numeric && spec.Fill == '0' && length > 2U && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+    {
+      AppendText(output, text, 2);
+      AppendPadding(output, padding, '0');
+      AppendText(output, text + 2, length - 2U);
+      return;
+    }
+    AppendPadding(output, padding, numeric ? spec.Fill : ' ');
+  }
   AppendText(output, text, length);
   if (left)
-    AppendPadding(output, padding);
+    AppendPadding(output, padding, spec.Fill);
 }
 
 void AppendArgument(FormatBuffer& output, const FormatArg& argument, const FormatSpec& spec) noexcept
@@ -137,8 +157,7 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
 
   switch (argument.Kind)
   {
-  case FormatArgKind::String:
-  {
+  case FormatArgKind::String: {
     const char* value = argument.Value.String;
     length = TextLength(value);
     if (spec.HasPrecision && length > spec.Precision)
@@ -146,8 +165,7 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
     AppendField(output, value, length, spec, false);
     return;
   }
-  case FormatArgKind::StringView:
-  {
+  case FormatArgKind::StringView: {
     usize length = argument.Value.View.Count;
     if (spec.HasPrecision && length > spec.Precision)
       length = spec.Precision;
@@ -157,8 +175,7 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
   case FormatArgKind::Character:
     text[length++] = argument.Value.Character;
     break;
-  case FormatArgKind::Boolean:
-  {
+  case FormatArgKind::Boolean: {
     const char* value = argument.Value.Boolean ? "true" : "false";
     AppendField(output, value, TextLength(value), spec, false);
     return;
@@ -169,8 +186,7 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
     length += UnsignedText(text + length, reinterpret_cast<usize>(argument.Value.Pointer), 16, false);
     numeric = true;
     break;
-  case FormatArgKind::Signed:
-  {
+  case FormatArgKind::Signed: {
     const i64 value = argument.Value.Signed;
     const bool negative = value < 0;
     const u64 magnitude = negative ? static_cast<u64>(-(value + 1)) + 1U : static_cast<u64>(value);
@@ -186,8 +202,7 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
     numeric = true;
     break;
   }
-  case FormatArgKind::Unsigned:
-  {
+  case FormatArgKind::Unsigned: {
     const bool hex = spec.Type == 'x' || spec.Type == 'X';
     if (hex && spec.Alternate)
     {
@@ -198,8 +213,7 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
     numeric = true;
     break;
   }
-  case FormatArgKind::Float:
-  {
+  case FormatArgKind::Float: {
     f64 value = argument.Value.Float;
     if (value != value)
     {

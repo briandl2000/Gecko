@@ -2,6 +2,7 @@
 
 #include "platform_io_linux.h"
 
+#include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/platform/platform_io.h"
 
@@ -15,8 +16,6 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include <new>
 
 namespace gecko::platform {
 
@@ -62,8 +61,7 @@ bool DirIterNext(void* handle, DirEntry* output) noexcept
     dirent* entry = ::readdir(directory);
     if (entry == nullptr)
       return false;
-    if (entry->d_name[0] == '.' &&
-        (entry->d_name[1] == '\0' || (entry->d_name[1] == '.' && entry->d_name[2] == '\0')))
+    if (entry->d_name[0] == '.' && (entry->d_name[1] == '\0' || (entry->d_name[1] == '.' && entry->d_name[2] == '\0')))
       continue;
     output->Name.Assign(StringView {entry->d_name});
     output->IsDirectory = entry->d_type == DT_DIR;
@@ -215,7 +213,7 @@ MappedFile Map(PathView path) noexcept
     return {};
   }
   void* storage = AllocBytes(sizeof(LinuxMapHandle), alignof(LinuxMapHandle));
-  auto* handle = new (storage) LinuxMapHandle {.Address = address, .Size = size, .File = file};
+  auto* handle = new (storage, Placement) LinuxMapHandle {.Address = address, .Size = size, .File = file};
   return MappedFile {static_cast<const byte*>(address), size, handle, &UnmapLinux};
 }
 

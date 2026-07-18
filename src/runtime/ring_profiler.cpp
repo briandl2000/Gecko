@@ -1,4 +1,4 @@
-#include "gecko/runtime/ring_profiler.h"
+#include "private/ring_profiler.h"
 
 #include "gecko/core/services/log.h"
 #include "gecko/core/utility/time.h"

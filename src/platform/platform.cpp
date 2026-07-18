@@ -58,22 +58,21 @@ bool detail::Initialize(const PlatformConfig& requestedConfig) noexcept
   g_Input = g_OwnedInput.get();
   g_Monitors->EnumerateMonitors();
 
-  IEventBus* events = GetEventBus();
-  if (!events->RegisterModule(labels::Platform.Id))
+  if (!RegisterEventModule(labels::Platform.Id))
   {
     GECKO_ERROR(labels::Platform, "Failed to register platform event source");
     detail::Shutdown();
     return false;
   }
-  g_Emitter = events->CreateEmitter(labels::Platform.Id);
+  g_Emitter = CreateEmitter(labels::Platform.Id);
   g_Initialized = true;
   return true;
 }
 
 void detail::Shutdown() noexcept
 {
-  if (g_Emitter.capability != 0)
-    GetEventBus()->UnregisterModule(labels::Platform.Id);
+  if (g_Emitter.IsValid())
+    UnregisterEventModule(labels::Platform.Id);
 
   g_Emitter = {};
   g_Input = nullptr;
@@ -108,7 +107,7 @@ IInput* GetInput() noexcept
 void PumpEvents() noexcept
 {
   GECKO_PROFILE_NAMED(labels::Platform, "platform::PumpEvents");
-  if (g_Windows == nullptr || g_Monitors == nullptr || g_Emitter.capability == 0)
+  if (g_Windows == nullptr || g_Monitors == nullptr || !g_Emitter.IsValid())
     return;
   if (g_Input != nullptr)
     g_Input->NewFrame();

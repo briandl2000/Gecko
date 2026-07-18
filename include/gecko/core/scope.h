@@ -7,7 +7,7 @@
 ///
 /// The default `GECKO_SCOPE` family runs at `Detailed` level, so the
 /// aggregator (`GetStats`/`WatchScope`) always observes the scope but
-/// the ring/sink path is gated by `IProfiler::SetMinLevel` and
+/// aggregation is gated by `SetProfilerLevel` and
 /// `SetDetailedSampleRate`.
 ///
 /// | Macro | Level | Name source |

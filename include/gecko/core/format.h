@@ -55,10 +55,10 @@ template <typename T>
 struct FormatInteger;
 
 #define GECKO_FORMAT_INTEGER(type, is_signed) \
-  template <>                                  \
-  struct FormatInteger<type>                   \
-  {                                             \
-    static constexpr bool Signed = is_signed;   \
+  template <>                                 \
+  struct FormatInteger<type>                  \
+  {                                           \
+    static constexpr bool Signed = is_signed; \
   }
 
 GECKO_FORMAT_INTEGER(signed char, true);
@@ -156,8 +156,8 @@ template <typename T>
 }
 
 template <typename T>
-  requires __is_enum(T)
-[[nodiscard]] constexpr FormatArg MakeFormatArg(T value) noexcept
+  requires __is_enum
+(T) [[nodiscard]] constexpr FormatArg MakeFormatArg(T value) noexcept
 {
   return MakeFormatArg(static_cast<__underlying_type(T)>(value));
 }
@@ -168,5 +168,25 @@ void FormatTo(FormatBuffer& output, const char* format, const First& first, cons
   const FormatArg arguments[] {MakeFormatArg(first), MakeFormatArg(rest)...};
   FormatTo(output, format, Span<const FormatArg> {arguments, 1U + sizeof...(rest)});
 }
+
+namespace detail {
+
+template <typename First, typename... Rest>
+[[noreturn]] void DispatchAssert(const char* expression, const char* file, u32 line, const char* function,
+                                 const char* format, const First& first, const Rest&... rest) noexcept
+{
+  char message[1024] {};
+  FormatBuffer output {.Data = message, .Capacity = sizeof(message)};
+  FormatTo(output, format, first, rest...);
+  AssertFailure(AssertInfo {
+      .Expression = expression,
+      .Message = message,
+      .File = file,
+      .Function = function,
+      .Line = line,
+  });
+}
+
+}  // namespace detail
 
 }  // namespace gecko

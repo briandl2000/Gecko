@@ -1,41 +1,20 @@
-# Build outputs
+# Generated build state
 /out/
+/.cache/
+/compile_commands.json
 
-# Compilation database
-compile_commands.json
-.cache/
-
-# IDE (user-specific)
-.vscode/
-.idea/
+# Local editor state
+/.vscode/
+/.idea/
+/.zed/
 *.swp
 *.swo
 *~
 
-# Local-only dev scripts / config
-scripts/copy_debug.py
-# Per-developer env overrides (host/paths for remote-run helpers, etc.)
-.gecko-*.env
+# Runtime output
+*.log
+/working_dir/
 
-# Safety nets — we don't vendor any of these; system Vulkan SDK is a
-# prerequisite (see docs/build.md). Blocks accidental check-ins.
-third_party/prebuilt/
-third_party/vulkan-headers/
-
-# OS
+# OS metadata
 .DS_Store
 Thumbs.db
-
-# Python bytecode (for scripts/)
-__pycache__/
-*.pyc
-
-# Logs and working files
-*.log
-log.txt
-gecko_trace.json
-working_dir/
-
-# direnv (if used)
-.envrc
-.direnv/

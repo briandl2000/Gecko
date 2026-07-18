@@ -1,11 +1,10 @@
 #pragma once
 
 #include "gecko/core/assert.h"
+#include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/types.h"
 #include "gecko/core/utility/move.h"
-
-#include <new>
 
 namespace gecko {
 
@@ -21,7 +20,7 @@ public:
     m_Data = AllocArray<T>(count);
     m_Capacity = count;
     while (m_Count < count)
-      new (m_Data + m_Count++) T {};
+      new (m_Data + m_Count++, Placement) T {};
   }
   Array(usize count, const T& value) noexcept
   {
@@ -30,7 +29,7 @@ public:
     m_Data = AllocArray<T>(count);
     m_Capacity = count;
     while (m_Count < count)
-      new (m_Data + m_Count++) T(value);
+      new (m_Data + m_Count++, Placement) T(value);
   }
   Array(const Array& other) noexcept
   {
@@ -82,7 +81,7 @@ public:
     T* replacement = AllocArray<T>(capacity);
     for (usize index = 0; index < m_Count; ++index)
     {
-      new (replacement + index) T(Move(m_Data[index]));
+      new (replacement + index, Placement) T(Move(m_Data[index]));
       m_Data[index].~T();
     }
     DeallocBytes(m_Data);
@@ -95,7 +94,7 @@ public:
     if (count > m_Capacity)
       Reserve(count > m_Capacity * 2U ? count : m_Capacity * 2U + 8U);
     while (m_Count < count)
-      new (m_Data + m_Count++) T {};
+      new (m_Data + m_Count++, Placement) T {};
     while (m_Count > count)
       m_Data[--m_Count].~T();
   }
@@ -112,7 +111,7 @@ public:
     if (count > m_Capacity)
       Reserve(count);
     while (m_Count < count)
-      new (m_Data + m_Count++) T(value);
+      new (m_Data + m_Count++, Placement) T(value);
   }
 
   template <typename... Args>
@@ -120,7 +119,7 @@ public:
   {
     if (m_Count == m_Capacity)
       Reserve(m_Capacity * 2U + 8U);
-    T* value = new (m_Data + m_Count++) T(Forward<Args>(arguments)...);
+    T* value = new (m_Data + m_Count++, Placement) T(Forward<Args>(arguments)...);
     return *value;
   }
 
@@ -146,7 +145,7 @@ public:
     m_Data[index].~T();
     for (usize cursor = index; cursor + 1U < m_Count; ++cursor)
     {
-      new (m_Data + cursor) T(Move(m_Data[cursor + 1U]));
+      new (m_Data + cursor, Placement) T(Move(m_Data[cursor + 1U]));
       m_Data[cursor + 1U].~T();
     }
     --m_Count;

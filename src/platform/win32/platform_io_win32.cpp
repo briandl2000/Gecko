@@ -2,15 +2,16 @@
 
 #include "platform_io_win32.h"
 
+#include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+// clang-format off: Windows.h must establish the target before ShlObj.h.
 #include <Windows.h>
 #include <ShlObj.h>
-
-#include <new>
+// clang-format on
 
 namespace gecko::platform {
 
@@ -182,9 +183,8 @@ Optional<FileStat> Stat(PathView path) noexcept
   constexpr u64 FileTimeUnixDelta = 116444736000000000ULL;
   return FileStat {
       .Size = size.QuadPart,
-      .MTimeEpoch = time.QuadPart >= FileTimeUnixDelta
-                        ? static_cast<i64>((time.QuadPart - FileTimeUnixDelta) / 10000000ULL)
-                        : -1,
+      .MTimeEpoch =
+          time.QuadPart >= FileTimeUnixDelta ? static_cast<i64>((time.QuadPart - FileTimeUnixDelta) / 10000000ULL) : -1,
       .IsDirectory = (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0,
   };
 }
@@ -247,7 +247,7 @@ MappedFile Map(PathView path) noexcept
     return {};
   }
   void* storage = AllocBytes(sizeof(Mapping), alignof(Mapping));
-  auto* mapping = new (storage) Mapping {.View = view, .Map = map, .File = file};
+  auto* mapping = new (storage, Placement) Mapping {.View = view, .Map = map, .File = file};
   return MappedFile {static_cast<const byte*>(view), static_cast<usize>(size.QuadPart), mapping, CloseMapping};
 }
 
@@ -274,7 +274,8 @@ bool AtomicWrite(PathView path, Span<const byte> data) noexcept
     return false;
   WidePath temporary = target;
   temporary.Append(L".tmp");
-  HANDLE file = ::CreateFileW(temporary.Data(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  HANDLE file =
+      ::CreateFileW(temporary.Data(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (file == INVALID_HANDLE_VALUE)
     return false;
   const bool ok = WriteHandle(file, data) && ::FlushFileBuffers(file);
@@ -358,7 +359,7 @@ DirIter IterateDir(PathView path) noexcept
   if (search == INVALID_HANDLE_VALUE)
     return {};
   void* storage = AllocBytes(sizeof(State), alignof(State));
-  auto* state = new (storage) State {.Handle = search, .Data = data};
+  auto* state = new (storage, Placement) State {.Handle = search, .Data = data};
   auto next = [](void* opaque, DirEntry* output) noexcept -> bool {
     auto* value = static_cast<State*>(opaque);
     for (;;)
@@ -366,9 +367,8 @@ DirIter IterateDir(PathView path) noexcept
       if (!value->HasFirst && !::FindNextFileW(value->Handle, &value->Data))
         return false;
       value->HasFirst = false;
-      if (value->Data.cFileName[0] == L'.' &&
-          (value->Data.cFileName[1] == L'\0' ||
-           (value->Data.cFileName[1] == L'.' && value->Data.cFileName[2] == L'\0')))
+      if (value->Data.cFileName[0] == L'.' && (value->Data.cFileName[1] == L'\0' ||
+                                               (value->Data.cFileName[1] == L'.' && value->Data.cFileName[2] == L'\0')))
         continue;
       usize length = 0;
       while (value->Data.cFileName[length] != L'\0')

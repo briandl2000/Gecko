@@ -1,10 +1,9 @@
 #pragma once
 
 #include "gecko/core/assert.h"
+#include "gecko/core/placement.h"
 #include "gecko/core/types.h"
 #include "gecko/core/utility/move.h"
-
-#include <new>
 
 namespace gecko {
 
@@ -15,19 +14,19 @@ public:
   Optional() noexcept = default;
   Optional(const T& value) noexcept
   {
-    new (m_Storage) T(value);
+    new (m_Storage, Placement) T(value);
     m_HasValue = true;
   }
   Optional(T&& value) noexcept
   {
-    new (m_Storage) T(Move(value));
+    new (m_Storage, Placement) T(Move(value));
     m_HasValue = true;
   }
   Optional(const Optional& other) noexcept
   {
     if (other.m_HasValue)
     {
-      new (m_Storage) T(other.Value());
+      new (m_Storage, Placement) T(other.Value());
       m_HasValue = true;
     }
   }
@@ -35,7 +34,7 @@ public:
   {
     if (other.m_HasValue)
     {
-      new (m_Storage) T(Move(other.Value()));
+      new (m_Storage, Placement) T(Move(other.Value()));
       m_HasValue = true;
       other.Reset();
     }
@@ -52,7 +51,7 @@ public:
     Reset();
     if (other.m_HasValue)
     {
-      new (m_Storage) T(other.Value());
+      new (m_Storage, Placement) T(other.Value());
       m_HasValue = true;
     }
     return *this;
@@ -64,7 +63,7 @@ public:
     Reset();
     if (other.m_HasValue)
     {
-      new (m_Storage) T(Move(other.Value()));
+      new (m_Storage, Placement) T(Move(other.Value()));
       m_HasValue = true;
       other.Reset();
     }

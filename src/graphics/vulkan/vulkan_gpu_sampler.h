@@ -6,7 +6,6 @@
 #include "gecko/graphics/graphics_device.h"
 #include "gecko/graphics/graphics_types.h"
 
-
 namespace gecko::graphics {
 
 class VulkanDevice;
@@ -19,7 +18,7 @@ class VulkanDevice;
 //   slot 1..2N       : zone begin/end pairs
 //
 // EndFrame walks the slot that is FramesInFlight-1 steps behind the
-// current one (assumed signalled) and emits its zones into IProfiler.
+// current one (assumed signalled) and emits its zones into the profiler.
 //
 // This is intentionally simple: no CPU<->GPU clock alignment, raw GPU
 // timestamps are emitted on a synthetic `GpuThreadId` row. Refinement

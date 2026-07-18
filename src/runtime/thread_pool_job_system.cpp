@@ -1,12 +1,11 @@
-#include "gecko/runtime/thread_pool_job_system.h"
+#include "private/thread_pool_job_system.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
 #include "gecko/platform/threading.h"
 #include "private/labels.h"
-
-#include <new>
 
 #if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -187,7 +186,7 @@ bool ThreadPoolJobSystem::Init() noexcept
 {
   GECKO_ASSERT(m_State == nullptr, "ThreadPoolJobSystem already initialized");
   void* storage = AllocBytes(sizeof(ThreadPoolState), alignof(ThreadPoolState));
-  auto* state = new (storage) ThreadPoolState {};
+  auto* state = new (storage, Placement) ThreadPoolState {};
 
   u32 workerCount = m_RequestedWorkerCount == 0 ? platform::HardwareThreadCount() : m_RequestedWorkerCount;
   if (workerCount == 0)
@@ -384,9 +383,8 @@ bool ThreadPoolJobSystem::RunOneJob() noexcept
 void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
 {
   static constexpr const char* WorkerNames[MaxWorkers] = {
-      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",
-      "job-worker-4",  "job-worker-5",  "job-worker-6",  "job-worker-7",
-      "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
+      "job-worker-0",  "job-worker-1",  "job-worker-2",  "job-worker-3",  "job-worker-4",  "job-worker-5",
+      "job-worker-6",  "job-worker-7",  "job-worker-8",  "job-worker-9",  "job-worker-10", "job-worker-11",
       "job-worker-12", "job-worker-13", "job-worker-14", "job-worker-15",
   };
   SetThreadProfilerName(WorkerNames[workerIndex]);

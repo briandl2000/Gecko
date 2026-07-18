@@ -7,9 +7,7 @@ namespace gecko::platform {
 
 inline u64 NowNsSafe() noexcept
 {
-  if (auto* profiler = GetProfiler())
-    return profiler->NowNs();
-  return 0;
+  return ProfilerNowNs();
 }
 
 }  // namespace gecko::platform

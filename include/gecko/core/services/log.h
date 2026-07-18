@@ -17,48 +17,22 @@ enum class LogLevel : u8
   Fatal,
 };
 
-struct ILogger
+GECKO_API void LogFormatted(LogLevel level, Label label, const char* format,
+                            Span<const FormatArg> arguments = {}) noexcept;
+GECKO_API void SetLogLevel(LogLevel level) noexcept;
+[[nodiscard]] GECKO_API LogLevel GetLogLevel() noexcept;
+
+inline void Log(LogLevel level, Label label, const char* format) noexcept
 {
-  virtual ~ILogger() = default;
-  virtual void LogFormatted(LogLevel level, Label label, const char* format,
-                            Span<const FormatArg> arguments) noexcept = 0;
-  virtual void SetLevel(LogLevel level) noexcept = 0;
-  [[nodiscard]] virtual LogLevel GetLevel() const noexcept = 0;
-  [[nodiscard]] virtual bool Initialize() noexcept = 0;
-  virtual void Shutdown() noexcept = 0;
+  LogFormatted(level, label, format);
+}
 
-  void Log(LogLevel level, Label label, const char* format) noexcept
-  {
-    LogFormatted(level, label, format, {});
-  }
-
-  template <typename First, typename... Rest>
-  void Log(LogLevel level, Label label, const char* format, const First& first, const Rest&... rest) noexcept
-  {
-    const FormatArg arguments[] {MakeFormatArg(first), MakeFormatArg(rest)...};
-    LogFormatted(level, label, format, Span<const FormatArg> {arguments, 1U + sizeof...(rest)});
-  }
-};
-
-[[nodiscard]] GECKO_API ILogger* GetLogger() noexcept;
-
-struct NullLogger final : ILogger
+template <typename First, typename... Rest>
+void Log(LogLevel level, Label label, const char* format, const First& first, const Rest&... rest) noexcept
 {
-  void LogFormatted(LogLevel, Label, const char*, Span<const FormatArg>) noexcept override
-  {}
-  void SetLevel(LogLevel) noexcept override
-  {}
-  [[nodiscard]] LogLevel GetLevel() const noexcept override
-  {
-    return LogLevel::Info;
-  }
-  [[nodiscard]] bool Initialize() noexcept override
-  {
-    return true;
-  }
-  void Shutdown() noexcept override
-  {}
-};
+  const FormatArg arguments[] {MakeFormatArg(first), MakeFormatArg(rest)...};
+  LogFormatted(level, label, format, Span<const FormatArg> {arguments, 1U + sizeof...(rest)});
+}
 
 }  // namespace gecko
 
@@ -67,7 +41,7 @@ struct NullLogger final : ILogger
 #endif
 
 #if GECKO_LOGGING
-#define GECKO_LOG(level, label, ...) gecko::GetLogger()->Log((level), (label), __VA_ARGS__)
+#define GECKO_LOG(level, label, ...) gecko::Log((level), (label), __VA_ARGS__)
 #define GECKO_TRACE(label, ...) GECKO_LOG(gecko::LogLevel::Trace, (label), __VA_ARGS__)
 #define GECKO_DEBUG(label, ...) GECKO_LOG(gecko::LogLevel::Debug, (label), __VA_ARGS__)
 #define GECKO_INFO(label, ...) GECKO_LOG(gecko::LogLevel::Info, (label), __VA_ARGS__)

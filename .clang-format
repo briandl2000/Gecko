@@ -1,11 +1,10 @@
-# Gecko Framework - clang-format configuration
-# Based on CODING_STANDARDS.md
+# Gecko C++ formatting
 
 BasedOnStyle: LLVM
 
 # Language
 Language: Cpp
-Standard: c++20
+Standard: Latest
 
 # Indentation
 IndentWidth: 2

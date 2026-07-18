@@ -19,7 +19,7 @@ namespace gecko::graphics {
 // `BeginZone` with an `EndZone` on the same command list; nest as
 // desired. Frames must be bracketed with `BeginFrame` / `EndFrame` so
 // the sampler can rotate its timestamp pools and resolve completed
-// frames into `IProfiler` events.
+// frames into Gecko profiler events.
 //
 // Threading: a single `IGpuSampler` instance is owned by the thread
 // that records the queue's command lists for the frame. Calls into
@@ -50,7 +50,7 @@ public:
 
   /// Mark the end of the current GPU frame. Records a frame-end
   /// timestamp and resolves a frame from `FramesInFlight` ago, emitting
-  /// all of its zones into `IProfiler` with `ProfSource::GPU`.
+  /// all of its zones into the profiler with `ProfSource::GPU`.
   GECKO_API virtual void EndFrame(ICommandList& cmd) noexcept = 0;
 
   /// Open a GPU zone. Pairs with `EndZone`. Nesting is supported up to
@@ -156,10 +156,10 @@ private:
 
 #if defined(GECKO_PROFILING)
 
-#define GECKO_GPU_PROF_SCOPE(sampler_ref, cmd_ref, label, name)                 \
+#define GECKO_GPU_PROF_SCOPE(sampler_ref, cmd_ref, label, name)               \
   gecko::graphics::GpuProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_prof_, __LINE__) \
-  {                                                                             \
-    (sampler_ref), (cmd_ref), (label), name                                     \
+  {                                                                           \
+    (sampler_ref), (cmd_ref), (label), name                                   \
   }
 
 // -- Ergonomic GPU scope macros (mirror CPU GECKO_SCOPE_*) ---------
@@ -172,21 +172,21 @@ private:
 //   _NORMAL_NAMED  -> Normal
 //   _ALWAYS_NAMED  -> Always
 
-#define GECKO_GPU_SCOPE_NAMED(cmd_ref, label, name)                                 \
+#define GECKO_GPU_SCOPE_NAMED(cmd_ref, label, name)                               \
   gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, __LINE__) \
-  {                                                                                 \
+  {                                                                               \
     (cmd_ref), (label), name, gecko::ProfLevel::Detailed                          \
   }
 
-#define GECKO_GPU_SCOPE_NORMAL_NAMED(cmd_ref, label, name)                          \
+#define GECKO_GPU_SCOPE_NORMAL_NAMED(cmd_ref, label, name)                        \
   gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, __LINE__) \
-  {                                                                                 \
+  {                                                                               \
     (cmd_ref), (label), name, gecko::ProfLevel::Normal                            \
   }
 
-#define GECKO_GPU_SCOPE_ALWAYS_NAMED(cmd_ref, label, name)                          \
+#define GECKO_GPU_SCOPE_ALWAYS_NAMED(cmd_ref, label, name)                        \
   gecko::graphics::GpuAutoProfScope GECKO_GPU_PROF_CONCAT(_g_gpu_auto_, __LINE__) \
-  {                                                                                 \
+  {                                                                               \
     (cmd_ref), (label), name, gecko::ProfLevel::Always                            \
   }
 

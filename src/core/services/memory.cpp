@@ -1,6 +1,6 @@
 #include "gecko/core/services/memory.h"
 
-#include <new>
+#include "gecko/core/placement.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -111,7 +111,7 @@ void UnlockArena() noexcept
     return false;
 #endif
 
-  auto* block = new (start) Block {};
+  auto* block = new (start, Placement) Block {};
   block->Size = commitSize;
   block->Previous = g_Arena.Last;
   if (g_Arena.Last != nullptr)
@@ -156,7 +156,7 @@ void SplitBlock(Block& block, usize usedSize) noexcept
   if (block.Size - usedSize < MinimumSplit)
     return;
 
-  auto* remainder = new (reinterpret_cast<u8*>(&block) + usedSize) Block {};
+  auto* remainder = new (reinterpret_cast<u8*>(&block) + usedSize, Placement) Block {};
   remainder->Size = block.Size - usedSize;
   remainder->Previous = &block;
   remainder->Next = block.Next;

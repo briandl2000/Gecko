@@ -1,8 +1,7 @@
 #pragma once
 
+#include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
-
-#include <new>
 
 #if defined(_MSC_VER)
 #include <intrin.h>
@@ -193,7 +192,7 @@ public:
   {
     using Control = detail::SharedControlWithDeleter<Deleter>;
     void* memory = AllocBytes(sizeof(Control), alignof(Control));
-    m_Control = new (memory) Control(object, static_cast<Deleter&&>(deleter));
+    m_Control = new (memory, Placement) Control(object, static_cast<Deleter&&>(deleter));
   }
 
   ~Shared() noexcept
@@ -282,7 +281,7 @@ template <typename T, typename... Args>
 [[nodiscard]] Unique<T> CreateUnique(Args&&... args) noexcept
 {
   void* memory = AllocBytes(sizeof(T), alignof(T));
-  T* object = new (memory) T(static_cast<Args&&>(args)...);
+  T* object = new (memory, Placement) T(static_cast<Args&&>(args)...);
   return Unique<T>(object, detail::DestroyObject<T>);
 }
 
@@ -296,7 +295,7 @@ template <typename T, typename... Args>
 [[nodiscard]] Shared<T> CreateShared(Args&&... args) noexcept
 {
   void* memory = AllocBytes(sizeof(T), alignof(T));
-  T* object = new (memory) T(static_cast<Args&&>(args)...);
+  T* object = new (memory, Placement) T(static_cast<Args&&>(args)...);
   return Shared<T>(object, detail::DestroyObject<T>);
 }
 

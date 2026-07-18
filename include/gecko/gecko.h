@@ -1,11 +1,12 @@
 #pragma once
 
-#include "gecko/core/assert.h"
 #include "gecko/core/array.h"
+#include "gecko/core/assert.h"
 #include "gecko/core/format.h"
 #include "gecko/core/hash_map.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/optional.h"
+#include "gecko/core/placement.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services.h"

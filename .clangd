@@ -1,5 +1,5 @@
 CompileFlags:
   Add:
-    - "-std=c++26"
+    - "-std=c++23"
   Remove:
     - "-Werror"

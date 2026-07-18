@@ -14,7 +14,7 @@ if /I "%Config%"=="debug" (
   set "ConfigName=Release"
   set "ConfigFlags=/O2 /Zi /DNDEBUG=1"
 ) else (
-  echo usage: build.bat [debug^|release] [build^|clean]
+  echo usage: build.bat [debug^|release] [build^|clean^|monolithic]
   exit /b 2
 )
 
@@ -28,8 +28,10 @@ if /I "%Action%"=="clean" (
 )
 
 if /I not "%Action%"=="build" (
-  echo unknown action: %Action%
-  exit /b 2
+  if /I not "%Action%"=="monolithic" (
+    echo unknown action: %Action%
+    exit /b 2
+  )
 )
 
 where cl >nul 2>nul
@@ -52,6 +54,20 @@ set Sources=^
  "%Root%src\gecko_engine.cpp"
 
 echo Building Gecko %ConfigName%
+if /I "%Action%"=="monolithic" (
+  cl /nologo /std:c++latest /MP /W4 /WX /wd4201 /wd4324 /EHs-c- /GR- ^
+   %ConfigFlags% /D_HAS_EXCEPTIONS=0 /DGECKO_BUILD_SHARED=0 /DGECKO_BUILDING=1 ^
+   /DGECKO_MONOLITHIC_GAME=1 /DGECKO_PLATFORM_WINDOWS=1 /DGECKO_GRAPHICS_VULKAN=1 ^
+   /DGECKO_GRAPHICS_VULKAN_WIN32=1 /D_CRT_SECURE_NO_WARNINGS ^
+   /I"%Root%include" /I"%Root%src\core" /I"%Root%src\graphics" %VulkanInclude% ^
+   %Sources% "%Root%projects\sandbox\game.cpp" "%Root%projects\launcher\main.cpp" ^
+   /Fe"%BinaryDir%\gecko_monolithic.exe" ^
+   /link user32.lib shcore.lib ole32.lib winmm.lib %VulkanLibrary%
+  if errorlevel 1 exit /b 1
+  echo Built %BinaryDir%\gecko_monolithic.exe
+  exit /b 0
+)
+
 cl /nologo /std:c++latest /MP /LD /W4 /WX /wd4201 /wd4324 /EHs-c- /GR- ^
  %ConfigFlags% /DGECKO_BUILD_SHARED=1 /DGECKO_BUILDING=1 ^
  /D_HAS_EXCEPTIONS=0 ^

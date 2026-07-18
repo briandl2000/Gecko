@@ -4,24 +4,23 @@
 
 namespace gecko::runtime {
 
-class EventBus final : public IEventBus
+class EventBus final
 {
 public:
-  EventSubscription Subscribe(EventCode code, CallbackFn fn, void* user,
-                              SubscriptionOptions options = {}) noexcept override;
-  void Send(const EventEmitter& emitter, EventCode code, EventView payload) noexcept override;
-  usize Dispatch(usize maxCount) noexcept override;
+  EventSubscription Subscribe(EventCode code, EventCallbackFn fn, void* user,
+                              SubscriptionOptions options = {}) noexcept;
+  void Send(const EventEmitter& emitter, EventCode code, EventView payload) noexcept;
+  usize Dispatch(usize maxCount) noexcept;
 
-  bool RegisterModule(u64 moduleId) noexcept override;
-  void UnregisterModule(u64 moduleId) noexcept override;
-  EventEmitter CreateEmitter(u64 moduleId, u64 sender) noexcept override;
-  bool ValidateEmitter(const EventEmitter& emitter, u64 expectedModuleId) const noexcept override;
+  bool RegisterModule(u64 moduleId) noexcept;
+  void UnregisterModule(u64 moduleId) noexcept;
+  EventEmitter CreateEmitter(u64 moduleId, u64 sender) noexcept;
+  bool ValidateEmitter(const EventEmitter& emitter, u64 expectedModuleId) const noexcept;
 
-  bool Init() noexcept override;
-  void Shutdown() noexcept override;
+  bool Init() noexcept;
+  void Shutdown() noexcept;
 
-protected:
-  void Unsubscribe(u64 id) noexcept override;
+  void Unsubscribe(u64 id) noexcept;
 
 private:
   static constexpr u32 MaxSubscribers = 1024;
@@ -33,7 +32,7 @@ private:
   {
     EventCode Code {0};
     u64 Id {0};
-    CallbackFn Callback {nullptr};
+    EventCallbackFn Callback {nullptr};
     void* User {nullptr};
     SubscriptionDelivery Delivery {SubscriptionDelivery::Queued};
     bool Active {false};

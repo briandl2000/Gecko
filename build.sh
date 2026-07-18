@@ -16,7 +16,7 @@ case "$Config" in
     ConfigFlags=(-O2 -g -DNDEBUG=1)
     ;;
   *)
-    echo "usage: ./build.sh [debug|release] [build|clean]" >&2
+    echo "usage: ./build.sh [debug|release] [build|clean|monolithic]" >&2
     exit 2
     ;;
 esac
@@ -32,7 +32,7 @@ if [[ "$Action" == "clean" ]]; then
   exit 0
 fi
 
-if [[ "$Action" != "build" ]]; then
+if [[ "$Action" != "build" && "$Action" != "monolithic" ]]; then
   echo "unknown action: $Action" >&2
   exit 2
 fi
@@ -146,6 +146,19 @@ if [[ ! -f "${ProtocolObjects[1]}" || "$GeneratedDir/xdg-decoration-protocol.c" 
 fi
 
 read -r -a PlatformLibraries <<<"$(pkg-config --libs wayland-client wayland-cursor xkbcommon x11 xrandr vulkan)"
+
+if [[ "$Action" == "monolithic" ]]; then
+  Monolithic="$BinaryDir/gecko_monolithic"
+  echo "  LINK gecko_monolithic"
+  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" \
+    -DGECKO_MONOLITHIC_GAME=1 \
+    "$Root/projects/launcher/main.cpp" "$Root/projects/sandbox/game.cpp" \
+    "${Objects[@]}" "${ProtocolObjects[@]}" \
+    "${PlatformLibraries[@]}" -pthread -ldl -lm \
+    -o "$Monolithic"
+  echo "Built $Monolithic"
+  exit 0
+fi
 
 EngineLibrary="$BinaryDir/libGecko.so"
 LinkEngine=false

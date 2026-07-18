@@ -1,4 +1,4 @@
-#include "gecko/runtime/immediate_logger.h"
+#include "private/immediate_logger.h"
 
 #include "gecko/core/assert.h"
 

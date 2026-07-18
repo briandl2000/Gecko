@@ -4,23 +4,23 @@
 
 namespace gecko::runtime {
 
-class RingProfiler final : public IProfiler
+class RingProfiler final
 {
 public:
   explicit RingProfiler(usize ignoredCapacity = 0) noexcept;
 
-  void Emit(const ProfEvent& event) noexcept override;
-  u64 NowNs() const noexcept override;
-  void SetMinLevel(ProfLevel level) noexcept override;
-  ProfLevel GetMinLevel() const noexcept override;
-  bool IsLevelEnabled(ProfLevel level) const noexcept override;
-  ScopeStats GetStats(u32 nameHash, ProfSource source = ProfSource::CPU) const noexcept override;
-  void ResetStats() noexcept override;
-  void ForEachScope(ForEachScopeFn callback, void* user) const noexcept override;
-  void DumpStats(Label label) const noexcept override;
-  ProfilerDiagnostics GetDiagnostics() const noexcept override;
-  bool Init() noexcept override;
-  void Shutdown() noexcept override;
+  void Emit(const ProfEvent& event) noexcept;
+  u64 NowNs() const noexcept;
+  void SetMinLevel(ProfLevel level) noexcept;
+  ProfLevel GetMinLevel() const noexcept;
+  bool IsLevelEnabled(ProfLevel level) const noexcept;
+  ScopeStats GetStats(u32 nameHash, ProfSource source = ProfSource::CPU) const noexcept;
+  void ResetStats() noexcept;
+  void ForEachScope(ForEachScopeFn callback, void* user) const noexcept;
+  void DumpStats(Label label) const noexcept;
+  ProfilerDiagnostics GetDiagnostics() const noexcept;
+  bool Init() noexcept;
+  void Shutdown() noexcept;
 
 private:
   static constexpr u32 StatsCapacity = 1024;

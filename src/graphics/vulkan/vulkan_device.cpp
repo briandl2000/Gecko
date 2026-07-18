@@ -21,7 +21,7 @@ template <typename T>
   void* mem = gecko::AllocBytes(sizeof(T), alignof(T));
   if (mem == nullptr)
     return nullptr;
-  return new (mem) T();
+  return new (mem, Placement) T();
 }
 
 template <typename T>
@@ -993,8 +993,7 @@ void VulkanDevice::ExecuteGraphicsCommandList(Unique<ICommandList> commandList) 
       // vkQueueSubmit call on the CPU timeline.
       if (auto* sampler = cl->GetAttachedGpuSampler(); sampler != nullptr)
       {
-        if (auto* p = gecko::GetProfiler(); p != nullptr)
-          sampler->OnSubmit(p->NowNs());
+        sampler->OnSubmit(gecko::ProfilerNowNs());
       }
       VULKAN_CHECK(vkQueueSubmit(m_GraphicsQueue, 1, &submitInfo, primaryFence));
     }
@@ -2091,8 +2090,7 @@ void VulkanDevice::OneTimeSubmit(void (*record)(VkCommandBuffer, void*), void* c
   vkFreeCommandBuffers(m_Device, pool, 1, &cmdBuf);
 }
 
-void VulkanDevice::UploadTextureData(Texture& texture, Span<const gecko::byte> data, u32 mip,
-                                     u32 slice) noexcept
+void VulkanDevice::UploadTextureData(Texture& texture, Span<const gecko::byte> data, u32 mip, u32 slice) noexcept
 {
   if (!texture.IsValid() || data.empty())
     return;
