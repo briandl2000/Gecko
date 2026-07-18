@@ -30,7 +30,7 @@ WindowHandle NullWindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   auto [it, ok] = m_Windows.emplace(id, ::std::move(entry));
   it->second.Desc.Title = it->second.TitleStorage.c_str();
 
-  GECKO_INFO(labels::General, "Created null window id=%llu", static_cast<unsigned long long>(id));
+  GECKO_INFO(labels::General, "Created null window id={}", static_cast<unsigned long long>(id));
   return WindowHandle {id};
 }
 

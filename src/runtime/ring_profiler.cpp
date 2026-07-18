@@ -745,8 +745,7 @@ void DumpCallback(const char* name, u32 hash, ProfSource source, const ScopeStat
   auto* ctx = static_cast<DumpCtx*>(user);
   const char* tag = (source == ProfSource::GPU) ? "[GPU]" : "[CPU]";
   GECKO_INFO(ctx->OutLabel,
-             "{} {:<40} count={:>5}  last={:>8.3f}ms  min={:>8.3f}ms  "
-             "max={:>8.3f}ms  avg={:>8.3f}ms  hash={:#x}",
+             "{} {:<40} count={:>5} last={:>8.3f}ms min={:>8.3f}ms max={:>8.3f}ms avg={:>8.3f}ms hash={:#x}",
              tag, name ? name : "(unnamed)", s.Count, s.LastNs / 1.0e6, s.MinNs / 1.0e6, s.MaxNs / 1.0e6,
              s.AvgNs / 1.0e6, hash);
 }
@@ -761,8 +760,8 @@ void RingProfiler::DumpStats(Label label) const noexcept
   DumpCtx ctx {label};
   ForEachScope(&DumpCallback, &ctx);
   ProfilerDiagnostics d = GetDiagnostics();
-  GECKO_INFO(label, "----- diagnostics: dropped={}, reentrant={}, agg-overflow={} -----", d.DroppedEvents,
-             d.ReentrantDrops, d.AggregatorOverflow);
+  GECKO_INFO(label, "----- diagnostics: dropped={}, reentrant={}, agg-overflow={} -----",
+             d.DroppedEvents, d.ReentrantDrops, d.AggregatorOverflow);
 }
 
 ProfilerDiagnostics RingProfiler::GetDiagnostics() const noexcept

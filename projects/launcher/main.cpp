@@ -58,7 +58,7 @@ bool LoadGame(LoadedGame& game) noexcept
   game.Library = gecko::platform::LoadSharedLibrary(GameLibraryPath);
   if (!game.Library.IsValid())
   {
-    GECKO_ERROR(LauncherLabel, "Could not load %s: %s", GameLibraryPath, gecko::platform::SharedLibraryError());
+    GECKO_ERROR(LauncherLabel, "Could not load {}: {}", GameLibraryPath, gecko::platform::SharedLibraryError());
     return false;
   }
 
@@ -66,7 +66,7 @@ bool LoadGame(LoadedGame& game) noexcept
       gecko::platform::FindSharedLibraryFunction<gecko::GetGameApiFn>(game.Library, gecko::GameApiSymbol);
   if (getApi == nullptr)
   {
-    GECKO_ERROR(LauncherLabel, "%s does not export %s", GameLibraryPath, gecko::GameApiSymbol);
+    GECKO_ERROR(LauncherLabel, "{} does not export {}", GameLibraryPath, gecko::GameApiSymbol);
     gecko::platform::UnloadSharedLibrary(game.Library);
     game = {};
     return false;
@@ -122,7 +122,7 @@ int main(int argumentCount, char** arguments)
   if (gecko::Initialize(config) != gecko::InitializeResult::Success)
     return 1;
 
-  GECKO_INFO(LauncherLabel, "Gecko %s", gecko::VersionFullString());
+  GECKO_INFO(LauncherLabel, "Gecko {}", gecko::VersionFullString());
 
   LoadedGame game {};
   if (!LoadGame(game))
@@ -142,7 +142,7 @@ int main(int argumentCount, char** arguments)
     return 3;
   }
 
-  GECKO_INFO(LauncherLabel, "Running game: %s", game.Api->Name != nullptr ? game.Api->Name : "unnamed");
+  GECKO_INFO(LauncherLabel, "Running game: {}", game.Api->Name != nullptr ? game.Api->Name : "unnamed");
 
   gecko::u64 previousTime = gecko::MonotonicTimeNs();
   gecko::u64 frameIndex = 0;

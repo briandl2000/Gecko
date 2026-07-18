@@ -323,7 +323,7 @@ WaylandWindowsBackend::WaylandWindowsBackend() noexcept
   m_XkbContext = ::xkb_context_new(XKB_CONTEXT_NO_FLAGS);
 #endif
 
-  GECKO_INFO(labels::General, "Initialized Wayland windows backend (display=%p)", m_Display);
+  GECKO_INFO(labels::General, "Initialized Wayland windows backend (display={})", m_Display);
 }
 
 WaylandWindowsBackend::~WaylandWindowsBackend() noexcept
@@ -591,7 +591,7 @@ WindowHandle WaylandWindowsBackend::CreateWindow(const WindowDesc& desc) noexcep
   if (desc.Visible)
     AttachBlankBuffer(ws);
 
-  GECKO_INFO(labels::Window, "Created Wayland window id=%llu, surface=%p, size=%ux%u",
+  GECKO_INFO(labels::Window, "Created Wayland window id={}, surface={}, size={}x{}",
              static_cast<unsigned long long>(id), static_cast<void*>(ws.Surface), ws.ClientSize.Width,
              ws.ClientSize.Height);
   return WindowHandle {id};

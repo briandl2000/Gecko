@@ -8,7 +8,6 @@ inline constexpr ::gecko::Label Runtime = ::gecko::MakeLabel("gecko.runtime");
 
 inline constexpr ::gecko::Label General = ::gecko::MakeLabel("gecko.runtime.general");
 inline constexpr ::gecko::Label JobSystem = ::gecko::MakeLabel("gecko.runtime.job_system");
-inline constexpr ::gecko::Label TrackingAllocator = ::gecko::MakeLabel("gecko.runtime.tracking_allocator");
 inline constexpr ::gecko::Label Logger = ::gecko::MakeLabel("gecko.runtime.logger");
 inline constexpr ::gecko::Label Profiler = ::gecko::MakeLabel("gecko.runtime.profiler");
 inline constexpr ::gecko::Label OperatorNew = ::gecko::MakeLabel("gecko.runtime.operator_new");

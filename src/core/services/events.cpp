@@ -14,7 +14,7 @@ void EventSubscription::Reset()
 
   if (m_Bus && m_Id != 0)
   {
-    GECKO_TRACE(core::labels::Events, "Unsubscribing event subscription ID=%llu", (unsigned long long)m_Id);
+    GECKO_TRACE(core::labels::Events, "Unsubscribing event subscription ID={}", (unsigned long long)m_Id);
     m_Bus->Unsubscribe(m_Id);
   }
   m_Bus = nullptr;
@@ -32,7 +32,7 @@ EventEmitter CreateEmitterForModule(Label moduleLabel, u64 sender)
     return {};
   }
 
-  GECKO_TRACE(core::labels::Events, "Creating emitter for module '%s' (sender=%llu)",
+  GECKO_TRACE(core::labels::Events, "Creating emitter for module '{}' (sender={})",
               moduleLabel.Name ? moduleLabel.Name : "<unnamed>", (unsigned long long)sender);
   return CreateEmitter(moduleLabel.Id, sender);
 }

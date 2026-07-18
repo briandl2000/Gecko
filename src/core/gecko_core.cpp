@@ -1,4 +1,5 @@
 #include "assert.cpp"
+#include "format.cpp"
 #include "services.cpp"
 #include "services/events.cpp"
 #include "services/jobs.cpp"

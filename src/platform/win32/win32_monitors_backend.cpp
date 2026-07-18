@@ -27,7 +27,7 @@ void Win32MonitorsBackend::EnumerateMonitors() noexcept
   m_Monitors.clear();
   ::EnumDisplayMonitors(nullptr, nullptr, EnumProc, reinterpret_cast<::LPARAM>(this));
 
-  GECKO_INFO(labels::General, "Win32MonitorsBackend: enumerated %u monitor(s)", static_cast<u32>(m_Monitors.size()));
+  GECKO_INFO(labels::General, "Win32MonitorsBackend: enumerated {} monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
 
 u32 Win32MonitorsBackend::GetMonitorCount() const noexcept

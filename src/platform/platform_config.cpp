@@ -135,7 +135,7 @@ PlatformConfig Resolve(const PlatformConfig& requested) noexcept
   if (resolved.Backend == DisplayBackendKind::Auto || resolved.Backend == DisplayBackendKind::Unknown)
   {
     resolved.Backend = ProbeBackend();
-    GECKO_INFO(labels::General, "Platform backend: Auto resolved to %s", BackendName(resolved.Backend));
+    GECKO_INFO(labels::General, "Platform backend: Auto resolved to {}", BackendName(resolved.Backend));
     return resolved;
   }
 
@@ -144,14 +144,14 @@ PlatformConfig Resolve(const PlatformConfig& requested) noexcept
   {
     const DisplayBackendKind fallback = ProbeBackend();
     GECKO_WARN(labels::General,
-               "Platform backend: %s requested but not available, "
-               "falling back to %s",
+               "Platform backend: {} requested but not available, "
+               "falling back to {}",
                BackendName(resolved.Backend), BackendName(fallback));
     resolved.Backend = fallback;
     return resolved;
   }
 
-  GECKO_INFO(labels::General, "Platform backend: %s (explicit)", BackendName(resolved.Backend));
+  GECKO_INFO(labels::General, "Platform backend: {} (explicit)", BackendName(resolved.Backend));
   return resolved;
 }
 

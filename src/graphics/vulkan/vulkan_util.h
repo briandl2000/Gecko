@@ -93,7 +93,7 @@ namespace gecko::graphics {
     VkResult _vkr = (expr);                                                                              \
     if (_vkr != VK_SUCCESS)                                                                              \
     {                                                                                                    \
-      GECKO_ERROR(labels::Vulkan, "Vulkan error %d in %s: %s", static_cast<i32>(_vkr), __func__, #expr); \
+      GECKO_ERROR(labels::Vulkan, "Vulkan error {} in {}: {}", static_cast<i32>(_vkr), __func__, #expr); \
     }                                                                                                    \
   } while (false)
 

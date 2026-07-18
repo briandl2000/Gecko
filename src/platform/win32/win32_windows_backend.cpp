@@ -267,7 +267,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   if (desc.Visible)
     ::ShowWindow(hwnd, SW_SHOW);
 
-  GECKO_INFO(labels::General, "Win32WindowsBackend: created window id=%llu hwnd=%p",
+  GECKO_INFO(labels::General, "Win32WindowsBackend: created window id={} hwnd={}",
              static_cast<unsigned long long>(id), static_cast<void*>(hwnd));
   return WindowHandle {id};
 }

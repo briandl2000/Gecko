@@ -1,6 +1,7 @@
 #if defined(GECKO_PLATFORM_WINDOWS)
 
 #include "gecko/platform/shared_library.h"
+#include "gecko/core/format.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -36,7 +37,8 @@ const char* SharedLibraryError() noexcept
   const DWORD error = ::GetLastError();
   if (error == 0)
     return "no shared-library error";
-  ::wsprintfA(g_Error, "Win32 error %lu", error);
+  FormatBuffer buffer {.Data = g_Error, .Capacity = sizeof(g_Error)};
+  FormatTo(buffer, "Win32 error {}", error);
   return g_Error;
 }
 

@@ -1,127 +1,120 @@
 #include "gecko/runtime/immediate_logger.h"
 
 #include "gecko/core/assert.h"
-#include "gecko/core/utility/thread.h"
-#include "gecko/core/utility/time.h"
 
-#include <algorithm>
-#include <cstdarg>
-#include <cstdio>
-#include <mutex>
+#if defined(GECKO_PLATFORM_WINDOWS)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#elif defined(GECKO_PLATFORM_LINUX)
+#include <unistd.h>
+#endif
 
 namespace gecko::runtime {
 
-// Reentrancy guard: Prevents logger from logging itself
-// (e.g., if logger internals call logged functions)
-thread_local bool g_InsideLogger = false;
+namespace {
 
-u64 NowNs() noexcept
+thread_local bool g_LogActive = false;
+
+const char* LevelName(LogLevel level) noexcept
 {
-  return MonotonicTimeNs();
+  switch (level)
+  {
+  case LogLevel::Trace:
+    return "TRACE";
+  case LogLevel::Debug:
+    return "DEBUG";
+  case LogLevel::Info:
+    return "INFO";
+  case LogLevel::Warn:
+    return "WARN";
+  case LogLevel::Error:
+    return "ERROR";
+  case LogLevel::Fatal:
+    return "FATAL";
+  }
+  return "?";
 }
 
-u32 ThreadId() noexcept
+void Append(char* output, usize capacity, usize& length, const char* text) noexcept
 {
-  return HashThreadId();
-}
-
-void ImmediateLogger::AddSink(ILogSink* sink) noexcept
-{
-  if (!sink)
+  if (text == nullptr)
     return;
-
-  if (m_ThreadSafe)
-  {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    m_Sinks.push_back(sink);
-  }
-  else
-  {
-    m_Sinks.push_back(sink);
-  }
+  while (*text != '\0' && length + 1U < capacity)
+    output[length++] = *text++;
 }
 
-void ImmediateLogger::RemoveSink(ILogSink* sink) noexcept
+void WriteLog(bool error, const char* text, usize size) noexcept
 {
-  if (!sink)
+#if defined(GECKO_PLATFORM_WINDOWS)
+  HANDLE handle = ::GetStdHandle(error ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
+  if (handle != nullptr && handle != INVALID_HANDLE_VALUE)
+  {
+    DWORD written = 0;
+    (void)::WriteFile(handle, text, static_cast<DWORD>(size), &written, nullptr);
+  }
+  ::OutputDebugStringA(text);
+#elif defined(GECKO_PLATFORM_LINUX)
+  const int descriptor = error ? STDERR_FILENO : STDOUT_FILENO;
+  usize written = 0;
+  while (written < size)
+  {
+    const ssize_t result = ::write(descriptor, text + written, size - written);
+    if (result <= 0)
+      break;
+    written += static_cast<usize>(result);
+  }
+#endif
+}
+
+}  // namespace
+
+void ImmediateLogger::LogFormatted(LogLevel level, Label label, const char* format,
+                                   Span<const FormatArg> arguments) noexcept
+{
+  if (static_cast<u8>(level) < static_cast<u8>(m_Level))
     return;
-
-  if (m_ThreadSafe)
-  {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
-    if (it != m_Sinks.end())
-      m_Sinks.erase(it);
-  }
-  else
-  {
-    auto it = std::find(m_Sinks.begin(), m_Sinks.end(), sink);
-    if (it != m_Sinks.end())
-      m_Sinks.erase(it);
-  }
-}
-
-void ImmediateLogger::LogV(LogLevel level, Label label, const char* fmt, va_list apIn) noexcept
-{
-  GECKO_ASSERT(fmt && "Format string cannot be null");
-
-  // Check log level filter
-  if (static_cast<int>(level) < static_cast<int>(m_Level))
-  {
+  GECKO_ASSERT(format != nullptr, "Log format cannot be null");
+  if (g_LogActive)
     return;
-  }
+  g_LogActive = true;
 
-  // Format the message
-  char buffer[512];
-  va_list ap;
-  va_copy(ap, apIn);
-  int n = std::vsnprintf(buffer, sizeof(buffer), fmt, ap);
-  va_end(ap);
+#if defined(_MSC_VER)
+  while (_InterlockedExchange(reinterpret_cast<volatile long*>(&m_Lock), 1) != 0)
+  {}
+#else
+  while (__atomic_exchange_n(&m_Lock, 1U, __ATOMIC_ACQUIRE) != 0)
+  {}
+#endif
 
-  if (n < 0)
-    buffer[0] = '\0';
+  char output[2048] {};
+  usize length = 0;
+  Append(output, sizeof(output), length, "[");
+  Append(output, sizeof(output), length, LevelName(level));
+  Append(output, sizeof(output), length, "][");
+  Append(output, sizeof(output), length, label.Name != nullptr ? label.Name : "unlabeled");
+  Append(output, sizeof(output), length, "] ");
 
-  // Create log message
-  LogMessage message;
-  message.Level = level;
-  message.MessageLabel = label;
-  message.TimeNs = NowNs();
-  message.ThreadId = ThreadId();
-  message.Text = buffer;
+  FormatBuffer formatBuffer {
+      .Data = output,
+      .Capacity = sizeof(output),
+      .Length = length,
+  };
+  FormatTo(formatBuffer, format, arguments);
+  length = formatBuffer.Length < sizeof(output) ? formatBuffer.Length : sizeof(output) - 1U;
+  if (length + 1U < sizeof(output))
+    output[length++] = '\n';
+  output[length] = '\0';
 
-  // Write to all sinks immediately
-  if (m_ThreadSafe)
-  {
-    std::lock_guard<std::mutex> lock(m_Mutex);
-    for (auto* sink : m_Sinks)
-    {
-      if (sink)
-        sink->Write(message);
-    }
-  }
-  else
-  {
-    for (auto* sink : m_Sinks)
-    {
-      if (sink)
-        sink->Write(message);
-    }
-  }
-}
+  WriteLog(level >= LogLevel::Warn, output, length);
 
-bool ImmediateLogger::Init() noexcept
-{
-  return true;
-}
-
-void ImmediateLogger::Shutdown() noexcept
-{}
-
-void ImmediateLogger::Flush() noexcept
-{
-  // For immediate logger, flush is a no-op since everything is written
-  // immediately We could potentially flush the underlying sinks if they support
-  // it
+#if defined(_MSC_VER)
+  (void)_InterlockedExchange(reinterpret_cast<volatile long*>(&m_Lock), 0);
+#else
+  __atomic_store_n(&m_Lock, 0U, __ATOMIC_RELEASE);
+#endif
+  g_LogActive = false;
 }
 
 }  // namespace gecko::runtime

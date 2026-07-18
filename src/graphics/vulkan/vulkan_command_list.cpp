@@ -233,7 +233,7 @@ void VulkanCommandList::MaybeRecordSwapchain(const RenderTarget& rt) noexcept
   }
   if (m_TouchedCount >= MaxSwapchainsPerSubmit)
   {
-    GECKO_WARN(labels::Vulkan, "VulkanCommandList: more than %u swapchains touched, dropping", MaxSwapchainsPerSubmit);
+    GECKO_WARN(labels::Vulkan, "VulkanCommandList: more than {} swapchains touched, dropping", MaxSwapchainsPerSubmit);
     return;
   }
   m_Touched[m_TouchedCount++] = {rtd->SwapchainData, rtd->FrameIndex, rtd->ImageIndex};
@@ -247,14 +247,14 @@ void VulkanCommandList::BeginRendering(const BeginRenderingInfo& info) noexcept
 
   if (info.Colors.size() > RenderTargetDesc::MaxRenderTargets)
   {
-    GECKO_WARN(labels::Vulkan, "VulkanCommandList::BeginRendering: too many render targets (%zu), max is %u",
+    GECKO_WARN(labels::Vulkan, "VulkanCommandList::BeginRendering: too many render targets ({}), max is {}",
                info.Colors.size(), RenderTargetDesc::MaxRenderTargets);
     return;
   }
 
   if (info.ClearColors.size() > 0 && info.Colors.size() != info.ClearColors.size())
   {
-    GECKO_WARN(labels::Vulkan, "VulkanCommandList::BeginRendering: colors/clears size mismatch (%zu vs %zu)",
+    GECKO_WARN(labels::Vulkan, "VulkanCommandList::BeginRendering: colors/clears size mismatch ({} vs {})",
                info.Colors.size(), info.ClearColors.size());
     return;
   }

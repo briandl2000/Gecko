@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/assert.h"
+#include "gecko/core/format.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/scope.h"

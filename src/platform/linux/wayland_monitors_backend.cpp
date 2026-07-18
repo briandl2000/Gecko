@@ -5,6 +5,7 @@
 #include "../private/labels.h"
 #include "../private/platform_utils.h"
 #include "gecko/core/ptr.h"
+#include "gecko/core/format.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services/events.h"
 #include "gecko/core/services/log.h"
@@ -12,7 +13,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <cstring>
 #include <iterator>
 
@@ -31,13 +31,17 @@ static void OutputGeometry(void* data, ::wl_output* /*output*/, i32 x, i32 y, i3
   // Build name from make + model
   char name[MaxMonitorNameLength] {};
   if (make && model)
-    ::std::snprintf(name, sizeof(name), "%s %s", make, model);
+  {
+    FormatBuffer buffer {.Data = name, .Capacity = sizeof(name)};
+    FormatTo(buffer, "{} {}", make, model);
+  }
   else if (make)
     ::std::strncpy(name, make, sizeof(name) - 1);
   else if (model)
     ::std::strncpy(name, model, sizeof(name) - 1);
   entry->PendingName[sizeof(entry->PendingName) - 1] = '\0';
-  ::std::snprintf(entry->PendingName, sizeof(entry->PendingName), "%s", name);
+  FormatBuffer buffer {.Data = entry->PendingName, .Capacity = sizeof(entry->PendingName)};
+  FormatTo(buffer, "{}", name);
 }
 
 static void OutputMode(void* data, ::wl_output* /*output*/, u32 flags, i32 width, i32 height, i32 refresh)
@@ -113,7 +117,7 @@ WaylandMonitorsBackend::WaylandMonitorsBackend() noexcept
   // Initial roundtrip to discover globals.
   ::wl_display_roundtrip(m_Display);
 
-  GECKO_INFO(labels::General, "WaylandMonitorsBackend: initialized (display=%p)", m_Display);
+  GECKO_INFO(labels::General, "WaylandMonitorsBackend: initialized (display={})", m_Display);
 }
 
 WaylandMonitorsBackend::~WaylandMonitorsBackend() noexcept
@@ -145,7 +149,7 @@ void WaylandMonitorsBackend::EnumerateMonitors() noexcept
   if (!m_Monitors.empty())
     m_Monitors.front().Info.IsPrimary = true;
 
-  GECKO_INFO(labels::General, "WaylandMonitorsBackend: enumerated %u monitor(s)", static_cast<u32>(m_Monitors.size()));
+  GECKO_INFO(labels::General, "WaylandMonitorsBackend: enumerated {} monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
 
 u32 WaylandMonitorsBackend::GetMonitorCount() const noexcept

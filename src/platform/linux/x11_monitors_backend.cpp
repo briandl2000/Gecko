@@ -38,7 +38,7 @@ X11MonitorsBackend::X11MonitorsBackend() noexcept
   ::XRRSelectInput(m_Display, DefaultRootWindow(m_Display),
                    RRScreenChangeNotifyMask | RROutputChangeNotifyMask | RRCrtcChangeNotifyMask);
 
-  GECKO_INFO(labels::General, "X11MonitorsBackend: initialized (display=%p, rrEventBase=%d)", m_Display, m_RREventBase);
+  GECKO_INFO(labels::General, "X11MonitorsBackend: initialized (display={}, rrEventBase={})", m_Display, m_RREventBase);
 }
 
 X11MonitorsBackend::~X11MonitorsBackend() noexcept
@@ -132,7 +132,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
 
     m_Monitors.push_back(entry);
 
-    GECKO_DEBUG(labels::General, "Monitor: %s (%dx%d @ %d,%d, %u mHz, %u DPI%s)", outInfo->name, crtcInfo->width,
+    GECKO_DEBUG(labels::General, "Monitor: {} ({}x{} @ {},{}, {} mHz, {} DPI{})", outInfo->name, crtcInfo->width,
                 crtcInfo->height, crtcInfo->x, crtcInfo->y, info.RefreshRateMilliHz, info.Dpi,
                 info.IsPrimary ? ", primary" : "");
 
@@ -142,7 +142,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
 
   ::XRRFreeScreenResources(resources);
 
-  GECKO_INFO(labels::General, "X11MonitorsBackend: enumerated %u monitor(s)", static_cast<u32>(m_Monitors.size()));
+  GECKO_INFO(labels::General, "X11MonitorsBackend: enumerated {} monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
 
 u32 X11MonitorsBackend::GetMonitorCount() const noexcept

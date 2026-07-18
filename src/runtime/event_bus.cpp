@@ -83,7 +83,7 @@ EventSubscription EventBus::Subscribe(EventCode code, CallbackFn fn, void* user,
   GECKO_ASSERT(fn && "Callback cannot be null");
 
   u64 id = m_NextSubscriptionId.fetch_add(1, std::memory_order_relaxed);
-  GECKO_TRACE(runtime::labels::General, "Creating subscription ID=%llu for event code %u", (unsigned long long)id,
+  GECKO_TRACE(runtime::labels::General, "Creating subscription ID={} for event code {}", (unsigned long long)id,
               code);
 
   Subscriber sub {};
@@ -133,7 +133,7 @@ void EventBus::Send(const EventEmitter& emitter, EventCode code, EventView paylo
   GECKO_ASSERT(ValidateEmitter(emitter, emitter.moduleId) && "Invalid emitter capability");
   GECKO_ASSERT(payload.size <= sizeof(QueuedEvent::payloadStorage) && "Payload too large for queue");
 
-  GECKO_TRACE(runtime::labels::General, "Sending event code=%u, moduleId=%llu, size=%zu", code,
+  GECKO_TRACE(runtime::labels::General, "Sending event code={}, moduleId={}, size={}", code,
               (unsigned long long)emitter.moduleId, payload.size);
 
   QueuedEvent qEvent {};
@@ -175,7 +175,7 @@ void EventBus::Send(const EventEmitter& emitter, EventCode code, EventView paylo
     if (count == 0)
       return 0;
 
-    GECKO_TRACE(runtime::labels::General, "Dispatching %zu queued events", count);
+    GECKO_TRACE(runtime::labels::General, "Dispatching {} queued events", count);
 
     events.reserve(count);
     for (std::size_t i = 0; i < count; ++i)

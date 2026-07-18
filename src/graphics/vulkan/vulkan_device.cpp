@@ -46,9 +46,9 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
                                                     void* /*userdata*/)
 {
   if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
-    GECKO_ERROR(labels::Vulkan, "%s", data->pMessage);
+    GECKO_ERROR(labels::Vulkan, "{}", data->pMessage);
   else if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-    GECKO_WARN(labels::Vulkan, "%s", data->pMessage);
+    GECKO_WARN(labels::Vulkan, "{}", data->pMessage);
   return VK_FALSE;
 }
 
@@ -94,7 +94,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     if (hasExt(e))
       instanceExts.push_back(e);
     else
-      GECKO_WARN(labels::Vulkan, "VulkanDevice: instance extension '%s' unavailable", e);
+      GECKO_WARN(labels::Vulkan, "VulkanDevice: instance extension '{}' unavailable", e);
   }
 
   ::std::vector<VkLayerProperties> availableLayers;
@@ -141,12 +141,12 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   {
     GECKO_ERROR(labels::Vulkan,
                 "VulkanDevice: vkCreateInstance failed "
-                "(requested %u extensions, %u layers)",
+                "(requested {} extensions, {} layers)",
                 instanceCreateInfo.enabledExtensionCount, instanceCreateInfo.enabledLayerCount);
     for (u32 i = 0; i < instanceCreateInfo.enabledExtensionCount; ++i)
-      GECKO_ERROR(labels::Vulkan, "  ext: %s", instanceExts[i]);
+      GECKO_ERROR(labels::Vulkan, "  ext: {}", instanceExts[i]);
     for (u32 i = 0; i < instanceCreateInfo.enabledLayerCount; ++i)
-      GECKO_ERROR(labels::Vulkan, "  layer: %s", layers[i]);
+      GECKO_ERROR(labels::Vulkan, "  layer: {}", layers[i]);
     return;
   }
 
@@ -199,7 +199,7 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
 
   VkPhysicalDeviceProperties physicalDeviceProps {};
   vkGetPhysicalDeviceProperties(m_PhysicalDevice, &physicalDeviceProps);
-  GECKO_INFO(labels::Vulkan, "VulkanDevice: using GPU '%s'", physicalDeviceProps.deviceName);
+  GECKO_INFO(labels::Vulkan, "VulkanDevice: using GPU '{}'", physicalDeviceProps.deviceName);
 
   m_TimestampPeriodNs = physicalDeviceProps.limits.timestampPeriod;
 
@@ -253,8 +253,8 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   if (supported13.dynamicRendering != VK_TRUE || supported13.synchronization2 != VK_TRUE)
   {
     GECKO_ERROR(labels::Vulkan,
-                "VulkanDevice: required features missing (dynamicRendering=%d, "
-                "synchronization2=%d)",
+                "VulkanDevice: required features missing (dynamicRendering={}, "
+                "synchronization2={})",
                 supported13.dynamicRendering, supported13.synchronization2);
     return;
   }
@@ -813,7 +813,7 @@ FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
   }
   if (ar != VK_SUCCESS && ar != VK_SUBOPTIMAL_KHR)
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice: acquire failed (%d)", static_cast<i32>(ar));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: acquire failed ({})", static_cast<i32>(ar));
     return ctx;
   }
 
@@ -867,7 +867,7 @@ void VulkanDevice::Present(::std::span<const FrameContext> frames) noexcept
       continue;
     if (count >= MaxSwapchainsPerSubmit)
     {
-      GECKO_WARN(labels::Vulkan, "VulkanDevice::Present: more than %u swapchains, truncated", MaxSwapchainsPerSubmit);
+      GECKO_WARN(labels::Vulkan, "VulkanDevice::Present: more than {} swapchains, truncated", MaxSwapchainsPerSubmit);
       break;
     }
     auto* data = static_cast<VulkanSwapchainData*>(f.SC->Data.get());
@@ -1194,7 +1194,7 @@ RenderTarget VulkanDevice::CreateRenderTarget(const RenderTargetDesc& desc) noex
   Texture t = CreateTexture(td);
   if (!t.IsValid())
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateRenderTarget: backing texture failed (%s)",
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateRenderTarget: backing texture failed ({})",
                 desc.DebugName != nullptr ? desc.DebugName : "<unnamed>");
     return RenderTarget {};
   }
@@ -1448,7 +1448,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
     return VK_NULL_HANDLE;
   if (code.Format != ShaderFormat::SPIRV)
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice: only SPIRV shaders accepted (format=%d)", static_cast<i32>(code.Format));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: only SPIRV shaders accepted (format={})", static_cast<i32>(code.Format));
     return VK_NULL_HANDLE;
   }
 
@@ -1458,7 +1458,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
   const auto* rawBytes = code.Bytes.data();
   if (byteCount == 0 || (byteCount % 4) != 0)
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice: SPIRV blob size %zu is not a multiple of 4 bytes", byteCount);
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: SPIRV blob size {} is not a multiple of 4 bytes", byteCount);
     return VK_NULL_HANDLE;
   }
 
@@ -1707,7 +1707,7 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(const GraphicsPipelineDesc
     vkDestroyPipelineLayout(m_Device, layout, nullptr);
     if (dsl != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateGraphicsPipelines failed (%d)", static_cast<i32>(res));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateGraphicsPipelines failed ({})", static_cast<i32>(res));
     return GraphicsPipeline {};
   }
 
@@ -1821,7 +1821,7 @@ ComputePipeline VulkanDevice::CreateComputePipeline(const ComputePipelineDesc& d
     vkDestroyPipelineLayout(m_Device, layout, nullptr);
     if (dsl != VK_NULL_HANDLE)
       vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateComputePipelines failed (%d)", static_cast<i32>(res));
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateComputePipelines failed ({})", static_cast<i32>(res));
     return ComputePipeline {};
   }
 

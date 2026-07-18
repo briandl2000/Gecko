@@ -60,7 +60,7 @@ VkResult CreateSurface(VkInstance instance, const ::gecko::platform::NativeWindo
     return CreateWin32Surface(instance, native, out);
 #endif
   default:
-    GECKO_ERROR(labels::Vulkan, "VulkanSurface: no surface backend for display kind %d",
+    GECKO_ERROR(labels::Vulkan, "VulkanSurface: no surface backend for display kind {}",
                 static_cast<i32>(native.Backend));
     return VK_ERROR_EXTENSION_NOT_PRESENT;
   }

@@ -1,18 +1,14 @@
-#include "gecko/engine.h"
-
 #include "core/private/services.h"
 #include "gecko/core/services/memory.h"
+#include "gecko/engine.h"
 #include "gecko/runtime/event_bus.h"
 #include "gecko/runtime/immediate_logger.h"
 #include "gecko/runtime/ring_profiler.h"
-#include "gecko/runtime/standard_log_sinks.h"
 #include "gecko/runtime/thread_pool_job_system.h"
-#include "gecko/runtime/tracking_allocator.h"
 #include "graphics/private/graphics_state.h"
 #include "platform/private/platform_state.h"
 
 #include <new>
-#include <optional>
 
 namespace gecko {
 
@@ -20,18 +16,13 @@ namespace {
 
 struct GeckoState
 {
-  GeckoState() noexcept : AllocatorScope(Allocator), Profiler(1U << 16U)
-  {
-    Logger.SetThreadSafe(true);
-  }
+  GeckoState() noexcept : Profiler(1U << 16U)
+  {}
 
-  runtime::TrackingAllocator Allocator;
-  gecko::AllocatorScope AllocatorScope;
   runtime::ThreadPoolJobSystem Jobs;
   runtime::RingProfiler Profiler;
   runtime::ImmediateLogger Logger;
   runtime::EventBus Events;
-  ::std::optional<runtime::StandardLogSinks> LogSinks;
 
   bool JobsInitialized {false};
   bool ProfilerInitialized {false};
@@ -45,8 +36,6 @@ GeckoState* g_State = nullptr;
 
 void ShutdownState(GeckoState& state) noexcept
 {
-  state.LogSinks.reset();
-
   if (state.GraphicsInitialized)
   {
     graphics::detail::Shutdown();
@@ -88,18 +77,11 @@ InitializeResult Initialize(const GeckoConfig& config) noexcept
   if (g_State != nullptr)
     return InitializeResult::AlreadyInitialized;
 
-  void* memory = PlatformAlloc(sizeof(GeckoState), alignof(GeckoState));
+  void* memory = AllocBytes(sizeof(GeckoState), alignof(GeckoState));
   if (memory == nullptr)
     return InitializeResult::OutOfMemory;
 
   auto* state = new (memory) GeckoState();
-  if (!state->AllocatorScope)
-  {
-    state->~GeckoState();
-    PlatformFree(memory, alignof(GeckoState));
-    return InitializeResult::RuntimeFailed;
-  }
-
   if (!state->Jobs.Init())
     goto failed;
   state->JobsInitialized = true;
@@ -110,7 +92,7 @@ InitializeResult Initialize(const GeckoConfig& config) noexcept
   state->ProfilerInitialized = true;
   detail::SetRuntimeServices(&state->Jobs, &state->Profiler, nullptr, nullptr);
 
-  if (!state->Logger.Init())
+  if (!state->Logger.Initialize())
     goto failed;
   state->LoggerInitialized = true;
   detail::SetRuntimeServices(&state->Jobs, &state->Profiler, &state->Logger, nullptr);
@@ -136,14 +118,13 @@ InitializeResult Initialize(const GeckoConfig& config) noexcept
     state->GraphicsInitialized = true;
   }
 
-  state->LogSinks.emplace();
   g_State = state;
   return InitializeResult::Success;
 
 failed:
   ShutdownState(*state);
   state->~GeckoState();
-  PlatformFree(memory, alignof(GeckoState));
+  DeallocBytes(memory);
   return InitializeResult::RuntimeFailed;
 }
 
@@ -156,7 +137,7 @@ void Shutdown() noexcept
   g_State = nullptr;
   ShutdownState(*state);
   state->~GeckoState();
-  PlatformFree(state, alignof(GeckoState));
+  DeallocBytes(state);
 }
 
 bool IsInitialized() noexcept

@@ -19,7 +19,7 @@ namespace gecko::platform {
 namespace {
 int X11ErrorHandler(::Display* /*display*/, ::XErrorEvent* event)
 {
-  GECKO_WARN(labels::General, "X11 error: request=%u, error=%u, serial=%lu", event->request_code, event->error_code,
+  GECKO_WARN(labels::General, "X11 error: request={}, error={}, serial={}", event->request_code, event->error_code,
              event->serial);
   return 0;
 }
@@ -48,7 +48,7 @@ X11WindowsBackend::X11WindowsBackend() noexcept
   m_NetWmStateAbove = ::XInternAtom(m_Display, "_NET_WM_STATE_ABOVE", False);
   m_MotifWmHints = ::XInternAtom(m_Display, "_MOTIF_WM_HINTS", False);
 
-  GECKO_INFO(labels::General, "Initialized X11 windows backend (display=%p)", m_Display);
+  GECKO_INFO(labels::General, "Initialized X11 windows backend (display={})", m_Display);
 }
 
 X11WindowsBackend::~X11WindowsBackend() noexcept
@@ -143,7 +143,7 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   if (desc.Buttons != WindowButtons::All)
     ApplyMotifFunctions(w, desc.Buttons, desc.Resizable);
 
-  GECKO_INFO(labels::Window, "Created X11 window id=%llu, xid=%lu, size=%ux%u", (unsigned long long)id,
+  GECKO_INFO(labels::Window, "Created X11 window id={}, xid={}, size={}x{}", (unsigned long long)id,
              (unsigned long)w, width, height);
   return WindowHandle {id};
 }
@@ -161,7 +161,7 @@ void X11WindowsBackend::DestroyWindow(WindowHandle window) noexcept
 
   if (m_Display && it->second.WindowId != 0)
   {
-    GECKO_DEBUG(labels::Window, "Destroying X11 window id=%llu, xid=%lu", (unsigned long long)window.Id,
+    GECKO_DEBUG(labels::Window, "Destroying X11 window id={}, xid={}", (unsigned long long)window.Id,
                 (unsigned long)it->second.WindowId);
     m_WindowByXid.erase(it->second.WindowId);
     ::XDestroyWindow(m_Display, it->second.WindowId);
@@ -416,7 +416,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   }
 
   if (eventCount > 0)
-    GECKO_TRACE(labels::Input, "Pumped %d X11 events", eventCount);
+    GECKO_TRACE(labels::Input, "Pumped {} X11 events", eventCount);
 }
 
 Extent2D X11WindowsBackend::GetClientSize(WindowHandle window) const noexcept
