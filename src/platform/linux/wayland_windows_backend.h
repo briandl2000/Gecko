@@ -65,7 +65,7 @@ struct WaylandWindowState
 
 // -- Staged event -------------------------------------------------------
 
-struct StagedEvent
+struct WaylandStagedEvent
 {
   gecko::EventCode Code {0};
   u8 PayloadStorage[128] {};
@@ -73,10 +73,10 @@ struct StagedEvent
 };
 
 template <typename T>
-StagedEvent MakeStagedEvent(gecko::EventCode code, const T& payload) noexcept
+WaylandStagedEvent MakeWaylandStagedEvent(gecko::EventCode code, const T& payload) noexcept
 {
   static_assert(sizeof(T) <= 128, "Payload too large for StagedEvent storage");
-  StagedEvent ev;
+  WaylandStagedEvent ev;
   ev.Code = code;
   ev.PayloadSize = static_cast<u32>(sizeof(T));
   ::std::memcpy(ev.PayloadStorage, &payload, sizeof(T));
@@ -190,7 +190,7 @@ private:
 
   ::std::unordered_map<u64, WaylandWindowState> m_Windows;
   ::std::unordered_map<::wl_surface*, u64> m_WindowBySurface;
-  ::std::vector<StagedEvent> m_Staged;
+  ::std::vector<WaylandStagedEvent> m_Staged;
 };
 
 Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;

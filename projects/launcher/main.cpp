@@ -1,9 +1,4 @@
-#include "gecko/core/services/log.h"
-#include "gecko/core/utility/time.h"
-#include "gecko/core/version.h"
-#include "gecko/game.h"
 #include "gecko/gecko.h"
-#include "gecko/platform/shared_library.h"
 
 namespace {
 

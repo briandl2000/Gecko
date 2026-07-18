@@ -15,7 +15,7 @@ namespace gecko {
 
 void* PlatformAlloc(u64 size, u32 alignment) noexcept
 {
-  if (alignment <= alignof(::std::max_align_t))
+  if (alignment <= alignof(long double))
   {
     return ::std::malloc(static_cast<usize>(size));
   }
@@ -36,7 +36,7 @@ void PlatformFree(void* ptr, u32 alignment) noexcept
     return;
 
 #if defined(GECKO_PLATFORM_WINDOWS)
-  if (alignment > alignof(::std::max_align_t))
+  if (alignment > alignof(long double))
     ::_aligned_free(ptr);
   else
     ::std::free(ptr);

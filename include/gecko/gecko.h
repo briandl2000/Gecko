@@ -1,31 +1,31 @@
 #pragma once
 
-#include "gecko/core/api.h"
+#include "gecko/core/assert.h"
+#include "gecko/core/labels.h"
+#include "gecko/core/ptr.h"
+#include "gecko/core/scope.h"
+#include "gecko/core/services.h"
+#include "gecko/core/span.h"
 #include "gecko/core/types.h"
+#include "gecko/core/utility/bit.h"
+#include "gecko/core/utility/hash.h"
+#include "gecko/core/utility/random.h"
+#include "gecko/core/utility/thread.h"
+#include "gecko/core/utility/time.h"
+#include "gecko/core/version.h"
+#include "gecko/engine.h"
+#include "gecko/game.h"
+#include "gecko/graphics/command_list.h"
 #include "gecko/graphics/graphics.h"
-#include "gecko/platform/platform_config.h"
-
-namespace gecko {
-
-enum class InitializeResult : u8
-{
-  Success,
-  AlreadyInitialized,
-  OutOfMemory,
-  RuntimeFailed,
-};
-
-struct GeckoConfig
-{
-  const char* AppName {"Gecko"};
-  platform::PlatformConfig Platform {};
-  graphics::GraphicsBackend GraphicsBackend {graphics::GraphicsBackend::Vulkan};
-  bool EnableGraphics {true};
-  bool EnableGraphicsDebug {false};
-};
-
-[[nodiscard]] GECKO_API InitializeResult Initialize(const GeckoConfig& config = {}) noexcept;
-GECKO_API void Shutdown() noexcept;
-[[nodiscard]] GECKO_API bool IsInitialized() noexcept;
-
-}  // namespace gecko
+#include "gecko/graphics/graphics_device.h"
+#include "gecko/graphics/graphics_types.h"
+#include "gecko/math/math.h"
+#include "gecko/platform/clipboard.h"
+#include "gecko/platform/input.h"
+#include "gecko/platform/monitor.h"
+#include "gecko/platform/platform.h"
+#include "gecko/platform/platform_io.h"
+#include "gecko/platform/shared_library.h"
+#include "gecko/platform/terminal.h"
+#include "gecko/platform/threading.h"
+#include "gecko/platform/window.h"

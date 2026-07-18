@@ -1,11 +1,5 @@
-#include "gecko/game.h"
-
-#include "gecko/core/services/events.h"
-#include "gecko/core/services/log.h"
-#include "gecko/core/utility/thread.h"
-#include "gecko/platform/platform.h"
+#include "gecko/gecko.h"
 #include "gecko/platform/platform_events.h"
-#include "gecko/platform/windows_interface.h"
 
 namespace {
 

@@ -77,7 +77,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     if (!outInfo)
       continue;
 
-    if (outInfo->crtc == None)
+    if (outInfo->crtc == 0L)
     {
       // No active CRTC -- output is genuinely inactive.
       ::XRRFreeOutputInfo(outInfo);

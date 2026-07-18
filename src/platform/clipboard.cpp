@@ -146,7 +146,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
   ::Window owner = ::XGetSelectionOwner(display, clipboard);
   if (owner == window)
     return OwnerState().Payload;
-  if (owner == None)
+  if (owner == 0L)
     return {};
 
   ::XConvertSelection(display, clipboard, utf8, prop, window, CurrentTime);
@@ -166,7 +166,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
     }
     ::std::this_thread::sleep_for(::std::chrono::milliseconds(2));
   }
-  if (!got || event.xselection.property == None)
+  if (!got || event.xselection.property == 0L)
     return {};
 
   ::Atom actualType = 0;
@@ -175,7 +175,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
   unsigned long bytesAfter = 0;
   unsigned char* data = nullptr;
   if (::XGetWindowProperty(display, window, prop, 0, ~0L, True, AnyPropertyType, &actualType, &actualFormat, &nItems,
-                           &bytesAfter, &data) != Success)
+                           &bytesAfter, &data) != 0)
     return {};
 
   ::std::string out;

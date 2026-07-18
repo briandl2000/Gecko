@@ -49,55 +49,7 @@ if defined VULKAN_SDK (
 )
 
 set Sources=^
- "%Root%src\gecko.cpp" ^
- "%Root%src\core\assert.cpp" ^
- "%Root%src\core\services.cpp" ^
- "%Root%src\core\services\events.cpp" ^
- "%Root%src\core\services\jobs.cpp" ^
- "%Root%src\core\services\log.cpp" ^
- "%Root%src\core\services\memory.cpp" ^
- "%Root%src\core\services\profiler.cpp" ^
- "%Root%src\core\utility\random.cpp" ^
- "%Root%src\core\utility\thread.cpp" ^
- "%Root%src\core\utility\time.cpp" ^
- "%Root%src\core\overwrite_new.cpp" ^
- "%Root%src\platform\clipboard.cpp" ^
- "%Root%src\platform\input.cpp" ^
- "%Root%src\platform\monitors_interface.cpp" ^
- "%Root%src\platform\platform_config.cpp" ^
- "%Root%src\platform\platform_io.cpp" ^
- "%Root%src\platform\platform.cpp" ^
- "%Root%src\platform\terminal.cpp" ^
- "%Root%src\platform\window_event_input.cpp" ^
- "%Root%src\platform\windows_interface.cpp" ^
- "%Root%src\platform\private\null_monitors_backend.cpp" ^
- "%Root%src\platform\private\null_windows_interface.cpp" ^
- "%Root%src\platform\win32\platform_io_win32.cpp" ^
- "%Root%src\platform\win32\shared_library_win32.cpp" ^
- "%Root%src\platform\win32\threading_win32.cpp" ^
- "%Root%src\platform\win32\win32_monitors_backend.cpp" ^
- "%Root%src\platform\win32\win32_windows_backend.cpp" ^
- "%Root%src\runtime\async_trace_profiler_sink.cpp" ^
- "%Root%src\runtime\console_log_sink.cpp" ^
- "%Root%src\runtime\crash_safe_trace_profiler_sink.cpp" ^
- "%Root%src\runtime\event_bus.cpp" ^
- "%Root%src\runtime\file_log_sink.cpp" ^
- "%Root%src\runtime\immediate_logger.cpp" ^
- "%Root%src\runtime\ring_logger.cpp" ^
- "%Root%src\runtime\ring_profiler.cpp" ^
- "%Root%src\runtime\standard_log_sinks.cpp" ^
- "%Root%src\runtime\thread_pool_job_system.cpp" ^
- "%Root%src\runtime\trace_file_sink.cpp" ^
- "%Root%src\runtime\trace_writer.cpp" ^
- "%Root%src\runtime\tracking_allocator.cpp" ^
- "%Root%src\graphics\graphics_device.cpp" ^
- "%Root%src\graphics\graphics.cpp" ^
- "%Root%src\graphics\private\null_device.cpp" ^
- "%Root%src\graphics\vulkan\vulkan_command_list.cpp" ^
- "%Root%src\graphics\vulkan\vulkan_device.cpp" ^
- "%Root%src\graphics\vulkan\vulkan_gpu_sampler.cpp" ^
- "%Root%src\graphics\vulkan\vulkan_surface.cpp" ^
- "%Root%src\graphics\vulkan\win32\vulkan_win32_surface.cpp"
+ "%Root%src\gecko_engine.cpp"
 
 echo Building Gecko %ConfigName%
 cl /nologo /std:c++latest /MP /LD /W4 /WX /wd4201 /wd4324 ^

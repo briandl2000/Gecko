@@ -17,6 +17,8 @@ The game API is a flat, versioned function table containing fixed-width values, 
 
 Subsystem boundaries are directories for navigation, not separately shipped libraries. Calls inside Gecko are ordinary direct calls. Function tables exist only where a real runtime boundary needs them: game/plugin loading or selecting an OS/graphics backend. A final monolithic build can compile the same game implementation into the executable and call the same API without dynamic loading.
 
+The engine uses a deliberate unity build. Each subsystem has one unity source that includes its implementation files, and `src/gecko_engine.cpp` combines those subsystem units into the shared library. This keeps the build visible and makes internal name collisions real problems to fix instead of relying on accidental translation-unit isolation. Projects may include the complete public API through `<gecko/gecko.h>` or choose granular headers when parse time matters.
+
 Memory belongs to Gecko. The shared library owns the allocator state, and every binary uses the exported allocation functions. OS allocation is the bottom layer. Graphics resource allocation is explicit Vulkan allocation. No third-party allocator or container library is part of the engine.
 
 Initialization and shutdown are explicit. The long-term public shape is `Initialize(config)` / `Shutdown()` with typed result enums. Destructors may clean up small local values, but correctness must not depend on global destructor order, exception unwinding, or hidden ownership chains.

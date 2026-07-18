@@ -470,8 +470,8 @@ void WaylandWindowsBackend::OnToplevelConfigure(WaylandWindowState* ws, i32 widt
 
 void WaylandWindowsBackend::OnToplevelClose(WaylandWindowState* ws) noexcept
 {
-  m_Staged.push_back(MakeStagedEvent(events::WindowCloseRequested,
-                                     events::WindowCloseRequestedPayload {WindowHandle {ws->GeckoId}, NowNsSafe()}));
+  m_Staged.push_back(MakeWaylandStagedEvent(
+      events::WindowCloseRequested, events::WindowCloseRequestedPayload {WindowHandle {ws->GeckoId}, NowNsSafe()}));
 }
 
 // -- Window management --------------------------------------------------
@@ -627,7 +627,7 @@ void WaylandWindowsBackend::DestroyWindow(WindowHandle window) noexcept
   if (m_Display)
     ::wl_display_flush(m_Display);
 
-  m_Staged.push_back(MakeStagedEvent(events::WindowClosed, events::WindowClosedPayload {window, NowNsSafe()}));
+  m_Staged.push_back(MakeWaylandStagedEvent(events::WindowClosed, events::WindowClosedPayload {window, NowNsSafe()}));
 
   m_Windows.erase(it);
 }
@@ -647,7 +647,7 @@ bool WaylandWindowsBackend::RequestClose(WindowHandle window) noexcept
     return false;
 
   m_Staged.push_back(
-      MakeStagedEvent(events::WindowCloseRequested, events::WindowCloseRequestedPayload {window, NowNsSafe()}));
+      MakeWaylandStagedEvent(events::WindowCloseRequested, events::WindowCloseRequestedPayload {window, NowNsSafe()}));
   return true;
 }
 
@@ -785,8 +785,8 @@ void WaylandWindowsBackend::SetWindowState(WindowHandle window, platform::Window
     ::wl_display_flush(m_Display);
 
   ws.State = state;
-  m_Staged.push_back(MakeStagedEvent(events::WindowStateChanged,
-                                     events::WindowStateChangedPayload {window, NowNsSafe(), oldState, state}));
+  m_Staged.push_back(MakeWaylandStagedEvent(events::WindowStateChanged,
+                                            events::WindowStateChangedPayload {window, NowNsSafe(), oldState, state}));
 }
 
 platform::WindowState WaylandWindowsBackend::GetWindowState(WindowHandle window) const noexcept
@@ -1180,8 +1180,8 @@ void WaylandWindowsBackend::OnKeyboardEnter(::wl_keyboard* /*kb*/, u32 /*serial*
 
   if (id != WindowHandle::InvalidId)
   {
-    m_Staged.push_back(MakeStagedEvent(events::WindowFocusChanged,
-                                       events::WindowFocusChangedPayload {WindowHandle {id}, NowNsSafe(), 1}));
+    m_Staged.push_back(MakeWaylandStagedEvent(events::WindowFocusChanged,
+                                              events::WindowFocusChangedPayload {WindowHandle {id}, NowNsSafe(), 1}));
   }
 }
 
@@ -1192,8 +1192,8 @@ void WaylandWindowsBackend::OnKeyboardLeave(::wl_keyboard* /*kb*/, u32 /*serial*
 
   if (id != WindowHandle::InvalidId)
   {
-    m_Staged.push_back(MakeStagedEvent(events::WindowFocusChanged,
-                                       events::WindowFocusChangedPayload {WindowHandle {id}, NowNsSafe(), 0}));
+    m_Staged.push_back(MakeWaylandStagedEvent(events::WindowFocusChanged,
+                                              events::WindowFocusChangedPayload {WindowHandle {id}, NowNsSafe(), 0}));
   }
 }
 
@@ -1212,8 +1212,9 @@ void WaylandWindowsBackend::OnKeyboardKey(::wl_keyboard* /*kb*/, u32 /*serial*/,
   const xkb_keysym_t sym = m_XkbState ? ::xkb_state_key_get_one_sym(m_XkbState, xkbCode) : XKB_KEY_NoSymbol;
   const KeyCode kc = XkbKeysymToKeyCode(sym);
 
-  m_Staged.push_back(MakeStagedEvent(events::WindowKey, events::WindowKeyPayload {WindowHandle {m_FocusedKeyboard}, now,
-                                                                                  kc, down ? u8(1) : u8(0), 0}));
+  m_Staged.push_back(
+      MakeWaylandStagedEvent(events::WindowKey, events::WindowKeyPayload {WindowHandle {m_FocusedKeyboard}, now, kc,
+                                                                          down ? u8(1) : u8(0), 0}));
 
   if (down && m_XkbState)
   {
@@ -1222,8 +1223,8 @@ void WaylandWindowsBackend::OnKeyboardKey(::wl_keyboard* /*kb*/, u32 /*serial*/,
     const bool keep = cp != 0 && !(cp < 32 && cp != '\t' && cp != '\n' && cp != '\r') && cp != 127;
     if (keep)
     {
-      m_Staged.push_back(
-          MakeStagedEvent(events::WindowChar, events::WindowCharPayload {WindowHandle {m_FocusedKeyboard}, now, cp}));
+      m_Staged.push_back(MakeWaylandStagedEvent(events::WindowChar,
+                                                events::WindowCharPayload {WindowHandle {m_FocusedKeyboard}, now, cp}));
     }
   }
 #else
@@ -1264,7 +1265,7 @@ void WaylandWindowsBackend::OnPointerEnter(::wl_pointer* /*pointer*/, u32 serial
     if (it != m_Windows.end())
       ApplyCursorVisibility(it->second);
 
-    m_Staged.push_back(MakeStagedEvent(
+    m_Staged.push_back(MakeWaylandStagedEvent(
         events::WindowMouseEntered, events::WindowMouseEnteredPayload {WindowHandle {m_FocusedPointer}, NowNsSafe()}));
   }
 }
@@ -1274,7 +1275,7 @@ void WaylandWindowsBackend::OnPointerLeave(::wl_pointer* /*pointer*/, u32 /*seri
 {
   if (m_FocusedPointer != WindowHandle::InvalidId)
   {
-    m_Staged.push_back(MakeStagedEvent(
+    m_Staged.push_back(MakeWaylandStagedEvent(
         events::WindowMouseExited, events::WindowMouseExitedPayload {WindowHandle {m_FocusedPointer}, NowNsSafe()}));
   }
   m_FocusedPointer = WindowHandle::InvalidId;
@@ -1286,9 +1287,9 @@ void WaylandWindowsBackend::OnPointerMotion(::wl_pointer* /*pointer*/, u32 /*tim
   if (m_FocusedPointer == WindowHandle::InvalidId)
     return;
 
-  m_Staged.push_back(MakeStagedEvent(events::WindowMouseMove,
-                                     events::WindowMouseMovePayload {WindowHandle {m_FocusedPointer}, NowNsSafe(),
-                                                                     wl_fixed_to_int(sx), wl_fixed_to_int(sy)}));
+  m_Staged.push_back(MakeWaylandStagedEvent(
+      events::WindowMouseMove, events::WindowMouseMovePayload {WindowHandle {m_FocusedPointer}, NowNsSafe(),
+                                                               wl_fixed_to_int(sx), wl_fixed_to_int(sy)}));
 }
 
 void WaylandWindowsBackend::OnPointerButton(::wl_pointer* /*pointer*/, u32 serial, u32 /*time*/, u32 button,
@@ -1299,10 +1300,10 @@ void WaylandWindowsBackend::OnPointerButton(::wl_pointer* /*pointer*/, u32 seria
     return;
 
   const bool down = (state == WL_POINTER_BUTTON_STATE_PRESSED);
-  m_Staged.push_back(
-      MakeStagedEvent(events::WindowMouseButton,
-                      events::WindowMouseButtonPayload {WindowHandle {m_FocusedPointer}, NowNsSafe(),
-                                                        WaylandButtonToMouseButton(button), down ? u8(1) : u8(0)}));
+  m_Staged.push_back(MakeWaylandStagedEvent(
+      events::WindowMouseButton,
+      events::WindowMouseButtonPayload {WindowHandle {m_FocusedPointer}, NowNsSafe(),
+                                        WaylandButtonToMouseButton(button), down ? u8(1) : u8(0)}));
 }
 
 void WaylandWindowsBackend::OnPointerAxis(::wl_pointer* /*pointer*/, u32 /*time*/, u32 axis, wl_fixed_t value) noexcept
@@ -1321,8 +1322,8 @@ void WaylandWindowsBackend::OnPointerAxis(::wl_pointer* /*pointer*/, u32 /*time*
     dx = v > 0 ? 1.0F : -1.0F;
 
   m_Staged.push_back(
-      MakeStagedEvent(events::WindowMouseWheel,
-                      events::WindowMouseWheelPayload {WindowHandle {m_FocusedPointer}, NowNsSafe(), dx, dy}));
+      MakeWaylandStagedEvent(events::WindowMouseWheel,
+                             events::WindowMouseWheelPayload {WindowHandle {m_FocusedPointer}, NowNsSafe(), dx, dy}));
 }
 
 // -- Helpers ------------------------------------------------------------

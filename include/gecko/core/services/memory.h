@@ -14,8 +14,6 @@
 #include "gecko/core/labels.h"
 #include "gecko/core/types.h"
 
-#include <cstdint>
-
 namespace gecko {
 
 struct LabelScope;
@@ -101,17 +99,17 @@ inline u32 EffectiveAlignment(u32 userAlignment) noexcept
 inline void* PlaceAllocHeader(void* rawPtr, u64 size, u32 userAlignment, u32 magic, Label label = {}) noexcept
 {
   const u32 effAlign = EffectiveAlignment(userAlignment);
-  auto rawAddr = reinterpret_cast<uintptr_t>(rawPtr);
+  auto rawAddr = reinterpret_cast<usize>(rawPtr);
 
-  const uintptr_t alignMask = static_cast<uintptr_t>(effAlign) - 1;
-  uintptr_t userAddr = (rawAddr + sizeof(AllocHeader) + alignMask) & ~alignMask;
+  const usize alignMask = static_cast<usize>(effAlign) - 1;
+  usize userAddr = (rawAddr + sizeof(AllocHeader) + alignMask) & ~alignMask;
 
   auto* header = reinterpret_cast<AllocHeader*>(userAddr - sizeof(AllocHeader));
   header->Magic = magic;
   header->Alignment = effAlign;
   header->RequestedSize = size;
   header->AllocLabel = label;
-  header->RawOffset = reinterpret_cast<uintptr_t>(header) - rawAddr;
+  header->RawOffset = reinterpret_cast<usize>(header) - rawAddr;
 
   return reinterpret_cast<void*>(userAddr);
 }
@@ -239,9 +237,9 @@ private:
 /// @return Pointer to the new allocation; never null.
 [[nodiscard]]
 inline void* AllocBytes(u64 size,
-                        u32 alignment = alignof(::std::max_align_t)) noexcept  // abi-ok: alignof() in default
-                                                                               // arg, evaluated at the call
-                                                                               // site as a u32 literal
+                        u32 alignment = alignof(long double)) noexcept  // abi-ok: alignof() in default
+                                                                        // arg, evaluated at the call
+                                                                        // site as a u32 literal
 {
   GECKO_ASSERT(size > 0 && "Cannot allocate zero bytes");
   GECKO_ASSERT(alignment > 0 && (alignment & (alignment - 1)) == 0 && "Alignment must be power of 2");
@@ -266,7 +264,7 @@ template <class T>
 inline T* AllocArray(u64 count, u32 alignment = alignof(T)) noexcept
 {
   GECKO_ASSERT(count > 0 && "Cannot allocate zero elements");
-  GECKO_ASSERT(count <= (SIZE_MAX / sizeof(T)) && "Count would overflow");
+  GECKO_ASSERT(count <= (USizeMax / sizeof(T)) && "Count would overflow");
   return static_cast<T*>(AllocBytes(sizeof(T) * count, alignment));
 }
 

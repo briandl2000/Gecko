@@ -88,61 +88,7 @@ CommonFlags=(
 )
 
 EngineSources=(
-  src/gecko.cpp
-  src/core/assert.cpp
-  src/core/services.cpp
-  src/core/services/events.cpp
-  src/core/services/jobs.cpp
-  src/core/services/log.cpp
-  src/core/services/memory.cpp
-  src/core/services/profiler.cpp
-  src/core/utility/random.cpp
-  src/core/utility/thread.cpp
-  src/core/utility/time.cpp
-  src/core/overwrite_new.cpp
-
-  src/platform/clipboard.cpp
-  src/platform/input.cpp
-  src/platform/monitors_interface.cpp
-  src/platform/platform_config.cpp
-  src/platform/platform_io.cpp
-  src/platform/platform.cpp
-  src/platform/terminal.cpp
-  src/platform/window_event_input.cpp
-  src/platform/windows_interface.cpp
-  src/platform/private/null_monitors_backend.cpp
-  src/platform/private/null_windows_interface.cpp
-  src/platform/linux/platform_io_linux.cpp
-  src/platform/linux/shared_library_linux.cpp
-  src/platform/linux/threading_linux.cpp
-  src/platform/linux/x11_monitors_backend.cpp
-  src/platform/linux/x11_windows_interface.cpp
-  src/platform/linux/wayland_monitors_backend.cpp
-  src/platform/linux/wayland_windows_backend.cpp
-
-  src/runtime/async_trace_profiler_sink.cpp
-  src/runtime/console_log_sink.cpp
-  src/runtime/crash_safe_trace_profiler_sink.cpp
-  src/runtime/event_bus.cpp
-  src/runtime/file_log_sink.cpp
-  src/runtime/immediate_logger.cpp
-  src/runtime/ring_logger.cpp
-  src/runtime/ring_profiler.cpp
-  src/runtime/standard_log_sinks.cpp
-  src/runtime/thread_pool_job_system.cpp
-  src/runtime/trace_file_sink.cpp
-  src/runtime/trace_writer.cpp
-  src/runtime/tracking_allocator.cpp
-
-  src/graphics/graphics_device.cpp
-  src/graphics/graphics.cpp
-  src/graphics/private/null_device.cpp
-  src/graphics/vulkan/vulkan_command_list.cpp
-  src/graphics/vulkan/vulkan_device.cpp
-  src/graphics/vulkan/vulkan_gpu_sampler.cpp
-  src/graphics/vulkan/vulkan_surface.cpp
-  src/graphics/vulkan/linux/vulkan_wayland_surface.cpp
-  src/graphics/vulkan/linux/vulkan_xlib_surface.cpp
+  src/gecko_engine.cpp
 )
 
 Objects=()

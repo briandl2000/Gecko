@@ -5,10 +5,10 @@
 
 namespace gecko {
 
-GECKO_API u32 RandomU32(u32 min = 0, u32 max = UINT32_MAX) noexcept;
-GECKO_API u64 RandomU64(u64 min = 0, u64 max = UINT64_MAX) noexcept;
-GECKO_API i32 RandomI32(i32 min = INT32_MIN, i32 max = INT32_MAX) noexcept;
-GECKO_API i64 RandomI64(i64 min = INT64_MIN, i64 max = INT64_MAX) noexcept;
+GECKO_API u32 RandomU32(u32 min = 0, u32 max = U32Max) noexcept;
+GECKO_API u64 RandomU64(u64 min = 0, u64 max = U64Max) noexcept;
+GECKO_API i32 RandomI32(i32 min = I32Min, i32 max = I32Max) noexcept;
+GECKO_API i64 RandomI64(i64 min = I64Min, i64 max = I64Max) noexcept;
 
 GECKO_API f32 RandomF32(f32 min = 0.0f, f32 max = 1.0f) noexcept;
 GECKO_API f64 RandomF64(f64 min = 0.0, f64 max = 1.0) noexcept;

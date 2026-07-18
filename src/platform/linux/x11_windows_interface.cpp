@@ -764,7 +764,7 @@ void X11WindowsBackend::SetCursorMode(WindowHandle window, CursorMode mode) noex
     if (mode == CursorMode::Locked)
     {
       ::XGrabPointer(m_Display, xid, True, PointerMotionMask | ButtonPressMask | ButtonReleaseMask, GrabModeAsync,
-                     GrabModeAsync, xid, None, CurrentTime);
+                     GrabModeAsync, xid, 0L, CurrentTime);
     }
   }
   else
@@ -828,7 +828,7 @@ void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons, b
   unsigned char* propData {};
 
   if (::XGetWindowProperty(m_Display, w, m_MotifWmHints, 0, sizeof(MwmHints) / sizeof(long), False, m_MotifWmHints,
-                           &actualType, &actualFormat, &nItems, &bytesAfter, &propData) == Success &&
+                           &actualType, &actualFormat, &nItems, &bytesAfter, &propData) == 0 &&
       propData && nItems >= 5)
   {
     hints = *reinterpret_cast<MwmHints*>(propData);
