@@ -49,6 +49,8 @@ if defined VULKAN_SDK (
 )
 
 set Sources=^
+ "%Root%src\gecko.cpp" ^
+ "%Root%src\core\assert.cpp" ^
  "%Root%src\core\services.cpp" ^
  "%Root%src\core\services\engine.cpp" ^
  "%Root%src\core\services\events.cpp" ^
@@ -74,6 +76,7 @@ set Sources=^
  "%Root%src\platform\private\null_monitors_backend.cpp" ^
  "%Root%src\platform\private\null_windows_interface.cpp" ^
  "%Root%src\platform\win32\platform_io_win32.cpp" ^
+ "%Root%src\platform\win32\shared_library_win32.cpp" ^
  "%Root%src\platform\win32\threading_win32.cpp" ^
  "%Root%src\platform\win32\win32_monitors_backend.cpp" ^
  "%Root%src\platform\win32\win32_windows_backend.cpp" ^
@@ -110,13 +113,18 @@ cl /nologo /std:c++latest /MP /LD /W4 /WX /wd4201 /wd4324 ^
  /link /IMPLIB:"%BinaryDir%\Gecko.lib" user32.lib shcore.lib ole32.lib winmm.lib %VulkanLibrary%
 if errorlevel 1 exit /b 1
 
-echo Building gecko_sandbox
-cl /nologo /std:c++latest /W4 /WX %ConfigFlags% ^
+echo Building gecko_game.dll
+cl /nologo /std:c++latest /LD /W4 /WX %ConfigFlags% ^
  /DGECKO_BUILD_SHARED=1 /DGECKO_PLATFORM_WINDOWS=1 /D_CRT_SECURE_NO_WARNINGS ^
- /I"%Root%include" ^
- "%Root%examples\app_skeleton\src\main.cpp" ^
- "%Root%examples\app_skeleton\src\App.cpp" ^
- "%BinaryDir%\Gecko.lib" /Fe"%BinaryDir%\gecko_sandbox.exe"
+ /I"%Root%include" "%Root%projects\sandbox\game.cpp" ^
+ "%BinaryDir%\Gecko.lib" /Fe"%BinaryDir%\gecko_game.dll"
 if errorlevel 1 exit /b 1
 
-echo Built %BinaryDir%\gecko_sandbox.exe
+echo Building gecko_launcher
+cl /nologo /std:c++latest /W4 /WX %ConfigFlags% ^
+ /DGECKO_BUILD_SHARED=1 /DGECKO_PLATFORM_WINDOWS=1 /D_CRT_SECURE_NO_WARNINGS ^
+ /I"%Root%include" "%Root%projects\launcher\main.cpp" ^
+ "%BinaryDir%\Gecko.lib" /Fe"%BinaryDir%\gecko_launcher.exe"
+if errorlevel 1 exit /b 1
+
+echo Built %BinaryDir%\gecko_launcher.exe and %BinaryDir%\gecko_game.dll

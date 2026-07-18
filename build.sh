@@ -54,10 +54,14 @@ ProtocolDir="$(pkg-config --variable=pkgdatadir wayland-protocols)"
 XdgShell="$ProtocolDir/stable/xdg-shell/xdg-shell.xml"
 XdgDecoration="$ProtocolDir/unstable/xdg-decoration/xdg-decoration-unstable-v1.xml"
 
-wayland-scanner client-header "$XdgShell" "$GeneratedDir/xdg-shell-client-protocol.h"
-wayland-scanner private-code "$XdgShell" "$GeneratedDir/xdg-shell-protocol.c"
-wayland-scanner client-header "$XdgDecoration" "$GeneratedDir/xdg-decoration-client-protocol.h"
-wayland-scanner private-code "$XdgDecoration" "$GeneratedDir/xdg-decoration-protocol.c"
+if [[ ! -f "$GeneratedDir/xdg-shell-client-protocol.h" || "$XdgShell" -nt "$GeneratedDir/xdg-shell-client-protocol.h" ]]; then
+  wayland-scanner client-header "$XdgShell" "$GeneratedDir/xdg-shell-client-protocol.h"
+  wayland-scanner private-code "$XdgShell" "$GeneratedDir/xdg-shell-protocol.c"
+fi
+if [[ ! -f "$GeneratedDir/xdg-decoration-client-protocol.h" || "$XdgDecoration" -nt "$GeneratedDir/xdg-decoration-client-protocol.h" ]]; then
+  wayland-scanner client-header "$XdgDecoration" "$GeneratedDir/xdg-decoration-client-protocol.h"
+  wayland-scanner private-code "$XdgDecoration" "$GeneratedDir/xdg-decoration-protocol.c"
+fi
 
 CommonFlags=(
   -std=c++23
@@ -84,6 +88,8 @@ CommonFlags=(
 )
 
 EngineSources=(
+  src/gecko.cpp
+  src/core/assert.cpp
   src/core/services.cpp
   src/core/services/engine.cpp
   src/core/services/events.cpp
@@ -110,6 +116,7 @@ EngineSources=(
   src/platform/private/null_monitors_backend.cpp
   src/platform/private/null_windows_interface.cpp
   src/platform/linux/platform_io_linux.cpp
+  src/platform/linux/shared_library_linux.cpp
   src/platform/linux/threading_linux.cpp
   src/platform/linux/x11_monitors_backend.cpp
   src/platform/linux/x11_windows_interface.cpp
@@ -163,6 +170,10 @@ for Source in "${EngineSources[@]}"; do
   ObjectName="${Source//\//_}"
   Object="$ObjectDir/${ObjectName%.cpp}.o"
   Objects+=("$Object")
+  if [[ -f "$Object" && "$Root/$Source" -ot "$Object" ]] &&
+     ! find "$Root/include" "$Root/src" -type f -name '*.h' -newer "$Object" -print -quit | grep -q .; then
+    continue
+  fi
   echo "  CXX $Source"
   "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" -DGECKO_BUILDING=1 \
     -c "$Root/$Source" -o "$Object" &
@@ -177,24 +188,55 @@ ProtocolObjects=(
   "$ObjectDir/xdg-shell-protocol.o"
   "$ObjectDir/xdg-decoration-protocol.o"
 )
-"$Cc" -fPIC -Wall -Wextra -Werror -I"$GeneratedDir" \
-  -c "$GeneratedDir/xdg-shell-protocol.c" -o "${ProtocolObjects[0]}"
-"$Cc" -fPIC -Wall -Wextra -Werror -I"$GeneratedDir" \
-  -c "$GeneratedDir/xdg-decoration-protocol.c" -o "${ProtocolObjects[1]}"
+if [[ ! -f "${ProtocolObjects[0]}" || "$GeneratedDir/xdg-shell-protocol.c" -nt "${ProtocolObjects[0]}" ]]; then
+  "$Cc" -fPIC -Wall -Wextra -Werror -I"$GeneratedDir" \
+    -c "$GeneratedDir/xdg-shell-protocol.c" -o "${ProtocolObjects[0]}"
+fi
+if [[ ! -f "${ProtocolObjects[1]}" || "$GeneratedDir/xdg-decoration-protocol.c" -nt "${ProtocolObjects[1]}" ]]; then
+  "$Cc" -fPIC -Wall -Wextra -Werror -I"$GeneratedDir" \
+    -c "$GeneratedDir/xdg-decoration-protocol.c" -o "${ProtocolObjects[1]}"
+fi
 
 read -r -a PlatformLibraries <<<"$(pkg-config --libs wayland-client wayland-cursor xkbcommon x11 xrandr vulkan)"
 
-echo "  LINK libGecko.so"
-"$Cxx" -shared -fuse-ld=lld -Wl,-soname,libGecko.so \
-  "${Objects[@]}" "${ProtocolObjects[@]}" \
-  "${PlatformLibraries[@]}" -pthread -lm \
-  -o "$BinaryDir/libGecko.so"
+EngineLibrary="$BinaryDir/libGecko.so"
+LinkEngine=false
+if [[ ! -f "$EngineLibrary" ]]; then
+  LinkEngine=true
+else
+  for Object in "${Objects[@]}" "${ProtocolObjects[@]}"; do
+    if [[ "$Object" -nt "$EngineLibrary" ]]; then
+      LinkEngine=true
+      break
+    fi
+  done
+fi
+if [[ "$LinkEngine" == true ]]; then
+  echo "  LINK libGecko.so"
+  "$Cxx" -shared -fuse-ld=lld -Wl,-soname,libGecko.so \
+    "${Objects[@]}" "${ProtocolObjects[@]}" \
+    "${PlatformLibraries[@]}" -pthread -ldl -lm \
+    -o "$EngineLibrary"
+fi
 
-echo "  CXX app_skeleton"
-"$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" \
-  "$Root/examples/app_skeleton/src/main.cpp" \
-  "$Root/examples/app_skeleton/src/App.cpp" \
-  -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
-  -o "$BinaryDir/gecko_sandbox"
+GameLibrary="$BinaryDir/libgecko_game.so"
+if [[ ! -f "$GameLibrary" || "$Root/projects/sandbox/game.cpp" -nt "$GameLibrary" || "$EngineLibrary" -nt "$GameLibrary" ]] ||
+   find "$Root/include" -type f -name '*.h' -newer "$GameLibrary" -print -quit | grep -q .; then
+  echo "  LINK libgecko_game.so"
+  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" -shared \
+    "$Root/projects/sandbox/game.cpp" \
+    -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
+    -o "$GameLibrary"
+fi
 
-echo "Built $BinaryDir/gecko_sandbox"
+Launcher="$BinaryDir/gecko_launcher"
+if [[ ! -f "$Launcher" || "$Root/projects/launcher/main.cpp" -nt "$Launcher" || "$EngineLibrary" -nt "$Launcher" ]] ||
+   find "$Root/include" -type f -name '*.h' -newer "$Launcher" -print -quit | grep -q .; then
+  echo "  LINK gecko_launcher"
+  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" \
+    "$Root/projects/launcher/main.cpp" \
+    -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
+    -o "$Launcher"
+fi
+
+echo "Built $BinaryDir/gecko_launcher and $BinaryDir/libgecko_game.so"
