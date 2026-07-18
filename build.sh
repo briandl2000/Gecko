@@ -5,6 +5,12 @@ set -euo pipefail
 Root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 Config="${1:-debug}"
 Action="${2:-build}"
+GameProject="${GECKO_GAME:-sandbox}"
+
+if [[ ! "$GameProject" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo "GECKO_GAME must be a project name from projects/" >&2
+  exit 2
+fi
 
 case "$Config" in
   debug)
@@ -16,7 +22,7 @@ case "$Config" in
     ConfigFlags=(-O2 -g -DNDEBUG=1)
     ;;
   *)
-    echo "usage: ./build.sh [debug|release] [build|clean|monolithic]" >&2
+    echo "usage: ./build.sh [debug|release] [build|clean|monolithic|examples]" >&2
     exit 2
     ;;
 esac
@@ -26,15 +32,21 @@ BuildDir="$Root/out/$PlatformId/handmade/$ConfigName"
 ObjectDir="$BuildDir/obj"
 GeneratedDir="$BuildDir/generated"
 BinaryDir="$BuildDir/bin"
+GameSource="$Root/projects/$GameProject/game.cpp"
 
 if [[ "$Action" == "clean" ]]; then
   rm -rf "$BuildDir"
   exit 0
 fi
 
-if [[ "$Action" != "build" && "$Action" != "monolithic" ]]; then
+if [[ "$Action" != "build" && "$Action" != "monolithic" && "$Action" != "examples" ]]; then
   echo "unknown action: $Action" >&2
   exit 2
+fi
+
+if [[ "$Action" != "examples" && ! -f "$GameSource" ]]; then
+  echo "game project not found: projects/$GameProject/game.cpp" >&2
+  exit 1
 fi
 
 Cxx="${CXX:-clang++}"
@@ -152,7 +164,7 @@ if [[ "$Action" == "monolithic" ]]; then
   echo "  LINK gecko_monolithic"
   "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" \
     -DGECKO_MONOLITHIC_GAME=1 \
-    "$Root/projects/launcher/main.cpp" "$Root/projects/sandbox/game.cpp" \
+    "$Root/projects/launcher/main.cpp" "$GameSource" \
     "${Objects[@]}" "${ProtocolObjects[@]}" \
     "${PlatformLibraries[@]}" -pthread -ldl -lm \
     -o "$Monolithic"
@@ -180,14 +192,41 @@ if [[ "$LinkEngine" == true ]]; then
     -o "$EngineLibrary"
 fi
 
+if [[ "$Action" == "examples" ]]; then
+  "$Root/tools/build_shaders.sh" "$Root/examples/triangle/shaders" "$BinaryDir/shaders"
+  for Example in core window triangle; do
+    Executable="$BinaryDir/gecko_example_$Example"
+    Source="$Root/examples/$Example/main.cpp"
+    if [[ ! -f "$Executable" || "$Source" -nt "$Executable" || "$EngineLibrary" -nt "$Executable" ]] ||
+       find "$Root/include" -type f -name '*.h' -newer "$Executable" -print -quit | grep -q .; then
+      echo "  LINK gecko_example_$Example"
+      "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" \
+        "$Source" -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' -o "$Executable"
+    fi
+  done
+  echo "Built Gecko examples in $BinaryDir"
+  exit 0
+fi
+
+GameShaderDir="$Root/projects/$GameProject/shaders"
+if [[ -d "$GameShaderDir" ]] && find "$GameShaderDir" -type f -name '*.hlsl' -print -quit | grep -q .; then
+  "$Root/tools/build_shaders.sh" "$GameShaderDir" "$BinaryDir/shaders"
+fi
+
 GameLibrary="$BinaryDir/libgecko_game.so"
-if [[ ! -f "$GameLibrary" || "$Root/projects/sandbox/game.cpp" -nt "$GameLibrary" || "$EngineLibrary" -nt "$GameLibrary" ]] ||
+GameStamp="$ObjectDir/game-project"
+BuiltGame=""
+if [[ -f "$GameStamp" ]]; then
+  IFS= read -r BuiltGame < "$GameStamp"
+fi
+if [[ "$BuiltGame" != "$GameProject" || ! -f "$GameLibrary" || "$GameSource" -nt "$GameLibrary" || "$EngineLibrary" -nt "$GameLibrary" ]] ||
    find "$Root/include" -type f -name '*.h' -newer "$GameLibrary" -print -quit | grep -q .; then
-  echo "  LINK libgecko_game.so"
+  echo "  LINK libgecko_game.so ($GameProject)"
   "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" -shared \
-    "$Root/projects/sandbox/game.cpp" \
+    "$GameSource" \
     -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
     -o "$GameLibrary"
+  printf '%s\n' "$GameProject" > "$GameStamp"
 fi
 
 Launcher="$BinaryDir/gecko_launcher"
@@ -200,4 +239,4 @@ if [[ ! -f "$Launcher" || "$Root/projects/launcher/main.cpp" -nt "$Launcher" || 
     -o "$Launcher"
 fi
 
-echo "Built $BinaryDir/gecko_launcher and $BinaryDir/libgecko_game.so"
+echo "Built $BinaryDir/gecko_launcher and $BinaryDir/libgecko_game.so ($GameProject)"

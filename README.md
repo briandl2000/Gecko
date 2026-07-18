@@ -23,6 +23,22 @@ out\Windows-x86_64\handmade\Debug\bin\gecko_launcher.exe
 
 Use `release` instead of `debug`, or pass `clean` as the second argument. Linux builds are incremental; an unchanged build is effectively immediate. Pass `monolithic` as the second argument to produce one executable containing Gecko and the sandbox game while preserving the same game API (`bash build.sh release monolithic` or `build.bat release monolithic`).
 
+Build the curated learning examples with `./build.sh debug examples`. The
+Vulkan example compiles its HLSL to SPIR-V with `glslc`; set `GLSLC` or install
+the Vulkan SDK if it is not on `PATH`. See [examples](examples/README.md).
+
+Create a game project and select it without adding another build system:
+
+```sh
+tools/new_project.sh my_game
+GECKO_GAME=my_game ./build.sh debug
+```
+
+On Windows, use `set GECKO_GAME=my_game` before `build.bat debug`. A project's
+`game.cpp` builds as the game shared library beside the launcher and Gecko. Put
+project HLSL files in its optional `shaders` directory; they are compiled into
+the same runtime `shaders` directory as part of the build.
+
 For a display/GPU-independent smoke run, use `gecko_launcher --backend=null --graphics=null --frames=2`.
 
 Outputs are the Gecko shared library, the launcher, and the sandbox game shared library. The game exports `GeckoGame_GetApi`; it also links Gecko normally and therefore resolves engine calls through the same `Gecko.dll` or `libGecko.so` already loaded by the launcher.

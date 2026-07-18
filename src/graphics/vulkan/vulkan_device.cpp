@@ -6,6 +6,7 @@
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
+#include "gecko/platform/platform_io.h"
 #include "vulkan_command_list.h"
 #include "vulkan_gpu_sampler.h"
 #include "vulkan_surface.h"
@@ -1447,10 +1448,23 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
     return VK_NULL_HANDLE;
   }
 
+  platform::ReadResult file;
+  Span<const byte> bytes = code.Bytes;
+  if (bytes.empty() && code.Path != nullptr)
+  {
+    file = platform::Read(code.Path);
+    if (!file)
+    {
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: could not read shader '{}'", code.Path);
+      return VK_NULL_HANDLE;
+    }
+    bytes = file.Data();
+  }
+
   // SPIR-V requires codeSize to be a multiple of 4 and pCode to be 4-byte
   // aligned. Copy into an aligned temporary if the caller's buffer isn't.
-  const usize byteCount = code.Bytes.size();
-  const auto* rawBytes = code.Bytes.data();
+  const usize byteCount = bytes.size();
+  const auto* rawBytes = bytes.data();
   if (byteCount == 0 || (byteCount % 4) != 0)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: SPIRV blob size {} is not a multiple of 4 bytes", byteCount);

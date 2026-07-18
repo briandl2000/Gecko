@@ -1,5 +1,6 @@
 CompileFlags:
-  Add:
-    - "-std=c++23"
+  CompilationDatabase: Ancestors
   Remove:
     - "-Werror"
+Index:
+  Background: Build
