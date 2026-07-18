@@ -1,9 +1,9 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_gpu_sampler.h"
 
+#include "../private/labels.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/utility/hash.h"
-#include "private/labels.h"
 #include "vulkan_device.h"
 
 namespace gecko::graphics {

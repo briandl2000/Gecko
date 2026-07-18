@@ -74,6 +74,9 @@ CommonFlags=(
   -DGECKO_PLATFORM_LINUX_WAYLAND=1
   -DGECKO_HAS_XKBCOMMON=1
   -DGECKO_HAVE_XDG_DECORATION=1
+  -DGECKO_GRAPHICS_VULKAN=1
+  -DGECKO_GRAPHICS_VULKAN_XLIB=1
+  -DGECKO_GRAPHICS_VULKAN_WAYLAND=1
   -I"$Root/include"
   -I"$Root/src/core"
   -I"$Root/src/graphics"
@@ -131,6 +134,12 @@ EngineSources=(
   src/graphics/graphics_device.cpp
   src/graphics/graphics_module.cpp
   src/graphics/private/null_device.cpp
+  src/graphics/vulkan/vulkan_command_list.cpp
+  src/graphics/vulkan/vulkan_device.cpp
+  src/graphics/vulkan/vulkan_gpu_sampler.cpp
+  src/graphics/vulkan/vulkan_surface.cpp
+  src/graphics/vulkan/linux/vulkan_wayland_surface.cpp
+  src/graphics/vulkan/linux/vulkan_xlib_surface.cpp
 )
 
 Objects=()
@@ -173,7 +182,7 @@ ProtocolObjects=(
 "$Cc" -fPIC -Wall -Wextra -Werror -I"$GeneratedDir" \
   -c "$GeneratedDir/xdg-decoration-protocol.c" -o "${ProtocolObjects[1]}"
 
-read -r -a PlatformLibraries <<<"$(pkg-config --libs wayland-client wayland-cursor xkbcommon x11 xrandr)"
+read -r -a PlatformLibraries <<<"$(pkg-config --libs wayland-client wayland-cursor xkbcommon x11 xrandr vulkan)"
 
 echo "  LINK libGecko.so"
 "$Cxx" -shared -fuse-ld=lld -Wl,-soname,libGecko.so \

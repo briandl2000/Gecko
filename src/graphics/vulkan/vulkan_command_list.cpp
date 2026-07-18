@@ -1,17 +1,16 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_command_list.h"
 
+#include "../private/labels.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "gecko/graphics/gpu_profiler.h"
-#include "private/labels.h"
 #include "vulkan_device.h"
 #include "vulkan_util.h"
 
 namespace gecko::graphics {
 
-VulkanCommandList::VulkanCommandList(VulkanDevice& device, bool compute) noexcept
-    : m_Device(&device), m_Compute(compute)
+VulkanCommandList::VulkanCommandList(VulkanDevice& device, bool /*compute*/) noexcept : m_Device(&device)
 {
   m_Pool = device.AcquireThreadCommandPool();
 

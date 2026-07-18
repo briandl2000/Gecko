@@ -1,9 +1,9 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_surface.h"
 
+#include "../private/labels.h"
 #include "gecko/core/services/log.h"
 #include "gecko/platform/platform_config.h"
-#include "private/labels.h"
 
 namespace gecko::graphics {
 

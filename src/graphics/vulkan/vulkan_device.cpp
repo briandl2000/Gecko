@@ -1,28 +1,11 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
-#define VMA_IMPLEMENTATION 1
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-
-// VMA's heavy use of partial C-style initializers trips our -Werror set.
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#pragma GCC diagnostic ignored "-Wunused-variable"
-#pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wunused-function"
-#endif
-
 #include "vulkan_device.h"
 
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
-
+#include "../private/labels.h"
 #include "gecko/core/scope.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
-#include "private/labels.h"
 #include "vulkan_command_list.h"
 #include "vulkan_gpu_sampler.h"
 #include "vulkan_surface.h"
@@ -324,23 +307,6 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &m_GraphicsCommandPool));
   }
 
-  // -- VMA allocator ---------------------------------------------
-
-  VmaVulkanFunctions vulkanFunctions {};
-  vulkanFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-  vulkanFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
-
-  VmaAllocatorCreateInfo allocatorCreateInfo {};
-  allocatorCreateInfo.instance = m_Instance;
-  allocatorCreateInfo.physicalDevice = m_PhysicalDevice;
-  allocatorCreateInfo.device = m_Device;
-  allocatorCreateInfo.vulkanApiVersion = VK_API_VERSION_1_3;
-  allocatorCreateInfo.pVulkanFunctions = &vulkanFunctions;
-  {
-    GECKO_PROFILE_NAMED(labels::Vulkan, "vmaCreateAllocator");
-    VULKAN_CHECK(vmaCreateAllocator(&allocatorCreateInfo, &m_Allocator));
-  }
-
   // -- Descriptor pool -------------------------------------------
   // Example-grade: a single large pool, never reset. Sufficient for the
   // current example (one or two BindTexture calls per frame, short-lived).
@@ -380,9 +346,6 @@ VulkanDevice::~VulkanDevice()
 
   if (m_DescriptorPool != VK_NULL_HANDLE)
     vkDestroyDescriptorPool(m_Device, m_DescriptorPool, nullptr);
-
-  if (m_Allocator != VK_NULL_HANDLE)
-    vmaDestroyAllocator(m_Allocator);
 
   if (m_GraphicsCommandPool != VK_NULL_HANDLE)
     vkDestroyCommandPool(m_Device, m_GraphicsCommandPool, nullptr);
@@ -1072,8 +1035,141 @@ void VulkanDevice::ExecuteComputeCommandList(Unique<ICommandList> commandList) n
 }
 
 // ------------------------------------------------------------
-// Resource creation (stubs for now -- triangle path doesn't need most)
+// Resource creation
 // ------------------------------------------------------------
+
+u32 VulkanDevice::FindMemoryType(u32 allowedTypes, VkMemoryPropertyFlags requiredProperties) const noexcept
+{
+  VkPhysicalDeviceMemoryProperties properties {};
+  vkGetPhysicalDeviceMemoryProperties(m_PhysicalDevice, &properties);
+
+  for (u32 index = 0; index < properties.memoryTypeCount; ++index)
+  {
+    const bool allowed = (allowedTypes & (1U << index)) != 0;
+    const bool supported = (properties.memoryTypes[index].propertyFlags & requiredProperties) == requiredProperties;
+    if (allowed && supported)
+      return index;
+  }
+
+  return UINT32_MAX;
+}
+
+bool VulkanDevice::CreateBuffer(const VkBufferCreateInfo& createInfo, VkMemoryPropertyFlags memoryProperties, bool map,
+                                VkBuffer& buffer, VulkanAllocation& allocation) noexcept
+{
+  buffer = VK_NULL_HANDLE;
+  allocation = {};
+
+  if (vkCreateBuffer(m_Device, &createInfo, nullptr, &buffer) != VK_SUCCESS)
+    return false;
+
+  VkMemoryRequirements requirements {};
+  vkGetBufferMemoryRequirements(m_Device, buffer, &requirements);
+
+  const u32 memoryType = FindMemoryType(requirements.memoryTypeBits, memoryProperties);
+  if (memoryType == UINT32_MAX)
+  {
+    vkDestroyBuffer(m_Device, buffer, nullptr);
+    buffer = VK_NULL_HANDLE;
+    return false;
+  }
+
+  VkMemoryAllocateInfo allocateInfo {};
+  allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  allocateInfo.allocationSize = requirements.size;
+  allocateInfo.memoryTypeIndex = memoryType;
+
+  if (vkAllocateMemory(m_Device, &allocateInfo, nullptr, &allocation.Memory) != VK_SUCCESS)
+  {
+    vkDestroyBuffer(m_Device, buffer, nullptr);
+    buffer = VK_NULL_HANDLE;
+    return false;
+  }
+
+  if (vkBindBufferMemory(m_Device, buffer, allocation.Memory, 0) != VK_SUCCESS)
+  {
+    vkDestroyBuffer(m_Device, buffer, nullptr);
+    vkFreeMemory(m_Device, allocation.Memory, nullptr);
+    buffer = VK_NULL_HANDLE;
+    allocation = {};
+    return false;
+  }
+
+  if (map && vkMapMemory(m_Device, allocation.Memory, 0, VK_WHOLE_SIZE, 0, &allocation.Mapped) != VK_SUCCESS)
+  {
+    vkDestroyBuffer(m_Device, buffer, nullptr);
+    vkFreeMemory(m_Device, allocation.Memory, nullptr);
+    buffer = VK_NULL_HANDLE;
+    allocation = {};
+    return false;
+  }
+
+  return true;
+}
+
+void VulkanDevice::DestroyBuffer(VkBuffer buffer, VulkanAllocation& allocation) noexcept
+{
+  if (allocation.Mapped != nullptr)
+    vkUnmapMemory(m_Device, allocation.Memory);
+  if (buffer != VK_NULL_HANDLE)
+    vkDestroyBuffer(m_Device, buffer, nullptr);
+  if (allocation.Memory != VK_NULL_HANDLE)
+    vkFreeMemory(m_Device, allocation.Memory, nullptr);
+  allocation = {};
+}
+
+bool VulkanDevice::CreateImage(const VkImageCreateInfo& createInfo, VkMemoryPropertyFlags memoryProperties,
+                               VkImage& image, VulkanAllocation& allocation) noexcept
+{
+  image = VK_NULL_HANDLE;
+  allocation = {};
+
+  if (vkCreateImage(m_Device, &createInfo, nullptr, &image) != VK_SUCCESS)
+    return false;
+
+  VkMemoryRequirements requirements {};
+  vkGetImageMemoryRequirements(m_Device, image, &requirements);
+
+  const u32 memoryType = FindMemoryType(requirements.memoryTypeBits, memoryProperties);
+  if (memoryType == UINT32_MAX)
+  {
+    vkDestroyImage(m_Device, image, nullptr);
+    image = VK_NULL_HANDLE;
+    return false;
+  }
+
+  VkMemoryAllocateInfo allocateInfo {};
+  allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  allocateInfo.allocationSize = requirements.size;
+  allocateInfo.memoryTypeIndex = memoryType;
+
+  if (vkAllocateMemory(m_Device, &allocateInfo, nullptr, &allocation.Memory) != VK_SUCCESS)
+  {
+    vkDestroyImage(m_Device, image, nullptr);
+    image = VK_NULL_HANDLE;
+    return false;
+  }
+
+  if (vkBindImageMemory(m_Device, image, allocation.Memory, 0) != VK_SUCCESS)
+  {
+    vkDestroyImage(m_Device, image, nullptr);
+    vkFreeMemory(m_Device, allocation.Memory, nullptr);
+    image = VK_NULL_HANDLE;
+    allocation = {};
+    return false;
+  }
+
+  return true;
+}
+
+void VulkanDevice::DestroyImage(VkImage image, VulkanAllocation& allocation) noexcept
+{
+  if (image != VK_NULL_HANDLE)
+    vkDestroyImage(m_Device, image, nullptr);
+  if (allocation.Memory != VK_NULL_HANDLE)
+    vkFreeMemory(m_Device, allocation.Memory, nullptr);
+  allocation = {};
+}
 
 RenderTarget VulkanDevice::CreateRenderTarget(const RenderTargetDesc& desc) noexcept
 {
@@ -1130,14 +1226,13 @@ Buffer VulkanDevice::CreateVertexBuffer(const VertexBufferDesc& desc) noexcept
   bufferCreateInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
-
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
-                      nullptr) != VK_SUCCESS)
+  const VkMemoryPropertyFlags memoryProperties =
+      (desc.Memory == MemoryType::Shared) ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                          : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  if (!CreateBuffer(bufferCreateInfo, memoryProperties, false, bufferData->Buffer, bufferData->Allocation))
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateVertexBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateVertexBuffer allocation failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1148,8 +1243,7 @@ Buffer VulkanDevice::CreateVertexBuffer(const VertexBufferDesc& desc) noexcept
   VulkanDevice* dev = this;
   b.Data = Shared<void>(bufferData, [dev](void* p) noexcept {
     auto* d = static_cast<VulkanBufferData*>(p);
-    if (d->Buffer != VK_NULL_HANDLE)
-      vmaDestroyBuffer(dev->m_Allocator, d->Buffer, d->Allocation);
+    dev->DestroyBuffer(d->Buffer, d->Allocation);
     FreeObject(d);
   });
   return b;
@@ -1168,14 +1262,13 @@ Buffer VulkanDevice::CreateIndexBuffer(const IndexBufferDesc& desc) noexcept
   bufferCreateInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
-
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
-                      nullptr) != VK_SUCCESS)
+  const VkMemoryPropertyFlags memoryProperties =
+      (desc.Memory == MemoryType::Shared) ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                          : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  if (!CreateBuffer(bufferCreateInfo, memoryProperties, false, bufferData->Buffer, bufferData->Allocation))
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateIndexBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateIndexBuffer allocation failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1186,8 +1279,7 @@ Buffer VulkanDevice::CreateIndexBuffer(const IndexBufferDesc& desc) noexcept
   VulkanDevice* dev = this;
   b.Data = Shared<void>(bufferData, [dev](void* p) noexcept {
     auto* d = static_cast<VulkanBufferData*>(p);
-    if (d->Buffer != VK_NULL_HANDLE)
-      vmaDestroyBuffer(dev->m_Allocator, d->Buffer, d->Allocation);
+    dev->DestroyBuffer(d->Buffer, d->Allocation);
     FreeObject(d);
   });
   return b;
@@ -1204,16 +1296,13 @@ Buffer VulkanDevice::CreateConstantBuffer(const ConstantBufferDesc& desc) noexce
   bufferCreateInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
-  if (desc.Memory == MemoryType::Shared)
-    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
-                      nullptr) != VK_SUCCESS)
+  const VkMemoryPropertyFlags memoryProperties =
+      (desc.Memory == MemoryType::Shared) ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                          : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  if (!CreateBuffer(bufferCreateInfo, memoryProperties, false, bufferData->Buffer, bufferData->Allocation))
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateConstantBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateConstantBuffer allocation failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1224,8 +1313,7 @@ Buffer VulkanDevice::CreateConstantBuffer(const ConstantBufferDesc& desc) noexce
   VulkanDevice* dev = this;
   b.Data = Shared<void>(bufferData, [dev](void* p) noexcept {
     auto* d = static_cast<VulkanBufferData*>(p);
-    if (d->Buffer != VK_NULL_HANDLE)
-      vmaDestroyBuffer(dev->m_Allocator, d->Buffer, d->Allocation);
+    dev->DestroyBuffer(d->Buffer, d->Allocation);
     FreeObject(d);
   });
   return b;
@@ -1245,16 +1333,13 @@ Buffer VulkanDevice::CreateStructuredBuffer(const StructuredBufferDesc& desc) no
                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = (desc.Memory == MemoryType::Shared) ? VMA_MEMORY_USAGE_CPU_TO_GPU : VMA_MEMORY_USAGE_GPU_ONLY;
-  if (desc.Memory == MemoryType::Shared)
-    allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
   VulkanBufferData* bufferData = AllocObject<VulkanBufferData>();
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &bufferData->Buffer, &bufferData->Allocation,
-                      nullptr) != VK_SUCCESS)
+  const VkMemoryPropertyFlags memoryProperties =
+      (desc.Memory == MemoryType::Shared) ? VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                          : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  if (!CreateBuffer(bufferCreateInfo, memoryProperties, false, bufferData->Buffer, bufferData->Allocation))
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateStructuredBuffer vmaCreateBuffer failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateStructuredBuffer allocation failed");
     FreeObject(bufferData);
     return Buffer {};
   }
@@ -1265,8 +1350,7 @@ Buffer VulkanDevice::CreateStructuredBuffer(const StructuredBufferDesc& desc) no
   VulkanDevice* dev = this;
   b.Data = Shared<void>(bufferData, [dev](void* p) noexcept {
     auto* d = static_cast<VulkanBufferData*>(p);
-    if (d->Buffer != VK_NULL_HANDLE)
-      vmaDestroyBuffer(dev->m_Allocator, d->Buffer, d->Allocation);
+    dev->DestroyBuffer(d->Buffer, d->Allocation);
     FreeObject(d);
   });
   return b;
@@ -1300,9 +1384,6 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-
   auto* td = AllocObject<VulkanTextureData>();
   td->Format = fmt;
   td->Width = desc.Width;
@@ -1319,10 +1400,9 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
     td->Aspect = VK_IMAGE_ASPECT_COLOR_BIT;
   }
 
-  if (vmaCreateImage(m_Allocator, &imageCreateInfo, &allocCreateInfo, &td->Image, &td->Allocation, nullptr) !=
-      VK_SUCCESS)
+  if (!CreateImage(imageCreateInfo, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, td->Image, td->Allocation))
   {
-    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateTexture vmaCreateImage failed");
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateTexture allocation failed");
     FreeObject(td);
     return Texture {};
   }
@@ -1338,7 +1418,7 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
   if (vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &td->ImageView) != VK_SUCCESS)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice::CreateTexture vkCreateImageView failed");
-    vmaDestroyImage(m_Allocator, td->Image, td->Allocation);
+    DestroyImage(td->Image, td->Allocation);
     FreeObject(td);
     return Texture {};
   }
@@ -1350,8 +1430,7 @@ Texture VulkanDevice::CreateTexture(const TextureDesc& desc) noexcept
     auto* d = static_cast<VulkanTextureData*>(p);
     if (d->ImageView != VK_NULL_HANDLE)
       vkDestroyImageView(dev->m_Device, d->ImageView, nullptr);
-    if (d->Image != VK_NULL_HANDLE)
-      vmaDestroyImage(dev->m_Allocator, d->Image, d->Allocation);
+    dev->DestroyImage(d->Image, d->Allocation);
     FreeObject(d);
   });
   if (desc.DebugName != nullptr)
@@ -2030,19 +2109,15 @@ void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko
   bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-  allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
   VkBuffer staging = VK_NULL_HANDLE;
-  VmaAllocation stagingAlloc = nullptr;
-  VmaAllocationInfo info {};
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &staging, &stagingAlloc, &info) != VK_SUCCESS)
+  VulkanAllocation stagingAllocation {};
+  if (!CreateBuffer(bufferCreateInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true,
+                    staging, stagingAllocation))
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice::UploadTextureData staging allocation failed");
     return;
   }
-  ::std::memcpy(info.pMappedData, data.data(), data.size());
+  ::std::memcpy(stagingAllocation.Mapped, data.data(), data.size());
 
   struct Ctx
   {
@@ -2097,7 +2172,7 @@ void VulkanDevice::UploadTextureData(Texture& texture, ::std::span<const ::gecko
       &ctx);
 
   td->CurrentLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-  vmaDestroyBuffer(m_Allocator, staging, stagingAlloc);
+  DestroyBuffer(staging, stagingAllocation);
 }
 
 void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::byte> data, u32 offset) noexcept
@@ -2113,20 +2188,16 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
   bufferCreateInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
   bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-  VmaAllocationCreateInfo allocCreateInfo {};
-  allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-  allocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
-
   VkBuffer staging = VK_NULL_HANDLE;
-  VmaAllocation stagingAlloc = nullptr;
-  VmaAllocationInfo info {};
-  if (vmaCreateBuffer(m_Allocator, &bufferCreateInfo, &allocCreateInfo, &staging, &stagingAlloc, &info) != VK_SUCCESS)
+  VulkanAllocation stagingAllocation {};
+  if (!CreateBuffer(bufferCreateInfo, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true,
+                    staging, stagingAllocation))
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice::UploadBufferData staging allocation failed");
     return;
   }
 
-  ::std::memcpy(info.pMappedData, data.data(), data.size());
+  ::std::memcpy(stagingAllocation.Mapped, data.data(), data.size());
 
   struct Ctx
   {
@@ -2146,7 +2217,7 @@ void VulkanDevice::UploadBufferData(Buffer& buffer, ::std::span<const ::gecko::b
       },
       &ctx);
 
-  vmaDestroyBuffer(m_Allocator, staging, stagingAlloc);
+  DestroyBuffer(staging, stagingAllocation);
 }
 
 }  // namespace gecko::graphics

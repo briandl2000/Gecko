@@ -89,10 +89,6 @@ public:
   /// Locked `vkDeviceWaitIdle`. Queues are externally synchronised with
   /// submit, so waiting on device idle needs to share the submit mutex.
   void WaitIdleLocked() noexcept;
-  [[nodiscard]] VmaAllocator Allocator() const noexcept
-  {
-    return m_Allocator;
-  }
   [[nodiscard]] VkDescriptorPool DescriptorPool() const noexcept
   {
     return m_DescriptorPool;
@@ -127,6 +123,16 @@ private:
   void DestroySwapchainResources(VulkanSwapchainData& data, bool destroySurface) noexcept;
 
   [[nodiscard]] VkShaderModule CreateShaderModule(const ShaderCode& code) noexcept;
+
+  [[nodiscard]] bool CreateBuffer(const VkBufferCreateInfo& createInfo, VkMemoryPropertyFlags memoryProperties,
+                                  bool map, VkBuffer& buffer, VulkanAllocation& allocation) noexcept;
+  void DestroyBuffer(VkBuffer buffer, VulkanAllocation& allocation) noexcept;
+
+  [[nodiscard]] bool CreateImage(const VkImageCreateInfo& createInfo, VkMemoryPropertyFlags memoryProperties,
+                                 VkImage& image, VulkanAllocation& allocation) noexcept;
+  void DestroyImage(VkImage image, VulkanAllocation& allocation) noexcept;
+
+  [[nodiscard]] u32 FindMemoryType(u32 allowedTypes, VkMemoryPropertyFlags requiredProperties) const noexcept;
 
   void OneTimeSubmit(void (*record)(VkCommandBuffer, void*), void* ctx) noexcept;
 
@@ -170,8 +176,6 @@ private:
   void ReleaseTrackerFence(VkFence fence) noexcept;
   void ReapPending() noexcept;
   void DrainPending() noexcept;
-
-  VmaAllocator m_Allocator {VK_NULL_HANDLE};
 
   VkDescriptorPool m_DescriptorPool {VK_NULL_HANDLE};
 

@@ -5,9 +5,9 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#include "../../private/labels.h"
 #include "../vulkan_surface.h"
 #include "gecko/core/services/log.h"
-#include "private/labels.h"
 
 #include <vulkan/vulkan.h>
 #include <windows.h>

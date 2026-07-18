@@ -41,6 +41,13 @@ if errorlevel 1 (
 if not exist "%ObjectDir%" mkdir "%ObjectDir%"
 if not exist "%BinaryDir%" mkdir "%BinaryDir%"
 
+set "VulkanInclude="
+set "VulkanLibrary=vulkan-1.lib"
+if defined VULKAN_SDK (
+  set "VulkanInclude=/I%VULKAN_SDK%\Include"
+  set "VulkanLibrary=/LIBPATH:%VULKAN_SDK%\Lib vulkan-1.lib"
+)
+
 set Sources=^
  "%Root%src\core\services.cpp" ^
  "%Root%src\core\services\engine.cpp" ^
@@ -86,15 +93,21 @@ set Sources=^
  "%Root%src\runtime\tracking_allocator.cpp" ^
  "%Root%src\graphics\graphics_device.cpp" ^
  "%Root%src\graphics\graphics_module.cpp" ^
- "%Root%src\graphics\private\null_device.cpp"
+ "%Root%src\graphics\private\null_device.cpp" ^
+ "%Root%src\graphics\vulkan\vulkan_command_list.cpp" ^
+ "%Root%src\graphics\vulkan\vulkan_device.cpp" ^
+ "%Root%src\graphics\vulkan\vulkan_gpu_sampler.cpp" ^
+ "%Root%src\graphics\vulkan\vulkan_surface.cpp" ^
+ "%Root%src\graphics\vulkan\win32\vulkan_win32_surface.cpp"
 
 echo Building Gecko %ConfigName%
 cl /nologo /std:c++latest /MP /LD /W4 /WX /wd4201 /wd4324 ^
  %ConfigFlags% /DGECKO_BUILD_SHARED=1 /DGECKO_BUILDING=1 ^
- /DGECKO_PLATFORM_WINDOWS=1 /D_CRT_SECURE_NO_WARNINGS ^
- /I"%Root%include" /I"%Root%src\core" /I"%Root%src\graphics" ^
+ /DGECKO_PLATFORM_WINDOWS=1 /DGECKO_GRAPHICS_VULKAN=1 ^
+ /DGECKO_GRAPHICS_VULKAN_WIN32=1 /D_CRT_SECURE_NO_WARNINGS ^
+ /I"%Root%include" /I"%Root%src\core" /I"%Root%src\graphics" %VulkanInclude% ^
  %Sources% /Fo"%ObjectDir%\\" /Fe"%BinaryDir%\Gecko.dll" ^
- /link /IMPLIB:"%BinaryDir%\Gecko.lib" user32.lib shcore.lib ole32.lib winmm.lib
+ /link /IMPLIB:"%BinaryDir%\Gecko.lib" user32.lib shcore.lib ole32.lib winmm.lib %VulkanLibrary%
 if errorlevel 1 exit /b 1
 
 echo Building gecko_sandbox

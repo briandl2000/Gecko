@@ -110,7 +110,6 @@ private:
   // because command buffers must be freed back to the same pool they came
   // from, and the recording thread may differ from the destruction thread.
   VkCommandPool m_Pool {VK_NULL_HANDLE};
-  bool m_Compute {false};
 
   TouchedSwapchain m_Touched[MaxSwapchainsPerSubmit] {};
   u32 m_TouchedCount {0};

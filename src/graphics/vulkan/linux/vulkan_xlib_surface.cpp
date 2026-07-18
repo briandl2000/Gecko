@@ -1,9 +1,9 @@
 #if defined(GECKO_PLATFORM_LINUX)
 #define VK_USE_PLATFORM_XLIB_KHR 1
 
+#include "../../private/labels.h"
 #include "gecko/core/services/log.h"
 #include "gecko/platform/window.h"
-#include "private/labels.h"
 
 #include <vulkan/vulkan.h>
 #include <X11/Xlib.h>
