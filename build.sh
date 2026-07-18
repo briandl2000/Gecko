@@ -91,13 +91,10 @@ EngineSources=(
   src/gecko.cpp
   src/core/assert.cpp
   src/core/services.cpp
-  src/core/services/engine.cpp
   src/core/services/events.cpp
   src/core/services/jobs.cpp
   src/core/services/log.cpp
   src/core/services/memory.cpp
-  src/core/services/modules.cpp
-  src/core/services/module_registry.cpp
   src/core/services/profiler.cpp
   src/core/utility/random.cpp
   src/core/utility/thread.cpp
@@ -109,7 +106,7 @@ EngineSources=(
   src/platform/monitors_interface.cpp
   src/platform/platform_config.cpp
   src/platform/platform_io.cpp
-  src/platform/platform_module.cpp
+  src/platform/platform.cpp
   src/platform/terminal.cpp
   src/platform/window_event_input.cpp
   src/platform/windows_interface.cpp
@@ -131,7 +128,6 @@ EngineSources=(
   src/runtime/immediate_logger.cpp
   src/runtime/ring_logger.cpp
   src/runtime/ring_profiler.cpp
-  src/runtime/runtime_module.cpp
   src/runtime/standard_log_sinks.cpp
   src/runtime/thread_pool_job_system.cpp
   src/runtime/trace_file_sink.cpp
@@ -139,7 +135,7 @@ EngineSources=(
   src/runtime/tracking_allocator.cpp
 
   src/graphics/graphics_device.cpp
-  src/graphics/graphics_module.cpp
+  src/graphics/graphics.cpp
   src/graphics/private/null_device.cpp
   src/graphics/vulkan/vulkan_command_list.cpp
   src/graphics/vulkan/vulkan_device.cpp

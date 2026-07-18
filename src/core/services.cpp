@@ -5,6 +5,7 @@
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/profiler.h"
 #include "private/labels.h"
+#include "private/services.h"
 
 #include <atomic>
 #include <mutex>
@@ -17,7 +18,6 @@ static NullJobSystem s_NullJobSystem;
 static NullProfiler s_NullProfiler;
 static NullLogger s_NullLogger;
 static NullEventBus s_NullEventBus;
-static NullModuleRegistry s_NullModuleRegistry;
 
 // Function-local static avoids the static initialization order fiasco.
 // The default SystemAllocator is alive from first use until process exit
@@ -34,17 +34,19 @@ static SystemAllocator& DefaultAllocator() noexcept
 // load via memory_order_acquire.
 static std::atomic<IAllocator*> g_UserAllocator {nullptr};
 
-// Active module registry, owned by gecko::Engine. Set by Engine::Create
-// (via SetActiveModuleRegistry) and cleared on Engine destruction. All
-// service accessors route through this -- the engine is the single source
-// of truth for which implementation is live.
-static std::atomic<IModuleRegistry*> g_Modules {nullptr};
+static std::atomic<IJobSystem*> g_Jobs {nullptr};
+static std::atomic<IProfiler*> g_Profiler {nullptr};
+static std::atomic<ILogger*> g_Logger {nullptr};
+static std::atomic<IEventBus*> g_Events {nullptr};
 
 namespace detail {
 
-void SetActiveModuleRegistry(IModuleRegistry* registry) noexcept
+void SetRuntimeServices(IJobSystem* jobs, IProfiler* profiler, ILogger* logger, IEventBus* events) noexcept
 {
-  g_Modules.store(registry, std::memory_order_release);
+  g_Jobs.store(jobs, std::memory_order_release);
+  g_Profiler.store(profiler, std::memory_order_release);
+  g_Logger.store(logger, std::memory_order_release);
+  g_Events.store(events, std::memory_order_release);
 }
 
 }  // namespace detail
@@ -85,29 +87,17 @@ void ResetAllocator() noexcept
   }
 }
 
-IModuleRegistry* GetModules() noexcept
-{
-  auto* m = g_Modules.load(std::memory_order_acquire);
-  return m ? m : &s_NullModuleRegistry;
-}
-
 IJobSystem* GetJobSystem() noexcept
 {
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
-  {
-    if (auto* impl = m->Service<IJobSystem>())
-      return impl;
-  }
+  if (auto* impl = g_Jobs.load(std::memory_order_acquire))
+    return impl;
   return &s_NullJobSystem;
 }
 
 IProfiler* GetProfiler() noexcept
 {
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
-  {
-    if (auto* impl = m->Service<IProfiler>())
-      return impl;
-  }
+  if (auto* impl = g_Profiler.load(std::memory_order_acquire))
+    return impl;
   return &s_NullProfiler;
 }
 
@@ -158,21 +148,15 @@ void RegisterThreadProfilerName(u32 threadId, const char* name) noexcept
 
 ILogger* GetLogger() noexcept
 {
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
-  {
-    if (auto* impl = m->Service<ILogger>())
-      return impl;
-  }
+  if (auto* impl = g_Logger.load(std::memory_order_acquire))
+    return impl;
   return &s_NullLogger;
 }
 
 IEventBus* GetEventBus() noexcept
 {
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
-  {
-    if (auto* impl = m->Service<IEventBus>())
-      return impl;
-  }
+  if (auto* impl = g_Events.load(std::memory_order_acquire))
+    return impl;
   return &s_NullEventBus;
 }
 

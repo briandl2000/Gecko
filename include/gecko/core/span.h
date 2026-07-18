@@ -7,7 +7,7 @@
 ///
 /// Used at the `CoreServices` shared-library boundary in place of
 /// `std::span<T>` so that virtual methods on Gecko service interfaces
-/// (`IModule::Publishes()`, `IProfilerSink::WriteBatch(...)`, etc.)
+/// (`IProfilerSink::WriteBatch(...)`, graphics uploads, etc.)
 /// don't depend on a particular standard-library implementation.
 /// Inside a single translation unit you can still use `std::span` for
 /// algorithms; convert at the boundary.

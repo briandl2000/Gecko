@@ -2,7 +2,7 @@
 
 #include "gecko/core/api.h"
 #include "gecko/core/types.h"
-#include "gecko/graphics/graphics_module.h"
+#include "gecko/graphics/graphics.h"
 #include "gecko/platform/platform_config.h"
 
 namespace gecko {

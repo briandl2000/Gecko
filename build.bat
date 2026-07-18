@@ -52,13 +52,10 @@ set Sources=^
  "%Root%src\gecko.cpp" ^
  "%Root%src\core\assert.cpp" ^
  "%Root%src\core\services.cpp" ^
- "%Root%src\core\services\engine.cpp" ^
  "%Root%src\core\services\events.cpp" ^
  "%Root%src\core\services\jobs.cpp" ^
  "%Root%src\core\services\log.cpp" ^
  "%Root%src\core\services\memory.cpp" ^
- "%Root%src\core\services\modules.cpp" ^
- "%Root%src\core\services\module_registry.cpp" ^
  "%Root%src\core\services\profiler.cpp" ^
  "%Root%src\core\utility\random.cpp" ^
  "%Root%src\core\utility\thread.cpp" ^
@@ -69,7 +66,7 @@ set Sources=^
  "%Root%src\platform\monitors_interface.cpp" ^
  "%Root%src\platform\platform_config.cpp" ^
  "%Root%src\platform\platform_io.cpp" ^
- "%Root%src\platform\platform_module.cpp" ^
+ "%Root%src\platform\platform.cpp" ^
  "%Root%src\platform\terminal.cpp" ^
  "%Root%src\platform\window_event_input.cpp" ^
  "%Root%src\platform\windows_interface.cpp" ^
@@ -88,14 +85,13 @@ set Sources=^
  "%Root%src\runtime\immediate_logger.cpp" ^
  "%Root%src\runtime\ring_logger.cpp" ^
  "%Root%src\runtime\ring_profiler.cpp" ^
- "%Root%src\runtime\runtime_module.cpp" ^
  "%Root%src\runtime\standard_log_sinks.cpp" ^
  "%Root%src\runtime\thread_pool_job_system.cpp" ^
  "%Root%src\runtime\trace_file_sink.cpp" ^
  "%Root%src\runtime\trace_writer.cpp" ^
  "%Root%src\runtime\tracking_allocator.cpp" ^
  "%Root%src\graphics\graphics_device.cpp" ^
- "%Root%src\graphics\graphics_module.cpp" ^
+ "%Root%src\graphics\graphics.cpp" ^
  "%Root%src\graphics\private\null_device.cpp" ^
  "%Root%src\graphics\vulkan\vulkan_command_list.cpp" ^
  "%Root%src\graphics\vulkan\vulkan_device.cpp" ^
