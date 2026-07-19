@@ -56,7 +56,7 @@ echo [GECKO] %ConfigName% %Action%
 echo [CXX  ] Gecko.dll
 cl %CommonFlags% /MP /LD %ConfigFlags% /DGECKO_BUILDING=1 /I"%Root%include" ^
  /I"%Root%src\core" /I"%Root%src\graphics" %VulkanInclude% ^
- "%Root%src\gecko_engine.cpp" /Fo"%ObjectDir%\" /Fe"%BinaryDir%\Gecko.dll" ^
+ "%Root%src\gecko_engine.cpp" /Fo"%ObjectDir%\gecko_engine.obj" /Fe"%BinaryDir%\Gecko.dll" ^
  /link /IMPLIB:"%BinaryDir%\Gecko.lib" user32.lib shcore.lib ole32.lib winmm.lib %VulkanLibrary%
 if errorlevel 1 exit /b 1
 
