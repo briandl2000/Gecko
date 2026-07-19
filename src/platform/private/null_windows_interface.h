@@ -4,6 +4,17 @@
 #include "gecko/platform/platform_events.h"
 #include "gecko/platform/windows_interface.h"
 
+// A Windows header may have been included after windows_interface.h in the
+// engine unity unit, reintroducing these broad WinUser.h macros.
+#if defined(CreateWindow)
+#undef CreateWindow
+#endif
+#if defined(CreateWindowA)
+#undef CreateWindowA
+#endif
+#if defined(CreateWindowW)
+#undef CreateWindowW
+#endif
 
 namespace gecko::platform {
 

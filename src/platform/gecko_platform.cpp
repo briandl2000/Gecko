@@ -13,6 +13,12 @@
 #if defined(CreateWindow)
 #undef CreateWindow
 #endif
+#if defined(CreateWindowA)
+#undef CreateWindowA
+#endif
+#if defined(CreateWindowW)
+#undef CreateWindowW
+#endif
 
 #include "private/null_monitors_backend.cpp"
 #include "private/null_windows_interface.cpp"
