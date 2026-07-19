@@ -2,10 +2,6 @@
 
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
 
-#include <cstring>
-#include <string>
-#include <unordered_map>
-#include <vector>
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 
@@ -32,7 +28,7 @@ namespace gecko::platform {
 struct WaylandWindowState
 {
   WindowDesc Desc {};
-  ::std::string TitleStorage;
+  String TitleStorage;
   Extent2D ClientSize {};
   math::Int2 Position {0, 0};
   platform::WindowState State {platform::WindowState::Normal};
@@ -65,7 +61,7 @@ struct WaylandWindowState
 
 // -- Staged event -------------------------------------------------------
 
-struct StagedEvent
+struct WaylandStagedEvent
 {
   gecko::EventCode Code {0};
   u8 PayloadStorage[128] {};
@@ -73,13 +69,13 @@ struct StagedEvent
 };
 
 template <typename T>
-StagedEvent MakeStagedEvent(gecko::EventCode code, const T& payload) noexcept
+WaylandStagedEvent MakeWaylandStagedEvent(gecko::EventCode code, const T& payload) noexcept
 {
   static_assert(sizeof(T) <= 128, "Payload too large for StagedEvent storage");
-  StagedEvent ev;
+  WaylandStagedEvent ev;
   ev.Code = code;
   ev.PayloadSize = static_cast<u32>(sizeof(T));
-  ::std::memcpy(ev.PayloadStorage, &payload, sizeof(T));
+  MemoryCopy(ev.PayloadStorage, &payload, sizeof(T));
   return ev;
 }
 
@@ -188,9 +184,9 @@ private:
   u64 m_FocusedKeyboard {0};
   u64 m_FocusedPointer {0};
 
-  ::std::unordered_map<u64, WaylandWindowState> m_Windows;
-  ::std::unordered_map<::wl_surface*, u64> m_WindowBySurface;
-  ::std::vector<StagedEvent> m_Staged;
+  HashMap<u64, WaylandWindowState> m_Windows;
+  HashMap<::wl_surface*, u64> m_WindowBySurface;
+  Array<WaylandStagedEvent> m_Staged;
 };
 
 Unique<IWindowsBackend> CreateWaylandWindowsBackend() noexcept;

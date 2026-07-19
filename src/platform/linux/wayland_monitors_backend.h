@@ -3,10 +3,7 @@
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
 
 #include "gecko/platform/monitors_interface.h"
-
-#include <deque>
-#include <list>
-#include <vector>
+#include "gecko/core/containers/hash_map.h"
 #include <wayland-client.h>
 
 namespace gecko::platform {
@@ -64,8 +61,8 @@ private:
 
   ::wl_display* m_Display {nullptr};
   ::wl_registry* m_Registry {nullptr};
-  ::std::list<WaylandMonitorEntry> m_Monitors;
-  ::std::vector<MonitorHandle> m_RemovedHandles;
+  HashMap<u32, WaylandMonitorEntry, 32> m_Monitors;
+  Array<MonitorHandle> m_RemovedHandles;
   bool m_Dirty {false};
 };
 

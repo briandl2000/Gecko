@@ -1,76 +1,297 @@
 #pragma once
 
-/// @file
-/// Smart-pointer aliases and convenience factories.
-///
-/// Gecko APIs use `Unique<T>`, `Shared<T>`, and `Weak<T>` (thin
-/// aliases for the standard library equivalents) so call sites read
-/// without `::std::` noise and so the project can swap the underlying
-/// implementation later if needed.
-
-#include <memory>
+#include "gecko/core/atomic.h"
+#include "gecko/core/placement.h"
+#include "gecko/core/services/memory.h"
 
 namespace gecko {
 
-// ------------------------------------------------------------
-// Smart pointer aliases
-// ------------------------------------------------------------
+namespace detail {
 
-/// Unique-ownership smart pointer (`std::unique_ptr`).
 template <typename T>
-using Unique = ::std::unique_ptr<T>;
+void DestroyObject(void* object) noexcept
+{
+  if (object == nullptr)
+    return;
+  static_cast<T*>(object)->~T();
+  DeallocBytes(object);
+}
 
-/// Shared-ownership smart pointer (`std::shared_ptr`).
+struct SharedControl
+{
+  AtomicU32 References {1};
+  void* Object {nullptr};
+  void (*Destroy)(SharedControl*) noexcept {nullptr};
+};
+
+inline void AddReference(SharedControl* control) noexcept
+{
+  (void)control->References.Increment();
+}
+
+inline bool RemoveReference(SharedControl* control) noexcept
+{
+  return control->References.Decrement() == 0;
+}
+
+template <typename Deleter>
+struct SharedControlWithDeleter final : SharedControl
+{
+  explicit SharedControlWithDeleter(void* object, Deleter&& deleter) noexcept
+      : DeleterFunction(static_cast<Deleter&&>(deleter))
+  {
+    Object = object;
+    Destroy = [](SharedControl* base) noexcept {
+      auto* control = static_cast<SharedControlWithDeleter*>(base);
+      control->DeleterFunction(control->Object);
+      control->~SharedControlWithDeleter();
+      DeallocBytes(control);
+    };
+  }
+
+  Deleter DeleterFunction;
+};
+
+}  // namespace detail
+
 template <typename T>
-using Shared = ::std::shared_ptr<T>;
+class Unique
+{
+  template <typename>
+  friend class Unique;
 
-/// Non-owning observer of a `Shared<T>` (`std::weak_ptr`).
+public:
+  constexpr Unique() noexcept = default;
+  constexpr Unique(decltype(nullptr)) noexcept
+  {}
+
+  Unique(T* pointer, void (*destroy)(void*) noexcept) noexcept : m_Pointer(pointer), m_Destroy(destroy)
+  {}
+
+  ~Unique() noexcept
+  {
+    reset();
+  }
+
+  Unique(const Unique&) = delete;
+  Unique& operator=(const Unique&) = delete;
+
+  Unique(Unique&& other) noexcept : m_Pointer(other.m_Pointer), m_Destroy(other.m_Destroy)
+  {
+    other.m_Pointer = nullptr;
+    other.m_Destroy = nullptr;
+  }
+
+  template <typename U>
+    requires requires(U* value) { static_cast<T*>(value); }
+  Unique(Unique<U>&& other) noexcept : m_Pointer(other.m_Pointer), m_Destroy(other.m_Destroy)
+  {
+    other.m_Pointer = nullptr;
+    other.m_Destroy = nullptr;
+  }
+
+  Unique& operator=(Unique&& other) noexcept
+  {
+    if (this != &other)
+    {
+      reset();
+      m_Pointer = other.m_Pointer;
+      m_Destroy = other.m_Destroy;
+      other.m_Pointer = nullptr;
+      other.m_Destroy = nullptr;
+    }
+    return *this;
+  }
+
+  template <typename U>
+    requires requires(U* value) { static_cast<T*>(value); }
+  Unique& operator=(Unique<U>&& other) noexcept
+  {
+    reset();
+    m_Pointer = other.m_Pointer;
+    m_Destroy = other.m_Destroy;
+    other.m_Pointer = nullptr;
+    other.m_Destroy = nullptr;
+    return *this;
+  }
+
+  Unique& operator=(decltype(nullptr)) noexcept
+  {
+    reset();
+    return *this;
+  }
+
+  void reset() noexcept
+  {
+    if (m_Pointer != nullptr)
+      m_Destroy(m_Pointer);
+    m_Pointer = nullptr;
+    m_Destroy = nullptr;
+  }
+
+  [[nodiscard]] T* get() const noexcept
+  {
+    return m_Pointer;
+  }
+
+  [[nodiscard]] T* operator->() const noexcept
+  {
+    return m_Pointer;
+  }
+
+  [[nodiscard]] T& operator*() const noexcept
+  {
+    return *m_Pointer;
+  }
+
+  [[nodiscard]] explicit operator bool() const noexcept
+  {
+    return m_Pointer != nullptr;
+  }
+
+  [[nodiscard]] bool operator==(decltype(nullptr)) const noexcept
+  {
+    return m_Pointer == nullptr;
+  }
+
+  [[nodiscard]] bool operator!=(decltype(nullptr)) const noexcept
+  {
+    return m_Pointer != nullptr;
+  }
+
+private:
+  T* m_Pointer {nullptr};
+  void (*m_Destroy)(void*) noexcept {nullptr};
+};
+
 template <typename T>
-using Weak = ::std::weak_ptr<T>;
+class Shared
+{
+  template <typename>
+  friend class Shared;
 
-// ------------------------------------------------------------
-// Smart pointer creation
-// ------------------------------------------------------------
+public:
+  constexpr Shared() noexcept = default;
+  constexpr Shared(decltype(nullptr)) noexcept
+  {}
 
-/// Construct a `Unique<T>` in-place (forwards to `std::make_unique`).
+  template <typename U, typename Deleter>
+    requires requires(U* value) { static_cast<T*>(value); }
+  Shared(U* object, Deleter deleter) noexcept : m_Pointer(object)
+  {
+    using Control = detail::SharedControlWithDeleter<Deleter>;
+    void* memory = AllocBytes(sizeof(Control), alignof(Control));
+    m_Control = new (memory, Placement) Control(object, static_cast<Deleter&&>(deleter));
+  }
+
+  ~Shared() noexcept
+  {
+    reset();
+  }
+
+  Shared(const Shared& other) noexcept : m_Pointer(other.m_Pointer), m_Control(other.m_Control)
+  {
+    if (m_Control != nullptr)
+      detail::AddReference(m_Control);
+  }
+
+  Shared(Shared&& other) noexcept : m_Pointer(other.m_Pointer), m_Control(other.m_Control)
+  {
+    other.m_Pointer = nullptr;
+    other.m_Control = nullptr;
+  }
+
+  Shared& operator=(const Shared& other) noexcept
+  {
+    if (this != &other)
+    {
+      reset();
+      m_Pointer = other.m_Pointer;
+      m_Control = other.m_Control;
+      if (m_Control != nullptr)
+        detail::AddReference(m_Control);
+    }
+    return *this;
+  }
+
+  Shared& operator=(Shared&& other) noexcept
+  {
+    if (this != &other)
+    {
+      reset();
+      m_Pointer = other.m_Pointer;
+      m_Control = other.m_Control;
+      other.m_Pointer = nullptr;
+      other.m_Control = nullptr;
+    }
+    return *this;
+  }
+
+  Shared& operator=(decltype(nullptr)) noexcept
+  {
+    reset();
+    return *this;
+  }
+
+  void reset() noexcept
+  {
+    if (m_Control != nullptr && detail::RemoveReference(m_Control))
+      m_Control->Destroy(m_Control);
+    m_Pointer = nullptr;
+    m_Control = nullptr;
+  }
+
+  [[nodiscard]] T* get() const noexcept
+  {
+    return m_Pointer;
+  }
+
+  [[nodiscard]] explicit operator bool() const noexcept
+  {
+    return m_Pointer != nullptr;
+  }
+
+  [[nodiscard]] bool operator==(decltype(nullptr)) const noexcept
+  {
+    return m_Pointer == nullptr;
+  }
+
+  [[nodiscard]] bool operator!=(decltype(nullptr)) const noexcept
+  {
+    return m_Pointer != nullptr;
+  }
+
+private:
+  T* m_Pointer {nullptr};
+  detail::SharedControl* m_Control {nullptr};
+};
+
 template <typename T, typename... Args>
-[[nodiscard]]
-constexpr Unique<T> CreateUnique(Args&&... args)
+[[nodiscard]] Unique<T> CreateUnique(Args&&... args) noexcept
 {
-  return ::std::make_unique<T>(::std::forward<Args>(args)...);
+  void* memory = AllocBytes(sizeof(T), alignof(T));
+  T* object = new (memory, Placement) T(static_cast<Args&&>(args)...);
+  return Unique<T>(object, detail::DestroyObject<T>);
 }
 
-/// Construct a `Shared<T>` in-place (forwards to `std::make_shared`).
+template <typename T>
+[[nodiscard]] Unique<T> CreateUniqueFromRaw(T* object) noexcept
+{
+  return Unique<T>(object, detail::DestroyObject<T>);
+}
+
 template <typename T, typename... Args>
-[[nodiscard]]
-constexpr Shared<T> CreateShared(Args&&... args)
+[[nodiscard]] Shared<T> CreateShared(Args&&... args) noexcept
 {
-  return ::std::make_shared<T>(::std::forward<Args>(args)...);
+  void* memory = AllocBytes(sizeof(T), alignof(T));
+  T* object = new (memory, Placement) T(static_cast<Args&&>(args)...);
+  return Shared<T>(object, detail::DestroyObject<T>);
 }
 
-/// Wrap an already-allocated raw pointer in a `Unique<T>`. Ownership
-/// transfers to the returned smart pointer.
 template <typename T>
-[[nodiscard]]
-constexpr Unique<T> CreateUniqueFromRaw(T* t)
+[[nodiscard]] Shared<T> CreateSharedFromRaw(T* object) noexcept
 {
-  return ::std::unique_ptr<T>(t);
+  return Shared<T>(object, detail::DestroyObject<T>);
 }
 
-/// Wrap an already-allocated raw pointer in a `Shared<T>`. Ownership
-/// transfers to the returned smart pointer.
-template <typename T>
-[[nodiscard]]
-constexpr Shared<T> CreateSharedFromRaw(T* t)
-{
-  return ::std::shared_ptr<T>(t);
-}
-
-/// Make a non-owning `Weak<T>` from an existing `Shared<T>`.
-template <typename T>
-[[nodiscard]]
-constexpr Weak<T> CreateWeakFromShared(Shared<T> shared)
-{
-  return ::std::weak_ptr<T>(shared);
-}
 }  // namespace gecko

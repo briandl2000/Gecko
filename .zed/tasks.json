@@ -1,0 +1,29 @@
+[
+  {
+    "label": "Gecko: Build Sandbox",
+    "command": "python3",
+    "args": ["build.py", "sandbox"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Gecko: Test SDK Consumer",
+    "command": "python3",
+    "args": ["build.py", "sdk-test"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Gecko: Stage SDK",
+    "command": "python3",
+    "args": ["build.py", "sdk"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]

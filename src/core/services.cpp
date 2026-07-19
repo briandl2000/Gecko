@@ -1,179 +1,74 @@
-#include "gecko/core/services.h"
-
-#include "gecko/core/assert.h"
-#include "gecko/core/services/events.h"
-#include "gecko/core/services/log.h"
 #include "gecko/core/services/profiler.h"
-#include "private/labels.h"
-
-#include <atomic>
-#include <mutex>
-#include <string>
-#include <unordered_map>
+#include "gecko/core/containers/string.h"
+#include "gecko/core/sync.h"
 
 namespace gecko {
 
-static NullJobSystem s_NullJobSystem;
-static NullProfiler s_NullProfiler;
-static NullLogger s_NullLogger;
-static NullEventBus s_NullEventBus;
-static NullModuleRegistry s_NullModuleRegistry;
-
-// Function-local static avoids the static initialization order fiasco.
-// The default SystemAllocator is alive from first use until process exit
-// and is the fallback whenever no user allocator is installed.
-static SystemAllocator& DefaultAllocator() noexcept
-{
-  static SystemAllocator instance;
-  return instance;
-}
-
-// User-installed allocator (via SetAllocator). Null means "use the
-// default". The Allocator() accessor never observes a torn state because
-// SetAllocator/ResetAllocator publish via memory_order_release and readers
-// load via memory_order_acquire.
-static std::atomic<IAllocator*> g_UserAllocator {nullptr};
-
-// Active module registry, owned by gecko::Engine. Set by Engine::Create
-// (via SetActiveModuleRegistry) and cleared on Engine destruction. All
-// service accessors route through this -- the engine is the single source
-// of truth for which implementation is live.
-static std::atomic<IModuleRegistry*> g_Modules {nullptr};
-
-namespace detail {
-
-void SetActiveModuleRegistry(IModuleRegistry* registry) noexcept
-{
-  g_Modules.store(registry, std::memory_order_release);
-}
-
-}  // namespace detail
-
-IAllocator& Allocator() noexcept
-{
-  if (auto* alloc = g_UserAllocator.load(std::memory_order_acquire))
-    return *alloc;
-  return DefaultAllocator();
-}
-
-bool SetAllocator(IAllocator* allocator) noexcept
-{
-  if (allocator == nullptr)
-  {
-    ResetAllocator();
-    return true;
-  }
-
-  // Replace path: shut down whatever was previously installed first.
-  if (auto* prev = g_UserAllocator.exchange(nullptr, std::memory_order_acq_rel))
-  {
-    prev->Shutdown();
-  }
-
-  if (!allocator->Init())
-    return false;
-
-  g_UserAllocator.store(allocator, std::memory_order_release);
-  return true;
-}
-
-void ResetAllocator() noexcept
-{
-  if (auto* prev = g_UserAllocator.exchange(nullptr, std::memory_order_acq_rel))
-  {
-    prev->Shutdown();
-  }
-}
-
-IModuleRegistry* GetModules() noexcept
-{
-  auto* m = g_Modules.load(std::memory_order_acquire);
-  return m ? m : &s_NullModuleRegistry;
-}
-
-IJobSystem* GetJobSystem() noexcept
-{
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
-  {
-    if (auto* impl = m->Service<IJobSystem>())
-      return impl;
-  }
-  return &s_NullJobSystem;
-}
-
-IProfiler* GetProfiler() noexcept
-{
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
-  {
-    if (auto* impl = m->Service<IProfiler>())
-      return impl;
-  }
-  return &s_NullProfiler;
-}
-
 namespace {
-thread_local ::std::string tls_ThreadProfilerName;
 
-// Process-global registry: TID -> profiler name. Written by
-// SetThreadProfilerName; read by trace sinks emitting chrome-trace
-// `thread_name` metadata. The map only ever holds named threads (small).
-// Names are owned strings so callers may pass non-static buffers.
-std::mutex g_ThreadNameMu;
-std::unordered_map<u32, ::std::string> g_ThreadNameMap;
+struct ThreadNameEntry
+{
+  StaticString<63> Name;
+  u32 ThreadId {0};
+  bool Active {false};
+};
+
+ThreadNameEntry g_ThreadNames[64] {};
+SpinMutex g_ThreadNameMutex;
+thread_local StaticString<63> g_CurrentThreadName;
+
 }  // namespace
 
 void SetThreadProfilerName(const char* name) noexcept
 {
-  if (!name)
-  {
-    tls_ThreadProfilerName.clear();
-    return;
-  }
-  tls_ThreadProfilerName = name;
-  u32 tid = ThisThreadId();
-  std::lock_guard<std::mutex> lk(g_ThreadNameMu);
-  g_ThreadNameMap[tid] = name;
+  g_CurrentThreadName.Clear();
+  if (name != nullptr)
+    g_CurrentThreadName.Append(StringView {name}.Substring(0, 63));
+  RegisterThreadProfilerName(ThisThreadId(), name);
 }
 
 const char* GetThreadProfilerName() noexcept
 {
-  return tls_ThreadProfilerName.empty() ? nullptr : tls_ThreadProfilerName.c_str();
+  return g_CurrentThreadName.Count() != 0 ? g_CurrentThreadName.Data() : nullptr;
 }
 
 const char* LookupThreadProfilerName(u32 threadId) noexcept
 {
-  std::lock_guard<std::mutex> lk(g_ThreadNameMu);
-  auto it = g_ThreadNameMap.find(threadId);
-  return (it != g_ThreadNameMap.end()) ? it->second.c_str() : nullptr;
+  LockGuard lock(g_ThreadNameMutex);
+  const char* result = nullptr;
+  for (const ThreadNameEntry& entry : g_ThreadNames)
+  {
+    if (entry.Active && entry.ThreadId == threadId)
+    {
+      result = entry.Name.Data();
+      break;
+    }
+  }
+  return result;
 }
 
 void RegisterThreadProfilerName(u32 threadId, const char* name) noexcept
 {
-  std::lock_guard<std::mutex> lk(g_ThreadNameMu);
-  if (name == nullptr)
-    g_ThreadNameMap.erase(threadId);
-  else
-    g_ThreadNameMap[threadId] = name;
-}
-
-ILogger* GetLogger() noexcept
-{
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
+  LockGuard lock(g_ThreadNameMutex);
+  ThreadNameEntry* destination = nullptr;
+  for (ThreadNameEntry& entry : g_ThreadNames)
   {
-    if (auto* impl = m->Service<ILogger>())
-      return impl;
+    if (entry.Active && entry.ThreadId == threadId)
+    {
+      destination = &entry;
+      break;
+    }
+    if (!entry.Active && destination == nullptr)
+      destination = &entry;
   }
-  return &s_NullLogger;
-}
-
-IEventBus* GetEventBus() noexcept
-{
-  if (auto* m = g_Modules.load(std::memory_order_acquire))
+  if (destination != nullptr)
   {
-    if (auto* impl = m->Service<IEventBus>())
-      return impl;
+    destination->Name.Clear();
+    destination->ThreadId = threadId;
+    destination->Active = name != nullptr;
+    if (name != nullptr)
+      destination->Name.Append(StringView {name}.Substring(0, 63));
   }
-  return &s_NullEventBus;
 }
 
 }  // namespace gecko

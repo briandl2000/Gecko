@@ -3,10 +3,6 @@
 #include "gecko/core/services/events.h"
 #include "gecko/platform/input.h"
 
-#include <array>
-#include <string>
-#include <string_view>
-
 namespace gecko::platform {
 
 // IInput backend that consumes window events from the platform event
@@ -23,9 +19,9 @@ class WindowEventInput final : public IInput
 {
 public:
   // Number of distinct KeyCode values we track (0x00-0xFF).
-  static constexpr ::gecko::usize KeyCount = 256;
+  static constexpr gecko::usize KeyCount = 256;
   // Number of distinct MouseButton values (Left/Right/Middle/X1/X2).
-  static constexpr ::gecko::usize MouseButtonCount = 5;
+  static constexpr gecko::usize MouseButtonCount = 5;
 
   WindowEventInput() noexcept;
   ~WindowEventInput() noexcept override;
@@ -52,25 +48,25 @@ public:
   [[nodiscard]] WindowHandle FocusedWindow() const noexcept override;
   [[nodiscard]] WindowHandle HoveredWindow() const noexcept override;
 
-  [[nodiscard]] ::std::string_view GetTypedText() const noexcept override;
+  [[nodiscard]] StringView GetTypedText() const noexcept override;
 
 private:
   // Event handlers (registered as static C-style callbacks).
-  static void OnKey(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
-  static void OnChar(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
-  static void OnMouseMove(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
-  static void OnMouseButton(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
-  static void OnMouseWheel(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
-  static void OnFocusChanged(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
-  static void OnMouseEntered(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
-  static void OnMouseExited(void* user, const ::gecko::EventMeta& meta, ::gecko::EventView view) noexcept;
+  static void OnKey(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
+  static void OnChar(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
+  static void OnMouseMove(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
+  static void OnMouseButton(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
+  static void OnMouseWheel(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
+  static void OnFocusChanged(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
+  static void OnMouseEntered(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
+  static void OnMouseExited(void* user, const gecko::EventMeta& meta, gecko::EventView view) noexcept;
 
   // -- State ----------------------------------------------------
-  ::std::array<bool, KeyCount> m_KeyDown {};
-  ::std::array<bool, KeyCount> m_KeyDownPrev {};
+  bool m_KeyDown[KeyCount] {};
+  bool m_KeyDownPrev[KeyCount] {};
 
-  ::std::array<bool, MouseButtonCount> m_MouseDown {};
-  ::std::array<bool, MouseButtonCount> m_MouseDownPrev {};
+  bool m_MouseDown[MouseButtonCount] {};
+  bool m_MouseDownPrev[MouseButtonCount] {};
 
   MousePosition m_MousePos {};      // current, focused-window-relative
   MousePosition m_MousePosPrev {};  // previous frame
@@ -83,17 +79,17 @@ private:
   MousePosition m_LastMouseWindowPos {};
 
   // Per-frame UTF-8 typed text. Cleared on NewFrame().
-  ::std::string m_TypedText {};
+  StaticString<1024> m_TypedText {};
 
   // -- Subscriptions --------------------------------------------
-  ::gecko::EventSubscription m_KeySub;
-  ::gecko::EventSubscription m_CharSub;
-  ::gecko::EventSubscription m_MouseMoveSub;
-  ::gecko::EventSubscription m_MouseButtonSub;
-  ::gecko::EventSubscription m_MouseWheelSub;
-  ::gecko::EventSubscription m_FocusSub;
-  ::gecko::EventSubscription m_MouseEnteredSub;
-  ::gecko::EventSubscription m_MouseExitedSub;
+  gecko::EventSubscription m_KeySub;
+  gecko::EventSubscription m_CharSub;
+  gecko::EventSubscription m_MouseMoveSub;
+  gecko::EventSubscription m_MouseButtonSub;
+  gecko::EventSubscription m_MouseWheelSub;
+  gecko::EventSubscription m_FocusSub;
+  gecko::EventSubscription m_MouseEnteredSub;
+  gecko::EventSubscription m_MouseExitedSub;
 };
 
 }  // namespace gecko::platform

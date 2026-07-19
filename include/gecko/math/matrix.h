@@ -65,8 +65,8 @@ struct Float2x2
 
   static inline Float2x2 Rotation(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {c, -s, s, c};
   }
 };
@@ -127,29 +127,29 @@ struct Float3x3
 
   static inline Float3x3 Rotation(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {c, -s, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static inline Float3x3 RotationX(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {1.0f, 0.0f, 0.0f, 0.0f, c, -s, 0.0f, s, c};
   }
 
   static inline Float3x3 RotationY(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {c, 0.0f, s, 0.0f, 1.0f, 0.0f, -s, 0.0f, c};
   }
 
   static inline Float3x3 RotationZ(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {c, -s, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 };
@@ -221,22 +221,22 @@ struct Float4x4
 
   static inline Float4x4 RotationX(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, c, -s, 0.0f, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static inline Float4x4 RotationY(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {c, 0.0f, s, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, -s, 0.0f, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
   static inline Float4x4 RotationZ(f32 angle) noexcept
   {
-    const f32 c = ::gecko::math::Cos(angle);
-    const f32 s = ::gecko::math::Sin(angle);
+    const f32 c = gecko::math::Cos(angle);
+    const f32 s = gecko::math::Sin(angle);
     return {c, -s, 0.0f, 0.0f, s, c, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
   }
 
@@ -269,7 +269,7 @@ struct Float4x4
   /// @param far     Far plane distance (positive, > `near`).
   static inline Float4x4 Perspective(f32 fovY, f32 aspect, f32 near, f32 far) noexcept
   {
-    const f32 tanHalfFovy = ::gecko::math::Tan(fovY / 2.0f);
+    const f32 tanHalfFovy = gecko::math::Tan(fovY / 2.0f);
     const f32 fn = 1.0f / (far - near);
     return {1.0f / (aspect * tanHalfFovy),
             0.0f,

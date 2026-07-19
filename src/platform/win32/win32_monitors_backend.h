@@ -10,7 +10,6 @@
 #endif
 #include "gecko/platform/monitors_interface.h"
 
-#include <vector>
 #include <Windows.h>
 
 namespace gecko::platform {
@@ -39,7 +38,7 @@ public:
 private:
   static ::BOOL CALLBACK EnumProc(::HMONITOR hMonitor, ::HDC hdc, LPRECT lpRect, ::LPARAM lParam) noexcept;
 
-  ::std::vector<MonitorEntry> m_Monitors;
+  Array<MonitorEntry> m_Monitors;
 };
 
 Unique<IMonitorsBackend> CreateWin32MonitorsBackend() noexcept;

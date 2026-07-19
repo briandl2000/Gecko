@@ -1,9 +1,9 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_gpu_sampler.h"
 
+#include "../private/labels.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/utility/hash.h"
-#include "private/labels.h"
 #include "vulkan_device.h"
 
 namespace gecko::graphics {
@@ -33,7 +33,7 @@ VulkanGpuSampler::VulkanGpuSampler(VulkanDevice& device, const GpuSamplerDesc& d
   // Register the synthetic GPU thread name so trace sinks show "GPU" on
   // its row instead of a numeric id.
   if (m_Desc.GpuThreadName != nullptr)
-    ::gecko::RegisterThreadProfilerName(m_Desc.GpuThreadId, m_Desc.GpuThreadName);
+    gecko::RegisterThreadProfilerName(m_Desc.GpuThreadId, m_Desc.GpuThreadName);
 
   m_Valid = true;
 }
@@ -75,10 +75,7 @@ void VulkanGpuSampler::BeginFrame(ICommandList& cmd) noexcept
   // only if no OnSubmit() arrives before ResolveSlot runs (e.g. cmd
   // lists were never submitted). When OnSubmit fires we prefer that
   // timestamp, since it lines up with the actual vkQueueSubmit call.
-  if (auto* p = ::gecko::GetProfiler(); p != nullptr)
-    slot.CpuFrameStartNs = p->NowNs();
-  else
-    slot.CpuFrameStartNs = 0;
+  slot.CpuFrameStartNs = gecko::ProfilerNowNs();
 
   // No cmd-side ResetTimestamps here -- the pool was reset from the host
   // either at creation (first use) or after ResolveSlot (subsequent
@@ -102,8 +99,8 @@ void VulkanGpuSampler::EndFrame(ICommandList& cmd) noexcept
   (void)cmd;
 }
 
-void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label, const char* name,
-                                 ::gecko::ProfLevel level) noexcept
+void VulkanGpuSampler::BeginZone(ICommandList& cmd, gecko::Label label, const char* name,
+                                 gecko::ProfLevel level) noexcept
 {
   if (!m_Valid)
     return;
@@ -120,7 +117,7 @@ void VulkanGpuSampler::BeginZone(ICommandList& cmd, ::gecko::Label label, const 
   ZoneRecord rec {};
   rec.ScopeLabel = label;
   rec.Name = name;
-  rec.NameHash = ::gecko::FNV1a(name);
+  rec.NameHash = gecko::FNV1a(name);
   rec.BeginQuery = slot.NextQuery++;
   rec.EndQuery = 0;
   rec.Level = level;
@@ -174,16 +171,9 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
 
   // Pull all timestamps in one shot. ReadTimestamps converts ticks->ns
   // internally using the device timestamp period.
-  std::vector<u64> ts(slot.NextQuery, 0);
-  const u32 got = m_Device->ReadTimestamps(slot.Pool, 0, std::span<u64>(ts.data(), ts.size()));
+  Array<u64> ts(slot.NextQuery, 0);
+  const u32 got = m_Device->ReadTimestamps(slot.Pool, 0, Span<u64>(ts.data(), ts.size()));
   if (got == 0)
-  {
-    m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
-    return;
-  }
-
-  auto* p = ::gecko::GetProfiler();
-  if (p == nullptr)
   {
     m_Device->HostResetQueryPool(slot.Pool, 0, poolSize);
     return;
@@ -225,20 +215,20 @@ void VulkanGpuSampler::ResolveSlot(FrameSlot& slot) noexcept
     const u64 beginNs = rebase(ts[rec.BeginQuery]);
     const u64 endNs = rebase(ts[rec.EndQuery]);
 
-    ::gecko::ProfEvent ev {};
+    gecko::ProfEvent ev {};
     ev.TimestampNs = beginNs;
     ev.Name = rec.Name;
     ev.EventLabel = rec.ScopeLabel;
     ev.ThreadId = m_Desc.GpuThreadId;
     ev.NameHash = rec.NameHash;
-    ev.Kind = ::gecko::ProfEventKind::ZoneBegin;
-    ev.Source = ::gecko::ProfSource::GPU;
+    ev.Kind = gecko::ProfEventKind::ZoneBegin;
+    ev.Source = gecko::ProfSource::GPU;
     ev.Level = rec.Level;
-    p->Emit(ev);
+    gecko::EmitProfileEvent(ev);
 
     ev.TimestampNs = endNs;
-    ev.Kind = ::gecko::ProfEventKind::ZoneEnd;
-    p->Emit(ev);
+    ev.Kind = gecko::ProfEventKind::ZoneEnd;
+    gecko::EmitProfileEvent(ev);
   }
 
   slot.Zones.clear();

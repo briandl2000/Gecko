@@ -3,7 +3,6 @@
 #include "gecko/core/services/events.h"
 #include "gecko/platform/monitors_interface.h"
 
-#include <vector>
 
 namespace gecko::platform {
 
@@ -29,7 +28,7 @@ private:
     MonitorInfo Info {};
   };
 
-  ::std::vector<MonitorEntry> m_Monitors;
+  Array<MonitorEntry> m_Monitors;
 };
 
 }  // namespace gecko::platform

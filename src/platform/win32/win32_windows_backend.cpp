@@ -9,7 +9,6 @@
 #include "gecko/core/services/log.h"
 #include "gecko/platform/input_codes.h"
 
-#include <cstring>
 #include <shellscalingapi.h>
 #include <windowsx.h>
 
@@ -226,7 +225,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
     GECKO_WARN(labels::Window, "CreateWindow: failed to convert title to UTF-16");
     return WindowHandle {};
   }
-  ::std::vector<wchar_t> wTitle(static_cast<size_t>(titleLen));
+  Array<wchar_t> wTitle(static_cast<usize>(titleLen));
   ::MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle.data(), titleLen);
 
   ::HWND hwnd = ::CreateWindowExW(exStyle, WndClassName, wTitle.data(), style, CW_USEDEFAULT, CW_USEDEFAULT,
@@ -258,7 +257,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   if (::GetWindowRect(hwnd, &winRect))
     entry.Position = {static_cast<i32>(winRect.left), static_cast<i32>(winRect.top)};
 
-  auto [it, ok] = m_Windows.emplace(id, ::std::move(entry));
+  auto [it, ok] = m_Windows.emplace(id, Move(entry));
   it->second.Desc.Title = it->second.TitleStorage.c_str();
 
   // Store the handle id in the window user data for WndProc lookup
@@ -267,7 +266,7 @@ WindowHandle Win32WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   if (desc.Visible)
     ::ShowWindow(hwnd, SW_SHOW);
 
-  GECKO_INFO(labels::General, "Win32WindowsBackend: created window id=%llu hwnd=%p",
+  GECKO_INFO(labels::General, "Win32WindowsBackend: created window id={} hwnd={}",
              static_cast<unsigned long long>(id), static_cast<void*>(hwnd));
   return WindowHandle {id};
 }
@@ -356,7 +355,7 @@ void Win32WindowsBackend::SetTitle(WindowHandle window, const char* title) noexc
   const int len = ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(), -1, nullptr, 0);
   if (len <= 0)
     return;
-  ::std::vector<wchar_t> wTitle(static_cast<size_t>(len));
+  Array<wchar_t> wTitle(static_cast<usize>(len));
   ::MultiByteToWideChar(CP_UTF8, 0, entry->TitleStorage.c_str(), -1, wTitle.data(), len);
   ::SetWindowTextW(entry->Hwnd, wTitle.data());
 }
@@ -578,20 +577,20 @@ void Win32WindowsBackend::SetWindowButtons(WindowHandle window, WindowButtons bu
   if (!sysMenu)
     return;
 
-  if (!::gecko::Any(buttons & WindowButtons::Close))
+  if (!gecko::Any(buttons & WindowButtons::Close))
     ::EnableMenuItem(sysMenu, SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
-  if (!::gecko::Any(buttons & WindowButtons::Minimize))
+  if (!gecko::Any(buttons & WindowButtons::Minimize))
     ::EnableMenuItem(sysMenu, SC_MINIMIZE, MF_BYCOMMAND | MF_GRAYED);
-  if (!::gecko::Any(buttons & WindowButtons::Maximize))
+  if (!gecko::Any(buttons & WindowButtons::Maximize))
     ::EnableMenuItem(sysMenu, SC_MAXIMIZE, MF_BYCOMMAND | MF_GRAYED);
 
   // Also toggle the WS_MINIMIZEBOX/WS_MAXIMIZEBOX style bits.
   LONG_PTR style = ::GetWindowLongPtrW(entry->Hwnd, GWL_STYLE);
-  if (::gecko::Any(buttons & WindowButtons::Minimize))
+  if (gecko::Any(buttons & WindowButtons::Minimize))
     style |= WS_MINIMIZEBOX;
   else
     style &= ~WS_MINIMIZEBOX;
-  if (::gecko::Any(buttons & WindowButtons::Maximize))
+  if (gecko::Any(buttons & WindowButtons::Maximize))
     style |= WS_MAXIMIZEBOX;
   else
     style &= ~WS_MAXIMIZEBOX;
@@ -820,14 +819,14 @@ void Win32WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcep
   case WM_CHAR: {
     if (!entry)
       break;
-    const ::gecko::u32 unit = static_cast<::gecko::u32>(wParam);
+    const gecko::u32 unit = static_cast<gecko::u32>(wParam);
 
     // Combine UTF-16 surrogate pairs into a single codepoint.
-    ::gecko::u32 codepoint = 0;
+    gecko::u32 codepoint = 0;
     if (unit >= 0xD800 && unit <= 0xDBFF)
     {
       // High surrogate -- wait for the low surrogate in the next WM_CHAR.
-      entry->PendingHighSurrogate = static_cast<::gecko::u16>(unit);
+      entry->PendingHighSurrogate = static_cast<gecko::u16>(unit);
       break;
     }
     if (unit >= 0xDC00 && unit <= 0xDFFF)
@@ -835,7 +834,7 @@ void Win32WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcep
       // Low surrogate -- combine with stored high surrogate.
       if (entry->PendingHighSurrogate == 0)
         break;  // unpaired, drop
-      codepoint = 0x10000 + ((::gecko::u32(entry->PendingHighSurrogate) - 0xD800) << 10) + (unit - 0xDC00);
+      codepoint = 0x10000 + ((gecko::u32(entry->PendingHighSurrogate) - 0xD800) << 10) + (unit - 0xDC00);
       entry->PendingHighSurrogate = 0;
     }
     else

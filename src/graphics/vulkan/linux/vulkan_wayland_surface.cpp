@@ -1,16 +1,16 @@
 #if defined(GECKO_PLATFORM_LINUX)
 #define VK_USE_PLATFORM_WAYLAND_KHR 1
 
+#include "../../private/labels.h"
 #include "gecko/core/services/log.h"
 #include "gecko/platform/window.h"
-#include "private/labels.h"
 
 #include <vulkan/vulkan.h>
 #include <wayland-client.h>
 
 namespace gecko::graphics {
 
-VkResult CreateWaylandSurface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateWaylandSurface(VkInstance instance, const gecko::platform::NativeWindowHandle& native,
                               VkSurfaceKHR* out) noexcept
 {
   VkWaylandSurfaceCreateInfoKHR sci {};

@@ -1,6 +1,8 @@
 #include "gecko/platform/clipboard.h"
 
 #include "gecko/core/services/log.h"
+#include "gecko/core/utility/time.h"
+#include "gecko/platform/threading.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
 
@@ -14,12 +16,12 @@
 
 namespace gecko::platform {
 
-::std::string GetClipboardText() noexcept
+String GetClipboardText() noexcept
 {
   if (!::OpenClipboard(nullptr))
     return {};
 
-  ::std::string out;
+  String out;
   ::HANDLE handle = ::GetClipboardData(CF_UNICODETEXT);
   if (handle != nullptr)
   {
@@ -29,9 +31,8 @@ namespace gecko::platform {
       const int needed = ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
       if (needed > 1)
       {
-        // -1 to drop the null terminator from std::string size.
-        out.resize(static_cast<::std::size_t>(needed - 1));
-        ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, out.data(), needed, nullptr, nullptr);
+        out.Resize(static_cast<usize>(needed - 1));
+        ::WideCharToMultiByte(CP_UTF8, 0, wide, -1, out.Data(), needed, nullptr, nullptr);
       }
       ::GlobalUnlock(handle);
     }
@@ -40,14 +41,14 @@ namespace gecko::platform {
   return out;
 }
 
-bool SetClipboardText(::std::string_view utf8) noexcept
+bool SetClipboardText(StringView utf8) noexcept
 {
   if (!::OpenClipboard(nullptr))
     return false;
 
   bool ok = false;
   // +1 source byte so terminating-null path works even with empty input.
-  const int wideLen = ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), nullptr, 0);
+  const int wideLen = ::MultiByteToWideChar(CP_UTF8, 0, utf8.Data(), static_cast<int>(utf8.Size()), nullptr, 0);
   // wideLen is the count of wchars NOT including any terminator; we add
   // one for our own null.
   const ::SIZE_T bytes = (static_cast<::SIZE_T>(wideLen) + 1) * sizeof(wchar_t);
@@ -59,7 +60,7 @@ bool SetClipboardText(::std::string_view utf8) noexcept
     {
       if (wideLen > 0)
       {
-        ::MultiByteToWideChar(CP_UTF8, 0, utf8.data(), static_cast<int>(utf8.size()), dst, wideLen);
+        ::MultiByteToWideChar(CP_UTF8, 0, utf8.Data(), static_cast<int>(utf8.Size()), dst, wideLen);
       }
       dst[wideLen] = L'\0';
       ::GlobalUnlock(mem);
@@ -81,9 +82,6 @@ bool SetClipboardText(::std::string_view utf8) noexcept
 
 #elif defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_X11)
 
-#include <chrono>
-#include <cstring>
-#include <thread>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 
@@ -100,7 +98,7 @@ struct X11ClipboardOwnerState
 {
   ::Display* Display {nullptr};
   ::Window OwnerWindow {0};
-  ::std::string Payload;
+  String Payload;
   bool Owns {false};
 };
 
@@ -131,7 +129,7 @@ X11ClipboardOwnerState& OwnerState() noexcept
 
 }  // namespace
 
-::std::string GetClipboardText() noexcept
+String GetClipboardText() noexcept
 {
   ::Display* display = OpenDisplayLocal();
   if (display == nullptr)
@@ -146,27 +144,26 @@ X11ClipboardOwnerState& OwnerState() noexcept
   ::Window owner = ::XGetSelectionOwner(display, clipboard);
   if (owner == window)
     return OwnerState().Payload;
-  if (owner == None)
+  if (owner == 0L)
     return {};
 
   ::XConvertSelection(display, clipboard, utf8, prop, window, CurrentTime);
   ::XFlush(display);
 
   // Wait for SelectionNotify (bounded poll, ~250 ms).
-  using clock = ::std::chrono::steady_clock;
-  const auto deadline = clock::now() + ::std::chrono::milliseconds(250);
+  const u64 deadline = MonotonicTimeNs() + time::MillisecondsToNs(250);
   ::XEvent event;
   bool got = false;
-  while (clock::now() < deadline)
+  while (MonotonicTimeNs() < deadline)
   {
     if (::XCheckTypedWindowEvent(display, window, SelectionNotify, &event))
     {
       got = true;
       break;
     }
-    ::std::this_thread::sleep_for(::std::chrono::milliseconds(2));
+    SleepNanoseconds(time::MillisecondsToNs(2));
   }
-  if (!got || event.xselection.property == None)
+  if (!got || event.xselection.property == 0L)
     return {};
 
   ::Atom actualType = 0;
@@ -175,19 +172,19 @@ X11ClipboardOwnerState& OwnerState() noexcept
   unsigned long bytesAfter = 0;
   unsigned char* data = nullptr;
   if (::XGetWindowProperty(display, window, prop, 0, ~0L, True, AnyPropertyType, &actualType, &actualFormat, &nItems,
-                           &bytesAfter, &data) != Success)
+                           &bytesAfter, &data) != 0)
     return {};
 
-  ::std::string out;
+  String out;
   if (data != nullptr)
   {
-    out.assign(reinterpret_cast<const char*>(data), nItems);
+    out.Assign(StringView {reinterpret_cast<const char*>(data), static_cast<usize>(nItems)});
     ::XFree(data);
   }
   return out;
 }
 
-bool SetClipboardText(::std::string_view utf8) noexcept
+bool SetClipboardText(StringView utf8) noexcept
 {
   ::Display* display = OpenDisplayLocal();
   if (display == nullptr)
@@ -195,7 +192,7 @@ bool SetClipboardText(::std::string_view utf8) noexcept
 
   const ::Atom clipboard = ::XInternAtom(display, "CLIPBOARD", False);
   auto& s = OwnerState();
-  s.Payload.assign(utf8);
+  s.Payload.Assign(utf8);
   s.Display = display;
   const ::Window window = EnsureHelperWindow(display);
   ::XSetSelectionOwner(display, clipboard, window, CurrentTime);
@@ -219,13 +216,13 @@ bool SetClipboardText(::std::string_view utf8) noexcept
 // public API will gain a real impl once that's wired up.
 namespace gecko::platform {
 
-::std::string GetClipboardText() noexcept
+String GetClipboardText() noexcept
 {
   GECKO_WARN("gecko.platform.clipboard", "GetClipboardText: Wayland clipboard not yet implemented");
   return {};
 }
 
-bool SetClipboardText(::std::string_view) noexcept
+bool SetClipboardText(StringView) noexcept
 {
   GECKO_WARN("gecko.platform.clipboard", "SetClipboardText: Wayland clipboard not yet implemented");
   return false;
@@ -237,12 +234,12 @@ bool SetClipboardText(::std::string_view) noexcept
 
 namespace gecko::platform {
 
-::std::string GetClipboardText() noexcept
+String GetClipboardText() noexcept
 {
   return {};
 }
 
-bool SetClipboardText(::std::string_view) noexcept
+bool SetClipboardText(StringView) noexcept
 {
   return false;
 }

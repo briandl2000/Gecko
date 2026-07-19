@@ -1,6 +1,7 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
+#include "../private/labels.h"
 #include "gecko/core/types.h"
 #include "gecko/graphics/graphics_types.h"
 
@@ -86,15 +87,14 @@ namespace gecko::graphics {
   }
 }
 
-#define VULKAN_CHECK(expr)                                                                                         \
-  do                                                                                                               \
-  {                                                                                                                \
-    VkResult _vkr = (expr);                                                                                        \
-    if (_vkr != VK_SUCCESS)                                                                                        \
-    {                                                                                                              \
-      GECKO_ERROR(::gecko::graphics::labels::Vulkan, "Vulkan error %d in %s: %s", static_cast<::gecko::i32>(_vkr), \
-                  __func__, #expr);                                                                                \
-    }                                                                                                              \
+#define VULKAN_CHECK(expr)                                                                               \
+  do                                                                                                     \
+  {                                                                                                      \
+    VkResult _vkr = (expr);                                                                              \
+    if (_vkr != VK_SUCCESS)                                                                              \
+    {                                                                                                    \
+      GECKO_ERROR(labels::Vulkan, "Vulkan error {} in {}: {}", static_cast<i32>(_vkr), __func__, #expr); \
+    }                                                                                                    \
   } while (false)
 
 [[nodiscard]] inline VkCompareOp ToVkCompareOp(CompareFunc f) noexcept

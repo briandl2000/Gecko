@@ -1,5 +1,4 @@
-# Gecko Framework - Editor Configuration
-# https://editorconfig.org
+# Gecko editor defaults
 
 root = true
 
@@ -13,24 +12,9 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
-[*.{cmake,txt}]
-indent_style = space
-indent_size = 2
-
-[CMakeLists.txt]
-indent_style = space
-indent_size = 2
-
-[*.{py,sh}]
-indent_style = space
-indent_size = 4
-
-[*.{json,yaml,yml}]
+[*.sh]
 indent_style = space
 indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
-
-[Makefile]
-indent_style = tab

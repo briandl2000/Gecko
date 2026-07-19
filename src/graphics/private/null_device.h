@@ -53,7 +53,7 @@ public:
   {}
   void BindSampler(u32, const Sampler&) noexcept override
   {}
-  void SetConstants(u32, ::std::span<const ::gecko::byte>) noexcept override
+  void SetConstants(u32, Span<const gecko::byte>) noexcept override
   {}
 
   void Draw(u32, u32, u32, u32) noexcept override
@@ -83,7 +83,7 @@ public:
   {}
   void WriteTimestamp(const QueryPool&, u32) noexcept override
   {}
-  void AttachGpuSampler(IGpuSampler*, ::gecko::Label) noexcept override
+  void AttachGpuSampler(IGpuSampler*, gecko::Label) noexcept override
   {}
   IGpuSampler* GetAttachedGpuSampler() const noexcept override
   {
@@ -100,12 +100,13 @@ public:
   NullDevice(const NullDevice&) = delete;
   NullDevice& operator=(const NullDevice&) = delete;
 
-  Swapchain CreateSwapchain(const ::gecko::platform::NativeWindowHandle&, const SwapchainDesc&) noexcept override;
+  Swapchain CreateSwapchain(const gecko::platform::NativeWindowHandle&, const SwapchainDesc&) noexcept override;
   void DestroySwapchain(Swapchain& swapchain) noexcept override;
   void ResizeSwapchain(Swapchain&) noexcept override;
 
   FrameContext BeginFrame(Swapchain&) noexcept override;
-  void Present(::std::span<const FrameContext>) noexcept override;
+  void Present(Span<const FrameContext>) noexcept override;
+  void WaitIdle() noexcept override;
 
   Unique<ICommandList> CreateGraphicsCommandList() noexcept override;
   Unique<ICommandList> CreateComputeCommandList() noexcept override;
@@ -122,15 +123,15 @@ public:
   GraphicsPipeline CreateGraphicsPipeline(const GraphicsPipelineDesc&) noexcept override;
   ComputePipeline CreateComputePipeline(const ComputePipelineDesc&) noexcept override;
   QueryPool CreateTimestampQueryPool(const QueryPoolDesc&) noexcept override;
-  u32 ReadTimestamps(const QueryPool&, u32, ::std::span<u64>) noexcept override;
+  u32 ReadTimestamps(const QueryPool&, u32, Span<u64>) noexcept override;
 
-  ::gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc&) noexcept override
+  gecko::Unique<IGpuSampler> CreateGpuSampler(const GpuSamplerDesc&) noexcept override
   {
     return nullptr;
   }
 
-  void UploadTextureData(Texture&, ::std::span<const ::gecko::byte>, u32, u32) noexcept override;
-  void UploadBufferData(Buffer&, ::std::span<const ::gecko::byte>, u32) noexcept override;
+  void UploadTextureData(Texture&, Span<const gecko::byte>, u32, u32) noexcept override;
+  void UploadBufferData(Buffer&, Span<const gecko::byte>, u32) noexcept override;
 };
 
 }  // namespace gecko::graphics

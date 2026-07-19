@@ -10,8 +10,6 @@
 #include "gecko/core/services/log.h"
 #include "gecko/platform/platform_events.h"
 
-#include <cmath>
-#include <cstring>
 #include <shellscalingapi.h>
 
 namespace gecko::platform {
@@ -27,7 +25,7 @@ void Win32MonitorsBackend::EnumerateMonitors() noexcept
   m_Monitors.clear();
   ::EnumDisplayMonitors(nullptr, nullptr, EnumProc, reinterpret_cast<::LPARAM>(this));
 
-  GECKO_INFO(labels::General, "Win32MonitorsBackend: enumerated %u monitor(s)", static_cast<u32>(m_Monitors.size()));
+  GECKO_INFO(labels::General, "Win32MonitorsBackend: enumerated {} monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
 
 u32 Win32MonitorsBackend::GetMonitorCount() const noexcept
@@ -93,7 +91,7 @@ void Win32MonitorsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexce
 
   MonitorEntry entry;
   entry.HMonitor = hMonitor;
-  entry.Handle = MonitorHandle {static_cast<u64>(reinterpret_cast<uintptr_t>(hMonitor))};
+  entry.Handle = MonitorHandle {static_cast<u64>(reinterpret_cast<usize>(hMonitor))};
 
   MonitorInfo& info = entry.Info;
   info.SetName(mi.szDevice);

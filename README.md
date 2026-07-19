@@ -1,72 +1,60 @@
-# Gecko Engine
+# Gecko
 
-A modular C++26 game/application engine focused on clean architecture and fast iteration.
+Gecko is a handmade C++26 game engine for learning, experiments, and games. It builds as one shared library used by executables and optional plugins.
 
-## Prerequisites
+## Build
 
-Install these **before** cloning:
+Gecko uses one Python 3.10+ build driver with no third-party Python packages:
 
-| Tool | Min version | Notes |
-|------|-------------|-------|
-| **GCC** | 15 | C++26 (`-std=c++2c`). Windows: via MSYS2 UCRT64. MSVC not yet supported. |
-| **CMake** | 3.22 | |
-| **Ninja** | any | Multi-config generator |
-| **Python** | 3.7 | For the `gk` CLI wrapper |
-| **Vulkan SDK** | 1.3 | Required for the Vulkan graphics backend (see below). |
-
-Linux also needs the X11 / Wayland dev packages. One-liners per distro and the
-Vulkan install commands live in [docs/build.md](docs/build.md#prerequisites).
-
-> **Vulkan SDK is optional only if you don't need rendering.** Without it
-> `CreateGraphicsDevice()` falls back to the `NullDevice` and every draw call
-> is a no-op. When missing, CMake prints the exact command to install it.
-
-## Quick Start
-
-```bash
-git clone https://github.com/yourusername/gecko.git
-cd gecko
-
-source scripts/setup.sh    # Linux / macOS / MSYS2 — creates `gk` shell function
-gk build                   # Debug build
-gk test                    # Run unit tests
-gk run graphics_example    # Run the graphics demo
+```sh
+python3 build.py engine
+python3 build.py sandbox
+python3 build.py sdk-test
+python3 build.py sdk
 ```
 
-## CLI Commands
+The target comes first and Debug is the default; use `--config release` when needed. `python3 build.py --help` lists the complete interface, and `python3 build.py graph` prints the engine module order.
 
-| Command | Description |
-|---------|-------------|
-| `gk setup [--clean]` | Configure CMake |
-| `gk build [debug\|release\|all]` | Build the engine libraries |
-| `gk build examples [debug\|release]` | Build example applications |
-| `gk test [debug\|release]` | Build and run tests |
-| `gk run <example> [debug\|release]` | Build and run an example |
-| `gk format` | `clang-format` all sources |
-| `gk package [local\|dev\|release]` | Create a distributable package |
+On Windows, run the same commands with `python` from an MSVC Developer Command Prompt. Linux uses GCC. Building Gecko from source also requires the Vulkan development files and the Wayland/X11 development packages; projects with shaders require `glslc`.
 
-## Project Structure
+`sandbox` builds the launcher and its shader-capable plugin against the current engine. `sdk-test` stages an SDK and rebuilds the same launcher/plugin exclusively through that public package. `sdk` produces the downloadable Debug and Release SDK under `out/sdk`.
 
-```
-gecko/
-├── include/gecko/    # Public headers
-│   ├── core/         # Core utilities, services, logging
-│   ├── graphics/     # Graphics module (Vulkan 1.3 + NullDevice)
-│   ├── math/         # Math library (vectors, matrices, rotors)
-│   ├── platform/     # Platform abstraction (windows, input, monitors)
-│   └── runtime/      # Runtime services (event bus, profiling, job system)
-├── src/              # Implementation
-├── test/             # Unit tests (Catch2 v3)
-├── examples/         # Example applications
-├── scripts/          # Build scripts and `gk` CLI
-└── out/              # All build outputs (gitignored)
+Every project or plugin has a small `module.py`:
+
+```python
+from build import module
+
+module(
+    name="my_project",
+    output="executable",
+    unity="src/main.cpp",
+    requires=["gecko"],
+)
 ```
 
-## Versioning
+Engine areas use the same description. Dependencies form a checked directed graph, and each source module contributes one unity object to the single Gecko shared library.
 
-`v{major}.{minor}.{patch}` for stable releases; `v0.0.0-{stage}.{N}` while
-pre-alpha. Stages: **alpha** → **beta** → **stable** (`0.1.0`+).
+Build an external module with either a source checkout or an unpacked SDK:
+
+```sh
+python3 ../Gecko/build.py ../MyProject
+python3 ../GeckoSDK/build.py ../MyProject --config release
+```
+
+Start with the [SDK project tutorial](docs/sdk-project.md). The
+[build-system guide](docs/build-system.md), [development workflow](docs/development.md),
+[architecture](docs/architecture.md), and [coding style](docs/coding-style.md)
+cover engine development in more detail.
+
+Development releases use `v0.0.0-alpha.N`. Pull requests and pushes to `dev` or `main` build and test Linux and Windows SDKs; pushes publish the tested packages.
 
 ## License
 
-MIT
+Gecko is [MIT licensed](LICENSE). You may use and modify it in commercial,
+closed-source, or open-source games; the license does not determine the
+license of your own game code or assets. When distributing Gecko itself—such
+as `Gecko.dll`, `libGecko.so`, source, or an SDK—include `LICENSE` and
+the applicable [third-party notices](docs/third-party-notices.txt) with it.
+
+The SDK does not bundle the Vulkan SDK, shader compiler, or platform shared
+libraries. Their licenses remain with their respective installations.

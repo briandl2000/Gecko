@@ -10,7 +10,6 @@
 #include "gecko/core/services/log.h"
 #include "gecko/platform/platform_events.h"
 
-#include <cmath>
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xlib.h>
 
@@ -38,7 +37,7 @@ X11MonitorsBackend::X11MonitorsBackend() noexcept
   ::XRRSelectInput(m_Display, DefaultRootWindow(m_Display),
                    RRScreenChangeNotifyMask | RROutputChangeNotifyMask | RRCrtcChangeNotifyMask);
 
-  GECKO_INFO(labels::General, "X11MonitorsBackend: initialized (display=%p, rrEventBase=%d)", m_Display, m_RREventBase);
+  GECKO_INFO(labels::General, "X11MonitorsBackend: initialized (display={}, rrEventBase={})", m_Display, m_RREventBase);
 }
 
 X11MonitorsBackend::~X11MonitorsBackend() noexcept
@@ -77,7 +76,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     if (!outInfo)
       continue;
 
-    if (outInfo->crtc == None)
+    if (outInfo->crtc == 0L)
     {
       // No active CRTC -- output is genuinely inactive.
       ::XRRFreeOutputInfo(outInfo);
@@ -116,7 +115,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
         {
           double rate = static_cast<double>(mode.dotClock) /
                         (static_cast<double>(mode.hTotal) * static_cast<double>(mode.vTotal));
-          info.RefreshRateMilliHz = static_cast<u32>(::std::round(rate * 1000.0));
+          info.RefreshRateMilliHz = static_cast<u32>(math::Round(static_cast<f32>(rate * 1000.0)));
         }
         break;
       }
@@ -126,13 +125,13 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
     if (outInfo->mm_width > 0 && outInfo->mm_height > 0)
     {
       double dpiX = static_cast<double>(crtcInfo->width) * 25.4 / static_cast<double>(outInfo->mm_width);
-      info.Dpi = static_cast<u32>(::std::round(dpiX));
+      info.Dpi = static_cast<u32>(math::Round(static_cast<f32>(dpiX)));
       info.DpiScale = static_cast<float>(info.Dpi) / 96.0F;
     }
 
     m_Monitors.push_back(entry);
 
-    GECKO_DEBUG(labels::General, "Monitor: %s (%dx%d @ %d,%d, %u mHz, %u DPI%s)", outInfo->name, crtcInfo->width,
+    GECKO_DEBUG(labels::General, "Monitor: {} ({}x{} @ {},{}, {} mHz, {} DPI{})", outInfo->name, crtcInfo->width,
                 crtcInfo->height, crtcInfo->x, crtcInfo->y, info.RefreshRateMilliHz, info.Dpi,
                 info.IsPrimary ? ", primary" : "");
 
@@ -142,7 +141,7 @@ void X11MonitorsBackend::EnumerateMonitors() noexcept
 
   ::XRRFreeScreenResources(resources);
 
-  GECKO_INFO(labels::General, "X11MonitorsBackend: enumerated %u monitor(s)", static_cast<u32>(m_Monitors.size()));
+  GECKO_INFO(labels::General, "X11MonitorsBackend: enumerated {} monitor(s)", static_cast<u32>(m_Monitors.size()));
 }
 
 u32 X11MonitorsBackend::GetMonitorCount() const noexcept

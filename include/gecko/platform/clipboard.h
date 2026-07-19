@@ -20,21 +20,19 @@
 /// - **Wayland**: not yet implemented (needs a valid serial); returns
 ///   empty / no-op.
 
-#include "gecko/core/api.h"
-
-#include <string>
-#include <string_view>
+#include "gecko/api.h"
+#include "gecko/core/containers/string.h"
 
 namespace gecko::platform {
 
 /// Read UTF-8 text from the system clipboard.
 /// @return The clipboard text, or an empty string on failure / non-text data.
-[[nodiscard]] GECKO_API ::std::string GetClipboardText() noexcept;
+[[nodiscard]] GECKO_API String GetClipboardText() noexcept;
 
 /// Place UTF-8 text on the system clipboard.
 /// @param utf8  The text to copy.
 /// @return `true` on success, `false` on backend failure or when writes
 ///         are unsupported (e.g. current Wayland backend).
-GECKO_API bool SetClipboardText(::std::string_view utf8) noexcept;
+GECKO_API bool SetClipboardText(StringView utf8) noexcept;
 
 }  // namespace gecko::platform

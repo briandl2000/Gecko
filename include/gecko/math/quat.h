@@ -339,7 +339,7 @@ constexpr Quat& operator/=(Quat& q, f32 s) noexcept
     return Normalized(q1 + (q2 + q1 * -1.0f) * t);
   }
 
-  const f32 theta = ::std::acos(dot);
+  const f32 theta = Acos(dot);
   const f32 sinTheta = Sin(theta);
   const f32 w1 = Sin((1.0f - t) * theta) / sinTheta;
   const f32 w2 = Sin(t * theta) / sinTheta;
@@ -370,7 +370,7 @@ constexpr Quat& operator/=(Quat& q, f32 s) noexcept
 inline void ToAxisAngle(const Quat& q, Float3& outAxis, f32& outAngle) noexcept
 {
   const Quat normalized = Normalized(q);
-  outAngle = 2.0f * ::std::acos(normalized.W);
+  outAngle = 2.0f * Acos(normalized.W);
   const f32 s = Sqrt(1.0f - normalized.W * normalized.W);
 
   if (s < Epsilon)

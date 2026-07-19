@@ -5,7 +5,7 @@
 
 #include "gecko/core/types.h"
 
-#include <cmath>
+#include <math.h>
 
 namespace gecko::math {
 
@@ -98,28 +98,27 @@ inline constexpr f32 Epsilon = 1e-6f;
   return x < 0 ? -x : x;
 }
 
-/// Square root (wraps `std::sqrt`).
 [[nodiscard]] inline f32 Sqrt(f32 x) noexcept
 {
-  return ::std::sqrt(x);
+  return ::sqrtf(x);
 }
 
-/// Floor (wraps `std::floor`).
+/// Floor using the platform scalar-math primitive.
 [[nodiscard]] inline f32 Floor(f32 x) noexcept
 {
-  return ::std::floor(x);
+  return ::floorf(x);
 }
 
-/// Ceiling (wraps `std::ceil`).
+/// Ceiling using the platform scalar-math primitive.
 [[nodiscard]] inline f32 Ceil(f32 x) noexcept
 {
-  return ::std::ceil(x);
+  return ::ceilf(x);
 }
 
-/// Round to nearest integer value as `f32` (wraps `std::round`).
+/// Round to the nearest integer value as `f32`.
 [[nodiscard]] inline f32 Round(f32 x) noexcept
 {
-  return ::std::round(x);
+  return ::roundf(x);
 }
 
 /// Fractional part of `x`.
@@ -128,40 +127,45 @@ inline constexpr f32 Epsilon = 1e-6f;
   return x - Floor(x);
 }
 
-/// Floating-point modulo (wraps `std::fmod`).
+/// Floating-point modulo.
 [[nodiscard]] inline f32 Mod(f32 x, f32 y) noexcept
 {
-  return ::std::fmod(x, y);
+  return ::fmodf(x, y);
 }
 
-/// Power (wraps `std::pow`).
+/// Raise `x` to `y`.
 [[nodiscard]] inline f32 Pow(f32 x, f32 y) noexcept
 {
-  return ::std::pow(x, y);
+  return ::powf(x, y);
 }
 
 /// Sine of `x` (radians).
 [[nodiscard]] inline f32 Sin(f32 x) noexcept
 {
-  return ::std::sin(x);
+  return ::sinf(x);
 }
 
 /// Cosine of `x` (radians).
 [[nodiscard]] inline f32 Cos(f32 x) noexcept
 {
-  return ::std::cos(x);
+  return ::cosf(x);
 }
 
 /// Tangent of `x` (radians).
 [[nodiscard]] inline f32 Tan(f32 x) noexcept
 {
-  return ::std::tan(x);
+  return ::tanf(x);
 }
 
 /// Two-argument arctangent: angle of `(x, y)` in radians.
 [[nodiscard]] inline f32 Atan2(f32 y, f32 x) noexcept
 {
-  return ::std::atan2(y, x);
+  return ::atan2f(y, x);
+}
+
+[[nodiscard]] inline f32 Acos(f32 value) noexcept
+{
+  return ::acosf(value);
 }
 
 }  // namespace gecko::math

@@ -2,16 +2,15 @@
 
 #if defined(GECKO_PLATFORM_LINUX)
 
+#include "gecko/core/containers/string.h"
 #include "gecko/platform/path_view.h"
-
-#include <string>
 
 namespace gecko::platform::linux_io {
 
-// Convert a forward-slash PathView to a NUL-terminated std::string
+// Convert a forward-slash PathView to a NUL-terminated Gecko string
 // suitable for passing to libc/syscalls. Linux uses '/' natively so
 // no separator translation is needed.
-[[nodiscard]] ::std::string ToCString(PathView path) noexcept;
+[[nodiscard]] String ToCString(PathView path) noexcept;
 
 }  // namespace gecko::platform::linux_io
 

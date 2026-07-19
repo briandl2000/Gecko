@@ -3,7 +3,7 @@
 /// @file
 /// High-precision time queries and unit-conversion helpers.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/types.h"
 
 namespace gecko {

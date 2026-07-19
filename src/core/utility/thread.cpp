@@ -1,13 +1,6 @@
 #include "gecko/core/utility/thread.h"
 
-#include <chrono>
-#include <functional>
-#include <thread>
-
-#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-#include <intrin.h>
-#endif
-
+#include "gecko/core/atomic.h"
 #include "gecko/core/assert.h"
 #include "gecko/core/utility/time.h"
 
@@ -15,8 +8,8 @@ namespace gecko {
 
 u32 HashThreadId() noexcept
 {
-  auto id = ::std::hash<::std::thread::id> {}(::std::this_thread::get_id());
-  return static_cast<u32>(id ^ (id >> 32));
+  const u64 id = platform::CurrentThreadId();
+  return static_cast<u32>(id ^ (id >> 32U));
 }
 
 u32 ThisThreadId() noexcept
@@ -26,7 +19,7 @@ u32 ThisThreadId() noexcept
 
 u32 HardwareThreadCount() noexcept
 {
-  return ::std::max(1u, ::std::thread::hardware_concurrency());
+  return platform::HardwareThreadCount();
 }
 
 void SpinWaitNs(u64 nanoseconds) noexcept
@@ -37,13 +30,7 @@ void SpinWaitNs(u64 nanoseconds) noexcept
   u64 target = start + nanoseconds;
 
   while (HighResTimeNs() < target)
-  {
-#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-    _mm_pause();
-#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-    __builtin_ia32_pause();
-#endif
-  }
+    CpuRelax();
 }
 
 void PreciseSleepNs(u64 nanoseconds) noexcept
@@ -68,7 +55,7 @@ void PreciseSleepNs(u64 nanoseconds) noexcept
   if (nanoseconds > spinThresholdNs)
   {
     u64 sleepTimeNs = nanoseconds - spinThresholdNs;
-    ::std::this_thread::sleep_for(::std::chrono::nanoseconds(sleepTimeNs));
+    platform::SleepNanoseconds(sleepTimeNs);
     SpinWaitNs(spinThresholdNs);
   }
   else

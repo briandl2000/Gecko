@@ -1,4 +1,4 @@
-name: CI
+name: Build and Release
 
 on:
   pull_request:
@@ -7,378 +7,58 @@ on:
     branches: [main, dev]
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Build & Test - GCC on Linux, MSVC on Windows
-  # ---------------------------------------------------------------------------
-  build-and-test:
-    name: Build & Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install -y ninja-build gcc-15 g++-15 lld ccache libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc
-
-      - name: ccache (Linux)
-        if: runner.os == 'Linux'
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          key: ci-linux-${{ github.ref_name }}
-          max-size: 500M
-
-      - name: Setup MSVC (Windows)
-        if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      - name: Install Ninja (Windows)
-        if: runner.os == 'Windows'
-        uses: seanmiddleditch/gha-setup-ninja@v5
-
-      - name: Install Vulkan SDK (Windows)
-        if: runner.os == 'Windows'
-        uses: jakoch/install-vulkan-sdk-action@v1
-        with:
-          install_runtime: true
-          cache: true
-          stripdown: true
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-      
-      - name: Set platform ID
-        id: platform
-        shell: bash
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            echo "id=Windows-x86_64" >> $GITHUB_OUTPUT
-          else
-            echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Configure (Linux)
-        if: runner.os == 'Linux'
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: |
-          export CC=gcc-15 CXX=g++-15
-          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" -DGECKO_BUILD_TESTS=ON
-
-      - name: Configure (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake -S . -B out/build/%GECKO_PLATFORM_ID% -G "Ninja Multi-Config" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DGECKO_BUILD_TESTS=ON
-
-      - name: Build (Linux)
-        if: runner.os == 'Linux'
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
-
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake --build out/build/%GECKO_PLATFORM_ID% --config Release
-
-      - name: Build tests (Linux)
-        if: runner.os == 'Linux'
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: |
-          cmake --build out/build/$GECKO_PLATFORM_ID --config Release \
-            --target core_tests platform_tests runtime_tests math_tests
-
-      - name: Build tests (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake --build out/build/%GECKO_PLATFORM_ID% --config Release --target core_tests platform_tests runtime_tests math_tests
-
-      - name: Run tests (Linux)
-        if: runner.os == 'Linux'
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: |
-          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
-          failed=0
-          for test in core_tests platform_tests runtime_tests math_tests; do
-            exe="$test_dir/${test}"
-            if [ -f "$exe" ]; then
-              echo "--- $test ---"
-              "$exe" || failed=1
-            else
-              echo "Test executable not found: $exe"
-              failed=1
-            fi
-          done
-          exit $failed
-
-      - name: Run tests (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: |
-          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
-          bin_dir="./out/$GECKO_PLATFORM_ID/bin/Release"
-          export PATH="$(cd "$bin_dir" && pwd):$PATH"
-          failed=0
-          for test in core_tests platform_tests runtime_tests math_tests; do
-            exe="$test_dir/${test}.exe"
-            if [ -f "$exe" ]; then
-              echo "--- $test ---"
-              "$exe" || failed=1
-            else
-              echo "Test executable not found: $exe"
-              failed=1
-            fi
-          done
-          exit $failed
-
-  # ---------------------------------------------------------------------------
-  # Build & Test - aarch64 cross-compile (amd64 host + aarch64-linux-gnu
-  # toolchain; tests are run under qemu-user)
-  # ---------------------------------------------------------------------------
-  build-aarch64:
-    name: Build & Test (aarch64 cross)
-    runs-on: ubuntu-latest
-    container:
-      image: ubuntu:25.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install cross toolchain + arm64 multi-arch deps + qemu-user
-        shell: bash
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          set -e
-          rm -f /etc/apt/sources.list.d/ubuntu.sources
-          printf '%s\n' \
-            'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky main restricted universe multiverse' \
-            'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky-updates main restricted universe multiverse' \
-            'deb [arch=amd64] http://security.ubuntu.com/ubuntu plucky-security main restricted universe multiverse' \
-            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky main restricted universe multiverse' \
-            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-updates main restricted universe multiverse' \
-            'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-security main restricted universe multiverse' \
-            > /etc/apt/sources.list
-          dpkg --add-architecture arm64
-          apt-get update
-          apt-get install -y --no-install-recommends \
-            gcc-15-aarch64-linux-gnu g++-15-aarch64-linux-gnu \
-            cmake ninja-build pkg-config python3 git ca-certificates file \
-            qemu-user \
-            glslc spirv-tools \
-            libvulkan-dev:arm64 \
-            libx11-dev:arm64 libxext-dev:arm64 libxrandr-dev:arm64 \
-            libwayland-dev:arm64 wayland-protocols libxkbcommon-dev:arm64
-          ln -sf /usr/bin/aarch64-linux-gnu-gcc-15 /usr/local/bin/aarch64-linux-gnu-gcc
-          ln -sf /usr/bin/aarch64-linux-gnu-g++-15 /usr/local/bin/aarch64-linux-gnu-g++
-
-      - name: Configure
-        env:
-          GECKO_PLATFORM_ID: Linux-aarch64
-          CMAKE_TOOLCHAIN_FILE: ${{ github.workspace }}/docker/aarch64-toolchain.cmake
-          PKG_CONFIG_PATH: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-          PKG_CONFIG_LIBDIR: /usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
-        run: |
-          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config" \
-            --toolchain $CMAKE_TOOLCHAIN_FILE -DGECKO_BUILD_TESTS=ON
-
-      - name: Build
-        env:
-          GECKO_PLATFORM_ID: Linux-aarch64
-        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
-
-      - name: Build tests
-        env:
-          GECKO_PLATFORM_ID: Linux-aarch64
-        run: |
-          cmake --build out/build/$GECKO_PLATFORM_ID --config Release \
-            --target core_tests platform_tests runtime_tests math_tests graphics_tests
-
-      - name: Verify aarch64 binaries
-        env:
-          GECKO_PLATFORM_ID: Linux-aarch64
-        run: |
-          file ./out/$GECKO_PLATFORM_ID/bin/Release/graphics_example | tee /tmp/arch.txt
-          grep -q "ARM aarch64" /tmp/arch.txt
-
-      - name: Run unit tests under qemu-user
-        env:
-          GECKO_PLATFORM_ID: Linux-aarch64
-          QEMU_LD_PREFIX: /usr/aarch64-linux-gnu
-        run: |
-          test_dir="./out/$GECKO_PLATFORM_ID/bin/Release/tests"
-          lib_dir="$(pwd)/out/$GECKO_PLATFORM_ID/bin/Release"
-          failed=0
-          for t in core_tests platform_tests runtime_tests math_tests graphics_tests; do
-            exe="$test_dir/$t"
-            if [ -f "$exe" ]; then
-              echo "--- $t ---"
-              LD_LIBRARY_PATH="$lib_dir" qemu-aarch64 "$exe" || failed=1
-            else
-              echo "Test executable not found: $exe"
-              failed=1
-            fi
-          done
-          exit $failed
-
-  # ---------------------------------------------------------------------------
-  # PR checks - enforce version bump and changelog for PRs to main
-  # ---------------------------------------------------------------------------
-  pr-checks:
-    name: PR Checks (main)
+  version-check:
+    name: Version check
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Check version was bumped
+      - name: Require a version change for main
+        shell: bash
         run: |
-          PR_VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
-          MAIN_VERSION=$(git show origin/main:CMakeLists.txt | sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p')
-          
-          PR_PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
-          MAIN_PRERELEASE=$(git show origin/main:CMakeLists.txt | sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p')
-          
-          PR_FULL="${PR_VERSION}"
-          MAIN_FULL="${MAIN_VERSION}"
-          [ -n "$PR_PRERELEASE" ] && PR_FULL="${PR_VERSION}-${PR_PRERELEASE}"
-          [ -n "$MAIN_PRERELEASE" ] && MAIN_FULL="${MAIN_VERSION}-${MAIN_PRERELEASE}"
-          
-          echo "Main version:  ${MAIN_FULL}"
-          echo "PR version:    ${PR_FULL}"
-          
-          if [ "$PR_FULL" = "$MAIN_FULL" ]; then
-            echo ""
-            echo "::error::Version was not bumped! Update the version in CMakeLists.txt before merging to main."
-            echo "Current main version: ${MAIN_FULL}"
-            echo ""
-            echo "To bump: change 'project(Gecko VERSION x.y.z)' and/or GECKO_VERSION_PRERELEASE in CMakeLists.txt"
+          current=$(sed -n 's/^#define GECKO_VERSION_FULL_STRING "\([^"]*\)"/\1/p' include/gecko/version.h)
+          previous=$(git show origin/main:include/gecko/version.h | sed -n 's/^#define GECKO_VERSION_FULL_STRING "\([^"]*\)"/\1/p')
+          echo "main=$previous pull-request=$current"
+          if [ -z "$current" ] || [ "$current" = "$previous" ]; then
+            echo "::error::Change GECKO_VERSION_FULL_STRING before merging to main."
             exit 1
           fi
-          
-          echo "Version bump verified: ${MAIN_FULL} -> ${PR_FULL}"
-      
-      - name: Check changelog was updated
-        run: |
-          if ! git diff origin/main...HEAD --name-only | grep -q "^CHANGELOG.md$"; then
-            echo "::error::CHANGELOG.md was not updated! Add an entry describing your changes before merging to main."
-            echo ""
-            echo "Add your changes under the appropriate section in CHANGELOG.md:"
-            echo "  ### Added     - for new features"
-            echo "  ### Changed   - for changes to existing functionality"
-            echo "  ### Fixed     - for bug fixes"
-            echo "  ### Removed   - for removed features"
-            exit 1
-          fi
-          echo "Changelog updated"
 
-  # ---------------------------------------------------------------------------
-  # Resolve version - compute version string once for all downstream jobs
-  # ---------------------------------------------------------------------------
-  resolve-version:
-    name: Resolve Version
-    needs: build-and-test
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      tag: ${{ steps.version.outputs.tag }}
-      prerelease: ${{ steps.version.outputs.prerelease }}
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Compute version string
-        id: version
-        run: |
-          VERSION=$(sed -n 's/.*project(Gecko VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
-          PRERELEASE=$(sed -n 's/.*GECKO_VERSION_PRERELEASE "\([^"]*\)".*/\1/p' CMakeLists.txt)
-          
-          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
-            if [ -n "$PRERELEASE" ]; then
-              VERSION_STR="${VERSION}-${PRERELEASE}-dev.${TIMESTAMP}"
-            else
-              VERSION_STR="${VERSION}-dev.${TIMESTAMP}"
-            fi
-            echo "version=${VERSION_STR}" >> $GITHUB_OUTPUT
-            echo "tag=v${VERSION_STR}" >> $GITHUB_OUTPUT
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            if [ -n "$PRERELEASE" ]; then
-              echo "version=${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
-              echo "tag=v${VERSION}-${PRERELEASE}" >> $GITHUB_OUTPUT
-              echo "prerelease=true" >> $GITHUB_OUTPUT
-            else
-              echo "version=${VERSION}" >> $GITHUB_OUTPUT
-              echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
-              echo "prerelease=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-          
-          echo "Resolved version: $(cat $GITHUB_OUTPUT | grep ^version= | cut -d= -f2)"
-
-  # ---------------------------------------------------------------------------
-  # Package - only on push (merge) to dev or main
-  # ---------------------------------------------------------------------------
-  package:
-    name: Package (${{ matrix.os }})
-    needs: resolve-version
+  build:
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
         include:
-          - os: ubuntu-latest
-            platform: linux
-          - os: windows-latest
-            platform: windows
-    
+          - name: Linux x86_64
+            os: ubuntu-latest
+            artifact: linux-x86_64
+          - name: Windows x86_64
+            os: windows-latest
+            artifact: windows-x86_64
+
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install dependencies (Linux)
+
+      - name: Install Linux build dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y ninja-build gcc-15 g++-15 libx11-dev libxext-dev libxrandr-dev libwayland-dev wayland-protocols libxkbcommon-dev libvulkan-dev glslc zip
+          sudo apt-get install -y \
+            gcc-14 g++-14 lld glslc zip \
+            libvulkan-dev libx11-dev libxrandr-dev \
+            libwayland-dev wayland-protocols libwayland-cursor0 libxkbcommon-dev
 
-      - name: Setup MSVC (Windows)
+      - name: Enable MSVC
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      - name: Install Ninja (Windows)
-        if: runner.os == 'Windows'
-        uses: seanmiddleditch/gha-setup-ninja@v5
-
-      - name: Install Vulkan SDK (Windows)
+      - name: Install Vulkan SDK
         if: runner.os == 'Windows'
         uses: jakoch/install-vulkan-sdk-action@v1
         with:
@@ -386,294 +66,99 @@ jobs:
           cache: true
           stripdown: true
 
-      - name: Set platform ID
-        id: platform
-        shell: bash
-        run: |
-          if [ "${{ runner.os }}" = "Windows" ]; then
-            echo "id=Windows-x86_64" >> $GITHUB_OUTPUT
-          else
-            echo "id=Linux-x86_64" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Configure (Linux)
+      - name: Build and test SDK
         if: runner.os == 'Linux'
         env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
+          CC: gcc-14
+          CXX: g++-14
         run: |
-          export CC=gcc-15 CXX=g++-15
-          # LTO is deliberately OFF for binary releases: GCC LTO bytecode in
-          # static archives is locked to the GCC major version that produced
-          # it, so a libGeckoRuntime.a built with GCC 15 fails to link on a
-          # consumer using GCC 16. Keep GECKO_DIST off here.
-          cmake -S . -B out/build/$GECKO_PLATFORM_ID -G "Ninja Multi-Config"
+          python3 build.py sdk
+          python3 build.py sdk-test --config release
 
-      - name: Configure (Windows)
+      - name: Build and test SDK
         if: runner.os == 'Windows'
         shell: cmd
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake -S . -B out/build/%GECKO_PLATFORM_ID% -G "Ninja Multi-Config" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl
-
-      - name: Build Release (Linux)
-        if: runner.os == 'Linux'
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake --build out/build/$GECKO_PLATFORM_ID --config Release
-
-      - name: Build Release (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake --build out/build/%GECKO_PLATFORM_ID% --config Release
-
-      - name: Install to package directory (Linux)
-        if: runner.os == 'Linux'
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake --install out/build/$GECKO_PLATFORM_ID --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
-
-      - name: Install to package directory (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        env:
-          GECKO_PLATFORM_ID: ${{ steps.platform.outputs.id }}
-        run: cmake --install out/build/%GECKO_PLATFORM_ID% --prefix out/package/gecko-${{ needs.resolve-version.outputs.version }} --config Release
-
-      - name: Check package is relocatable (Linux)
-        if: runner.os == 'Linux'
         run: |
-          set -e
-          pkg_dir="out/package/gecko-${{ needs.resolve-version.outputs.version }}"
-          echo "Scanning installed CMake files for host-specific paths..."
-          # The Gecko package must NOT bake in distro-specific absolute paths
-          # (e.g. /usr/lib/x86_64-linux-gnu/libXrandr.so on Ubuntu) because
-          # those make the same zip unusable on Arch/Fedora/etc. All system
-          # deps must be referenced via imported targets (X11::*, PkgConfig::*).
-          if grep -RnE "(/home/runner|/usr/lib/x86_64-linux-gnu|/usr/lib/aarch64-linux-gnu|${GITHUB_WORKSPACE})" \
-              "$pkg_dir/lib/cmake/Gecko"; then
-            echo "::error::Package contains host-specific absolute paths -- it will not be portable across Linux distros."
-            exit 1
-          fi
-          echo "OK: package CMake files are relocatable"
+          python build.py sdk
+          python build.py sdk-test --config release
 
-      - name: Smoke test installed package (Linux)
-        if: runner.os == 'Linux'
+      - name: Package Linux engine
+        if: runner.os == 'Linux' && github.event_name == 'push'
         run: |
-          set -e
-          pkg_dir="$(pwd)/out/package/gecko-${{ needs.resolve-version.outputs.version }}"
-          smoke_dir="$(pwd)/out/smoke-consumer"
-          mkdir -p "$smoke_dir"
+          cd out/sdk
+          zip -r ../gecko-linux-x86_64.zip .
 
-          cat > "$smoke_dir/CMakeLists.txt" <<'EOF'
-          cmake_minimum_required(VERSION 3.22)
-          project(GeckoConsumerSmoke LANGUAGES CXX)
-          set(CMAKE_CXX_STANDARD 23)
-          set(CMAKE_CXX_STANDARD_REQUIRED ON)
-          find_package(Gecko CONFIG REQUIRED)
-          add_executable(smoke main.cpp)
-          target_link_libraries(smoke PRIVATE
-              Gecko::Core
-              Gecko::CoreServices
-              Gecko::Math
-              Gecko::Runtime
-              Gecko::Platform
-          )
-          EOF
-
-          cat > "$smoke_dir/main.cpp" <<'EOF'
-          #include <gecko/version.h>
-          int main() { return 0; }
-          EOF
-
-          export CC=gcc-15 CXX=g++-15
-          cmake -S "$smoke_dir" -B "$smoke_dir/build" -G Ninja \
-            -DCMAKE_PREFIX_PATH="$pkg_dir"
-          cmake --build "$smoke_dir/build"
-
-      - name: Smoke test installed package (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          set -e
-          pkg_dir="$(pwd)/out/package/gecko-${{ needs.resolve-version.outputs.version }}"
-          smoke_dir="$(pwd)/out/smoke-consumer"
-          mkdir -p "$smoke_dir"
-
-          cat > "$smoke_dir/CMakeLists.txt" <<'EOF'
-          cmake_minimum_required(VERSION 3.22)
-          project(GeckoConsumerSmoke LANGUAGES CXX)
-          set(CMAKE_CXX_STANDARD 23)
-          set(CMAKE_CXX_STANDARD_REQUIRED ON)
-          find_package(Gecko CONFIG REQUIRED)
-          add_executable(smoke main.cpp)
-          target_link_libraries(smoke PRIVATE
-              Gecko::Core
-              Gecko::CoreServices
-              Gecko::Math
-              Gecko::Runtime
-              Gecko::Platform
-          )
-          EOF
-
-          cat > "$smoke_dir/main.cpp" <<'EOF'
-          #include <gecko/version.h>
-          int main() { return 0; }
-          EOF
-
-          cmake -S "$smoke_dir" -B "$smoke_dir/build" -G Ninja \
-            -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl \
-            -DCMAKE_PREFIX_PATH="$pkg_dir"
-          cmake --build "$smoke_dir/build"
-
-      - name: Check static libs are free of GCC LTO bytecode (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          set -e
-          pkg_dir="out/package/gecko-${{ needs.resolve-version.outputs.version }}"
-          # GCC LTO IR baked into a .a archive is locked to the GCC major
-          # version that produced it. Shipping such archives forces all
-          # consumers to match the CI's GCC major version, which broke
-          # downstream Arch users in alpha.3. The simple invariant: no .a
-          # in the public zip may contain .gnu.lto_* ELF sections.
-          found_lto=0
-          while IFS= read -r archive; do
-            # Extract members into a temp dir and scan their ELF sections.
-            tmpdir="$(mktemp -d)"
-            ( cd "$tmpdir" && ar x "$GITHUB_WORKSPACE/$archive" )
-            if find "$tmpdir" -name '*.o' -print0 \
-                | xargs -0 -r readelf -SW 2>/dev/null \
-                | grep -qE '\.gnu\.lto_|\.gnu\.debuglto_'; then
-              echo "::error::$archive contains GCC LTO bytecode -- it will not link across GCC major versions"
-              found_lto=1
-            fi
-            rm -rf "$tmpdir"
-          done < <(find "$pkg_dir" -name '*.a')
-          if [ "$found_lto" -ne 0 ]; then exit 1; fi
-          echo "OK: no GCC LTO bytecode in shipped static archives"
-
-      - name: Create zip (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          # Zip the package *contents* (not the wrapping gecko-<version> dir)
-          # so consumers who extract to e.g. gecko-<version>-linux/ end up
-          # with a flat <prefix>/{bin,include,lib} layout instead of the
-          # double-nested gecko-<version>/gecko-<version>/... we used to ship.
-          cd out/package/gecko-${{ needs.resolve-version.outputs.version }}
-          zip -r ../gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip .
-
-      - name: Create zip (Windows)
-        if: runner.os == 'Windows'
+      - name: Package Windows engine
+        if: runner.os == 'Windows' && github.event_name == 'push'
         shell: pwsh
         run: |
-          cd out/package/gecko-${{ needs.resolve-version.outputs.version }}
-          Compress-Archive -Path "*" -DestinationPath "../gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip"
-      
-      - name: Upload artifact
+          Compress-Archive -Path out/sdk/* -DestinationPath out/gecko-windows-x86_64.zip
+
+      - name: Upload release package
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: gecko-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}
-          path: out/package/*.zip
+          name: gecko-${{ matrix.artifact }}
+          path: out/*.zip
           retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
 
-  # ---------------------------------------------------------------------------
-  # Release - create GitHub release after packaging (dev and main)
-  # ---------------------------------------------------------------------------
   release:
-    name: Create Release
-    needs: [resolve-version, package]
+    name: Publish version
+    if: github.event_name == 'push'
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
           pattern: gecko-*
-      
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          base=$(sed -n 's/^#define GECKO_VERSION_FULL_STRING "\([^"]*\)"/\1/p' include/gecko/version.h)
+          if [ -z "$base" ]; then
+            echo "Could not read GECKO_VERSION_FULL_STRING" >&2
+            exit 1
+          fi
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            version="${base}-dev.$(date -u +%Y%m%d%H%M%S)"
+            prerelease=true
+          else
+            version="$base"
+            case "$base" in
+              *-*) prerelease=true ;;
+              *) prerelease=false ;;
+            esac
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
       - name: Collect packages
         run: |
-          mkdir -p release
-          find artifacts -name "*.zip" -exec cp {} release/ \;
-          ls -la release/
+          mkdir release
+          find artifacts -name '*.zip' -exec cp {} release/ \;
 
-      - name: Generate dev release notes
-        if: github.ref == 'refs/heads/dev'
-        id: dev_notes
-        run: |
-          set -e
-          HEAD_SHA="${{ github.sha }}"
-          HEAD_SUBJECT="$(git log -1 --pretty=%s "$HEAD_SHA")"
-          HEAD_BODY="$(git log -1 --pretty=%b "$HEAD_SHA")"
-
-          # Try to extract "Merge pull request #N from owner/branch" -> PR + branch.
-          PR_LINE="$(printf '%s' "$HEAD_SUBJECT" | grep -oE 'Merge pull request #[0-9]+ from [^[:space:]]+' || true)"
-          PR_NUMBER="$(printf '%s' "$PR_LINE" | grep -oE '#[0-9]+' | tr -d '#' || true)"
-          SOURCE_REF="$(printf '%s' "$PR_LINE" | sed -nE 's/.*from ([^[:space:]]+).*/\1/p' || true)"
-
-          # Find previous tag (if any) to list commits since.
-          PREV_TAG="$(git describe --tags --abbrev=0 "$HEAD_SHA^" 2>/dev/null || true)"
-
-          {
-            echo "## Triggering merge"
-            echo
-            if [ -n "$PR_NUMBER" ]; then
-              echo "- PR: [#${PR_NUMBER}](${{ github.server_url }}/${{ github.repository }}/pull/${PR_NUMBER})"
-            fi
-            if [ -n "$SOURCE_REF" ]; then
-              echo "- Source: \`${SOURCE_REF}\`"
-            fi
-            echo "- Commit: [\`$(printf '%s' "$HEAD_SHA" | cut -c1-10)\`](${{ github.server_url }}/${{ github.repository }}/commit/${HEAD_SHA})"
-            echo "- Subject: ${HEAD_SUBJECT}"
-            if [ -n "$HEAD_BODY" ]; then
-              echo
-              echo "### Merge message"
-              echo
-              printf '```\n%s\n```\n' "$HEAD_BODY"
-            fi
-            if [ -n "$PREV_TAG" ]; then
-              echo
-              echo "## Commits since \`${PREV_TAG}\`"
-              echo
-              git log --no-merges --pretty=format:'- %s (%h)' "${PREV_TAG}..${HEAD_SHA}" || true
-              echo
-            fi
-          } > dev_notes.md
-
-          echo "Generated dev_notes.md:"
-          cat dev_notes.md
-
-      - name: Create GitHub Release
+      - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            # Dev: prerelease, not shown as latest; notes describe the
-            # triggering merge and commits since the previous tag.
-            gh release create "${{ needs.resolve-version.outputs.tag }}" \
-              --title "Gecko Dev Build ${{ needs.resolve-version.outputs.version }}" \
-              --prerelease \
-              --latest=false \
-              --notes-file dev_notes.md \
-              release/*.zip
-          else
-            # Main: extract changelog section for this version as the release description
-            VERSION_STR="${{ needs.resolve-version.outputs.version }}"
-            python3 -c "import re,sys;t=open('CHANGELOG.md').read();m=re.search(r'## \['+re.escape(sys.argv[1])+r'\](.*?)(?=\n## \[|\Z)',t,re.DOTALL);print(m.group(1).strip()if m else '')" "$VERSION_STR" > release_notes.md
-            FLAGS=""
-            if [ "${{ needs.resolve-version.outputs.prerelease }}" = "true" ]; then
-              FLAGS="--prerelease"
-            fi
-            gh release create "${{ needs.resolve-version.outputs.tag }}" \
-              --title "Gecko ${{ needs.resolve-version.outputs.version }}" \
-              ${FLAGS} \
-              --notes-file release_notes.md \
-              release/*.zip
+          flags=(--generate-notes)
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
+            flags+=(--prerelease)
           fi
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            flags+=(--latest=false)
+          fi
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Gecko ${{ steps.version.outputs.version }}" \
+            "${flags[@]}" release/*.zip

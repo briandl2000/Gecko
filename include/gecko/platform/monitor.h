@@ -11,8 +11,6 @@
 #include "gecko/core/types.h"
 #include "gecko/math/rect.h"
 
-#include <cstring>
-
 namespace gecko::platform {
 
 /// Maximum number of bytes (including NUL) reserved for `MonitorInfo::Name`.
@@ -75,9 +73,12 @@ struct MonitorInfo
   {
     if (name)
     {
-      const auto len = ::std::strlen(name);
-      const auto count = len < MaxMonitorNameLength - 1 ? len : MaxMonitorNameLength - 1;
-      ::std::memcpy(Name, name, count);
+      usize length = 0;
+      while (name[length] != '\0')
+        ++length;
+      const usize count = length < MaxMonitorNameLength - 1 ? length : MaxMonitorNameLength - 1;
+      for (usize index = 0; index < count; ++index)
+        Name[index] = name[index];
       Name[count] = '\0';
     }
   }

@@ -24,7 +24,7 @@ namespace gecko::platform::events {
 
 namespace detail {
 /// Module id every platform event code is namespaced under.
-inline constexpr u64 PlatformModuleId = ::gecko::MakeLabel("gecko.platform").Id;
+inline constexpr u64 PlatformModuleId = gecko::MakeLabel("gecko.platform").Id;
 }  // namespace detail
 
 // Window event codes -------------------------------------------------

@@ -3,15 +3,13 @@
 /// @file
 /// Thread-related helpers: sleeping, yielding, and identifying threads.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/types.h"
-
-#include <chrono>
-#include <thread>
+#include "gecko/platform/threading.h"
 
 namespace gecko {
 
-/// @return A 32-bit hash of the calling thread's `std::thread::id`.
+/// @return A 32-bit hash of the calling OS thread id.
 ///         Stable for the lifetime of the thread.
 GECKO_API u32 HashThreadId() noexcept;
 
@@ -22,26 +20,26 @@ GECKO_API u32 HardwareThreadCount() noexcept;
 /// Sleep the calling thread for at least `milliseconds`.
 inline void SleepMs(u64 milliseconds) noexcept
 {
-  ::std::this_thread::sleep_for(::std::chrono::milliseconds(milliseconds));
+  platform::SleepNanoseconds(milliseconds * 1'000'000ULL);
 }
 
 /// Sleep the calling thread for at least `microseconds`.
 inline void SleepUs(u64 microseconds) noexcept
 {
-  ::std::this_thread::sleep_for(::std::chrono::microseconds(microseconds));
+  platform::SleepNanoseconds(microseconds * 1'000ULL);
 }
 
 /// Sleep the calling thread for at least `nanoseconds`.
 inline void SleepNs(u64 nanoseconds) noexcept
 {
-  ::std::this_thread::sleep_for(::std::chrono::nanoseconds(nanoseconds));
+  platform::SleepNanoseconds(nanoseconds);
 }
 
 /// Hint to the scheduler that the thread can give up its remaining
 /// quantum.
 inline void YieldThread() noexcept
 {
-  ::std::this_thread::yield();
+  platform::YieldThread();
 }
 
 /// Busy-wait for at least `nanoseconds` without releasing the core.
@@ -59,13 +57,13 @@ GECKO_API void PreciseSleepNs(u64 nanoseconds) noexcept;
 #endif
 
 #if GECKO_THREADING
-#define GECKO_SLEEP_MS(ms) ::gecko::SleepMs(ms)
-#define GECKO_SLEEP_US(us) ::gecko::SleepUs(us)
-#define GECKO_SLEEP_NS(ns) ::gecko::SleepNs(ns)
-#define GECKO_YIELD() ::gecko::YieldThread()
-#define GECKO_SPIN_WAIT_NS(ns) ::gecko::SpinWaitNs(ns)
-#define GECKO_PRECISE_SLEEP_NS(ns) ::gecko::PreciseSleepNs(ns)
-#define GECKO_THREAD_HASH() ::gecko::HashThreadId()
+#define GECKO_SLEEP_MS(ms) gecko::SleepMs(ms)
+#define GECKO_SLEEP_US(us) gecko::SleepUs(us)
+#define GECKO_SLEEP_NS(ns) gecko::SleepNs(ns)
+#define GECKO_YIELD() gecko::YieldThread()
+#define GECKO_SPIN_WAIT_NS(ns) gecko::SpinWaitNs(ns)
+#define GECKO_PRECISE_SLEEP_NS(ns) gecko::PreciseSleepNs(ns)
+#define GECKO_THREAD_HASH() gecko::HashThreadId()
 #else
 #define GECKO_SLEEP_MS(ms)
 #define GECKO_SLEEP_US(us)

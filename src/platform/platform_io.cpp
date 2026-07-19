@@ -1,15 +1,11 @@
 #include "gecko/platform/platform_io.h"
 
-#include <utility>
-
 namespace gecko::platform {
 
-// -- ReadResult ------------------------------------------------------
-
-ReadResult::ReadResult(::std::vector<::std::byte> bytes) noexcept : m_Bytes(::std::move(bytes)), m_Ok(true)
+ReadResult::ReadResult(Array<byte> bytes) noexcept : m_Bytes(Move(bytes)), m_Ok(true)
 {}
 
-ReadResult::ReadResult(ReadResult&& other) noexcept : m_Bytes(::std::move(other.m_Bytes)), m_Ok(other.m_Ok)
+ReadResult::ReadResult(ReadResult&& other) noexcept : m_Bytes(Move(other.m_Bytes)), m_Ok(other.m_Ok)
 {
   other.m_Ok = false;
 }
@@ -18,24 +14,20 @@ ReadResult& ReadResult::operator=(ReadResult&& other) noexcept
 {
   if (this != &other)
   {
-    m_Bytes = ::std::move(other.m_Bytes);
+    m_Bytes = Move(other.m_Bytes);
     m_Ok = other.m_Ok;
     other.m_Ok = false;
   }
   return *this;
 }
 
-ReadResult::~ReadResult() noexcept = default;
-
-::std::vector<::std::byte> ReadResult::Take() noexcept
+Array<byte> ReadResult::Take() noexcept
 {
   m_Ok = false;
-  return ::std::move(m_Bytes);
+  return Move(m_Bytes);
 }
 
-// -- MappedFile ------------------------------------------------------
-
-MappedFile::MappedFile(const ::std::byte* data, ::std::size_t size, void* handle, Deleter deleter) noexcept
+MappedFile::MappedFile(const byte* data, usize size, void* handle, Deleter deleter) noexcept
     : m_Data(data), m_Size(size), m_Handle(handle), m_Deleter(deleter)
 {}
 
@@ -72,7 +64,7 @@ MappedFile::~MappedFile() noexcept
 
 void MappedFile::Reset() noexcept
 {
-  if (m_Deleter && m_Handle)
+  if (m_Deleter != nullptr && m_Handle != nullptr)
     m_Deleter(m_Handle);
   m_Data = nullptr;
   m_Size = 0;
@@ -80,13 +72,12 @@ void MappedFile::Reset() noexcept
   m_Deleter = nullptr;
 }
 
-// -- DirIter ---------------------------------------------------------
-
-DirIter::DirIter(void* handle, NextFn nextFn, CloseFn closeFn) noexcept
-    : m_Handle(handle), m_Next(nextFn), m_Close(closeFn)
+DirIter::DirIter(void* handle, NextFn next, CloseFn close) noexcept
+    : m_Handle(handle), m_Next(next), m_Close(close)
 {}
 
-DirIter::DirIter(DirIter&& other) noexcept : m_Handle(other.m_Handle), m_Next(other.m_Next), m_Close(other.m_Close)
+DirIter::DirIter(DirIter&& other) noexcept
+    : m_Handle(other.m_Handle), m_Next(other.m_Next), m_Close(other.m_Close)
 {
   other.m_Handle = nullptr;
   other.m_Next = nullptr;
@@ -113,30 +104,26 @@ DirIter::~DirIter() noexcept
   Close();
 }
 
-::std::optional<DirEntry> DirIter::Next() noexcept
+Optional<DirEntry> DirIter::Next() noexcept
 {
-  if (!m_Handle || !m_Next)
-    return ::std::nullopt;
   DirEntry entry;
-  if (!m_Next(m_Handle, &entry))
-    return ::std::nullopt;
-  return entry;
+  if (m_Handle == nullptr || m_Next == nullptr || !m_Next(m_Handle, &entry))
+    return {};
+  return Optional<DirEntry> {Move(entry)};
 }
 
 void DirIter::Close() noexcept
 {
-  if (m_Close && m_Handle)
+  if (m_Close != nullptr && m_Handle != nullptr)
     m_Close(m_Handle);
   m_Handle = nullptr;
   m_Next = nullptr;
   m_Close = nullptr;
 }
 
-// -- FileWriter helpers ----------------------------------------------
-
-bool FileWriter::WriteString(::std::string_view text) noexcept
+bool FileWriter::WriteString(StringView text) noexcept
 {
-  return Write({reinterpret_cast<const ::std::byte*>(text.data()), text.size()});
+  return Write(Span<const byte> {reinterpret_cast<const byte*>(text.Data()), text.Size()});
 }
 
 }  // namespace gecko::platform

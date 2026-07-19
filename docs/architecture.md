@@ -1,153 +1,40 @@
 # Architecture
 
-> The mental model behind libraries, modules, services, systems, and
-> contexts is documented in detail at
-> [architecture/modules-services-contexts.md](architecture/modules-services-contexts.md).
-> Read that first if you're adding subsystems or touching `Engine` /
-> `IModule` / the service registry.
+Gecko is one shared library and one process-wide engine instance. Any executable may link it directly. A host may also load zero, one, or many shared-library plugins; a game is one possible plugin role.
 
-## TL;DR
-
-- Core = interfaces + tiny utilities
-- Platform = OS boundary
-- Runtime = concrete implementations
-- Keep IO out of Core (avoids boot cycles)
-
-Gecko is organized as modules with clear layering:
-
-- **Core**: foundational services and utilities (allocator, jobs, profiler, logger, time/thread/random, etc.)
-- **Platform**: OS abstraction boundary (platform context; windowing/input/filesystem)
-- **Runtime**: concrete implementations built on Core (thread-pool job system, ring logger/profiler, sinks, tracking allocator)
-
-## Service model
-
-Most systems are accessed via a global “installed services” table:
-
-- `IAllocator*`, `IJobSystem*`, `IProfiler*`, `ILogger*`
-
-This enables:
-
-- modular swapping of implementations
-- predictable initialization/shutdown order
-- low coupling across subsystems
-
-### Dependency order
-
-Recommended install order:
-
-1. Allocator
-2. Job system
-3. Profiler
-4. Logger
-
-Shutdown in reverse.
-
-## Data, IO, and paths (high level)
-
-### Keep IO out of Core
-
-Core has strict initialization rules and intentionally minimal dependencies.
-
-If IO becomes a Core service, it tends to create cycles:
-
-- IO init wants to log errors → logger not installed yet
-- logger wants file sinks → sinks need IO → IO not installed yet
-
-**Conclusion:** treat filesystem/IO as an OS abstraction (Platform), not a Core service.
-
-## Platform threading interface
-
-### Design philosophy
-
-Platform provides minimal OS threading primitives. Runtime services build on these primitives.
-
-**Layering:**
-```
-Platform: Thread, Mutex (wraps std::thread/OS APIs)
-    ↓
-Runtime: ThreadPoolJobSystem (uses platform::Thread)
-    ↓
-Application: Job submission, future render thread
+```text
+standalone executable ----+----> Gecko shared library ----> OS + Vulkan
+editor / launcher --------+
+        |
+        +----> game plugin --------+
+        +----> tool plugin --------+----> same Gecko shared library
+        +----> other plugins ------+
 ```
 
-**Benefits:**
-- Clean separation: Platform = OS wrappers, Runtime = high-level services
-- Testable: Can swap platform implementation
-- Future-proof: Renderer, physics, etc. can all use platform::Thread
-- Debuggable: Platform layer adds thread naming, profiling integration
+Every executable and plugin in a process links the same `Gecko.dll` or `libGecko.so`. Gecko therefore owns one allocator and one set of logging, profiling, job, event, platform, and graphics state.
 
-**Initial scope (alpha v0.2):**
-- `platform::Thread` - basic thread creation/join
-- `platform::Mutex` - basic synchronization
-- `platform::GetHardwareThreadCount()`
-- `platform::GetCurrentThreadId()`
+The host resolves `GeckoPlugin_GetApi` from a plugin. The returned function table uses fixed-width values, pointers, and callbacks. During alpha development, `PluginApiVersion` and `StructSize` protect this loader contract; plugins are otherwise rebuilt with the engine.
 
-**Implementation:** Can use std::thread initially, optimize to OS APIs (pthread, Win32) later if needed.
+## Build concepts
 
-## Math module (header-only)
+A module is a unit of code, dependencies, and resources described by `module.py`. A project is the root module selected for a build. A plugin is a module packaged as a shared library; an executable is a module packaged as a program. A source module may instead contribute code to its requesting project.
 
-### Why no IModule?
+The engine itself is the root project producing the Gecko shared library. Core, Math, Platform, Graphics, and Debug Renderer are source or header modules with the same `module.py` contract used by external projects. Their dependencies are resolved topologically and a cycle stops the build before compilation. Each source module compiles its own unity file; the resulting objects are linked into one Gecko shared library, not separate engine libraries.
 
-Math is intentionally **header-only** with no runtime initialization:
+The `src/module.py` descriptor makes the source tree itself the explicit engine project: it names the final engine glue source and selects the transitive module graph. One unity object per source module is the middle ground between a single giant translation unit and per-file compilation: clean builds stay small, changes normally rebuild only the affected module, and include-order accidents cannot leak between subsystems.
 
-- Pure compile-time utilities (vectors, matrices, quaternions)
-- No state → no Startup/Shutdown → no need for IModule boilerplate
-- Foundational layer - must work before module system boots
-- Examples: glm, DirectXMath, Eigen are all header-only
+Module descriptions are ordinary typed Python calls imported from `build.py`. They name a unity source, dependencies, includes, shaders, and platform-specific compile and link requirements. Compiler selection, tool invocation, output layout, shader embedding, and incremental checks remain in the single root `build.py` driver. Keeping that entrypoint at the root also makes it the one build file copied into the downloadable SDK.
 
-### SIMD strategy
+Successful builds generate the ignored `compile_commands.json` from the compiler commands actually used. Zed/clangd consumes that file, so no tracked editor-only `compile_flags.txt` needs to mirror the build configuration.
 
-**Compile-time selection:**
-- Use preprocessor/constexpr to select SIMD paths at compile time
-- No runtime CPU detection needed initially
-- Keeps math module stateless and simple
+Shaders have logical names scoped to their module. The driver invokes `glslc -mfmt=c` and generates `<module>/Shaders.generated.h`; generated paths and symbols cannot collide across modules. Runtime shader loading can later use the same declarations without changing the Release embedding path.
 
-**If runtime features needed later:**
-- SIMD detection → add to Platform capabilities system
-- Custom allocators → use existing allocator service
-- Performance tracking → use existing profiler
+## SDK boundary
 
-### Structure
+The downloadable SDK contains `build.py`, public headers, consumer guides, and Debug/Release libraries. The same project module description builds against a source checkout or an unpacked SDK. CI stages the exact SDK directory, uses its copied driver and public artifacts to rebuild the sandbox consumer, runs it headlessly, and only then packages it.
 
-```
-include/gecko/math/
-  vec2.h, vec3.h, vec4.h    // Vector types
-  mat4.h                     // Matrix types
-  quat.h                     // Quaternion
-  common.h                   // lerp, clamp, smoothstep, etc.
-  simd.h                     // Compile-time SIMD implementations
-```
+Configuration uses plain value structs with default member initializers. Module settings stay nested by value in `GeckoConfig`; there is no config registry, dependency injection graph, or interchangeable core service hierarchy.
 
-**Usage pattern:**
-```cpp
-#include "gecko/math/vec3.h"
-#include "gecko/math/common.h"
+Initialization and shutdown are explicit through `Initialize(config)` and `Shutdown()`. Errors use typed results where callers can recover; assertions are for programmer errors. Important lifetime, allocation, and control flow must remain visible.
 
-vec3 position = vec3(0.0f, 1.0f, 0.0f);
-float distance = length(position);
-vec3 normalized = normalize(position);
-```
-
-### Model storage as domains
-
-Different data has different expectations. Use domains instead of “one folder”:
-
-- **Install (read-only)**: shipped assets, default config
-- **Project**: workspace-local state (e.g. `.gecko/`)
-- **UserConfig**: settings, keybinds, editor prefs
-- **UserData**: saves, user content
-- **Cache**: derived data (safe to delete)
-- **Temp**: short-lived scratch
-
-### Put OS conventions in Platform; policy in Runtime/app
-
-Platform answers: “what is the correct OS folder for config/data/cache?”
-
-Runtime/app policy answers:
-
-- app identity (org/product)
-- editor vs game
-- project root
-- overrides (portable mode, CLI flags)
-
-This keeps layering clean and avoids boot-time dependency traps.
+Linux prefers Wayland and keeps X11 for compatibility. Windows uses Win32. Vulkan is the hardware renderer, Null supports headless work, and a software renderer can become another explicit backend.

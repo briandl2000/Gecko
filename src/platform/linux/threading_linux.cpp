@@ -4,7 +4,6 @@
 
 #include "gecko/platform/threading.h"
 
-#include <cstddef>
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
@@ -14,10 +13,10 @@
 
 namespace gecko::platform {
 
-::gecko::u32 HardwareThreadCount() noexcept
+gecko::u32 HardwareThreadCount() noexcept
 {
   long n = ::sysconf(_SC_NPROCESSORS_ONLN);
-  return (n > 0) ? static_cast<::gecko::u32>(n) : 1u;
+  return (n > 0) ? static_cast<gecko::u32>(n) : 1u;
 }
 
 ThreadId CurrentThreadId() noexcept
@@ -31,14 +30,14 @@ void SetCurrentThreadName(const char* name) noexcept
     return;
   // pthread_setname_np caps at 16 chars including the trailing NUL.
   char buf[16];
-  ::std::size_t i = 0;
+  usize i = 0;
   for (; i < sizeof(buf) - 1 && name[i] != '\0'; ++i)
     buf[i] = name[i];
   buf[i] = '\0';
   ::pthread_setname_np(::pthread_self(), buf);
 }
 
-void SleepNanoseconds(::gecko::u64 nanoseconds) noexcept
+void SleepNanoseconds(gecko::u64 nanoseconds) noexcept
 {
   if (nanoseconds == 0)
     return;

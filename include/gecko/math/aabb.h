@@ -103,17 +103,17 @@ struct Aabb3
 
 [[nodiscard]] constexpr Aabb2 Expand(const Aabb2& box, const Float2& p) noexcept
 {
-  return {::gecko::math::Min(box.Min, p), ::gecko::math::Max(box.Max, p)};
+  return {gecko::math::Min(box.Min, p), gecko::math::Max(box.Max, p)};
 }
 
 [[nodiscard]] constexpr Aabb2 Union(const Aabb2& a, const Aabb2& b) noexcept
 {
-  return {::gecko::math::Min(a.Min, b.Min), ::gecko::math::Max(a.Max, b.Max)};
+  return {gecko::math::Min(a.Min, b.Min), gecko::math::Max(a.Max, b.Max)};
 }
 
 [[nodiscard]] constexpr Float2 Clamp(const Aabb2& box, const Float2& p) noexcept
 {
-  return ::gecko::math::Clamp(p, box.Min, box.Max);
+  return gecko::math::Clamp(p, box.Min, box.Max);
 }
 
 [[nodiscard]] constexpr Int2 Size(const Aabb2i& box) noexcept
@@ -143,17 +143,17 @@ struct Aabb3
 
 [[nodiscard]] constexpr Aabb2i Expand(const Aabb2i& box, const Int2& p) noexcept
 {
-  return {::gecko::math::Min(box.Min, p), ::gecko::math::Max(box.Max, p)};
+  return {gecko::math::Min(box.Min, p), gecko::math::Max(box.Max, p)};
 }
 
 [[nodiscard]] constexpr Aabb2i Union(const Aabb2i& a, const Aabb2i& b) noexcept
 {
-  return {::gecko::math::Min(a.Min, b.Min), ::gecko::math::Max(a.Max, b.Max)};
+  return {gecko::math::Min(a.Min, b.Min), gecko::math::Max(a.Max, b.Max)};
 }
 
 [[nodiscard]] constexpr Int2 Clamp(const Aabb2i& box, const Int2& p) noexcept
 {
-  return ::gecko::math::Clamp(p, box.Min, box.Max);
+  return gecko::math::Clamp(p, box.Min, box.Max);
 }
 
 [[nodiscard]] constexpr Float3 Size(const Aabb3& box) noexcept
@@ -207,17 +207,17 @@ struct Aabb3
 
 [[nodiscard]] constexpr Aabb3 Expand(const Aabb3& box, const Float3& p) noexcept
 {
-  return {::gecko::math::Min(box.Min, p), ::gecko::math::Max(box.Max, p)};
+  return {gecko::math::Min(box.Min, p), gecko::math::Max(box.Max, p)};
 }
 
 [[nodiscard]] constexpr Aabb3 Union(const Aabb3& a, const Aabb3& b) noexcept
 {
-  return {::gecko::math::Min(a.Min, b.Min), ::gecko::math::Max(a.Max, b.Max)};
+  return {gecko::math::Min(a.Min, b.Min), gecko::math::Max(a.Max, b.Max)};
 }
 
 [[nodiscard]] constexpr Float3 Clamp(const Aabb3& box, const Float3& p) noexcept
 {
-  return ::gecko::math::Clamp(p, box.Min, box.Max);
+  return gecko::math::Clamp(p, box.Min, box.Max);
 }
 
 /// Alias: float AABB used as a position-rectangle. See also `Rect2D`.

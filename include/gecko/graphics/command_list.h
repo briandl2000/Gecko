@@ -3,11 +3,10 @@
 /// @file
 /// `ICommandList` interface for recording GPU work.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/graphics/graphics_types.h"
 
-#include <span>
 
 namespace gecko::graphics {
 
@@ -98,7 +97,7 @@ public:
   /// Upload `bytes` into the currently-bound pipeline's push-constant
   /// block starting at `offset`. `offset + bytes.size_bytes()` must be
   /// <= the pipeline's declared `PushConstantBytes`.
-  GECKO_API virtual void SetConstants(u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept = 0;
+  GECKO_API virtual void SetConstants(u32 offset, Span<const gecko::byte> bytes) noexcept = 0;
 
   /// Issue a non-indexed draw.
   GECKO_API virtual void Draw(u32 vertexCount, u32 instanceCount = 1, u32 firstVertex = 0,
@@ -154,7 +153,7 @@ public:
   // list is automatically wrapped in a GPU zone at ProfLevel::Detailed.
   // Pass `nullptr` to disable. Manual BeginZone/EndZone keep working
   // alongside; auto-zones nest inside any user-opened zone.
-  GECKO_API virtual void AttachGpuSampler(IGpuSampler* sampler, ::gecko::Label autoZoneLabel) noexcept = 0;
+  GECKO_API virtual void AttachGpuSampler(IGpuSampler* sampler, gecko::Label autoZoneLabel) noexcept = 0;
 
   // Sampler currently attached to this command list (or nullptr). Used
   // by GECKO_GPU_SCOPE_* macros so callers don't have to re-thread the

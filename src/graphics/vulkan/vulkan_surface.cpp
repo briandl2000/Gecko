@@ -1,29 +1,29 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #include "vulkan_surface.h"
 
+#include "../private/labels.h"
 #include "gecko/core/services/log.h"
 #include "gecko/platform/platform_config.h"
-#include "private/labels.h"
 
 namespace gecko::graphics {
 
 // -- Per-OS backends (defined in vulkan/<os>/vulkan_*_surface.cpp) ---------
 
 #if defined(GECKO_GRAPHICS_VULKAN_XLIB)
-VkResult CreateXlibSurface(VkInstance, const ::gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
+VkResult CreateXlibSurface(VkInstance, const gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
 #endif
 
 #if defined(GECKO_GRAPHICS_VULKAN_WAYLAND)
-VkResult CreateWaylandSurface(VkInstance, const ::gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
+VkResult CreateWaylandSurface(VkInstance, const gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
 #endif
 
 #if defined(GECKO_GRAPHICS_VULKAN_WIN32)
-VkResult CreateWin32Surface(VkInstance, const ::gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
+VkResult CreateWin32Surface(VkInstance, const gecko::platform::NativeWindowHandle&, VkSurfaceKHR*) noexcept;
 #endif
 
 // -- Public API ------------------------------------------------------------
 
-::std::span<const char* const> GetRequiredSurfaceExtensions() noexcept
+Span<const char* const> GetRequiredSurfaceExtensions() noexcept
 {
   static const char* const Extensions[] = {
       VK_KHR_SURFACE_EXTENSION_NAME,
@@ -40,10 +40,10 @@ VkResult CreateWin32Surface(VkInstance, const ::gecko::platform::NativeWindowHan
   return {Extensions, sizeof(Extensions) / sizeof(Extensions[0])};
 }
 
-VkResult CreateSurface(VkInstance instance, const ::gecko::platform::NativeWindowHandle& native,
+VkResult CreateSurface(VkInstance instance, const gecko::platform::NativeWindowHandle& native,
                        VkSurfaceKHR* out) noexcept
 {
-  using ::gecko::platform::DisplayBackendKind;
+  using gecko::platform::DisplayBackendKind;
 
   switch (native.Backend)
   {
@@ -60,7 +60,7 @@ VkResult CreateSurface(VkInstance instance, const ::gecko::platform::NativeWindo
     return CreateWin32Surface(instance, native, out);
 #endif
   default:
-    GECKO_ERROR(labels::Vulkan, "VulkanSurface: no surface backend for display kind %d",
+    GECKO_ERROR(labels::Vulkan, "VulkanSurface: no surface backend for display kind {}",
                 static_cast<i32>(native.Backend));
     return VK_ERROR_EXTENSION_NOT_PRESENT;
   }

@@ -1,7 +1,5 @@
 #include "gecko/platform/terminal.h"
 
-#include <cstdio>
-
 #if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -9,9 +7,8 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-#include <io.h>
-#include <windows.h>
-#else
+#include <Windows.h>
+#elif defined(GECKO_PLATFORM_LINUX)
 #include <unistd.h>
 #endif
 
@@ -19,14 +16,9 @@ namespace gecko::platform {
 
 namespace {
 
-[[nodiscard]] ::std::FILE* StreamFile(TermStream s) noexcept
+const char* AnsiForeground(TermColor color) noexcept
 {
-  return s == TermStream::Stderr ? stderr : stdout;
-}
-
-[[nodiscard]] const char* AnsiFg(TermColor c) noexcept
-{
-  switch (c)
+  switch (color)
   {
   case TermColor::Default:
     return "\x1b[0m";
@@ -66,97 +58,98 @@ namespace {
   return "\x1b[0m";
 }
 
-constexpr const char* kAnsiReset = "\x1b[0m";
-
 #if defined(GECKO_PLATFORM_WINDOWS)
 
-// Enable VT processing + force CP_UTF8 once. Done lazily on the first
-// Print() call so we don't reach into the console for headless tools
-// that never write to it.
-void EnsureWindowsConsoleConfigured() noexcept
+HANDLE StreamHandle(TermStream stream) noexcept
 {
-  static const bool s_done = []() noexcept {
-    // Force the console output to interpret bytes as UTF-8. Critical
-    // for non-ASCII log output and clipboard-style messages.
-    ::SetConsoleOutputCP(CP_UTF8);
-
-    auto enableVt = [](::DWORD which) noexcept {
-      ::HANDLE h = ::GetStdHandle(which);
-      if (h == INVALID_HANDLE_VALUE || h == nullptr)
-        return;
-      ::DWORD mode = 0;
-      if (!::GetConsoleMode(h, &mode))
-        return;
-      ::SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-    };
-    enableVt(STD_OUTPUT_HANDLE);
-    enableVt(STD_ERROR_HANDLE);
-    return true;
-  }();
-  (void)s_done;
+  return ::GetStdHandle(stream == TermStream::Stderr ? STD_ERROR_HANDLE : STD_OUTPUT_HANDLE);
 }
 
-[[nodiscard]] bool StreamIsTtyImpl(TermStream s) noexcept
+void ConfigureWindowsConsole() noexcept
 {
-  const int fd = ::_fileno(StreamFile(s));
-  if (fd < 0)
-    return false;
-  return ::_isatty(fd) != 0;
+  static bool configured = false;
+  if (configured)
+    return;
+  configured = true;
+  (void)::SetConsoleOutputCP(CP_UTF8);
+  constexpr DWORD streams[] {STD_OUTPUT_HANDLE, STD_ERROR_HANDLE};
+  for (DWORD stream : streams)
+  {
+    HANDLE handle = ::GetStdHandle(stream);
+    DWORD mode = 0;
+    if (handle != nullptr && handle != INVALID_HANDLE_VALUE && ::GetConsoleMode(handle, &mode))
+      (void)::SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+  }
 }
 
-#else
-
-[[nodiscard]] bool StreamIsTtyImpl(TermStream s) noexcept
+void WriteRaw(TermStream stream, StringView text) noexcept
 {
-  const int fd = ::fileno(StreamFile(s));
-  if (fd < 0)
-    return false;
-  return ::isatty(fd) != 0;
+  HANDLE handle = StreamHandle(stream);
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE || text.Empty())
+    return;
+  usize offset = 0;
+  while (offset < text.Size())
+  {
+    DWORD written = 0;
+    const DWORD count = static_cast<DWORD>(text.Size() - offset > 0xFFFFFFFFULL ? 0xFFFFFFFFULL : text.Size() - offset);
+    if (!::WriteFile(handle, text.Data() + offset, count, &written, nullptr) || written == 0)
+      break;
+    offset += written;
+  }
+}
+
+#elif defined(GECKO_PLATFORM_LINUX)
+
+int StreamDescriptor(TermStream stream) noexcept
+{
+  return stream == TermStream::Stderr ? STDERR_FILENO : STDOUT_FILENO;
+}
+
+void WriteRaw(TermStream stream, StringView text) noexcept
+{
+  usize offset = 0;
+  while (offset < text.Size())
+  {
+    const ssize_t written = ::write(StreamDescriptor(stream), text.Data() + offset, text.Size() - offset);
+    if (written <= 0)
+      break;
+    offset += static_cast<usize>(written);
+  }
 }
 
 #endif
-
-void WriteUtf8(::std::FILE* f, ::std::string_view text) noexcept
-{
-  if (text.empty())
-    return;
-  ::std::fwrite(text.data(), 1, text.size(), f);
-}
 
 }  // namespace
 
 bool IsTerminal(TermStream stream) noexcept
 {
 #if defined(GECKO_PLATFORM_WINDOWS)
-  EnsureWindowsConsoleConfigured();
+  ConfigureWindowsConsole();
+  DWORD mode = 0;
+  const HANDLE handle = StreamHandle(stream);
+  return handle != nullptr && handle != INVALID_HANDLE_VALUE && ::GetConsoleMode(handle, &mode);
+#elif defined(GECKO_PLATFORM_LINUX)
+  return ::isatty(StreamDescriptor(stream)) != 0;
 #endif
-  return StreamIsTtyImpl(stream);
 }
 
-void Print(TermStream stream, TermColor fg, ::std::string_view text) noexcept
+void Print(TermStream stream, TermColor foreground, StringView text) noexcept
 {
 #if defined(GECKO_PLATFORM_WINDOWS)
-  EnsureWindowsConsoleConfigured();
+  ConfigureWindowsConsole();
 #endif
-  ::std::FILE* f = StreamFile(stream);
-
-  const bool tty = StreamIsTtyImpl(stream);
-  const bool color = tty && fg != TermColor::Default;
-
-  if (color)
-    ::std::fputs(AnsiFg(fg), f);
-  WriteUtf8(f, text);
-  if (color)
-    ::std::fputs(kAnsiReset, f);
-
-  ::std::fflush(f);
+  const bool colored = foreground != TermColor::Default && IsTerminal(stream);
+  if (colored)
+    WriteRaw(stream, StringView {AnsiForeground(foreground)});
+  WriteRaw(stream, text);
+  if (colored)
+    WriteRaw(stream, StringView {"\x1b[0m"});
 }
 
-void PrintLine(TermStream stream, TermColor fg, ::std::string_view text) noexcept
+void PrintLine(TermStream stream, TermColor foreground, StringView text) noexcept
 {
-  Print(stream, fg, text);
-  ::std::fputc('\n', StreamFile(stream));
-  ::std::fflush(StreamFile(stream));
+  Print(stream, foreground, text);
+  WriteRaw(stream, StringView {"\n"});
 }
 
 }  // namespace gecko::platform

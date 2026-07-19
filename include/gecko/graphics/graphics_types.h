@@ -4,8 +4,6 @@
 #include "gecko/core/span.h"
 #include "gecko/core/types.h"
 
-#include <span>
-
 namespace gecko::graphics {
 
 // -- Named constants -------------------------------------------------------
@@ -753,18 +751,17 @@ struct BeginRenderingInfo
 
 // Shader code -------------------------------------------------------
 
-/// Shader-source reference. Either points to inline `Bytes` (e.g. via
-/// `#embed`) or to an on-disk `Path`. `Entry` names the entry point.
+/// Shader-source reference. Compiled shader bytes are generated into a C++
+/// header and embedded in the client binary; `Entry` names the entry point.
 struct ShaderCode
 {
   ShaderFormat Format {ShaderFormat::None};
-  ::std::span<const ::gecko::byte> Bytes {};  ///< inline (e.g. #embed)
-  const char* Path {nullptr};                 ///< on-disk fallback
+  Span<const gecko::byte> Bytes {};
   const char* Entry {"main"};
 
   [[nodiscard]] bool IsValid() const noexcept
   {
-    return Format != ShaderFormat::None && (!Bytes.empty() || Path != nullptr);
+    return Format != ShaderFormat::None && !Bytes.empty();
   }
 };
 
@@ -802,6 +799,8 @@ struct GraphicsPipelineDesc
   [[nodiscard]] bool IsValid() const noexcept
   {
     if (!VertexShader.IsValid())
+      return false;
+    if (NumRenderTargets > RenderTargetDesc::MaxRenderTargets || NumPipelineResources > MaxPipelineResources)
       return false;
     if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
       return false;
@@ -854,6 +853,8 @@ struct ComputePipelineDesc
   [[nodiscard]] bool IsValid() const noexcept
   {
     if (!ComputeShader.IsValid())
+      return false;
+    if (NumPipelineResources > MaxPipelineResources)
       return false;
     if (PushConstantBytes > MaxPushConstantBytes || (PushConstantBytes % 4) != 0)
       return false;

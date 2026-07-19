@@ -38,7 +38,7 @@ public:
   void End() noexcept override;
   [[nodiscard]] bool IsValid() const noexcept override
   {
-    return m_CmdBuffer != VK_NULL_HANDLE;
+    return m_CmdBuffer != VK_NULL_HANDLE && m_DescPool != VK_NULL_HANDLE;
   }
 
   void BeginRendering(const BeginRenderingInfo& info) noexcept override;
@@ -59,7 +59,7 @@ public:
   void BindTexture(u32 slot, const Texture& texture) noexcept override;
   void BindRWTexture(u32 slot, const Texture& texture) noexcept override;
   void BindSampler(u32 slot, const Sampler& sampler) noexcept override;
-  void SetConstants(u32 offset, ::std::span<const ::gecko::byte> bytes) noexcept override;
+  void SetConstants(u32 offset, Span<const gecko::byte> bytes) noexcept override;
 
   void Draw(u32 vertexCount, u32 instanceCount, u32 firstVertex, u32 firstInstance) noexcept override;
   void DrawIndexed(u32 indexCount, u32 instanceCount, u32 firstIndex, i32 vertexOffset,
@@ -78,7 +78,7 @@ public:
   void ResetTimestamps(const QueryPool& pool, u32 first, u32 count) noexcept override;
   void WriteTimestamp(const QueryPool& pool, u32 index) noexcept override;
 
-  void AttachGpuSampler(IGpuSampler* sampler, ::gecko::Label autoZoneLabel) noexcept override;
+  void AttachGpuSampler(IGpuSampler* sampler, gecko::Label autoZoneLabel) noexcept override;
 
   IGpuSampler* GetAttachedGpuSampler() const noexcept override
   {
@@ -110,7 +110,6 @@ private:
   // because command buffers must be freed back to the same pool they came
   // from, and the recording thread may differ from the destruction thread.
   VkCommandPool m_Pool {VK_NULL_HANDLE};
-  bool m_Compute {false};
 
   TouchedSwapchain m_Touched[MaxSwapchainsPerSubmit] {};
   u32 m_TouchedCount {0};
@@ -139,7 +138,7 @@ private:
   // Optional auto-zone wiring: if non-null, every Draw/Dispatch wraps
   // the recorded vkCmd* call in BeginZone/EndZone.
   IGpuSampler* m_AutoSampler {nullptr};
-  ::gecko::Label m_AutoZoneLabel {};
+  gecko::Label m_AutoZoneLabel {};
   // True between AttachGpuSampler and End() -- the always-on
   // "CommandList" GPU zone covering the whole command-buffer execution.
   bool m_AutoCmdListZoneOpen {false};

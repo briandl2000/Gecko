@@ -9,7 +9,7 @@
 /// this interface for application code; most users should not call
 /// `IWindowsBackend` directly.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/events.h"
 #include "gecko/platform/platform_config.h"

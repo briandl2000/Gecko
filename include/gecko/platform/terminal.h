@@ -8,10 +8,9 @@
 /// virtual-terminal mode is enabled (Windows 10+); colour is suppressed
 /// automatically when the destination is not a TTY.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
+#include "gecko/core/containers/string.h"
 #include "gecko/core/types.h"
-
-#include <string_view>
 
 namespace gecko::platform {
 
@@ -19,7 +18,7 @@ namespace gecko::platform {
 /// `Default` value (leave terminal default in place). Bright variants
 /// use the bold / `1;3x` ANSI sequence on POSIX and the
 /// `FOREGROUND_INTENSITY` bit on Win32.
-enum class TermColor : ::gecko::u8
+enum class TermColor : gecko::u8
 {
   Default,
   Black,
@@ -41,7 +40,7 @@ enum class TermColor : ::gecko::u8
 };
 
 /// Standard stream selector for `Print` / `PrintLine`.
-enum class TermStream : ::gecko::u8
+enum class TermStream : gecko::u8
 {
   Stdout,  ///< Standard output.
   Stderr,  ///< Standard error.
@@ -53,18 +52,18 @@ enum class TermStream : ::gecko::u8
 /// and virtual-terminal mode is enabled where supported. When `stream`
 /// is not a TTY (redirection or pipe) colour is suppressed so captured
 /// output never contains raw escape sequences.
-GECKO_API void Print(TermStream stream, TermColor fg, ::std::string_view text) noexcept;
+GECKO_API void Print(TermStream stream, TermColor fg, StringView text) noexcept;
 
 /// Convenience: write `text` followed by a newline.
-GECKO_API void PrintLine(TermStream stream, TermColor fg, ::std::string_view text) noexcept;
+GECKO_API void PrintLine(TermStream stream, TermColor fg, StringView text) noexcept;
 
 /// Default-colour overload.
-inline void Print(TermStream stream, ::std::string_view text) noexcept
+inline void Print(TermStream stream, StringView text) noexcept
 {
   Print(stream, TermColor::Default, text);
 }
 /// Default-colour overload.
-inline void PrintLine(TermStream stream, ::std::string_view text) noexcept
+inline void PrintLine(TermStream stream, StringView text) noexcept
 {
   PrintLine(stream, TermColor::Default, text);
 }

@@ -4,9 +4,7 @@
 #include "gecko/graphics/graphics_types.h"
 #include "gecko/platform/window.h"
 
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#include <vk_mem_alloc.h>
+#include <vulkan/vulkan.h>
 
 // -- Vulkan backend GPU-object payloads ----------------------------------
 // These are the structs attached to Swapchain/Texture/RenderTarget/Buffer/
@@ -15,6 +13,12 @@
 // public header exposes Vulkan symbols.
 
 namespace gecko::graphics {
+
+struct VulkanAllocation
+{
+  VkDeviceMemory Memory {VK_NULL_HANDLE};
+  void* Mapped {nullptr};
+};
 
 // -- Swapchain GPU data --------------------------------------------------
 // One `VulkanSwapchainData` per Swapchain. Sync objects are sized by
@@ -47,18 +51,18 @@ struct VulkanSwapchainData
   u32 FrameIndex {0};     ///< wraps mod MaxFramesInFlight
   u32 AcquiredIndex {0};  ///< last image returned by vkAcquireNextImageKHR
 
-  ::gecko::platform::NativeWindowHandle Native {};
+  gecko::platform::NativeWindowHandle Native {};
   SwapchainDesc Desc {};
 };
 
 // -- Texture GPU data ----------------------------------------------------
-// Attached to Texture::Data. Owns VkImage + VkImageView + VMA allocation.
+// Attached to Texture::Data. Owns VkImage + VkImageView + memory.
 // `CurrentLayout` is mutated by the command list as barriers are recorded.
 
 struct VulkanTextureData
 {
   VkImage Image {VK_NULL_HANDLE};
-  VmaAllocation Allocation {nullptr};
+  VulkanAllocation Allocation {};
   VkImageView ImageView {VK_NULL_HANDLE};
   VkFormat Format {VK_FORMAT_UNDEFINED};
   u32 Width {0};
@@ -103,7 +107,7 @@ struct VulkanRTData
 struct VulkanBufferData
 {
   VkBuffer Buffer {VK_NULL_HANDLE};
-  VmaAllocation Allocation {nullptr};
+  VulkanAllocation Allocation {};
 };
 
 // -- Pipeline GPU data ---------------------------------------------------

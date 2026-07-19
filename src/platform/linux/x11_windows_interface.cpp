@@ -10,7 +10,6 @@
 #include "gecko/platform/input_codes.h"
 #include "x11_key_map.h"
 
-#include <cstdint>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 
@@ -19,7 +18,7 @@ namespace gecko::platform {
 namespace {
 int X11ErrorHandler(::Display* /*display*/, ::XErrorEvent* event)
 {
-  GECKO_WARN(labels::General, "X11 error: request=%u, error=%u, serial=%lu", event->request_code, event->error_code,
+  GECKO_WARN(labels::General, "X11 error: request={}, error={}, serial={}", event->request_code, event->error_code,
              event->serial);
   return 0;
 }
@@ -48,7 +47,7 @@ X11WindowsBackend::X11WindowsBackend() noexcept
   m_NetWmStateAbove = ::XInternAtom(m_Display, "_NET_WM_STATE_ABOVE", False);
   m_MotifWmHints = ::XInternAtom(m_Display, "_MOTIF_WM_HINTS", False);
 
-  GECKO_INFO(labels::General, "Initialized X11 windows backend (display=%p)", m_Display);
+  GECKO_INFO(labels::General, "Initialized X11 windows backend (display={})", m_Display);
 }
 
 X11WindowsBackend::~X11WindowsBackend() noexcept
@@ -135,7 +134,7 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   st.State = desc.Visible ? platform::WindowState::Normal : platform::WindowState::Hidden;
   st.WindowId = w;
 
-  auto [it, ok] = m_Windows.emplace(id, ::std::move(st));
+  auto [it, ok] = m_Windows.emplace(id, Move(st));
   it->second.Desc.Title = it->second.TitleStorage.c_str();
   m_WindowByXid.emplace(w, id);
 
@@ -143,7 +142,7 @@ WindowHandle X11WindowsBackend::CreateWindow(const WindowDesc& desc) noexcept
   if (desc.Buttons != WindowButtons::All)
     ApplyMotifFunctions(w, desc.Buttons, desc.Resizable);
 
-  GECKO_INFO(labels::Window, "Created X11 window id=%llu, xid=%lu, size=%ux%u", (unsigned long long)id,
+  GECKO_INFO(labels::Window, "Created X11 window id={}, xid={}, size={}x{}", (unsigned long long)id,
              (unsigned long)w, width, height);
   return WindowHandle {id};
 }
@@ -161,7 +160,7 @@ void X11WindowsBackend::DestroyWindow(WindowHandle window) noexcept
 
   if (m_Display && it->second.WindowId != 0)
   {
-    GECKO_DEBUG(labels::Window, "Destroying X11 window id=%llu, xid=%lu", (unsigned long long)window.Id,
+    GECKO_DEBUG(labels::Window, "Destroying X11 window id={}, xid={}", (unsigned long long)window.Id,
                 (unsigned long)it->second.WindowId);
     m_WindowByXid.erase(it->second.WindowId);
     ::XDestroyWindow(m_Display, it->second.WindowId);
@@ -287,7 +286,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
           int i = 0;
           while (i < len)
           {
-            ::gecko::u32 cp = 0;
+            gecko::u32 cp = 0;
             int consumed = 1;
             const unsigned char b0 = bytes[i];
             if (b0 < 0x80)
@@ -296,19 +295,19 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
             }
             else if ((b0 & 0xE0) == 0xC0 && i + 1 < len)
             {
-              cp = ::gecko::u32(b0 & 0x1F) << 6 | ::gecko::u32(bytes[i + 1] & 0x3F);
+              cp = gecko::u32(b0 & 0x1F) << 6 | gecko::u32(bytes[i + 1] & 0x3F);
               consumed = 2;
             }
             else if ((b0 & 0xF0) == 0xE0 && i + 2 < len)
             {
-              cp = ::gecko::u32(b0 & 0x0F) << 12 | ::gecko::u32(bytes[i + 1] & 0x3F) << 6 |
-                   ::gecko::u32(bytes[i + 2] & 0x3F);
+              cp = gecko::u32(b0 & 0x0F) << 12 | gecko::u32(bytes[i + 1] & 0x3F) << 6 |
+                   gecko::u32(bytes[i + 2] & 0x3F);
               consumed = 3;
             }
             else if ((b0 & 0xF8) == 0xF0 && i + 3 < len)
             {
-              cp = ::gecko::u32(b0 & 0x07) << 18 | ::gecko::u32(bytes[i + 1] & 0x3F) << 12 |
-                   ::gecko::u32(bytes[i + 2] & 0x3F) << 6 | ::gecko::u32(bytes[i + 3] & 0x3F);
+              cp = gecko::u32(b0 & 0x07) << 18 | gecko::u32(bytes[i + 1] & 0x3F) << 12 |
+                   gecko::u32(bytes[i + 2] & 0x3F) << 6 | gecko::u32(bytes[i + 3] & 0x3F);
               consumed = 4;
             }
             else
@@ -416,7 +415,7 @@ void X11WindowsBackend::PumpEvents(const gecko::EventEmitter& emitter) noexcept
   }
 
   if (eventCount > 0)
-    GECKO_TRACE(labels::Input, "Pumped %d X11 events", eventCount);
+    GECKO_TRACE(labels::Input, "Pumped {} X11 events", eventCount);
 }
 
 Extent2D X11WindowsBackend::GetClientSize(WindowHandle window) const noexcept
@@ -456,7 +455,7 @@ NativeWindowHandle X11WindowsBackend::GetNativeWindowHandle(WindowHandle window)
   NativeWindowHandle nh;
   nh.Backend = DisplayBackendKind::Xlib;
   nh.Display = m_Display;
-  nh.Handle = reinterpret_cast<void*>(static_cast<uintptr_t>(it->second.WindowId));
+  nh.Handle = reinterpret_cast<void*>(static_cast<usize>(it->second.WindowId));
   return nh;
 }
 
@@ -764,7 +763,7 @@ void X11WindowsBackend::SetCursorMode(WindowHandle window, CursorMode mode) noex
     if (mode == CursorMode::Locked)
     {
       ::XGrabPointer(m_Display, xid, True, PointerMotionMask | ButtonPressMask | ButtonReleaseMask, GrabModeAsync,
-                     GrabModeAsync, xid, None, CurrentTime);
+                     GrabModeAsync, xid, 0L, CurrentTime);
     }
   }
   else
@@ -828,7 +827,7 @@ void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons, b
   unsigned char* propData {};
 
   if (::XGetWindowProperty(m_Display, w, m_MotifWmHints, 0, sizeof(MwmHints) / sizeof(long), False, m_MotifWmHints,
-                           &actualType, &actualFormat, &nItems, &bytesAfter, &propData) == Success &&
+                           &actualType, &actualFormat, &nItems, &bytesAfter, &propData) == 0 &&
       propData && nItems >= 5)
   {
     hints = *reinterpret_cast<MwmHints*>(propData);
@@ -840,11 +839,11 @@ void X11WindowsBackend::ApplyMotifFunctions(::Window w, WindowButtons buttons, b
   unsigned long funcs = MwmFuncMove;
   if (resizable)
     funcs |= MwmFuncResize;
-  if (::gecko::Any(buttons & WindowButtons::Minimize))
+  if (gecko::Any(buttons & WindowButtons::Minimize))
     funcs |= MwmFuncMinimize;
-  if (::gecko::Any(buttons & WindowButtons::Maximize))
+  if (gecko::Any(buttons & WindowButtons::Maximize))
     funcs |= MwmFuncMaximize;
-  if (::gecko::Any(buttons & WindowButtons::Close))
+  if (gecko::Any(buttons & WindowButtons::Close))
     funcs |= MwmFuncClose;
   hints.functions = funcs;
 
