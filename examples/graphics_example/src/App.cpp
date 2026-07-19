@@ -494,7 +494,8 @@ void App::RenderFrame() noexcept
   if (m_TimestampPool.IsValid())
     cmd->ResetTimestamps(m_TimestampPool, 0, 4);
 
-  const gecko::f32 time = gecko::time::NsToSecondsF(gecko::MonotonicTimeNs() - m_StartTimeNs);
+  const gecko::f32 time =
+      static_cast<gecko::f32>(gecko::time::NsToSecondsF(gecko::MonotonicTimeNs() - m_StartTimeNs));
 
   RecordComputePass(time);
   RecordTrianglePass(*cmd, time);
