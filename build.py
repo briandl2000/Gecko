@@ -230,6 +230,7 @@ def windows_cpp_flags(config: str, includes: list[Path], defines: list[str]) -> 
         "/wd4201",
         "/wd4251",
         "/wd4324",
+        "/Zc:preprocessor",
         "/EHs-c-",
         "/GR-",
         "/D_HAS_EXCEPTIONS=0",
