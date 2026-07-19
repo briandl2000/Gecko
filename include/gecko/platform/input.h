@@ -11,7 +11,7 @@
 
 #include "gecko/api.h"
 #include "gecko/core/types.h"
-#include "gecko/core/string.h"
+#include "gecko/core/containers/string.h"
 #include "gecko/platform/input_codes.h"
 #include "gecko/platform/window.h"
 

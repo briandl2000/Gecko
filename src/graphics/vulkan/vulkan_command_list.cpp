@@ -13,13 +13,19 @@ namespace gecko::graphics {
 VulkanCommandList::VulkanCommandList(VulkanDevice& device, bool /*compute*/) noexcept : m_Device(&device)
 {
   m_Pool = device.AcquireThreadCommandPool();
+  if (m_Pool == VK_NULL_HANDLE)
+    return;
 
   VkCommandBufferAllocateInfo allocInfo {};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.commandPool = m_Pool;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = 1;
-  VULKAN_CHECK(vkAllocateCommandBuffers(device.Device(), &allocInfo, &m_CmdBuffer));
+  if (vkAllocateCommandBuffers(device.Device(), &allocInfo, &m_CmdBuffer) != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanCommandList: vkAllocateCommandBuffers failed");
+    return;
+  }
 
   // Per-command-list descriptor pool. Reset at Begin(). Sized to handle
   // many BindPipeline calls per frame without running out.
@@ -36,7 +42,8 @@ VulkanCommandList::VulkanCommandList(VulkanDevice& device, bool /*compute*/) noe
   descPoolCreateInfo.maxSets = 128;
   descPoolCreateInfo.poolSizeCount = sizeof(sizes) / sizeof(sizes[0]);
   descPoolCreateInfo.pPoolSizes = sizes;
-  VULKAN_CHECK(vkCreateDescriptorPool(device.Device(), &descPoolCreateInfo, nullptr, &m_DescPool));
+  if (vkCreateDescriptorPool(device.Device(), &descPoolCreateInfo, nullptr, &m_DescPool) != VK_SUCCESS)
+    GECKO_ERROR(labels::Vulkan, "VulkanCommandList: vkCreateDescriptorPool failed");
 }
 
 VulkanCommandList::~VulkanCommandList()

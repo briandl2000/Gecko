@@ -1,8 +1,8 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
-#include "gecko/core/array.h"
-#include "gecko/core/hash_map.h"
+#include "gecko/core/containers/array.h"
+#include "gecko/core/containers/hash_map.h"
 #include "gecko/core/sync.h"
 #include "gecko/graphics/graphics_device.h"
 #include "gecko/platform/threading.h"
@@ -116,10 +116,12 @@ public:
 private:
   // -- Helpers ---------------------------------------------------
 
-  /// Build the swapchain + image views + (re)create sync objects once.
-  /// Used by CreateSwapchain and ResizeSwapchain.
+  /// Build only replaceable swapchain images and views. Synchronization is
+  /// owned separately so a resize can construct its replacement first.
   [[nodiscard]] bool BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchainKHR oldSwapchain) noexcept;
+  [[nodiscard]] bool CreateSwapchainSync(VulkanSwapchainData& data) noexcept;
 
+  void DestroySwapchainImages(VulkanSwapchainData& data) noexcept;
   void DestroySwapchainResources(VulkanSwapchainData& data, bool destroySurface) noexcept;
 
   [[nodiscard]] VkShaderModule CreateShaderModule(const ShaderCode& code) noexcept;
@@ -157,7 +159,7 @@ private:
 
   // Serialises vkQueueSubmit / vkQueuePresentKHR since Vulkan queues are
   // externally synchronised and may be touched from any thread.
-  SpinMutex m_QueueMutex;
+  Mutex m_QueueMutex;
 
   // Deferred command-list destruction: each Execute* submits with a tracker
   // fence and pushes the owning Unique here. ReapPending() runs each frame

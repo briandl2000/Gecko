@@ -1,9 +1,6 @@
 #include "gecko/core/utility/thread.h"
 
-#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-#include <intrin.h>
-#endif
-
+#include "gecko/core/atomic.h"
 #include "gecko/core/assert.h"
 #include "gecko/core/utility/time.h"
 
@@ -33,13 +30,7 @@ void SpinWaitNs(u64 nanoseconds) noexcept
   u64 target = start + nanoseconds;
 
   while (HighResTimeNs() < target)
-  {
-#if defined(_MSC_VER) && (defined(_M_X64) || defined(_M_IX86))
-    _mm_pause();
-#elif defined(__GNUC__) && (defined(__x86_64__) || defined(__i386__))
-    __builtin_ia32_pause();
-#endif
-  }
+    CpuRelax();
 }
 
 void PreciseSleepNs(u64 nanoseconds) noexcept

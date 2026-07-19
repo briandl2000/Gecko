@@ -4,17 +4,9 @@
 #include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
+#include "gecko/core/sync.h"
 #include "gecko/platform/threading.h"
 #include "private/labels.h"
-
-#if defined(GECKO_PLATFORM_WINDOWS)
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <Windows.h>
-#elif defined(GECKO_PLATFORM_LINUX)
-#include <pthread.h>
-#endif
 
 namespace gecko::runtime {
 
@@ -50,17 +42,10 @@ struct ThreadPoolState
 {
   JobSlot Jobs[MaxJobs] {};
   WorkerStart Starts[MaxWorkers] {};
-#if defined(GECKO_PLATFORM_WINDOWS)
-  HANDLE Threads[MaxWorkers] {};
-  SRWLOCK Mutex = SRWLOCK_INIT;
-  CONDITION_VARIABLE Wake = CONDITION_VARIABLE_INIT;
-  CONDITION_VARIABLE Complete = CONDITION_VARIABLE_INIT;
-#elif defined(GECKO_PLATFORM_LINUX)
-  pthread_t Threads[MaxWorkers] {};
-  pthread_mutex_t Mutex = PTHREAD_MUTEX_INITIALIZER;
-  pthread_cond_t Wake = PTHREAD_COND_INITIALIZER;
-  pthread_cond_t Complete = PTHREAD_COND_INITIALIZER;
-#endif
+  Thread Threads[MaxWorkers] {};
+  Mutex JobMutex;
+  ConditionVariable Wake;
+  ConditionVariable Complete;
   u64 NextJobId {1};
   u32 WorkerCount {0};
   bool ShuttingDown {false};
@@ -68,77 +53,20 @@ struct ThreadPoolState
 
 namespace {
 
-void Lock(ThreadPoolState& state) noexcept
-{
-#if defined(GECKO_PLATFORM_WINDOWS)
-  ::AcquireSRWLockExclusive(&state.Mutex);
-#elif defined(GECKO_PLATFORM_LINUX)
-  (void)::pthread_mutex_lock(&state.Mutex);
-#endif
-}
-
-void Unlock(ThreadPoolState& state) noexcept
-{
-#if defined(GECKO_PLATFORM_WINDOWS)
-  ::ReleaseSRWLockExclusive(&state.Mutex);
-#elif defined(GECKO_PLATFORM_LINUX)
-  (void)::pthread_mutex_unlock(&state.Mutex);
-#endif
-}
-
 void WakeOne(ThreadPoolState& state) noexcept
 {
-#if defined(GECKO_PLATFORM_WINDOWS)
-  ::WakeConditionVariable(&state.Wake);
-#elif defined(GECKO_PLATFORM_LINUX)
-  (void)::pthread_cond_signal(&state.Wake);
-#endif
+  state.Wake.SignalOne();
 }
 
 void WakeAll(ThreadPoolState& state) noexcept
 {
-#if defined(GECKO_PLATFORM_WINDOWS)
-  ::WakeAllConditionVariable(&state.Wake);
-  ::WakeAllConditionVariable(&state.Complete);
-#elif defined(GECKO_PLATFORM_LINUX)
-  (void)::pthread_cond_broadcast(&state.Wake);
-  (void)::pthread_cond_broadcast(&state.Complete);
-#endif
-}
-
-void SignalComplete(ThreadPoolState& state) noexcept
-{
-#if defined(GECKO_PLATFORM_WINDOWS)
-  ::WakeAllConditionVariable(&state.Complete);
-#elif defined(GECKO_PLATFORM_LINUX)
-  (void)::pthread_cond_broadcast(&state.Complete);
-#endif
-}
-
-void WaitForWake(ThreadPoolState& state) noexcept
-{
-#if defined(GECKO_PLATFORM_WINDOWS)
-  (void)::SleepConditionVariableSRW(&state.Wake, &state.Mutex, 100, 0);
-#elif defined(GECKO_PLATFORM_LINUX)
-  timespec deadline {};
-  (void)::clock_gettime(CLOCK_REALTIME, &deadline);
-  deadline.tv_nsec += 100'000'000;
-  if (deadline.tv_nsec >= 1'000'000'000)
-  {
-    ++deadline.tv_sec;
-    deadline.tv_nsec -= 1'000'000'000;
-  }
-  (void)::pthread_cond_timedwait(&state.Wake, &state.Mutex, &deadline);
-#endif
+  state.Wake.SignalAll();
+  state.Complete.SignalAll();
 }
 
 void WaitForCompletion(ThreadPoolState& state) noexcept
 {
-#if defined(GECKO_PLATFORM_WINDOWS)
-  (void)::SleepConditionVariableSRW(&state.Complete, &state.Mutex, INFINITE, 0);
-#elif defined(GECKO_PLATFORM_LINUX)
-  (void)::pthread_cond_wait(&state.Complete, &state.Mutex);
-#endif
+  state.Complete.Wait(state.JobMutex);
 }
 
 JobSlot* FindJob(ThreadPoolState& state, JobHandle handle) noexcept
@@ -176,6 +104,21 @@ JobSlot* TakeReadyJob(ThreadPoolState& state) noexcept
   return best;
 }
 
+void ExecuteJob(ThreadPoolState& state, JobSlot& slot) noexcept
+{
+  {
+    MemoryLabelScope memoryLabel(slot.JobLabel);
+    slot.Function.Invoke(slot.Function.User);
+  }
+  if (slot.Function.Free != nullptr && slot.Function.User != nullptr)
+    slot.Function.Free(slot.Function.User);
+
+  LockGuard lock(state.JobMutex);
+  slot.Function = {};
+  slot.State = JobState::Free;
+  WakeAll(state);
+}
+
 }  // namespace
 
 bool ThreadPoolJobSystem::Init() noexcept
@@ -194,29 +137,13 @@ bool ThreadPoolJobSystem::Init() noexcept
   for (u32 index = 0; index < workerCount; ++index)
   {
     state->Starts[index] = WorkerStart {.Owner = this, .Index = index};
-#if defined(GECKO_PLATFORM_WINDOWS)
-    state->Threads[index] = ::CreateThread(
-        nullptr, 0,
-        [](void* user) -> DWORD {
-          auto* start = static_cast<WorkerStart*>(user);
-          start->Owner->WorkerThreadFunction(start->Index);
-          return 0;
-        },
-        &state->Starts[index], 0, nullptr);
-    if (state->Threads[index] == nullptr)
+    if (!state->Threads[index].Start(
+            [](void* user) noexcept {
+              auto* start = static_cast<WorkerStart*>(user);
+              start->Owner->WorkerThreadFunction(start->Index);
+            },
+            &state->Starts[index]))
       break;
-#elif defined(GECKO_PLATFORM_LINUX)
-    const int result = ::pthread_create(
-        &state->Threads[index], nullptr,
-        [](void* user) -> void* {
-          auto* start = static_cast<WorkerStart*>(user);
-          start->Owner->WorkerThreadFunction(start->Index);
-          return nullptr;
-        },
-        &state->Starts[index]);
-    if (result != 0)
-      break;
-#endif
     ++state->WorkerCount;
   }
   return state->WorkerCount != 0;
@@ -228,31 +155,20 @@ void ThreadPoolJobSystem::Shutdown() noexcept
   if (state == nullptr)
     return;
 
-  Lock(*state);
-  state->ShuttingDown = true;
-  WakeAll(*state);
-  Unlock(*state);
+  {
+    LockGuard lock(state->JobMutex);
+    state->ShuttingDown = true;
+    WakeAll(*state);
+  }
 
   for (u32 index = 0; index < state->WorkerCount; ++index)
-  {
-#if defined(GECKO_PLATFORM_WINDOWS)
-    (void)::WaitForSingleObject(state->Threads[index], INFINITE);
-    (void)::CloseHandle(state->Threads[index]);
-#elif defined(GECKO_PLATFORM_LINUX)
-    (void)::pthread_join(state->Threads[index], nullptr);
-#endif
-  }
+    state->Threads[index].Join();
 
   for (JobSlot& slot : state->Jobs)
   {
     if (slot.Function.Free != nullptr && slot.Function.User != nullptr)
       slot.Function.Free(slot.Function.User);
   }
-#if defined(GECKO_PLATFORM_LINUX)
-  (void)::pthread_cond_destroy(&state->Complete);
-  (void)::pthread_cond_destroy(&state->Wake);
-  (void)::pthread_mutex_destroy(&state->Mutex);
-#endif
   state->~ThreadPoolState();
   DeallocBytes(state);
   m_State = nullptr;
@@ -275,37 +191,37 @@ JobHandle ThreadPoolJobSystem::SubmitRaw(JobFn job, const JobHandle* dependencie
   }
 
   ThreadPoolState& state = *m_State;
-  Lock(state);
-  JobSlot* destination = nullptr;
-  for (JobSlot& slot : state.Jobs)
+  JobHandle handle {};
   {
-    if (slot.State == JobState::Free)
+    LockGuard lock(state.JobMutex);
+    JobSlot* destination = nullptr;
+    for (JobSlot& slot : state.Jobs)
     {
-      destination = &slot;
-      break;
+      if (slot.State == JobState::Free)
+      {
+        destination = &slot;
+        break;
+      }
+    }
+    if (destination != nullptr && !state.ShuttingDown)
+    {
+      handle = JobHandle {state.NextJobId++};
+      *destination = JobSlot {
+          .Function = job,
+          .Handle = handle,
+          .JobLabel = label,
+          .DependencyCount = dependencyCount,
+          .Priority = priority,
+          .State = JobState::Queued,
+      };
+      for (u32 index = 0; index < dependencyCount; ++index)
+        destination->Dependencies[index] = dependencies[index];
+      WakeOne(state);
     }
   }
-  if (destination == nullptr || state.ShuttingDown)
-  {
-    Unlock(state);
-    if (job.Free != nullptr && job.User != nullptr)
-      job.Free(job.User);
-    return {};
-  }
 
-  const JobHandle handle {state.NextJobId++};
-  *destination = JobSlot {
-      .Function = job,
-      .Handle = handle,
-      .JobLabel = label,
-      .DependencyCount = dependencyCount,
-      .Priority = priority,
-      .State = JobState::Queued,
-  };
-  for (u32 index = 0; index < dependencyCount; ++index)
-    destination->Dependencies[index] = dependencies[index];
-  WakeOne(state);
-  Unlock(state);
+  if (!handle.IsValid() && job.Free != nullptr && job.User != nullptr)
+    job.Free(job.User);
   return handle;
 }
 
@@ -314,10 +230,9 @@ void ThreadPoolJobSystem::Wait(JobHandle handle) noexcept
   if (m_State == nullptr || !handle.IsValid())
     return;
   ThreadPoolState& state = *m_State;
-  Lock(state);
+  LockGuard lock(state.JobMutex);
   while (FindJob(state, handle) != nullptr)
     WaitForCompletion(state);
-  Unlock(state);
 }
 
 void ThreadPoolJobSystem::WaitAll(const JobHandle* handles, u32 count) noexcept
@@ -333,9 +248,8 @@ bool ThreadPoolJobSystem::IsComplete(JobHandle handle) noexcept
   if (m_State == nullptr || !handle.IsValid())
     return true;
   ThreadPoolState& state = *m_State;
-  Lock(state);
+  LockGuard lock(state.JobMutex);
   const bool complete = FindJob(state, handle) == nullptr;
-  Unlock(state);
   return complete;
 }
 
@@ -355,24 +269,15 @@ bool ThreadPoolJobSystem::RunOneJob() noexcept
   if (m_State == nullptr)
     return false;
   ThreadPoolState& state = *m_State;
-  Lock(state);
-  JobSlot* slot = TakeReadyJob(state);
-  Unlock(state);
+  JobSlot* slot = nullptr;
+  {
+    LockGuard lock(state.JobMutex);
+    slot = TakeReadyJob(state);
+  }
   if (slot == nullptr)
     return false;
 
-  PushMemoryLabel(slot->JobLabel);
-  slot->Function.Invoke(slot->Function.User);
-  PopMemoryLabel();
-  if (slot->Function.Free != nullptr && slot->Function.User != nullptr)
-    slot->Function.Free(slot->Function.User);
-
-  Lock(state);
-  slot->Function = {};
-  slot->State = JobState::Free;
-  SignalComplete(state);
-  WakeAll(state);
-  Unlock(state);
+  ExecuteJob(state, *slot);
   return true;
 }
 
@@ -388,16 +293,15 @@ void ThreadPoolJobSystem::WorkerThreadFunction(u32 workerIndex) noexcept
   ThreadPoolState& state = *m_State;
   for (;;)
   {
-    if (RunOneJob())
-      continue;
-    Lock(state);
-    if (state.ShuttingDown)
+    JobSlot* slot = nullptr;
     {
-      Unlock(state);
-      break;
+      LockGuard lock(state.JobMutex);
+      while (!state.ShuttingDown && (slot = TakeReadyJob(state)) == nullptr)
+        state.Wake.Wait(state.JobMutex);
+      if (state.ShuttingDown)
+        return;
     }
-    WaitForWake(state);
-    Unlock(state);
+    ExecuteJob(state, *slot);
   }
 }
 

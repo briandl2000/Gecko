@@ -302,7 +302,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
   cmdPoolCreateInfo.queueFamilyIndex = m_GraphicsQueueFamily;
   {
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateCommandPool");
-    VULKAN_CHECK(vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &m_GraphicsCommandPool));
+    if (vkCreateCommandPool(m_Device, &cmdPoolCreateInfo, nullptr, &m_GraphicsCommandPool) != VK_SUCCESS)
+    {
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateCommandPool failed");
+      return;
+    }
   }
 
   // -- Descriptor pool -------------------------------------------
@@ -321,7 +325,11 @@ VulkanDevice::VulkanDevice(const GraphicsDeviceDesc& desc) noexcept
     descPoolCreateInfo.poolSizeCount = 1;
     descPoolCreateInfo.pPoolSizes = poolSizes;
     GECKO_PROFILE_NAMED(labels::Vulkan, "vkCreateDescriptorPool");
-    VULKAN_CHECK(vkCreateDescriptorPool(m_Device, &descPoolCreateInfo, nullptr, &m_DescriptorPool));
+    if (vkCreateDescriptorPool(m_Device, &descPoolCreateInfo, nullptr, &m_DescriptorPool) != VK_SUCCESS)
+    {
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateDescriptorPool failed");
+      return;
+    }
   }
 
   m_Valid = true;
@@ -498,7 +506,11 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchai
 {
   // Query surface caps
   VkSurfaceCapabilitiesKHR surfaceCaps {};
-  VULKAN_CHECK(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, data.Surface, &surfaceCaps));
+  if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(m_PhysicalDevice, data.Surface, &surfaceCaps) != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: querying surface capabilities failed");
+    return false;
+  }
 
   // Extent
   VkExtent2D extent {};
@@ -520,14 +532,23 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchai
 
   // Format
   u32 formatCount = 0;
-  vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface, &formatCount, nullptr);
+  if (vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface, &formatCount, nullptr) != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: querying surface formats failed");
+    return false;
+  }
   if (formatCount == 0)
   {
     GECKO_ERROR(labels::Vulkan, "VulkanDevice: surface reports zero supported formats");
     return false;
   }
   Array<VkSurfaceFormatKHR> surfaceFormats(formatCount);
-  vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface, &formatCount, surfaceFormats.data());
+  if (vkGetPhysicalDeviceSurfaceFormatsKHR(m_PhysicalDevice, data.Surface, &formatCount, surfaceFormats.data()) !=
+      VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: reading surface formats failed");
+    return false;
+  }
 
   VkFormat wanted = ToVkFormat(data.Desc.Format);
   VkSurfaceFormatKHR chosenFormat = surfaceFormats[0];
@@ -546,9 +567,19 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchai
   if (!data.Desc.VSync)
   {
     u32 presentModeCount = 0;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount, nullptr);
+    if (vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount, nullptr) !=
+        VK_SUCCESS)
+    {
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: querying present modes failed");
+      return false;
+    }
     Array<VkPresentModeKHR> presentModes(presentModeCount);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount, presentModes.data());
+    if (vkGetPhysicalDeviceSurfacePresentModesKHR(m_PhysicalDevice, data.Surface, &presentModeCount,
+                                                  presentModes.data()) != VK_SUCCESS)
+    {
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: reading present modes failed");
+      return false;
+    }
     for (VkPresentModeKHR m : presentModes)
     {
       if (m == VK_PRESENT_MODE_IMMEDIATE_KHR)
@@ -592,11 +623,20 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchai
 
   // Images + views
   u32 realCount = 0;
-  vkGetSwapchainImagesKHR(m_Device, data.Swapchain, &realCount, nullptr);
-  if (realCount > MaxSwapchainImages)
-    realCount = MaxSwapchainImages;
+  if (vkGetSwapchainImagesKHR(m_Device, data.Swapchain, &realCount, nullptr) != VK_SUCCESS || realCount == 0 ||
+      realCount > MaxSwapchainImages)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: unsupported swapchain image count {}", realCount);
+    DestroySwapchainImages(data);
+    return false;
+  }
   data.ImageCount = realCount;
-  vkGetSwapchainImagesKHR(m_Device, data.Swapchain, &realCount, data.Images);
+  if (vkGetSwapchainImagesKHR(m_Device, data.Swapchain, &realCount, data.Images) != VK_SUCCESS)
+  {
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: reading swapchain images failed");
+    DestroySwapchainImages(data);
+    return false;
+  }
 
   for (u32 i = 0; i < realCount; ++i)
   {
@@ -609,40 +649,62 @@ bool VulkanDevice::BuildSwapchainResources(VulkanSwapchainData& data, VkSwapchai
     viewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewCreateInfo.subresourceRange.levelCount = 1;
     viewCreateInfo.subresourceRange.layerCount = 1;
-    VULKAN_CHECK(vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &data.ImageViews[i]));
-  }
-
-  // Sync objects.
-  // ImageAvailable + InFlight are per-frame-in-flight. RenderFinished is
-  // per-image: the present engine may still be holding the semaphore by
-  // the time the frame slot recycles, so it can't be reused across frames.
-  if (data.InFlight[0] == VK_NULL_HANDLE)
-  {
-    VkSemaphoreCreateInfo semaphoreCreateInfo {};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    VkFenceCreateInfo fenceCreateInfo {};
-    fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    for (u32 i = 0; i < MaxFramesInFlight; ++i)
+    if (vkCreateImageView(m_Device, &viewCreateInfo, nullptr, &data.ImageViews[i]) != VK_SUCCESS)
     {
-      VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr, &data.ImageAvailable[i]));
-      VULKAN_CHECK(vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &data.InFlight[i]));
-    }
-  }
-  {
-    VkSemaphoreCreateInfo semaphoreCreateInfo {};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    for (u32 i = 0; i < data.ImageCount; ++i)
-    {
-      if (data.RenderFinished[i] == VK_NULL_HANDLE)
-        VULKAN_CHECK(vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr, &data.RenderFinished[i]));
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: creating swapchain image view {} failed", i);
+      DestroySwapchainImages(data);
+      return false;
     }
   }
 
   return true;
 }
 
-void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data, bool destroySurface) noexcept
+bool VulkanDevice::CreateSwapchainSync(VulkanSwapchainData& data) noexcept
+{
+  VkSemaphoreCreateInfo semaphoreCreateInfo {};
+  semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+  VkFenceCreateInfo fenceCreateInfo {};
+  fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+  for (u32 i = 0; i < MaxFramesInFlight; ++i)
+  {
+    if (vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr, &data.ImageAvailable[i]) != VK_SUCCESS ||
+        vkCreateFence(m_Device, &fenceCreateInfo, nullptr, &data.InFlight[i]) != VK_SUCCESS)
+      goto failed;
+  }
+
+  // Allocate the fixed maximum once. Resizing then replaces only the
+  // swapchain images and never needs to mutate synchronization ownership.
+  for (u32 i = 0; i < MaxSwapchainImages; ++i)
+  {
+    if (vkCreateSemaphore(m_Device, &semaphoreCreateInfo, nullptr, &data.RenderFinished[i]) != VK_SUCCESS)
+      goto failed;
+  }
+  return true;
+
+failed:
+  GECKO_ERROR(labels::Vulkan, "VulkanDevice: creating swapchain synchronization failed");
+  for (u32 i = 0; i < MaxFramesInFlight; ++i)
+  {
+    if (data.ImageAvailable[i] != VK_NULL_HANDLE)
+      vkDestroySemaphore(m_Device, data.ImageAvailable[i], nullptr);
+    if (data.InFlight[i] != VK_NULL_HANDLE)
+      vkDestroyFence(m_Device, data.InFlight[i], nullptr);
+    data.ImageAvailable[i] = VK_NULL_HANDLE;
+    data.InFlight[i] = VK_NULL_HANDLE;
+  }
+  for (u32 i = 0; i < MaxSwapchainImages; ++i)
+  {
+    if (data.RenderFinished[i] != VK_NULL_HANDLE)
+      vkDestroySemaphore(m_Device, data.RenderFinished[i], nullptr);
+    data.RenderFinished[i] = VK_NULL_HANDLE;
+  }
+  return false;
+}
+
+void VulkanDevice::DestroySwapchainImages(VulkanSwapchainData& data) noexcept
 {
   for (u32 i = 0; i < data.ImageCount; ++i)
   {
@@ -659,6 +721,11 @@ void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data, bool des
     vkDestroySwapchainKHR(m_Device, data.Swapchain, nullptr);
     data.Swapchain = VK_NULL_HANDLE;
   }
+}
+
+void VulkanDevice::DestroySwapchainResources(VulkanSwapchainData& data, bool destroySurface) noexcept
+{
+  DestroySwapchainImages(data);
 
   if (destroySurface)
   {
@@ -721,7 +788,7 @@ Swapchain VulkanDevice::CreateSwapchain(const gecko::platform::NativeWindowHandl
     return Swapchain {};
   }
 
-  if (!BuildSwapchainResources(*data, VK_NULL_HANDLE))
+  if (!BuildSwapchainResources(*data, VK_NULL_HANDLE) || !CreateSwapchainSync(*data))
   {
     DestroySwapchainResources(*data, true);
     FreeObject(data);
@@ -763,23 +830,29 @@ void VulkanDevice::ResizeSwapchain(Swapchain& swapchain) noexcept
   data->Desc.Width = swapchain.Desc.Width;
   data->Desc.Height = swapchain.Desc.Height;
   vkDeviceWaitIdle(m_Device);
-  VkSwapchainKHR old = data->Swapchain;
-  data->Swapchain = VK_NULL_HANDLE;
-  // Destroy image views but keep surface + sync
-  for (u32 i = 0; i < data->ImageCount; ++i)
+
+  VulkanSwapchainData replacement {};
+  replacement.Surface = data->Surface;
+  replacement.Native = data->Native;
+  replacement.Desc = data->Desc;
+  if (!BuildSwapchainResources(replacement, data->Swapchain))
+    return;
+
+  DestroySwapchainImages(*data);
+  data->Swapchain = replacement.Swapchain;
+  data->Format = replacement.Format;
+  data->Extent = replacement.Extent;
+  data->ImageCount = replacement.ImageCount;
+  for (u32 i = 0; i < replacement.ImageCount; ++i)
   {
-    if (data->ImageViews[i] != VK_NULL_HANDLE)
-    {
-      vkDestroyImageView(m_Device, data->ImageViews[i], nullptr);
-      data->ImageViews[i] = VK_NULL_HANDLE;
-    }
+    data->Images[i] = replacement.Images[i];
+    data->ImageViews[i] = replacement.ImageViews[i];
+    data->ImageLayouts[i] = replacement.ImageLayouts[i];
   }
-  (void)BuildSwapchainResources(*data, old);
-  if (old != VK_NULL_HANDLE)
-    vkDestroySwapchainKHR(m_Device, old, nullptr);
 
   swapchain.Desc.Width = data->Extent.width;
   swapchain.Desc.Height = data->Extent.height;
+  swapchain.Desc.Format = FromVkFormat(data->Format);
 }
 
 FrameContext VulkanDevice::BeginFrame(Swapchain& swapchain) noexcept
@@ -1636,7 +1709,14 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(const GraphicsPipelineDesc
     descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descSetLayoutCreateInfo.bindingCount = numBindings;
     descSetLayoutCreateInfo.pBindings = bindings;
-    VULKAN_CHECK(vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo, nullptr, &dsl));
+    if (vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo, nullptr, &dsl) != VK_SUCCESS)
+    {
+      vkDestroyShaderModule(m_Device, vs, nullptr);
+      if (ps != VK_NULL_HANDLE)
+        vkDestroyShaderModule(m_Device, ps, nullptr);
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateDescriptorSetLayout failed");
+      return GraphicsPipeline {};
+    }
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &dsl;
   }
@@ -1652,7 +1732,16 @@ GraphicsPipeline VulkanDevice::CreateGraphicsPipeline(const GraphicsPipelineDesc
   }
 
   VkPipelineLayout layout = VK_NULL_HANDLE;
-  VULKAN_CHECK(vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo, nullptr, &layout));
+  if (vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo, nullptr, &layout) != VK_SUCCESS)
+  {
+    if (dsl != VK_NULL_HANDLE)
+      vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
+    vkDestroyShaderModule(m_Device, vs, nullptr);
+    if (ps != VK_NULL_HANDLE)
+      vkDestroyShaderModule(m_Device, ps, nullptr);
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreatePipelineLayout failed");
+    return GraphicsPipeline {};
+  }
 
   // Dynamic rendering info (VK_KHR_dynamic_rendering core in 1.3)
   VkFormat colorFormats[RenderTargetDesc::MaxRenderTargets] {};
@@ -1788,7 +1877,12 @@ ComputePipeline VulkanDevice::CreateComputePipeline(const ComputePipelineDesc& d
     descSetLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     descSetLayoutCreateInfo.bindingCount = numBindings;
     descSetLayoutCreateInfo.pBindings = bindings;
-    VULKAN_CHECK(vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo, nullptr, &dsl));
+    if (vkCreateDescriptorSetLayout(m_Device, &descSetLayoutCreateInfo, nullptr, &dsl) != VK_SUCCESS)
+    {
+      vkDestroyShaderModule(m_Device, cs, nullptr);
+      GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreateDescriptorSetLayout failed");
+      return ComputePipeline {};
+    }
     pipelineLayoutCreateInfo.setLayoutCount = 1;
     pipelineLayoutCreateInfo.pSetLayouts = &dsl;
   }
@@ -1804,7 +1898,14 @@ ComputePipeline VulkanDevice::CreateComputePipeline(const ComputePipelineDesc& d
   }
 
   VkPipelineLayout layout = VK_NULL_HANDLE;
-  VULKAN_CHECK(vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo, nullptr, &layout));
+  if (vkCreatePipelineLayout(m_Device, &pipelineLayoutCreateInfo, nullptr, &layout) != VK_SUCCESS)
+  {
+    if (dsl != VK_NULL_HANDLE)
+      vkDestroyDescriptorSetLayout(m_Device, dsl, nullptr);
+    vkDestroyShaderModule(m_Device, cs, nullptr);
+    GECKO_ERROR(labels::Vulkan, "VulkanDevice: vkCreatePipelineLayout failed");
+    return ComputePipeline {};
+  }
 
   VkPipelineShaderStageCreateInfo stage {};
   stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

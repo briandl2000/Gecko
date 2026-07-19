@@ -2,7 +2,7 @@
 
 #if defined(GECKO_PLATFORM_LINUX)
 
-#include "gecko/core/string.h"
+#include "gecko/core/containers/string.h"
 #include "gecko/platform/path_view.h"
 
 namespace gecko::platform::linux_io {

@@ -41,7 +41,10 @@ module(
 )
 ```
 
-Hover `module()`, `build_options()`, or `shader()` in Zed for every field. The important output kinds are:
+In the engine checkout, hover `module()`, `build_options()`, or `shader()` in
+Zed for every field. An external project gets the same Python completion when
+the SDK directory is visible to its Python analyzer. The important output
+kinds are:
 
 - `sources`: contributes compiled implementation.
 - `headers`: dependency and include boundary with no translation unit.

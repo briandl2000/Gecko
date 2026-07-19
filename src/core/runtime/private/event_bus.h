@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/services/events.h"
+#include "gecko/core/sync.h"
 
 namespace gecko::runtime {
 
@@ -47,13 +48,10 @@ private:
 
   void NotifySubscribers(EventCode code, const EventMeta& meta, EventView payload,
                          SubscriptionDelivery delivery) noexcept;
-  void Lock() const noexcept;
-  void Unlock() const noexcept;
-
   Subscriber m_Subscribers[MaxSubscribers] {};
   QueuedEvent m_Queue[MaxQueuedEvents] {};
   u64 m_Modules[MaxRegisteredModules] {};
-  mutable u32 m_Lock {0};
+  mutable Mutex m_Mutex;
   u32 m_QueueRead {0};
   u32 m_QueueCount {0};
   u32 m_ModuleCount {0};

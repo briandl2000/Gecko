@@ -1,6 +1,7 @@
 #include "gecko/core/services/memory.h"
 
 #include "gecko/core/placement.h"
+#include "gecko/core/sync.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -43,7 +44,7 @@ struct ArenaState
   usize Committed {0};
   Block* First {nullptr};
   Block* Last {nullptr};
-  u32 Lock {0};
+  SpinMutex Mutex;
   u64 LiveBytes {0};
   u64 PeakBytes {0};
   u64 AllocationCount {0};
@@ -56,26 +57,6 @@ thread_local u32 g_LabelDepth = 0;
 [[nodiscard]] constexpr usize AlignUp(usize value, usize alignment) noexcept
 {
   return (value + alignment - 1U) & ~(alignment - 1U);
-}
-
-void LockArena() noexcept
-{
-#if defined(_MSC_VER)
-  while (_InterlockedExchange(reinterpret_cast<volatile long*>(&g_Arena.Lock), 1) != 0)
-  {}
-#else
-  while (__atomic_exchange_n(&g_Arena.Lock, 1U, __ATOMIC_ACQUIRE) != 0)
-  {}
-#endif
-}
-
-void UnlockArena() noexcept
-{
-#if defined(_MSC_VER)
-  (void)_InterlockedExchange(reinterpret_cast<volatile long*>(&g_Arena.Lock), 0);
-#else
-  __atomic_store_n(&g_Arena.Lock, 0U, __ATOMIC_RELEASE);
-#endif
 }
 
 [[nodiscard]] bool ReserveArena() noexcept
@@ -111,18 +92,22 @@ void UnlockArena() noexcept
     return false;
 #endif
 
+  if (g_Arena.Last != nullptr && g_Arena.Last->Free)
+  {
+    // The committed range is contiguous with the free tail, so no new list
+    // node is needed. In particular, Last->Next must remain null: a node
+    // constructed at `start` would become interior storage after this merge.
+    g_Arena.Last->Size += commitSize;
+    g_Arena.Committed += commitSize;
+    return true;
+  }
+
   auto* block = new (start, Placement) Block {};
   block->Size = commitSize;
   block->Previous = g_Arena.Last;
   if (g_Arena.Last != nullptr)
   {
     g_Arena.Last->Next = block;
-    if (g_Arena.Last->Free)
-    {
-      g_Arena.Last->Size += block->Size;
-      g_Arena.Committed += commitSize;
-      return true;
-    }
   }
   else
   {
@@ -180,24 +165,33 @@ void OutOfMemory(u64 size) noexcept
   (void)size;
 }
 
+[[noreturn]] void InvalidMemoryOperation(const char* expression, const char* message, u32 line) noexcept
+{
+  AssertFailure(AssertInfo {
+      .Expression = expression,
+      .Message = message,
+      .File = __FILE__,
+      .Function = __func__,
+      .Line = line,
+  });
+}
+
 }  // namespace
 
 void* AllocBytes(u64 requestedSize, u32 requestedAlignment) noexcept
 {
-  GECKO_ASSERT(requestedSize != 0, "Cannot allocate zero bytes");
-  GECKO_ASSERT(requestedAlignment != 0 && (requestedAlignment & (requestedAlignment - 1U)) == 0,
-               "Alignment must be a power of two");
+  if (requestedSize == 0)
+    InvalidMemoryOperation("requestedSize != 0", "Cannot allocate zero bytes", __LINE__);
+  if (requestedAlignment == 0 || (requestedAlignment & (requestedAlignment - 1U)) != 0)
+    InvalidMemoryOperation("requestedAlignment is a power of two", "Invalid allocation alignment", __LINE__);
 
   const usize size = static_cast<usize>(requestedSize);
   const usize alignment =
       requestedAlignment > alignof(AllocationHeader) ? requestedAlignment : alignof(AllocationHeader);
 
-  LockArena();
+  LockGuard lock(g_Arena.Mutex);
   if (!ReserveArena())
-  {
-    UnlockArena();
     OutOfMemory(requestedSize);
-  }
 
   usize usedSize = 0;
   usize userOffset = 0;
@@ -206,14 +200,12 @@ void* AllocBytes(u64 requestedSize, u32 requestedAlignment) noexcept
   {
     const usize minimumCommit = sizeof(Block) + sizeof(AllocationHeader) + alignment - 1U + size;
     if (!CommitArena(minimumCommit))
-    {
-      UnlockArena();
       OutOfMemory(requestedSize);
-    }
     block = FindBlock(size, alignment, usedSize, userOffset);
   }
 
-  GECKO_ASSERT(block != nullptr, "Committed memory did not produce a free block");
+  if (block == nullptr)
+    OutOfMemory(requestedSize);
   SplitBlock(*block, usedSize);
   block->Free = false;
 
@@ -229,7 +221,6 @@ void* AllocBytes(u64 requestedSize, u32 requestedAlignment) noexcept
   if (g_Arena.LiveBytes > g_Arena.PeakBytes)
     g_Arena.PeakBytes = g_Arena.LiveBytes;
   ++g_Arena.AllocationCount;
-  UnlockArena();
   return user;
 }
 
@@ -239,11 +230,13 @@ void DeallocBytes(void* memory) noexcept
     return;
 
   auto* header = reinterpret_cast<AllocationHeader*>(static_cast<u8*>(memory) - sizeof(AllocationHeader));
-  GECKO_ASSERT(header->Magic == AllocationMagic, "Pointer was not allocated by Gecko");
+  if (header->Magic != AllocationMagic)
+    InvalidMemoryOperation("header->Magic == AllocationMagic", "Pointer was not allocated by Gecko", __LINE__);
 
-  LockArena();
+  LockGuard lock(g_Arena.Mutex);
   Block* block = header->Owner;
-  GECKO_ASSERT(block != nullptr && !block->Free, "Double free or corrupt allocation header");
+  if (block == nullptr || block->Free)
+    InvalidMemoryOperation("block != nullptr && !block->Free", "Double free or corrupt allocation header", __LINE__);
   g_Arena.LiveBytes -= header->RequestedSize;
   block->Free = true;
   header->Magic = 0;
@@ -268,12 +261,11 @@ void DeallocBytes(void* memory) noexcept
     else
       g_Arena.Last = previous;
   }
-  UnlockArena();
 }
 
 MemoryStats GetMemoryStats() noexcept
 {
-  LockArena();
+  LockGuard lock(g_Arena.Mutex);
   const MemoryStats stats {
       .ReservedBytes = g_Arena.Reserved,
       .CommittedBytes = g_Arena.Committed,
@@ -281,7 +273,6 @@ MemoryStats GetMemoryStats() noexcept
       .PeakBytes = g_Arena.PeakBytes,
       .AllocationCount = g_Arena.AllocationCount,
   };
-  UnlockArena();
   return stats;
 }
 

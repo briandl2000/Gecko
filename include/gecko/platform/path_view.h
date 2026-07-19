@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/core/string.h"
+#include "gecko/core/containers/string.h"
 
 namespace gecko::platform {
 

@@ -21,7 +21,7 @@
 ///   empty / no-op.
 
 #include "gecko/api.h"
-#include "gecko/core/string.h"
+#include "gecko/core/containers/string.h"
 
 namespace gecko::platform {
 

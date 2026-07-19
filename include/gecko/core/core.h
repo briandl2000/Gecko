@@ -1,9 +1,12 @@
 #pragma once
 
-#include "gecko/core/array.h"
 #include "gecko/core/assert.h"
+#include "gecko/core/atomic.h"
+#include "gecko/core/containers/array.h"
+#include "gecko/core/containers/hash_map.h"
+#include "gecko/core/containers/string.h"
+#include "gecko/core/defer.h"
 #include "gecko/core/format.h"
-#include "gecko/core/hash_map.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/optional.h"
 #include "gecko/core/placement.h"
@@ -11,7 +14,6 @@
 #include "gecko/core/scope.h"
 #include "gecko/core/services.h"
 #include "gecko/core/span.h"
-#include "gecko/core/string.h"
 #include "gecko/core/sync.h"
 #include "gecko/core/types.h"
 #include "gecko/core/utility/bit.h"

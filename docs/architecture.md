@@ -31,7 +31,7 @@ Shaders have logical names scoped to their module. The driver invokes `glslc -mf
 
 ## SDK boundary
 
-The downloadable SDK contains `build.py`, public headers, a prebuilt Gecko module description, and Debug/Release libraries. The same module description builds against a source checkout or an unpacked SDK. CI stages the exact SDK directory, uses its copied driver and public artifacts to rebuild the sandbox consumer, runs it headlessly, and only then packages it.
+The downloadable SDK contains `build.py`, public headers, consumer guides, and Debug/Release libraries. The same project module description builds against a source checkout or an unpacked SDK. CI stages the exact SDK directory, uses its copied driver and public artifacts to rebuild the sandbox consumer, runs it headlessly, and only then packages it.
 
 Configuration uses plain value structs with default member initializers. Module settings stay nested by value in `GeckoConfig`; there is no config registry, dependency injection graph, or interchangeable core service hierarchy.
 

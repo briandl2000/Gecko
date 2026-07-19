@@ -1,11 +1,8 @@
 #pragma once
 
+#include "gecko/core/atomic.h"
 #include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
-
-#if defined(_MSC_VER)
-#include <intrin.h>
-#endif
 
 namespace gecko {
 
@@ -22,27 +19,19 @@ void DestroyObject(void* object) noexcept
 
 struct SharedControl
 {
-  u32 References {1};
+  AtomicU32 References {1};
   void* Object {nullptr};
   void (*Destroy)(SharedControl*) noexcept {nullptr};
 };
 
 inline void AddReference(SharedControl* control) noexcept
 {
-#if defined(_MSC_VER)
-  (void)_InterlockedIncrement(reinterpret_cast<volatile long*>(&control->References));
-#else
-  (void)__atomic_add_fetch(&control->References, 1U, __ATOMIC_RELAXED);
-#endif
+  (void)control->References.Increment();
 }
 
 inline bool RemoveReference(SharedControl* control) noexcept
 {
-#if defined(_MSC_VER)
-  return _InterlockedDecrement(reinterpret_cast<volatile long*>(&control->References)) == 0;
-#else
-  return __atomic_sub_fetch(&control->References, 1U, __ATOMIC_ACQ_REL) == 0;
-#endif
+  return control->References.Decrement() == 0;
 }
 
 template <typename Deleter>

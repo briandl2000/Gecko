@@ -38,7 +38,7 @@ public:
   void End() noexcept override;
   [[nodiscard]] bool IsValid() const noexcept override
   {
-    return m_CmdBuffer != VK_NULL_HANDLE;
+    return m_CmdBuffer != VK_NULL_HANDLE && m_DescPool != VK_NULL_HANDLE;
   }
 
   void BeginRendering(const BeginRenderingInfo& info) noexcept override;

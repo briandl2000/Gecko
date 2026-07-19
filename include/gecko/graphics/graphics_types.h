@@ -800,6 +800,8 @@ struct GraphicsPipelineDesc
   {
     if (!VertexShader.IsValid())
       return false;
+    if (NumRenderTargets > RenderTargetDesc::MaxRenderTargets || NumPipelineResources > MaxPipelineResources)
+      return false;
     if (NumRenderTargets == 0 && DepthStencilFormat == DataFormat::None)
       return false;
     for (u32 i = 0; i < NumRenderTargets; ++i)
@@ -851,6 +853,8 @@ struct ComputePipelineDesc
   [[nodiscard]] bool IsValid() const noexcept
   {
     if (!ComputeShader.IsValid())
+      return false;
+    if (NumPipelineResources > MaxPipelineResources)
       return false;
     if (PushConstantBytes > MaxPushConstantBytes || (PushConstantBytes % 4) != 0)
       return false;

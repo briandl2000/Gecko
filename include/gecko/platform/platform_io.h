@@ -1,11 +1,11 @@
 #pragma once
 
 #include "gecko/api.h"
-#include "gecko/core/array.h"
+#include "gecko/core/containers/array.h"
 #include "gecko/core/optional.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/span.h"
-#include "gecko/core/string.h"
+#include "gecko/core/containers/string.h"
 #include "gecko/core/types.h"
 #include "gecko/platform/path_view.h"
 

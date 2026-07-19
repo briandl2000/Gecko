@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/services/log.h"
+#include "gecko/core/sync.h"
 
 namespace gecko::runtime {
 
@@ -24,7 +25,7 @@ public:
   {}
 
 private:
-  u32 m_Lock {0};
+  Mutex m_Mutex;
   LogLevel m_Level {LogLevel::Info};
 };
 

@@ -1,9 +1,6 @@
 #include "gecko/core/services/profiler.h"
-#include "gecko/core/string.h"
-
-#if defined(_MSC_VER)
-#include <intrin.h>
-#endif
+#include "gecko/core/containers/string.h"
+#include "gecko/core/sync.h"
 
 namespace gecko {
 
@@ -17,28 +14,8 @@ struct ThreadNameEntry
 };
 
 ThreadNameEntry g_ThreadNames[64] {};
-u32 g_ThreadNameLock = 0;
+SpinMutex g_ThreadNameMutex;
 thread_local StaticString<63> g_CurrentThreadName;
-
-void LockThreadNames() noexcept
-{
-#if defined(_MSC_VER)
-  while (_InterlockedExchange(reinterpret_cast<volatile long*>(&g_ThreadNameLock), 1) != 0)
-  {}
-#else
-  while (__atomic_exchange_n(&g_ThreadNameLock, 1U, __ATOMIC_ACQUIRE) != 0)
-  {}
-#endif
-}
-
-void UnlockThreadNames() noexcept
-{
-#if defined(_MSC_VER)
-  (void)_InterlockedExchange(reinterpret_cast<volatile long*>(&g_ThreadNameLock), 0);
-#else
-  __atomic_store_n(&g_ThreadNameLock, 0U, __ATOMIC_RELEASE);
-#endif
-}
 
 }  // namespace
 
@@ -57,7 +34,7 @@ const char* GetThreadProfilerName() noexcept
 
 const char* LookupThreadProfilerName(u32 threadId) noexcept
 {
-  LockThreadNames();
+  LockGuard lock(g_ThreadNameMutex);
   const char* result = nullptr;
   for (const ThreadNameEntry& entry : g_ThreadNames)
   {
@@ -67,13 +44,12 @@ const char* LookupThreadProfilerName(u32 threadId) noexcept
       break;
     }
   }
-  UnlockThreadNames();
   return result;
 }
 
 void RegisterThreadProfilerName(u32 threadId, const char* name) noexcept
 {
-  LockThreadNames();
+  LockGuard lock(g_ThreadNameMutex);
   ThreadNameEntry* destination = nullptr;
   for (ThreadNameEntry& entry : g_ThreadNames)
   {
@@ -93,7 +69,6 @@ void RegisterThreadProfilerName(u32 threadId, const char* name) noexcept
     if (name != nullptr)
       destination->Name.Append(StringView {name}.Substring(0, 63));
   }
-  UnlockThreadNames();
 }
 
 }  // namespace gecko

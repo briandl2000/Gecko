@@ -873,8 +873,12 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
             command += [*map(str, sources), *map(str, protocol_objects), f"-L{gecko.link_library.parent}",
                         "-lGecko", "-Wl,-rpath,$ORIGIN"]
             command += libraries + ["-o", str(output)]
-        if stale(output, inputs):
+        signature = hashlib.sha256("\0".join(map(str, command)).encode()).hexdigest()
+        signature_file = directories.objects / f"{safe_name(value.name)}.signature"
+        signature_changed = not signature_file.is_file() or signature_file.read_text() != signature
+        if signature_changed or stale(output, inputs):
             run("LINK", output.name, command)
+            write_if_changed(signature_file, signature)
         built_outputs[value.root] = output
 
     runtime_target = directories.binary / gecko.runtime_library.name
@@ -893,14 +897,19 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
 def stage_sdk(root: Path, config: str, destination: Path) -> None:
     artifact = build_engine(root, config)
     shutil.copytree(root / "include", destination / "include", dirs_exist_ok=True)
-    shutil.copytree(root / "docs", destination / "docs", dirs_exist_ok=True)
+    docs = destination / "docs"
+    docs.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(root / "docs/sdk-project.md", docs / "sdk-project.md")
+    shutil.copy2(root / "docs/build-system.md", docs / "build-system.md")
     shutil.copy2(root / "build.py", destination / "build.py")
     shutil.copy2(root / "LICENSE", destination / "LICENSE")
-    shutil.copy2(root / "THIRD_PARTY_NOTICES.md", destination / "THIRD_PARTY_NOTICES.md")
-    shutil.copy2(root / "README.md", destination / "README.md")
-    module_dir = destination / "modules" / "gecko"
-    module_dir.mkdir(parents=True, exist_ok=True)
-    write_if_changed(module_dir / "module.py", 'from build import module\n\nmodule(name="gecko", output="prebuilt")\n')
+    shutil.copy2(root / "docs/third-party-notices.txt", destination / "THIRD_PARTY_NOTICES.txt")
+    write_if_changed(
+        destination / "README.md",
+        "# Gecko SDK\n\n"
+        "This package contains Gecko's public headers, Debug and Release shared libraries, and the "
+        "single-file project build driver. Start with [the project tutorial](docs/sdk-project.md).\n",
+    )
     config_dir = destination / "lib" / config_name(config)
     config_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(artifact.runtime_library, config_dir / artifact.runtime_library.name)
@@ -941,46 +950,56 @@ def sdk_test(root: Path, config: str) -> None:
 # Command line
 # ---------------------------------------------------------------------------
 
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Build Gecko or a Gecko project.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""examples:
+def parse_arguments(source_checkout: bool) -> argparse.Namespace:
+    if source_checkout:
+        default_target = "sandbox"
+        target_help = "engine, sandbox, sdk-test, graph, sdk, clean, or a module directory"
+        examples = """examples:
   python3 build.py                         build the Debug sandbox
   python3 build.py engine --config release
   python3 build.py sdk-test --config release
   python3 build.py ../MyGame --output ../MyGame/out
   python3 build.py graph                   show engine dependency order
   python3 build.py sdk                     stage Debug and Release SDKs
-""",
+"""
+    else:
+        default_target = "."
+        target_help = "clean or a project module directory (default: current directory)"
+        examples = """examples:
+  python3 /path/to/GeckoSDK/build.py       build the project in the current directory
+  python3 /path/to/GeckoSDK/build.py . --config release
+  python3 /path/to/GeckoSDK/build.py clean
+"""
+    parser = argparse.ArgumentParser(
+        description="Build Gecko or a Gecko project.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=examples,
     )
-    parser.add_argument("target", nargs="?", default="sandbox",
-                        help="engine, sandbox, sdk-test, graph, sdk, clean, or a module directory")
+    parser.add_argument("target", nargs="?", default=default_target, help=target_help)
     parser.add_argument("-c", "--config", choices=("debug", "release"), default="debug",
                         help="build configuration (default: debug)")
     parser.add_argument("-o", "--output", type=Path, default=None,
-                        help="output root for an external project (default: ./out)")
+                        help="output root for a project (default: the project's out directory)")
     return parser.parse_args()
 
 
 def main() -> None:
     global _compile_commands_path
-    arguments = parse_arguments()
     root = Path(__file__).resolve().parent
+    source_checkout = (root / "src/gecko_engine.cpp").is_file()
+    arguments = parse_arguments(source_checkout)
     target = arguments.target
     config = arguments.config
-    source_checkout = (root / "src/gecko_engine.cpp").is_file()
 
     if source_checkout:
         _compile_commands_path = root / "compile_commands.json"
-    elif target not in {"clean", "graph", "sdk"}:
-        _compile_commands_path = Path.cwd() / "compile_commands.json"
 
     if target == "clean":
-        output = root / "out"
+        clean_root = root if source_checkout else Path.cwd()
+        output = clean_root / "out"
         if output.exists():
             shutil.rmtree(output)
-        compile_commands = root / "compile_commands.json"
+        compile_commands = clean_root / "compile_commands.json"
         if compile_commands.exists():
             compile_commands.unlink()
         print(f"[CLEAN] {output}")
@@ -1008,7 +1027,8 @@ def main() -> None:
         sdk_test(root, config)
     else:
         module_root = Path(target).resolve()
-        output = arguments.output.resolve() if arguments.output else Path.cwd() / "out"
+        _compile_commands_path = module_root / "compile_commands.json"
+        output = arguments.output.resolve() if arguments.output else module_root / "out"
         build_project(root, module_root, config, output)
     write_compile_commands()
     print(f"[DONE ] {config_name(config)} {target}")

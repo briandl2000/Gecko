@@ -1,6 +1,7 @@
 #include "private/immediate_logger.h"
 
 #include "gecko/core/assert.h"
+#include "gecko/core/defer.h"
 
 #if defined(GECKO_PLATFORM_WINDOWS)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -79,14 +80,8 @@ void ImmediateLogger::LogFormatted(LogLevel level, Label label, const char* form
   if (g_LogActive)
     return;
   g_LogActive = true;
-
-#if defined(_MSC_VER)
-  while (_InterlockedExchange(reinterpret_cast<volatile long*>(&m_Lock), 1) != 0)
-  {}
-#else
-  while (__atomic_exchange_n(&m_Lock, 1U, __ATOMIC_ACQUIRE) != 0)
-  {}
-#endif
+  auto resetActive = Defer([]() noexcept { g_LogActive = false; });
+  LockGuard lock(m_Mutex);
 
   char output[2048] {};
   usize length = 0;
@@ -108,13 +103,6 @@ void ImmediateLogger::LogFormatted(LogLevel level, Label label, const char* form
   output[length] = '\0';
 
   WriteLog(level >= LogLevel::Warn, output, length);
-
-#if defined(_MSC_VER)
-  (void)_InterlockedExchange(reinterpret_cast<volatile long*>(&m_Lock), 0);
-#else
-  __atomic_store_n(&m_Lock, 0U, __ATOMIC_RELEASE);
-#endif
-  g_LogActive = false;
 }
 
 }  // namespace gecko::runtime

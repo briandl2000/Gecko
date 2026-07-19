@@ -1,7 +1,7 @@
 #include "gecko/debug_renderer/debug_renderer.h"
 
 #include "debug_renderer/Shaders.generated.h"
-#include "gecko/core/array.h"
+#include "gecko/core/containers/array.h"
 #include "gecko/core/services/log.h"
 #include "gecko/graphics/graphics.h"
 

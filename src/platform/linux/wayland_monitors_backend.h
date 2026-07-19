@@ -3,7 +3,7 @@
 #if defined(GECKO_PLATFORM_LINUX) && defined(GECKO_PLATFORM_LINUX_WAYLAND)
 
 #include "gecko/platform/monitors_interface.h"
-#include "gecko/core/hash_map.h"
+#include "gecko/core/containers/hash_map.h"
 #include <wayland-client.h>
 
 namespace gecko::platform {

@@ -9,7 +9,7 @@
 /// automatically when the destination is not a TTY.
 
 #include "gecko/api.h"
-#include "gecko/core/string.h"
+#include "gecko/core/containers/string.h"
 #include "gecko/core/types.h"
 
 namespace gecko::platform {

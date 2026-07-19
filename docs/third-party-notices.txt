@@ -1,17 +1,17 @@
-# Third-party notices
+THIRD-PARTY NOTICES
 
 Gecko's Linux library contains client protocol code generated from the
-Wayland `xdg-shell` and `xdg-decoration` protocol descriptions. The following
+Wayland xdg-shell and xdg-decoration protocol descriptions. The following
 notice applies to that generated code.
 
-## Wayland protocols
+Wayland protocols
 
-Copyright © 2008-2013 Kristian Høgsberg  
-Copyright © 2013 Rafael Antognolli  
-Copyright © 2013 Jasper St. Pierre  
-Copyright © 2010-2013 Intel Corporation  
-Copyright © 2015-2017 Samsung Electronics Co., Ltd  
-Copyright © 2015-2017 Red Hat Inc.  
+Copyright © 2008-2013 Kristian Høgsberg
+Copyright © 2013 Rafael Antognolli
+Copyright © 2013 Jasper St. Pierre
+Copyright © 2010-2013 Intel Corporation
+Copyright © 2015-2017 Samsung Electronics Co., Ltd
+Copyright © 2015-2017 Red Hat Inc.
 Copyright © 2018 Simon Ser
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

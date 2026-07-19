@@ -8,26 +8,6 @@ namespace gecko::runtime {
 RingProfiler::RingProfiler(usize) noexcept
 {}
 
-void RingProfiler::Lock() const noexcept
-{
-#if defined(_MSC_VER)
-  while (_InterlockedExchange(reinterpret_cast<volatile long*>(&m_Lock), 1) != 0)
-  {}
-#else
-  while (__atomic_exchange_n(&m_Lock, 1U, __ATOMIC_ACQUIRE) != 0)
-  {}
-#endif
-}
-
-void RingProfiler::Unlock() const noexcept
-{
-#if defined(_MSC_VER)
-  (void)_InterlockedExchange(reinterpret_cast<volatile long*>(&m_Lock), 0);
-#else
-  __atomic_store_n(&m_Lock, 0U, __ATOMIC_RELEASE);
-#endif
-}
-
 bool RingProfiler::Init() noexcept
 {
   m_Initialized = true;
@@ -46,16 +26,14 @@ u64 RingProfiler::NowNs() const noexcept
 
 void RingProfiler::SetMinLevel(ProfLevel level) noexcept
 {
-  Lock();
+  LockGuard lock(m_Mutex);
   m_MinLevel = level;
-  Unlock();
 }
 
 ProfLevel RingProfiler::GetMinLevel() const noexcept
 {
-  Lock();
+  LockGuard lock(m_Mutex);
   const ProfLevel level = m_MinLevel;
-  Unlock();
   return level;
 }
 
@@ -68,7 +46,7 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
 {
   if (!m_Initialized || !IsLevelEnabled(event.Level))
     return;
-  Lock();
+  LockGuard lock(m_Mutex);
   if (event.Kind == ProfEventKind::ZoneBegin)
   {
     for (OpenZone& zone : m_OpenZones)
@@ -80,7 +58,6 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
                          .ThreadId = event.ThreadId,
                          .Source = event.Source,
                          .Active = true};
-        Unlock();
         return;
       }
     }
@@ -90,7 +67,6 @@ void RingProfiler::Emit(const ProfEvent& event) noexcept
   {
     FinishZone(event);
   }
-  Unlock();
 }
 
 void RingProfiler::FinishZone(const ProfEvent& event) noexcept
@@ -144,7 +120,7 @@ void RingProfiler::FinishZone(const ProfEvent& event) noexcept
 
 ScopeStats RingProfiler::GetStats(u32 nameHash, ProfSource source) const noexcept
 {
-  Lock();
+  LockGuard lock(m_Mutex);
   ScopeStats result {};
   for (const StatsSlot& slot : m_Stats)
   {
@@ -154,28 +130,25 @@ ScopeStats RingProfiler::GetStats(u32 nameHash, ProfSource source) const noexcep
       break;
     }
   }
-  Unlock();
   return result;
 }
 
 void RingProfiler::ResetStats() noexcept
 {
-  Lock();
+  LockGuard lock(m_Mutex);
   for (StatsSlot& slot : m_Stats)
     slot = {};
   m_Diagnostics = {};
-  Unlock();
 }
 
 void RingProfiler::ForEachScope(ForEachScopeFn callback, void* user) const noexcept
 {
   if (callback == nullptr)
     return;
-  Lock();
+  LockGuard lock(m_Mutex);
   for (const StatsSlot& slot : m_Stats)
     if (slot.Active)
       callback(slot.Name, slot.NameHash, slot.Source, slot.Stats, user);
-  Unlock();
 }
 
 namespace {
@@ -203,9 +176,8 @@ void RingProfiler::DumpStats(Label label) const noexcept
 
 ProfilerDiagnostics RingProfiler::GetDiagnostics() const noexcept
 {
-  Lock();
+  LockGuard lock(m_Mutex);
   const ProfilerDiagnostics diagnostics = m_Diagnostics;
-  Unlock();
   return diagnostics;
 }
 

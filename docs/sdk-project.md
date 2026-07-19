@@ -81,6 +81,9 @@ python3 /path/to/GeckoSDK/build.py . --config release
 
 Every successful build also writes `compile_commands.json` in the project
 directory so Zed/clangd can navigate the real compiler configuration.
+C++ completion and navigation therefore work without copying editor flags.
+For Python completion in `module.py`, add the SDK directory to Zed's workspace
+or Python analysis paths so it can resolve the SDK's `build.py` module.
 
 ## 3. Grow from the working boundary
 
@@ -96,5 +99,5 @@ loads the library, and resolves `GeckoPlugin_GetApi`. Gecko's launcher and
 sandbox are the reference host/plugin pair.
 
 When shipping a game with the Gecko shared library, place `LICENSE` and
-`THIRD_PARTY_NOTICES.md` in the distribution. The MIT license applies to
+`THIRD_PARTY_NOTICES.txt` in the distribution. The MIT license applies to
 Gecko, not to the game's own code or assets.

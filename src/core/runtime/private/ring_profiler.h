@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gecko/core/services/profiler.h"
+#include "gecko/core/sync.h"
 
 namespace gecko::runtime {
 
@@ -44,13 +45,11 @@ private:
     bool Active {false};
   };
 
-  void Lock() const noexcept;
-  void Unlock() const noexcept;
   void FinishZone(const ProfEvent& event) noexcept;
 
   StatsSlot m_Stats[StatsCapacity] {};
   OpenZone m_OpenZones[OpenZoneCapacity] {};
-  mutable u32 m_Lock {0};
+  mutable Mutex m_Mutex;
   ProfLevel m_MinLevel {ProfLevel::Detailed};
   ProfilerDiagnostics m_Diagnostics {};
   bool m_Initialized {false};
