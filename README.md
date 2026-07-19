@@ -41,7 +41,7 @@ python3 ../Gecko/build.py ../MyProject
 python3 ../GeckoSDK/build.py ../MyProject --config release
 ```
 
-See [development](docs/development.md), [architecture](docs/architecture.md), and [coding style](docs/coding-style.md).
+See the [build-system guide](docs/build-system.md), [development workflow](docs/development.md), [architecture](docs/architecture.md), and [coding style](docs/coding-style.md).
 
 Development releases use `v0.0.0-alpha.N`. Pull requests and pushes to `dev` or `main` build and test Linux and Windows SDKs; pushes publish the tested packages.
 

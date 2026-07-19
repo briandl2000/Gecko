@@ -33,6 +33,8 @@ sys.modules.setdefault("build", sys.modules[__name__])
 
 @dataclass
 class Shader:
+    """One shader declaration owned and namespaced by a module."""
+
     name: str
     path: str
     stage: str | None = None
@@ -41,6 +43,8 @@ class Shader:
 
 @dataclass
 class Module:
+    """Loaded representation of one ``module.py`` declaration."""
+
     root: Path
     name: str
     output: str = "sources"
@@ -104,7 +108,32 @@ def module(
     shaders: list[Shader] | None = None,
     shader_namespace: str | None = None,
 ) -> None:
-    """Declare the module in the current module.py file."""
+    """Declare the single build node owned by the current directory.
+
+    Prefer one unity source per source module. Declare direct dependencies even
+    when another dependency already reaches them transitively; the graph is
+    also the readable statement of the subsystem boundary.
+
+    Args:
+        name: Stable project-wide name. Names must be unique in a build graph.
+        output: ``sources`` or ``headers`` for a contributing module;
+            ``executable`` or ``plugin`` for a final project; ``engine`` for
+            Gecko's source root. ``prebuilt`` is reserved for the staged SDK.
+        output_name: Filename stem for an executable or plugin. Defaults to
+            ``name``.
+        unity: C++ unity source relative to this ``module.py``. This is the
+            recommended source-module entrypoint.
+        sources: Additional C++ sources relative to this directory. Use when a
+            source genuinely should remain a separate translation unit.
+        requires: Direct dependency directories relative to this module. Use
+            the special name ``gecko`` when building against the engine.
+        include_dirs: Additional include roots relative to this module.
+        defines: Preprocessor definitions applied to this module's consumer.
+        system_libraries: Platform linker arguments required by the module.
+        shaders: Shader declarations produced by :func:`shader`.
+        shader_namespace: C++ namespace for generated shader symbols. A stable,
+            module-owned namespace is recommended for public code.
+    """
     global _loaded_module
     if _loading_root is None:
         raise RuntimeError("module() may only be called while loading module.py")
@@ -127,7 +156,13 @@ def module(
 
 
 def shader(name: str, path: str, *, stage: str | None = None, entry: str = "main") -> Shader:
-    """Describe one HLSL shader that should be embedded in its module."""
+    """Describe one HLSL shader embedded in its module's final binary.
+
+    ``name`` becomes the generated C++ symbol and must be an identifier. The
+    stage is inferred from names such as ``.vert.hlsl`` and ``.frag.hlsl``;
+    pass ``stage`` only for a non-standard filename. ``path`` is relative to
+    the declaring ``module.py``.
+    """
     return Shader(name=name, path=path, stage=stage, entry=entry)
 
 
@@ -141,11 +176,18 @@ def fail(message: str) -> NoReturn:
 
 def run(label: str, description: str, arguments: list[str], *, cwd: Path | None = None) -> None:
     print(f"[{label:<5}] {description}", flush=True)
-    subprocess.run(arguments, cwd=cwd, check=True)
+    result = subprocess.run(arguments, cwd=cwd, check=False)
+    if result.returncode != 0:
+        fail(f"[FAIL ] {description} ({label}, exit {result.returncode})")
 
 
 def capture(arguments: list[str]) -> str:
-    return subprocess.check_output(arguments, text=True).strip()
+    result = subprocess.run(arguments, text=True, capture_output=True, check=False)
+    if result.returncode != 0:
+        if result.stderr:
+            print(result.stderr.rstrip(), file=sys.stderr)
+        fail(f"[FAIL ] {Path(arguments[0]).name} exited with code {result.returncode}")
+    return result.stdout.strip()
 
 
 def require_tool(name: str) -> str:
@@ -461,10 +503,11 @@ def build_shaders(module_value: Module, generated_root: Path) -> tuple[list[Path
 def build_engine(root: Path, config: str) -> GeckoArtifact:
     if not (root / "src/gecko_engine.cpp").is_file():
         fail("this SDK contains a prebuilt Gecko engine; the engine target requires a source checkout")
-    modules = load_graph(root)
+    engine_root = root / "src"
+    modules = load_graph(engine_root)
     engine_module = modules[-1]
     if engine_module.output != "engine":
-        fail(f"{root / 'module.py'} must declare output='engine'")
+        fail(f"{engine_root / 'module.py'} must declare output='engine'")
     directories = BuildDirectories.create(root / "out", config)
 
     if os.name == "nt":
@@ -497,7 +540,7 @@ def engine_compile_units(modules: list[Module]) -> list[tuple[Module, int, Path]
 
 def engine_inputs(root: Path, value: Module, generated_inputs: list[Path], modules: list[Module]) -> list[Path]:
     inputs = [root / "build.py", value.root / "module.py", root / "include/gecko/api.h", *generated_inputs]
-    if value.root == root:
+    if value.output == "engine":
         inputs += files_under(root / "include", (".h", ".hpp"))
         inputs += files_under(root / "src", (".h", ".hpp"))
         inputs += value.source_paths()
@@ -844,7 +887,7 @@ def main() -> None:
     if target == "graph":
         if not source_checkout:
             fail("the graph target requires a Gecko source checkout")
-        print_graph(load_graph(root))
+        print_graph(load_graph(root / "src"))
         return
     if target == "sdk":
         if not source_checkout:
