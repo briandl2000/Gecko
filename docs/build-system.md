@@ -22,20 +22,23 @@ projects/launcher/module.py    executable project
 projects/sandbox/module.py     plugin project
 ```
 
-A typical module is deliberately small:
+A typical module is deliberately small. Platform-specific requirements stay
+with the module that uses them:
 
 ```python
-from build import module, shader
+from build import build_options, module, shader
 
 module(
     name="debug_renderer",
     unity="gecko_debug_renderer.cpp",
     requires=["../core", "../graphics"],
+    windows=build_options(libraries=["example.lib"]),
+    linux=build_options(packages=["example"]),
     shaders=[shader("DebugLineVertex", "shaders/debug_line.vert.hlsl")],
 )
 ```
 
-Hover `module()` or `shader()` in Zed for every field. The important output kinds are:
+Hover `module()`, `build_options()`, or `shader()` in Zed for every field. The important output kinds are:
 
 - `sources`: contributes compiled implementation.
 - `headers`: dependency and include boundary with no translation unit.
@@ -46,11 +49,17 @@ Hover `module()` or `shader()` in Zed for every field. The important output kind
 Recommended conventions:
 
 - Use one subsystem directory and one unity source per source module.
-- Declare direct dependencies, not only the minimum transitive path.
+- Declare modules whose API you use directly. Their dependencies are inherited;
+  a module requiring Platform does not repeat Core unless it also uses Core.
 - Keep the graph acyclic; duplicate module names are rejected.
 - Use `sources=` only when code must remain a separate translation unit.
 - Give shaders logical names and let the driver own generated paths.
-- Keep compiler and platform policy in `build.py`, not individual modules.
+- Put optional backend defines, native libraries, and `pkg-config` packages in
+  their owning module. The driver only resolves and invokes the tools.
+
+Shader declarations remain in their owning module, while compilation and
+embedding remain generic driver operations. Graphics consumes shader bytes at
+runtime; it does not need to know how a project chose to produce them.
 
 ## What a build does
 

@@ -42,6 +42,24 @@ class Shader:
 
 
 @dataclass
+class WaylandProtocol:
+    """One Wayland protocol generated for a module on Linux."""
+
+    name: str
+    path: str
+
+
+@dataclass
+class BuildOptions:
+    """Platform-specific compile and link requirements for a module."""
+
+    defines: list[str] = field(default_factory=list)
+    libraries: list[str] = field(default_factory=list)
+    packages: list[str] = field(default_factory=list)
+    wayland_protocols: list[WaylandProtocol] = field(default_factory=list)
+
+
+@dataclass
 class Module:
     """Loaded representation of one ``module.py`` declaration."""
 
@@ -54,7 +72,8 @@ class Module:
     requires: list[str] = field(default_factory=list)
     include_dirs: list[str] = field(default_factory=list)
     defines: list[str] = field(default_factory=list)
-    system_libraries: list[str] = field(default_factory=list)
+    windows: BuildOptions = field(default_factory=BuildOptions)
+    linux: BuildOptions = field(default_factory=BuildOptions)
     shaders: list[Shader] = field(default_factory=list)
     shader_namespace: str | None = None
 
@@ -104,15 +123,16 @@ def module(
     requires: list[str] | None = None,
     include_dirs: list[str] | None = None,
     defines: list[str] | None = None,
-    system_libraries: list[str] | None = None,
+    windows: BuildOptions | None = None,
+    linux: BuildOptions | None = None,
     shaders: list[Shader] | None = None,
     shader_namespace: str | None = None,
 ) -> None:
     """Declare the single build node owned by the current directory.
 
-    Prefer one unity source per source module. Declare direct dependencies even
-    when another dependency already reaches them transitively; the graph is
-    also the readable statement of the subsystem boundary.
+    Prefer one unity source per source module. Declare each module whose public
+    API this module uses; dependencies of that module are inherited through the
+    graph and do not need to be repeated.
 
     Args:
         name: Stable project-wide name. Names must be unique in a build graph.
@@ -129,7 +149,8 @@ def module(
             the special name ``gecko`` when building against the engine.
         include_dirs: Additional include roots relative to this module.
         defines: Preprocessor definitions applied to this module's consumer.
-        system_libraries: Platform linker arguments required by the module.
+        windows: Windows-only requirements produced by :func:`build_options`.
+        linux: Linux-only requirements produced by :func:`build_options`.
         shaders: Shader declarations produced by :func:`shader`.
         shader_namespace: C++ namespace for generated shader symbols. A stable,
             module-owned namespace is recommended for public code.
@@ -149,10 +170,40 @@ def module(
         requires=requires or [],
         include_dirs=include_dirs or [],
         defines=defines or [],
-        system_libraries=system_libraries or [],
+        windows=windows or BuildOptions(),
+        linux=linux or BuildOptions(),
         shaders=shaders or [],
         shader_namespace=shader_namespace,
     )
+
+
+def build_options(
+    *,
+    defines: list[str] | None = None,
+    libraries: list[str] | None = None,
+    packages: list[str] | None = None,
+    wayland_protocols: list[WaylandProtocol] | None = None,
+) -> BuildOptions:
+    """Declare platform-specific requirements owned by a module.
+
+    ``defines`` are added while compiling a graph containing the module.
+    ``libraries`` are native linker arguments such as ``user32.lib`` or
+    ``-pthread``. On Linux, ``packages`` provide both compile and link flags
+    through ``pkg-config``. ``wayland_protocols`` are generated and compiled
+    by the driver. Keep these requirements beside the module that uses them
+    instead of adding subsystem knowledge to the build driver.
+    """
+    return BuildOptions(
+        defines=defines or [],
+        libraries=libraries or [],
+        packages=packages or [],
+        wayland_protocols=wayland_protocols or [],
+    )
+
+
+def wayland_protocol(name: str, path: str) -> WaylandProtocol:
+    """Declare a protocol XML path relative to the wayland-protocols data directory."""
+    return WaylandProtocol(name=name, path=path)
 
 
 def shader(name: str, path: str, *, stage: str | None = None, entry: str = "main") -> Shader:
@@ -354,21 +405,54 @@ def common_defines() -> list[str]:
         return [
             "GECKO_BUILD_SHARED=1",
             "GECKO_PLATFORM_WINDOWS=1",
-            "GECKO_GRAPHICS_VULKAN=1",
-            "GECKO_GRAPHICS_VULKAN_WIN32=1",
             "_CRT_SECURE_NO_WARNINGS",
         ]
     return [
         "GECKO_BUILD_SHARED=1",
         "GECKO_PLATFORM_LINUX=1",
-        "GECKO_PLATFORM_LINUX_X11=1",
-        "GECKO_PLATFORM_LINUX_WAYLAND=1",
-        "GECKO_HAS_XKBCOMMON=1",
-        "GECKO_HAVE_XDG_DECORATION=1",
-        "GECKO_GRAPHICS_VULKAN=1",
-        "GECKO_GRAPHICS_VULKAN_XLIB=1",
-        "GECKO_GRAPHICS_VULKAN_WAYLAND=1",
     ]
+
+
+def active_options(value: Module) -> BuildOptions:
+    return value.windows if os.name == "nt" else value.linux
+
+
+def module_defines(modules: list[Module]) -> list[str]:
+    result = common_defines()
+    for value in modules:
+        result += value.defines
+        result += active_options(value).defines
+    return list(dict.fromkeys(result))
+
+
+def module_libraries(modules: list[Module]) -> list[str]:
+    """Resolve native libraries for the active platform in graph order."""
+    libraries: list[str] = []
+    packages: list[str] = []
+    for value in modules:
+        options = active_options(value)
+        libraries += options.libraries
+        packages += options.packages
+    libraries = list(dict.fromkeys(libraries))
+    packages = list(dict.fromkeys(packages))
+    if packages:
+        pkg_config = require_tool("pkg-config")
+        libraries = capture([pkg_config, "--libs", *packages]).split() + libraries
+    return list(dict.fromkeys(libraries))
+
+
+def module_compile_options(modules: list[Module]) -> list[str]:
+    """Resolve compiler flags exported by packages on the active platform."""
+    if os.name == "nt":
+        return []
+    packages: list[str] = []
+    for value in modules:
+        packages += active_options(value).packages
+    packages = list(dict.fromkeys(packages))
+    if not packages:
+        return []
+    pkg_config = require_tool("pkg-config")
+    return list(dict.fromkeys(capture([pkg_config, "--cflags", *packages]).split()))
 
 
 def linux_cpp_flags(config: str, includes: list[Path], defines: list[str]) -> list[str]:
@@ -565,27 +649,43 @@ def engine_inputs(root: Path, value: Module, generated_inputs: list[Path], modul
     return list(dict.fromkeys(inputs))
 
 
-def build_engine_linux(root: Path, config: str, modules: list[Module], directories: BuildDirectories) -> GeckoArtifact:
-    cxx = require_tool(os.environ.get("CXX", "g++"))
-    cc = require_tool(os.environ.get("CC", "gcc"))
-    require_tool("pkg-config")
+def build_wayland_protocols(modules: list[Module], directories: BuildDirectories, cc: str) -> list[Path]:
+    """Generate protocol sources declared by modules and return their objects."""
+    protocols = [protocol for value in modules for protocol in active_options(value).wayland_protocols]
+    if not protocols:
+        return []
     scanner = require_tool("wayland-scanner")
-    protocol_dir = Path(capture(["pkg-config", "--variable=pkgdatadir", "wayland-protocols"]))
-    protocols = {
-        "xdg-shell": protocol_dir / "stable/xdg-shell/xdg-shell.xml",
-        "xdg-decoration": protocol_dir / "unstable/xdg-decoration/xdg-decoration-unstable-v1.xml",
-    }
-    protocol_objects: list[Path] = []
-    for name, source in protocols.items():
+    pkg_config = require_tool("pkg-config")
+    protocol_dir = Path(capture([pkg_config, "--variable=pkgdatadir", "wayland-protocols"]))
+    objects: list[Path] = []
+    names: set[str] = set()
+    for protocol in protocols:
+        name = protocol.name
+        if re.fullmatch(r"[A-Za-z0-9_-]+", name) is None:
+            fail(f"invalid Wayland protocol name: {name}")
+        if name in names:
+            fail(f"duplicate Wayland protocol name: {name}")
+        names.add(name)
+        source = protocol_dir / protocol.path
+        if not source.is_file():
+            fail(f"Wayland protocol not found: {source}")
         header = directories.generated / f"{name}-client-protocol.h"
         code = directories.generated / f"{name}-protocol.c"
-        if stale(header, [source]):
+        if stale(header, [source]) or stale(code, [source]):
             run("WAYL", name, [scanner, "client-header", str(source), str(header)])
             run("WAYL", name, [scanner, "private-code", str(source), str(code)])
         output = directories.objects / f"{name}-protocol.o"
         if stale(output, [code]):
-            run("CC", name, [cc, "-fPIC", "-Wall", "-Wextra", "-Werror", f"-I{directories.generated}", "-c", str(code), "-o", str(output)])
-        protocol_objects.append(output)
+            run("CC", name, [cc, "-fPIC", "-Wall", "-Wextra", "-Werror", f"-I{directories.generated}",
+                              "-c", str(code), "-o", str(output)])
+        objects.append(output)
+    return objects
+
+
+def build_engine_linux(root: Path, config: str, modules: list[Module], directories: BuildDirectories) -> GeckoArtifact:
+    cxx = require_tool(os.environ.get("CXX", "g++"))
+    cc = require_tool(os.environ.get("CC", "gcc"))
+    protocol_objects = build_wayland_protocols(modules, directories, cc)
 
     generated_inputs: dict[Path, list[Path]] = {}
     for value in modules:
@@ -593,10 +693,8 @@ def build_engine_linux(root: Path, config: str, modules: list[Module], directori
         generated_inputs[value.root] = shader_outputs
 
     includes = engine_includes(root, modules, directories.generated)
-    defines = common_defines() + ["GECKO_BUILDING=1"]
-    for value in modules:
-        defines += value.defines
-    flags = linux_cpp_flags(config, includes, list(dict.fromkeys(defines)))
+    defines = module_defines(modules) + ["GECKO_BUILDING=1"]
+    flags = linux_cpp_flags(config, includes, defines) + module_compile_options(modules)
     signature = hashlib.sha256("\0".join([cxx, *flags]).encode()).hexdigest()
     signature_file = directories.objects / "engine.signature"
     signature_changed = not signature_file.is_file() or signature_file.read_text() != signature
@@ -617,9 +715,9 @@ def build_engine_linux(root: Path, config: str, modules: list[Module], directori
         linker = ["-nostdlib++"]
         if shutil.which("ld.lld"):
             linker += ["-fuse-ld=lld"]
-        platform_libraries = capture(["pkg-config", "--libs", "wayland-client", "wayland-cursor", "xkbcommon", "x11", "xrandr", "vulkan"]).split()
+        libraries = module_libraries(modules)
         run("LINK", library.name, [cxx, *linker, "-shared", "-Wl,-soname,libGecko.so", *map(str, engine_objects),
-                                    *map(str, protocol_objects), *platform_libraries, "-pthread", "-ldl", "-lm", "-o", str(library)])
+                                    *map(str, protocol_objects), *libraries, "-o", str(library)])
     return GeckoArtifact(root / "include", library, library)
 
 
@@ -636,10 +734,8 @@ def build_engine_windows(root: Path, config: str, modules: list[Module],
     sdk = os.environ.get("VULKAN_SDK")
     if sdk:
         includes.append(Path(sdk) / "Include")
-    defines = common_defines() + ["GECKO_BUILDING=1"]
-    for value in modules:
-        defines += value.defines
-    flags = windows_cpp_flags(config, includes, list(dict.fromkeys(defines)))
+    defines = module_defines(modules) + ["GECKO_BUILDING=1"]
+    flags = windows_cpp_flags(config, includes, defines)
     signature = hashlib.sha256("\0".join([cl, *flags]).encode()).hexdigest()
     signature_file = directories.objects / "engine.signature"
     signature_changed = not signature_file.is_file() or signature_file.read_text() != signature
@@ -658,13 +754,13 @@ def build_engine_windows(root: Path, config: str, modules: list[Module],
     import_library = directories.libraries / "Gecko.lib"
     pdb = directories.binary / "Gecko.pdb"
     if stale(runtime, engine_objects):
-        vulkan_library = "vulkan-1.lib"
         link_flags: list[str] = []
         if sdk:
             link_flags.append(f"/LIBPATH:{Path(sdk) / 'Lib'}")
+        libraries = module_libraries(modules)
         run("LINK", runtime.name, [cl, "/nologo", "/LD", *map(str, engine_objects), f"/Fe{runtime}", "/link",
                                      f"/IMPLIB:{import_library}", "/DEBUG", f"/PDB:{pdb}", *link_flags,
-                                     "user32.lib", "shell32.lib", "shcore.lib", "ole32.lib", "winmm.lib", vulkan_library])
+                                     *libraries])
     return GeckoArtifact(root / "include", import_library, runtime)
 
 
@@ -725,18 +821,20 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
         source_modules = compile_dependencies(value)
         sources: list[Path] = []
         includes = [gecko.include_dir, directories.generated]
-        defines = common_defines()
-        libraries: list[str] = []
+        defines = module_defines(source_modules)
         generated_inputs: list[Path] = []
         for dependency in source_modules:
             if dependency.output != "headers":
                 sources += dependency.source_paths()
             includes.append(dependency.root)
             includes += [(dependency.root / path).resolve() for path in dependency.include_dirs]
-            defines += dependency.defines
-            libraries += dependency.system_libraries
             shader_outputs, _ = build_shaders(dependency, directories.generated)
             generated_inputs += shader_outputs
+        libraries = module_libraries(source_modules)
+        protocol_objects: list[Path] = []
+        if os.name != "nt" and any(active_options(item).wayland_protocols for item in source_modules):
+            cc = require_tool(os.environ.get("CC", "gcc"))
+            protocol_objects = build_wayland_protocols(source_modules, directories, cc)
 
         output_name = value.output_name or value.name
         if value.output == "plugin":
@@ -744,7 +842,7 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
         elif os.name == "nt":
             output_name += ".exe"
         output = directories.binary / output_name
-        inputs = [driver_root / "build.py", gecko.link_library, *generated_inputs]
+        inputs = [driver_root / "build.py", gecko.link_library, *generated_inputs, *protocol_objects]
         for dependency in source_modules:
             inputs += module_inputs(dependency)
 
@@ -763,7 +861,7 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
             command += [*map(str, sources), str(gecko.link_library), f"/Fo{object_dir}{os.sep}", f"/Fe{output}",
                         "/link", "/DEBUG", f"/PDB:{output.with_suffix('.pdb')}", *libraries]
         else:
-            flags = linux_cpp_flags(config, includes, defines)
+            flags = linux_cpp_flags(config, includes, defines) + module_compile_options(source_modules)
             compiler = require_tool(os.environ.get("CXX", "g++"))
             for source in sources:
                 record_compile(source, [compiler, *flags, "-c", str(source)])
@@ -772,7 +870,8 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
                 command.append("-fuse-ld=lld")
             if value.output == "plugin":
                 command.append("-shared")
-            command += [*map(str, sources), f"-L{gecko.link_library.parent}", "-lGecko", "-Wl,-rpath,$ORIGIN", "-lm"]
+            command += [*map(str, sources), *map(str, protocol_objects), f"-L{gecko.link_library.parent}",
+                        "-lGecko", "-Wl,-rpath,$ORIGIN"]
             command += libraries + ["-o", str(output)]
         if stale(output, inputs):
             run("LINK", output.name, command)

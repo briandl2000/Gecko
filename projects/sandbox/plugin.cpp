@@ -27,7 +27,11 @@ void OnWindowResized(void*, const gecko::EventMeta&, gecko::EventView view) noex
     return;
   const auto& event = *static_cast<const gecko::platform::events::WindowResizedPayload*>(view.Data());
   if (event.Window == g_Window && event.Width != 0 && event.Height != 0)
+  {
+    g_Swapchain.Desc.Width = event.Width;
+    g_Swapchain.Desc.Height = event.Height;
     g_ResizePending = true;
+  }
 }
 
 bool CreateGraphicsResources() noexcept
