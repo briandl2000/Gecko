@@ -6,6 +6,7 @@
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/services/profiler.h"
+#include "gecko/core/utility/memory.h"
 #include "gecko/platform/platform_io.h"
 #include "vulkan_command_list.h"
 #include "vulkan_gpu_sampler.h"
@@ -407,6 +408,12 @@ void VulkanDevice::WaitIdleLocked() noexcept
     return;
   LockGuard lock(m_QueueMutex);
   vkDeviceWaitIdle(m_Device);
+}
+
+void VulkanDevice::WaitIdle() noexcept
+{
+  WaitIdleLocked();
+  DrainPending();
 }
 
 VkFence VulkanDevice::AcquireTrackerFence() noexcept

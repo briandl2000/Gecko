@@ -96,6 +96,10 @@ public:
     Present(Span<const FrameContext> {&frame, 1});
   }
 
+  /// Wait until all submitted work has completed. Call at an explicit
+  /// teardown boundary before releasing resources used by recent frames.
+  GECKO_API virtual void WaitIdle() noexcept = 0;
+
   // Command lists ----------------------------------------------
 
   /// Allocate a graphics command list. Caller fills it and submits via

@@ -106,6 +106,7 @@ public:
 
   FrameContext BeginFrame(Swapchain&) noexcept override;
   void Present(Span<const FrameContext>) noexcept override;
+  void WaitIdle() noexcept override;
 
   Unique<ICommandList> CreateGraphicsCommandList() noexcept override;
   Unique<ICommandList> CreateComputeCommandList() noexcept override;

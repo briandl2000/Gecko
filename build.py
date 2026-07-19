@@ -10,12 +10,15 @@ import os
 from pathlib import Path
 import platform
 import re
+import runpy
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from typing import NoReturn
 
 sys.dont_write_bytecode = True
+sys.modules.setdefault("build", sys.modules[__name__])
 
 
 @dataclass
@@ -55,33 +58,70 @@ class GeckoArtifact:
     runtime_library: Path
 
 
+_loading_root: Path | None = None
+_loaded_module: Module | None = None
+
+
+def module(
+    *,
+    name: str,
+    output: str = "sources",
+    output_name: str | None = None,
+    unity: str | None = None,
+    sources: list[str] | None = None,
+    requires: list[str] | None = None,
+    include_dirs: list[str] | None = None,
+    defines: list[str] | None = None,
+    system_libraries: list[str] | None = None,
+    shaders: list[Shader] | None = None,
+    shader_namespace: str | None = None,
+) -> None:
+    """Declare the module in the current module.py file."""
+    global _loaded_module
+    if _loading_root is None:
+        raise RuntimeError("module() may only be called while loading module.py")
+    if _loaded_module is not None:
+        fail(f"{_loading_root / 'module.py'} declares more than one module")
+    _loaded_module = Module(
+        root=_loading_root,
+        name=name,
+        output=output,
+        output_name=output_name,
+        unity=unity,
+        sources=sources or [],
+        requires=requires or [],
+        include_dirs=include_dirs or [],
+        defines=defines or [],
+        system_libraries=system_libraries or [],
+        shaders=shaders or [],
+        shader_namespace=shader_namespace,
+    )
+
+
 def shader(name: str, path: str, *, stage: str | None = None, entry: str = "main") -> Shader:
     return Shader(name=name, path=path, stage=stage, entry=entry)
 
 
 def load_module(module_root: Path) -> Module:
+    global _loading_root, _loaded_module
     module_root = module_root.resolve()
     description = module_root / "module.py"
     if not description.is_file():
         fail(f"module description not found: {description}")
 
-    result: list[Module] = []
-
-    def declare(**values: object) -> None:
-        if result:
-            fail(f"{description} declares more than one module")
-        result.append(Module(root=module_root, **values))
-
-    environment = {
-        "__builtins__": {},
-        "module": declare,
-        "shader": shader,
-    }
-    exec(compile(description.read_text(encoding="utf-8"), str(description), "exec"), environment)
-    if len(result) != 1:
+    previous_root = _loading_root
+    previous_module = _loaded_module
+    _loading_root = module_root
+    _loaded_module = None
+    try:
+        runpy.run_path(str(description), run_name=f"gecko_module_{safe_name(str(module_root))}")
+        result = _loaded_module
+    finally:
+        _loading_root = previous_root
+        _loaded_module = previous_module
+    if result is None:
         fail(f"{description} must call module(...) exactly once")
-
-    value = result[0]
+    value = result
     if value.output not in {"engine", "executable", "plugin", "sources", "headers", "prebuilt"}:
         fail(f"{description}: unknown output kind {value.output!r}")
     if value.output not in {"headers", "prebuilt"} and not value.source_paths():
@@ -89,7 +129,7 @@ def load_module(module_root: Path) -> Module:
     return value
 
 
-def fail(message: str) -> None:
+def fail(message: str) -> NoReturn:
     raise SystemExit(message)
 
 
@@ -297,7 +337,10 @@ def engine_directories(root: Path, config: str) -> tuple[Path, Path, Path, Path]
 def build_engine(root: Path, config: str) -> GeckoArtifact:
     if not (root / "src/gecko_engine.cpp").is_file():
         fail("this SDK contains a prebuilt Gecko engine; the engine target requires a source checkout")
-    engine_module = load_module(root)
+    modules = load_graph(root)
+    engine_module = modules[-1]
+    if engine_module.output != "engine":
+        fail(f"{root / 'module.py'} must declare output='engine'")
     build, objects, generated, binary = engine_directories(root, config)
     library_dir = build / "lib"
     objects.mkdir(parents=True, exist_ok=True)
@@ -306,11 +349,56 @@ def build_engine(root: Path, config: str) -> GeckoArtifact:
     library_dir.mkdir(parents=True, exist_ok=True)
 
     if os.name == "nt":
-        return build_engine_windows(root, config, engine_module, objects, generated, binary, library_dir)
-    return build_engine_linux(root, config, engine_module, objects, generated, binary)
+        return build_engine_windows(root, config, modules, objects, generated, binary, library_dir)
+    return build_engine_linux(root, config, modules, objects, generated, binary)
 
 
-def build_engine_linux(root: Path, config: str, engine_module: Module, objects: Path, generated: Path,
+def engine_includes(root: Path, modules: list[Module], generated: Path) -> list[Path]:
+    result = [root / "include", generated]
+    for value in modules:
+        result.append(value.root)
+        result += [(value.root / path).resolve() for path in value.include_dirs]
+    return list(dict.fromkeys(result))
+
+
+def engine_compile_units(modules: list[Module]) -> list[tuple[Module, int, Path]]:
+    result: list[tuple[Module, int, Path]] = []
+    for value in modules:
+        if value.output == "headers":
+            continue
+        for index, source in enumerate(value.source_paths()):
+            result.append((value, index, source))
+    return result
+
+
+def engine_inputs(root: Path, value: Module, generated_inputs: list[Path], modules: list[Module]) -> list[Path]:
+    inputs = [root / "build.py", value.root / "module.py", root / "include/gecko/api.h", *generated_inputs]
+    if value.root == root:
+        inputs += files_under(root / "include", (".h", ".hpp"))
+        inputs += files_under(root / "src", (".h", ".hpp"))
+        inputs += value.source_paths()
+        inputs.append(root / "src/gecko.cpp")
+    else:
+        inputs += module_inputs(value)
+        by_root = {module_value.root: module_value for module_value in modules}
+        dependencies: set[Path] = set()
+
+        def collect(module_value: Module) -> None:
+            if module_value.root in dependencies:
+                return
+            dependencies.add(module_value.root)
+            for requirement in module_value.requires:
+                if requirement != "gecko":
+                    collect(by_root[(module_value.root / requirement).resolve()])
+
+        collect(value)
+        for dependency_root in dependencies:
+            dependency = by_root[dependency_root]
+            inputs += files_under(root / "include/gecko" / dependency.name, (".h", ".hpp"))
+    return list(dict.fromkeys(inputs))
+
+
+def build_engine_linux(root: Path, config: str, modules: list[Module], objects: Path, generated: Path,
                        binary: Path) -> GeckoArtifact:
     cxx = os.environ.get("CXX", "g++")
     cc = os.environ.get("CC", "gcc")
@@ -335,55 +423,77 @@ def build_engine_linux(root: Path, config: str, engine_module: Module, objects: 
             run("CC", name, [cc, "-fPIC", "-Wall", "-Wextra", "-Werror", f"-I{generated}", "-c", str(code), "-o", str(output)])
         protocol_objects.append(output)
 
-    includes = [root / "include", root / "src/core", root / "src/graphics", generated]
-    flags = linux_cpp_flags(config, includes, common_defines() + ["GECKO_BUILDING=1"])
-    source = engine_module.source_paths()[0]
-    output = objects / "gecko_engine.o"
+    generated_inputs: dict[Path, list[Path]] = {}
+    for value in modules:
+        shader_outputs, _ = build_shaders(value, generated)
+        generated_inputs[value.root] = shader_outputs
+
+    includes = engine_includes(root, modules, generated)
+    defines = common_defines() + ["GECKO_BUILDING=1"]
+    for value in modules:
+        defines += value.defines
+    flags = linux_cpp_flags(config, includes, list(dict.fromkeys(defines)))
     signature = hashlib.sha256("\0".join([cxx, *flags]).encode()).hexdigest()
     signature_file = objects / "engine.signature"
-    engine_inputs = [root / "build.py", root / "module.py"] + files_under(root / "include", (".h",)) + files_under(root / "src", (".h", ".cpp"))
-    if not signature_file.is_file() or signature_file.read_text() != signature or stale(output, engine_inputs):
-        run("CXX", "Gecko", [cxx, *flags, "-c", str(source), "-o", str(output)])
-        write_if_changed(signature_file, signature)
+    signature_changed = not signature_file.is_file() or signature_file.read_text() != signature
+    engine_objects: list[Path] = []
+    for value, index, source in engine_compile_units(modules):
+        output = objects / f"{safe_name(value.name)}_{index}.o"
+        inputs = engine_inputs(root, value, generated_inputs[value.root], modules)
+        if signature_changed or stale(output, inputs):
+            run("CXX", value.name, [cxx, *flags, "-c", str(source), "-o", str(output)])
+        engine_objects.append(output)
+    write_if_changed(signature_file, signature)
 
     library = binary / "libGecko.so"
-    link_inputs = [output, *protocol_objects]
+    link_inputs = [*engine_objects, *protocol_objects]
     if stale(library, link_inputs):
         linker = ["-nostdlib++"]
         if shutil.which("ld.lld"):
             linker += ["-fuse-ld=lld"]
         platform_libraries = capture(["pkg-config", "--libs", "wayland-client", "wayland-cursor", "xkbcommon", "x11", "xrandr", "vulkan"]).split()
-        run("LINK", library.name, [cxx, *linker, "-shared", "-Wl,-soname,libGecko.so", str(output),
+        run("LINK", library.name, [cxx, *linker, "-shared", "-Wl,-soname,libGecko.so", *map(str, engine_objects),
                                     *map(str, protocol_objects), *platform_libraries, "-pthread", "-ldl", "-lm", "-o", str(library)])
     return GeckoArtifact(root / "include", library, library)
 
 
-def build_engine_windows(root: Path, config: str, engine_module: Module, objects: Path, generated: Path,
+def build_engine_windows(root: Path, config: str, modules: list[Module], objects: Path, generated: Path,
                          binary: Path, library_dir: Path) -> GeckoArtifact:
     cl = require_tool("cl")
-    includes = [root / "include", root / "src/core", root / "src/graphics", generated]
+    generated_inputs: dict[Path, list[Path]] = {}
+    for value in modules:
+        shader_outputs, _ = build_shaders(value, generated)
+        generated_inputs[value.root] = shader_outputs
+
+    includes = engine_includes(root, modules, generated)
     sdk = os.environ.get("VULKAN_SDK")
     if sdk:
         includes.append(Path(sdk) / "Include")
-    flags = windows_cpp_flags(config, includes, common_defines() + ["GECKO_BUILDING=1"])
-    source = engine_module.source_paths()[0]
-    output = objects / "gecko_engine.obj"
+    defines = common_defines() + ["GECKO_BUILDING=1"]
+    for value in modules:
+        defines += value.defines
+    flags = windows_cpp_flags(config, includes, list(dict.fromkeys(defines)))
     signature = hashlib.sha256("\0".join([cl, *flags]).encode()).hexdigest()
     signature_file = objects / "engine.signature"
-    engine_inputs = [root / "build.py", root / "module.py"] + files_under(root / "include", (".h",)) + files_under(root / "src", (".h", ".cpp"))
-    if not signature_file.is_file() or signature_file.read_text() != signature or stale(output, engine_inputs):
-        run("CXX", "Gecko", [cl, *flags, "/c", str(source), f"/Fo{output}"])
-        write_if_changed(signature_file, signature)
+    signature_changed = not signature_file.is_file() or signature_file.read_text() != signature
+    engine_objects: list[Path] = []
+    for value, index, source in engine_compile_units(modules):
+        output = objects / f"{safe_name(value.name)}_{index}.obj"
+        inputs = engine_inputs(root, value, generated_inputs[value.root], modules)
+        if signature_changed or stale(output, inputs):
+            run("CXX", value.name, [cl, *flags, "/c", str(source), f"/Fo{output}"])
+        engine_objects.append(output)
+    write_if_changed(signature_file, signature)
 
     runtime = binary / "Gecko.dll"
     import_library = library_dir / "Gecko.lib"
     pdb = binary / "Gecko.pdb"
-    if stale(runtime, [output]):
+    if stale(runtime, engine_objects):
         vulkan_library = "vulkan-1.lib"
         link_flags: list[str] = []
         if sdk:
             link_flags.append(f"/LIBPATH:{Path(sdk) / 'Lib'}")
-        run("LINK", runtime.name, [cl, "/nologo", "/LD", str(output), f"/Fe{runtime}", "/link",
+        run("LINK", runtime.name, [cl, "/nologo", "/LD", *map(str, engine_objects), f"/Fe{runtime}", "/link",
                                      f"/IMPLIB:{import_library}", "/DEBUG", f"/PDB:{pdb}", *link_flags,
                                      "user32.lib", "shell32.lib", "shcore.lib", "ole32.lib", "winmm.lib", vulkan_library])
     return GeckoArtifact(root / "include", import_library, runtime)
@@ -538,7 +648,7 @@ def stage_sdk(root: Path, config: str, destination: Path) -> None:
     shutil.copy2(root / "README.md", destination / "README.md")
     module_dir = destination / "modules" / "gecko"
     module_dir.mkdir(parents=True, exist_ok=True)
-    write_if_changed(module_dir / "module.py", 'module(name="gecko", output="prebuilt")\n')
+    write_if_changed(module_dir / "module.py", 'from build import module\n\nmodule(name="gecko", output="prebuilt")\n')
     config_dir = destination / "lib" / config_name(config)
     config_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(artifact.runtime_library, config_dir / artifact.runtime_library.name)

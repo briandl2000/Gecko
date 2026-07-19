@@ -23,6 +23,9 @@ FrameContext NullDevice::BeginFrame(Swapchain&) noexcept
 void NullDevice::Present(Span<const FrameContext>) noexcept
 {}
 
+void NullDevice::WaitIdle() noexcept
+{}
+
 Unique<ICommandList> NullDevice::CreateGraphicsCommandList() noexcept
 {
   return gecko::CreateUnique<NullCommandList>();

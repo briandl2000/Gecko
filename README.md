@@ -20,6 +20,8 @@ On Windows, run the same commands with `python` from an MSVC Developer Command P
 Every project or plugin has a small `module.py`:
 
 ```python
+from build import module
+
 module(
     name="my_project",
     output="executable",
@@ -27,6 +29,8 @@ module(
     requires=["gecko"],
 )
 ```
+
+Engine areas use the same description. Dependencies form a checked directed graph, and each source module contributes one unity object to the single Gecko shared library.
 
 Build an external module with either a source checkout or an unpacked SDK:
 

@@ -6,7 +6,7 @@ Use three increasingly strict loops:
 2. `python3 build.py debug sandbox` for dirty experiments using the launcher and plugin in `projects/`.
 3. `python3 build.py debug sdk-test` before pushing to prove that public headers and packaged libraries are sufficient.
 
-The sandbox is intentionally disposable. It may temporarily contain the rendering, audio, input, or plugin experiment currently being developed. It should remain small enough to rewrite.
+The sandbox is intentionally disposable. Its baseline opens a platform window, creates a Vulkan swapchain, clears and presents it, and draws animated lines through the Debug Renderer module. The headless Null path remains available for SDK smoke checks. It may temporarily contain the rendering, audio, input, or plugin experiment currently being developed, but should remain small enough to rewrite.
 
 `sdk-test` uses the same sandbox source but a different dependency path. It stages an SDK under `out/sdk-test/sdk`, invokes the copied SDK driver, builds into `out/sdk-test/consumer`, and runs the result. It must not use private Gecko headers or source files.
 

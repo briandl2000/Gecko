@@ -1,9 +1,10 @@
 #if defined(GECKO_GRAPHICS_VULKAN)
 #pragma once
 
-#include "gecko/graphics/graphics_device.h"
+#include "gecko/core/array.h"
 #include "gecko/core/hash_map.h"
 #include "gecko/core/sync.h"
+#include "gecko/graphics/graphics_device.h"
 #include "gecko/platform/threading.h"
 #include "vulkan_types.h"
 
@@ -29,6 +30,7 @@ public:
 
   FrameContext BeginFrame(Swapchain& swapchain) noexcept override;
   void Present(Span<const FrameContext> frames) noexcept override;
+  void WaitIdle() noexcept override;
 
   // -- Command lists ----------------------------------------------
 

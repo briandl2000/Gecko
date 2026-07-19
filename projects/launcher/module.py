@@ -1,3 +1,5 @@
+from build import module
+
 module(
     name="launcher",
     output="executable",

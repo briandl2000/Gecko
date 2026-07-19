@@ -15,4 +15,6 @@
 -Iinclude
 -Isrc/core
 -Isrc/graphics
+-Isrc/platform
+-Isrc/debug_renderer
 -Iout/Linux-x86_64/Debug/generated

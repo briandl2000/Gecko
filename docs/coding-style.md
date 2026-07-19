@@ -8,7 +8,7 @@ Gecko uses C++26 as a better C: data and control flow should remain visible, lay
 - No exceptions or RTTI. Builds disable both. Expected failures return a typed result enum or a result struct. Assertions are for programmer errors and invariants, not ordinary runtime failure.
 - Prefer explicit `Initialize` / `Shutdown`, `Create` / `Destroy`, and caller-visible ownership. RAII is fine for a small lexical guard when it cannot hide important lifetime or allocation behavior; it is not the engine architecture.
 - One Gecko implementation exists for allocator, logger, profiler, jobs, and events. Configuration changes behavior; dependency injection does not choose implementations.
-- Core, Math, Platform, and Graphics are explicit engine areas. Build modules are described by `module.py` and may contribute sources or produce an executable/plugin. Neither concept implies another shipped engine library.
+- Core, Math, Platform, Graphics, and Debug Renderer are explicit engine modules. A `module.py` may contribute a unity object or produce an executable/plugin. Module boundaries express build order and ownership; they do not imply another shipped engine library.
 - Configuration is plain data with default member initializers. Nest module configs by value in the owning config; do not add registries, inheritance, callbacks, or generic option bags.
 - Allocation is never implicit in a low-level API. A function that may allocate should make that clear through its owning type, allocator/arena, or documentation at the declaration.
 - Virtual dispatch is reserved for an actual runtime-polymorphic boundary. Ordinary subsystem code uses concrete types and direct calls.

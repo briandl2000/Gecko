@@ -1,3 +1,5 @@
+from build import module, shader
+
 module(
     name="sandbox",
     output="plugin",

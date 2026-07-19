@@ -19,9 +19,9 @@ The host resolves `GeckoPlugin_GetApi` from a plugin. The returned function tabl
 
 A module is a unit of code, dependencies, and resources described by `module.py`. A project is the root module selected for a build. A plugin is a module packaged as a shared library; an executable is a module packaged as a program. A source module may instead contribute code to its requesting project.
 
-The engine itself is a project producing the Gecko shared library. Core, Math, Platform, and Graphics are currently explicit engine areas combined by its unity source. They can become separately described source modules when that produces a real organizational benefit; doing so does not require separate shared libraries.
+The engine itself is the root project producing the Gecko shared library. Core, Math, Platform, Graphics, and Debug Renderer are source or header modules with the same `module.py` contract used by external projects. Their dependencies are resolved topologically and a cycle stops the build before compilation. Each source module compiles its own unity file; the resulting objects are linked into one Gecko shared library, not separate engine libraries.
 
-Module descriptions are declarative. They name a unity source, dependencies, includes, definitions, system libraries, and shaders. Compiler selection, platform behavior, output layout, shader embedding, and incremental checks remain in the single `build.py` driver.
+Module descriptions are ordinary typed Python calls imported from `build.py`. They name a unity source, dependencies, includes, definitions, system libraries, and shaders. Compiler selection, platform behavior, output layout, shader embedding, and incremental checks remain in the single root `build.py` driver. Keeping that entrypoint at the root also makes it the one file copied into the downloadable SDK.
 
 Shaders have logical names scoped to their module. The driver invokes `glslc -mfmt=c` and generates `<module>/Shaders.generated.h`; generated paths and symbols cannot collide across modules. Runtime shader loading can later use the same declarations without changing the Release embedding path.
 
