@@ -1,11 +1,17 @@
 #!/usr/bin/env python3
 
-"""Direct Gecko build driver. Python 3 standard library only."""
+"""Build Gecko and Gecko projects with Python's standard library only.
+
+The file intentionally contains both the small ``module.py`` declaration API
+and the build implementation. Keeping one driver makes a source checkout and a
+downloaded SDK behave the same without shipping a Python package.
+"""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 from pathlib import Path
 import platform
@@ -20,6 +26,10 @@ from typing import NoReturn
 sys.dont_write_bytecode = True
 sys.modules.setdefault("build", sys.modules[__name__])
 
+
+# ---------------------------------------------------------------------------
+# Data model and public module.py API
+# ---------------------------------------------------------------------------
 
 @dataclass
 class Shader:
@@ -58,8 +68,26 @@ class GeckoArtifact:
     runtime_library: Path
 
 
+@dataclass(frozen=True)
+class BuildDirectories:
+    objects: Path
+    generated: Path
+    binary: Path
+    libraries: Path
+
+    @staticmethod
+    def create(output_base: Path, config: str) -> BuildDirectories:
+        root = output_base / platform_name() / config_name(config)
+        result = BuildDirectories(root / "obj", root / "generated", root / "bin", root / "lib")
+        for path in (result.objects, result.generated, result.binary):
+            path.mkdir(parents=True, exist_ok=True)
+        return result
+
+
 _loading_root: Path | None = None
 _loaded_module: Module | None = None
+_compile_commands: dict[Path, list[str]] = {}
+_compile_commands_path: Path | None = None
 
 
 def module(
@@ -99,35 +127,13 @@ def module(
 
 
 def shader(name: str, path: str, *, stage: str | None = None, entry: str = "main") -> Shader:
+    """Describe one HLSL shader that should be embedded in its module."""
     return Shader(name=name, path=path, stage=stage, entry=entry)
 
 
-def load_module(module_root: Path) -> Module:
-    global _loading_root, _loaded_module
-    module_root = module_root.resolve()
-    description = module_root / "module.py"
-    if not description.is_file():
-        fail(f"module description not found: {description}")
-
-    previous_root = _loading_root
-    previous_module = _loaded_module
-    _loading_root = module_root
-    _loaded_module = None
-    try:
-        runpy.run_path(str(description), run_name=f"gecko_module_{safe_name(str(module_root))}")
-        result = _loaded_module
-    finally:
-        _loading_root = previous_root
-        _loaded_module = previous_module
-    if result is None:
-        fail(f"{description} must call module(...) exactly once")
-    value = result
-    if value.output not in {"engine", "executable", "plugin", "sources", "headers", "prebuilt"}:
-        fail(f"{description}: unknown output kind {value.output!r}")
-    if value.output not in {"headers", "prebuilt"} and not value.source_paths():
-        fail(f"{description}: a {value.output} module needs unity= or sources=")
-    return value
-
+# ---------------------------------------------------------------------------
+# Generic build helpers
+# ---------------------------------------------------------------------------
 
 def fail(message: str) -> NoReturn:
     raise SystemExit(message)
@@ -178,6 +184,127 @@ def stale(output: Path, inputs: list[Path]) -> bool:
         return True
     output_time = output.stat().st_mtime_ns
     return any(path.is_file() and path.stat().st_mtime_ns > output_time for path in inputs)
+
+
+def safe_name(value: str) -> str:
+    result = re.sub(r"[^A-Za-z0-9_]", "_", value)
+    if not result or result[0].isdigit():
+        result = f"_{result}"
+    return result
+
+
+def record_compile(source: Path, arguments: list[str]) -> None:
+    """Record the real compiler command used by clangd/Zed navigation."""
+    _compile_commands.setdefault(source.resolve(), arguments)
+
+
+def write_compile_commands() -> None:
+    if _compile_commands_path is None or not _compile_commands:
+        return
+    entries_by_source: dict[Path, dict[str, object]] = {}
+    if _compile_commands_path.is_file():
+        try:
+            previous_entries = json.loads(_compile_commands_path.read_text(encoding="utf-8"))
+            for entry in previous_entries:
+                source = Path(entry["file"]).resolve()
+                if source.is_file():
+                    entries_by_source[source] = entry
+        except (json.JSONDecodeError, KeyError, TypeError):
+            pass
+    for source, arguments in _compile_commands.items():
+        entries_by_source[source] = {
+            "directory": str(_compile_commands_path.parent),
+            "file": str(source),
+            "arguments": arguments,
+        }
+    entries = [entries_by_source[source] for source in sorted(entries_by_source, key=str)]
+    write_if_changed(_compile_commands_path, json.dumps(entries, indent=2) + "\n")
+
+
+# ---------------------------------------------------------------------------
+# Module loading and dependency graph
+# ---------------------------------------------------------------------------
+
+def load_module(module_root: Path) -> Module:
+    """Load exactly one declaration from ``module_root/module.py``."""
+    global _loading_root, _loaded_module
+    module_root = module_root.resolve()
+    description = module_root / "module.py"
+    if not description.is_file():
+        fail(f"module description not found: {description}")
+
+    previous_root = _loading_root
+    previous_module = _loaded_module
+    _loading_root = module_root
+    _loaded_module = None
+    try:
+        runpy.run_path(str(description), run_name=f"gecko_module_{safe_name(str(module_root))}")
+        result = _loaded_module
+    finally:
+        _loading_root = previous_root
+        _loaded_module = previous_module
+    if result is None:
+        fail(f"{description} must call module(...) exactly once")
+    if result.output not in {"engine", "executable", "plugin", "sources", "headers", "prebuilt"}:
+        fail(f"{description}: unknown output kind {result.output!r}")
+    if result.output not in {"headers", "prebuilt"} and not result.source_paths():
+        fail(f"{description}: a {result.output} module needs unity= or sources=")
+    return result
+
+
+def load_graph(root_module: Path) -> list[Module]:
+    """Return dependencies before consumers and reject dependency cycles."""
+    ordered: list[Module] = []
+    visiting: list[Path] = []
+    loaded: dict[Path, Module] = {}
+
+    def visit(module_root: Path) -> None:
+        key = module_root.resolve()
+        if key in loaded:
+            return
+        if key in visiting:
+            cycle = visiting[visiting.index(key):] + [key]
+            fail("module dependency cycle:\n  " + "\n  -> ".join(str(path) for path in cycle))
+        visiting.append(key)
+        value = load_module(key)
+        for requirement in value.requires:
+            if requirement != "gecko":
+                visit(value.root / requirement)
+        visiting.pop()
+        loaded[key] = value
+        ordered.append(value)
+
+    visit(root_module)
+    names: dict[str, Path] = {}
+    for value in ordered:
+        previous = names.get(value.name)
+        if previous is not None:
+            fail(f"duplicate module name {value.name!r}:\n  {previous}\n  {value.root}")
+        names[value.name] = value.root
+    return ordered
+
+
+def module_inputs(value: Module) -> list[Path]:
+    return [value.root / "module.py"] + files_under(value.root, (".h", ".hpp", ".cpp", ".hlsl", ".hlsli"))
+
+
+def print_graph(modules: list[Module]) -> None:
+    """Print the build order and direct dependencies for human review."""
+    by_root = {value.root: value for value in modules}
+    print("[GRAPH] dependency order")
+    for index, value in enumerate(modules, start=1):
+        dependency_names = [
+            "gecko" if requirement == "gecko" else by_root[(value.root / requirement).resolve()].name
+            for requirement in value.requires
+        ]
+        dependencies = ", ".join(dependency_names) if dependency_names else "none"
+        unity = value.unity or "headers only"
+        print(f"  {index}. {value.name:<16} {value.output:<8} <- {dependencies:<36} {unity}")
+
+
+# ---------------------------------------------------------------------------
+# Compiler configuration
+# ---------------------------------------------------------------------------
 
 
 def common_defines() -> list[str]:
@@ -268,12 +395,9 @@ def shader_stage(path: Path, explicit: str | None) -> str:
     fail(f"cannot infer shader stage from {path}; pass stage= explicitly")
 
 
-def safe_name(value: str) -> str:
-    result = re.sub(r"[^A-Za-z0-9_]", "_", value)
-    if not result or result[0].isdigit():
-        result = f"_{result}"
-    return result
-
+# ---------------------------------------------------------------------------
+# Shader compilation and embedding
+# ---------------------------------------------------------------------------
 
 def build_shaders(module_value: Module, generated_root: Path) -> tuple[list[Path], Path | None]:
     if not module_value.shaders:
@@ -330,10 +454,9 @@ def build_shaders(module_value: Module, generated_root: Path) -> tuple[list[Path
     return outputs, header
 
 
-def engine_directories(root: Path, config: str) -> tuple[Path, Path, Path, Path]:
-    build = root / "out" / platform_name() / config_name(config)
-    return build, build / "obj", build / "generated", build / "bin"
-
+# ---------------------------------------------------------------------------
+# Gecko engine build
+# ---------------------------------------------------------------------------
 
 def build_engine(root: Path, config: str) -> GeckoArtifact:
     if not (root / "src/gecko_engine.cpp").is_file():
@@ -342,16 +465,11 @@ def build_engine(root: Path, config: str) -> GeckoArtifact:
     engine_module = modules[-1]
     if engine_module.output != "engine":
         fail(f"{root / 'module.py'} must declare output='engine'")
-    build, objects, generated, binary = engine_directories(root, config)
-    library_dir = build / "lib"
-    objects.mkdir(parents=True, exist_ok=True)
-    generated.mkdir(parents=True, exist_ok=True)
-    binary.mkdir(parents=True, exist_ok=True)
-    library_dir.mkdir(parents=True, exist_ok=True)
+    directories = BuildDirectories.create(root / "out", config)
 
     if os.name == "nt":
-        return build_engine_windows(root, config, modules, objects, generated, binary, library_dir)
-    return build_engine_linux(root, config, modules, objects, generated, binary)
+        return build_engine_windows(root, config, modules, directories)
+    return build_engine_linux(root, config, modules, directories)
 
 
 def engine_includes(root: Path, modules: list[Module], generated: Path) -> list[Path]:
@@ -363,6 +481,11 @@ def engine_includes(root: Path, modules: list[Module], generated: Path) -> list[
 
 
 def engine_compile_units(modules: list[Module]) -> list[tuple[Module, int, Path]]:
+    """Use one unity object per source module for useful incremental builds.
+
+    These objects are implementation units inside one Gecko shared library;
+    they are not separately distributed libraries.
+    """
     result: list[tuple[Module, int, Path]] = []
     for value in modules:
         if value.output == "headers":
@@ -399,12 +522,9 @@ def engine_inputs(root: Path, value: Module, generated_inputs: list[Path], modul
     return list(dict.fromkeys(inputs))
 
 
-def build_engine_linux(root: Path, config: str, modules: list[Module], objects: Path, generated: Path,
-                       binary: Path) -> GeckoArtifact:
-    cxx = os.environ.get("CXX", "g++")
-    cc = os.environ.get("CC", "gcc")
-    require_tool(cxx)
-    require_tool(cc)
+def build_engine_linux(root: Path, config: str, modules: list[Module], directories: BuildDirectories) -> GeckoArtifact:
+    cxx = require_tool(os.environ.get("CXX", "g++"))
+    cc = require_tool(os.environ.get("CC", "gcc"))
     require_tool("pkg-config")
     scanner = require_tool("wayland-scanner")
     protocol_dir = Path(capture(["pkg-config", "--variable=pkgdatadir", "wayland-protocols"]))
@@ -414,39 +534,41 @@ def build_engine_linux(root: Path, config: str, modules: list[Module], objects: 
     }
     protocol_objects: list[Path] = []
     for name, source in protocols.items():
-        header = generated / f"{name}-client-protocol.h"
-        code = generated / f"{name}-protocol.c"
+        header = directories.generated / f"{name}-client-protocol.h"
+        code = directories.generated / f"{name}-protocol.c"
         if stale(header, [source]):
             run("WAYL", name, [scanner, "client-header", str(source), str(header)])
             run("WAYL", name, [scanner, "private-code", str(source), str(code)])
-        output = objects / f"{name}-protocol.o"
+        output = directories.objects / f"{name}-protocol.o"
         if stale(output, [code]):
-            run("CC", name, [cc, "-fPIC", "-Wall", "-Wextra", "-Werror", f"-I{generated}", "-c", str(code), "-o", str(output)])
+            run("CC", name, [cc, "-fPIC", "-Wall", "-Wextra", "-Werror", f"-I{directories.generated}", "-c", str(code), "-o", str(output)])
         protocol_objects.append(output)
 
     generated_inputs: dict[Path, list[Path]] = {}
     for value in modules:
-        shader_outputs, _ = build_shaders(value, generated)
+        shader_outputs, _ = build_shaders(value, directories.generated)
         generated_inputs[value.root] = shader_outputs
 
-    includes = engine_includes(root, modules, generated)
+    includes = engine_includes(root, modules, directories.generated)
     defines = common_defines() + ["GECKO_BUILDING=1"]
     for value in modules:
         defines += value.defines
     flags = linux_cpp_flags(config, includes, list(dict.fromkeys(defines)))
     signature = hashlib.sha256("\0".join([cxx, *flags]).encode()).hexdigest()
-    signature_file = objects / "engine.signature"
+    signature_file = directories.objects / "engine.signature"
     signature_changed = not signature_file.is_file() or signature_file.read_text() != signature
     engine_objects: list[Path] = []
     for value, index, source in engine_compile_units(modules):
-        output = objects / f"{safe_name(value.name)}_{index}.o"
+        output = directories.objects / f"{safe_name(value.name)}_{index}.o"
         inputs = engine_inputs(root, value, generated_inputs[value.root], modules)
+        command = [cxx, *flags, "-c", str(source), "-o", str(output)]
+        record_compile(source, command)
         if signature_changed or stale(output, inputs):
-            run("CXX", value.name, [cxx, *flags, "-c", str(source), "-o", str(output)])
+            run("CXX", value.name, command)
         engine_objects.append(output)
     write_if_changed(signature_file, signature)
 
-    library = binary / "libGecko.so"
+    library = directories.binary / "libGecko.so"
     link_inputs = [*engine_objects, *protocol_objects]
     if stale(library, link_inputs):
         linker = ["-nostdlib++"]
@@ -458,15 +580,16 @@ def build_engine_linux(root: Path, config: str, modules: list[Module], objects: 
     return GeckoArtifact(root / "include", library, library)
 
 
-def build_engine_windows(root: Path, config: str, modules: list[Module], objects: Path, generated: Path,
-                         binary: Path, library_dir: Path) -> GeckoArtifact:
+def build_engine_windows(root: Path, config: str, modules: list[Module],
+                         directories: BuildDirectories) -> GeckoArtifact:
     cl = require_tool("cl")
+    directories.libraries.mkdir(parents=True, exist_ok=True)
     generated_inputs: dict[Path, list[Path]] = {}
     for value in modules:
-        shader_outputs, _ = build_shaders(value, generated)
+        shader_outputs, _ = build_shaders(value, directories.generated)
         generated_inputs[value.root] = shader_outputs
 
-    includes = engine_includes(root, modules, generated)
+    includes = engine_includes(root, modules, directories.generated)
     sdk = os.environ.get("VULKAN_SDK")
     if sdk:
         includes.append(Path(sdk) / "Include")
@@ -475,20 +598,22 @@ def build_engine_windows(root: Path, config: str, modules: list[Module], objects
         defines += value.defines
     flags = windows_cpp_flags(config, includes, list(dict.fromkeys(defines)))
     signature = hashlib.sha256("\0".join([cl, *flags]).encode()).hexdigest()
-    signature_file = objects / "engine.signature"
+    signature_file = directories.objects / "engine.signature"
     signature_changed = not signature_file.is_file() or signature_file.read_text() != signature
     engine_objects: list[Path] = []
     for value, index, source in engine_compile_units(modules):
-        output = objects / f"{safe_name(value.name)}_{index}.obj"
+        output = directories.objects / f"{safe_name(value.name)}_{index}.obj"
         inputs = engine_inputs(root, value, generated_inputs[value.root], modules)
+        command = [cl, *flags, "/c", str(source), f"/Fo{output}"]
+        record_compile(source, command)
         if signature_changed or stale(output, inputs):
-            run("CXX", value.name, [cl, *flags, "/c", str(source), f"/Fo{output}"])
+            run("CXX", value.name, command)
         engine_objects.append(output)
     write_if_changed(signature_file, signature)
 
-    runtime = binary / "Gecko.dll"
-    import_library = library_dir / "Gecko.lib"
-    pdb = binary / "Gecko.pdb"
+    runtime = directories.binary / "Gecko.dll"
+    import_library = directories.libraries / "Gecko.lib"
+    pdb = directories.binary / "Gecko.pdb"
     if stale(runtime, engine_objects):
         vulkan_library = "vulkan-1.lib"
         link_flags: list[str] = []
@@ -518,46 +643,16 @@ def resolve_gecko(driver_root: Path, config: str) -> GeckoArtifact:
     return sdk_artifact(driver_root, config)
 
 
-def load_graph(root_module: Path) -> list[Module]:
-    ordered: list[Module] = []
-    visiting: set[Path] = set()
-    loaded: dict[Path, Module] = {}
-
-    def visit(module_root: Path) -> None:
-        key = module_root.resolve()
-        if key in loaded:
-            return
-        if key in visiting:
-            fail(f"module dependency cycle at {key}")
-        visiting.add(key)
-        value = load_module(key)
-        for requirement in value.requires:
-            if requirement != "gecko":
-                visit((value.root / requirement).resolve())
-        visiting.remove(key)
-        loaded[key] = value
-        ordered.append(value)
-
-    visit(root_module)
-    return ordered
-
-
-def module_inputs(value: Module) -> list[Path]:
-    return [value.root / "module.py"] + files_under(value.root, (".h", ".hpp", ".cpp", ".hlsl", ".hlsli"))
-
+# ---------------------------------------------------------------------------
+# Executable and plugin projects
+# ---------------------------------------------------------------------------
 
 def build_project(driver_root: Path, module_root: Path, config: str, output_base: Path) -> Path:
     modules = load_graph(module_root)
     if not any("gecko" in value.requires for value in modules):
         fail("the project does not require the gecko module")
     gecko = resolve_gecko(driver_root, config)
-    build = output_base / platform_name() / config_name(config)
-    objects = build / "obj"
-    generated = build / "generated"
-    binary = build / "bin"
-    objects.mkdir(parents=True, exist_ok=True)
-    generated.mkdir(parents=True, exist_ok=True)
-    binary.mkdir(parents=True, exist_ok=True)
+    directories = BuildDirectories.create(output_base, config)
 
     built_outputs: dict[Path, Path] = {}
     modules_by_root = {value.root: value for value in modules}
@@ -586,7 +681,7 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
             continue
         source_modules = compile_dependencies(value)
         sources: list[Path] = []
-        includes = [gecko.include_dir, generated]
+        includes = [gecko.include_dir, directories.generated]
         defines = common_defines()
         libraries: list[str] = []
         generated_inputs: list[Path] = []
@@ -597,7 +692,7 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
             includes += [(dependency.root / path).resolve() for path in dependency.include_dirs]
             defines += dependency.defines
             libraries += dependency.system_libraries
-            shader_outputs, _ = build_shaders(dependency, generated)
+            shader_outputs, _ = build_shaders(dependency, directories.generated)
             generated_inputs += shader_outputs
 
         output_name = value.output_name or value.name
@@ -605,34 +700,42 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
             output_name = f"{'' if os.name == 'nt' else 'lib'}{output_name}{'.dll' if os.name == 'nt' else '.so'}"
         elif os.name == "nt":
             output_name += ".exe"
-        output = binary / output_name
-        inputs = [gecko.link_library, *generated_inputs]
+        output = directories.binary / output_name
+        inputs = [driver_root / "build.py", gecko.link_library, *generated_inputs]
         for dependency in source_modules:
             inputs += module_inputs(dependency)
 
+        includes = list(dict.fromkeys(includes))
+        defines = list(dict.fromkeys(defines))
+        if os.name == "nt":
+            flags = windows_cpp_flags(config, includes, defines)
+            compiler = require_tool("cl")
+            for source in sources:
+                record_compile(source, [compiler, *flags, "/c", str(source)])
+            command = [compiler, *flags]
+            if value.output == "plugin":
+                command.append("/LD")
+            object_dir = directories.objects / safe_name(value.name)
+            object_dir.mkdir(parents=True, exist_ok=True)
+            command += [*map(str, sources), str(gecko.link_library), f"/Fo{object_dir}{os.sep}", f"/Fe{output}",
+                        "/link", "/DEBUG", f"/PDB:{output.with_suffix('.pdb')}", *libraries]
+        else:
+            flags = linux_cpp_flags(config, includes, defines)
+            compiler = require_tool(os.environ.get("CXX", "g++"))
+            for source in sources:
+                record_compile(source, [compiler, *flags, "-c", str(source)])
+            command = [compiler, *flags, "-nostdlib++"]
+            if shutil.which("ld.lld"):
+                command.append("-fuse-ld=lld")
+            if value.output == "plugin":
+                command.append("-shared")
+            command += [*map(str, sources), f"-L{gecko.link_library.parent}", "-lGecko", "-Wl,-rpath,$ORIGIN", "-lm"]
+            command += libraries + ["-o", str(output)]
         if stale(output, inputs):
-            if os.name == "nt":
-                flags = windows_cpp_flags(config, includes, defines)
-                command = [require_tool("cl"), *flags]
-                if value.output == "plugin":
-                    command.append("/LD")
-                object_dir = objects / safe_name(value.name)
-                object_dir.mkdir(parents=True, exist_ok=True)
-                command += [*map(str, sources), str(gecko.link_library), f"/Fo{object_dir}{os.sep}", f"/Fe{output}",
-                            "/link", "/DEBUG", f"/PDB:{output.with_suffix('.pdb')}", *libraries]
-            else:
-                flags = linux_cpp_flags(config, includes, defines)
-                command = [os.environ.get("CXX", "g++"), *flags, "-nostdlib++"]
-                if shutil.which("ld.lld"):
-                    command.append("-fuse-ld=lld")
-                if value.output == "plugin":
-                    command.append("-shared")
-                command += [*map(str, sources), f"-L{gecko.link_library.parent}", "-lGecko", "-Wl,-rpath,$ORIGIN", "-lm"]
-                command += libraries + ["-o", str(output)]
             run("LINK", output.name, command)
         built_outputs[value.root] = output
 
-    runtime_target = binary / gecko.runtime_library.name
+    runtime_target = directories.binary / gecko.runtime_library.name
     if gecko.runtime_library.resolve() != runtime_target.resolve():
         shutil.copy2(gecko.runtime_library, runtime_target)
     root = load_module(module_root)
@@ -640,6 +743,10 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
         fail(f"root module {root.name} must produce an executable or plugin")
     return built_outputs[root.root]
 
+
+# ---------------------------------------------------------------------------
+# Downloadable SDK and public-consumer smoke test
+# ---------------------------------------------------------------------------
 
 def stage_sdk(root: Path, config: str, destination: Path) -> None:
     artifact = build_engine(root, config)
@@ -678,50 +785,88 @@ def sdk_test(root: Path, config: str) -> None:
     if test_root.exists():
         shutil.rmtree(test_root)
     stage_sdk(root, config, sdk_root)
-    command = [sys.executable, str(sdk_root / "build.py"), config, str(root / "projects/launcher"), "--output", str(consumer)]
+    command = [sys.executable, str(sdk_root / "build.py"), str(root / "projects/launcher"),
+               "--config", config, "--output", str(consumer)]
     run("SDK", "external launcher + plugin", command, cwd=root)
     binary = consumer / platform_name() / config_name(config) / "bin"
     launcher = binary / ("gecko_launcher.exe" if os.name == "nt" else "gecko_launcher")
     run("RUN", "headless SDK consumer", [str(launcher), "--backend=null", "--graphics=null", "--frames=2"], cwd=binary)
 
 
+# ---------------------------------------------------------------------------
+# Command line
+# ---------------------------------------------------------------------------
+
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build Gecko or a Gecko module")
-    parser.add_argument("first", nargs="?", default="debug")
-    parser.add_argument("second", nargs="?")
-    parser.add_argument("--output", type=Path, default=None)
+    parser = argparse.ArgumentParser(
+        description="Build Gecko or a Gecko project.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""examples:
+  python3 build.py                         build the Debug sandbox
+  python3 build.py engine --config release
+  python3 build.py sdk-test --config release
+  python3 build.py ../MyGame --output ../MyGame/out
+  python3 build.py graph                   show engine dependency order
+  python3 build.py sdk                     stage Debug and Release SDKs
+""",
+    )
+    parser.add_argument("target", nargs="?", default="sandbox",
+                        help="engine, sandbox, sdk-test, graph, sdk, clean, or a module directory")
+    parser.add_argument("-c", "--config", choices=("debug", "release"), default="debug",
+                        help="build configuration (default: debug)")
+    parser.add_argument("-o", "--output", type=Path, default=None,
+                        help="output root for an external project (default: ./out)")
     return parser.parse_args()
 
 
 def main() -> None:
+    global _compile_commands_path
     arguments = parse_arguments()
     root = Path(__file__).resolve().parent
-    if arguments.first == "clean":
+    target = arguments.target
+    config = arguments.config
+    source_checkout = (root / "src/gecko_engine.cpp").is_file()
+
+    if source_checkout:
+        _compile_commands_path = root / "compile_commands.json"
+    elif target not in {"clean", "graph", "sdk"}:
+        _compile_commands_path = Path.cwd() / "compile_commands.json"
+
+    if target == "clean":
         output = root / "out"
         if output.exists():
             shutil.rmtree(output)
+        compile_commands = root / "compile_commands.json"
+        if compile_commands.exists():
+            compile_commands.unlink()
         print(f"[CLEAN] {output}")
         return
-    if arguments.first == "sdk":
-        if not (root / "src/gecko_engine.cpp").is_file():
+    if target == "graph":
+        if not source_checkout:
+            fail("the graph target requires a Gecko source checkout")
+        print_graph(load_graph(root))
+        return
+    if target == "sdk":
+        if not source_checkout:
             fail("the sdk target requires a Gecko source checkout")
         build_sdk(root)
+        write_compile_commands()
         return
-    if arguments.first not in {"debug", "release"}:
-        fail("usage: python build.py [debug|release] [engine|sandbox|sdk-test|module-path]\n       python build.py [sdk|clean]")
-
-    config = arguments.first
-    target = arguments.second or "sandbox"
     if target == "engine":
         build_engine(root, config)
     elif target == "sandbox":
+        if not source_checkout:
+            fail("the sandbox target requires a Gecko source checkout")
         build_project(root, root / "projects/launcher", config, root / "out")
     elif target == "sdk-test":
+        if not source_checkout:
+            fail("the sdk-test target requires a Gecko source checkout")
         sdk_test(root, config)
     else:
         module_root = Path(target).resolve()
         output = arguments.output.resolve() if arguments.output else Path.cwd() / "out"
         build_project(root, module_root, config, output)
+    write_compile_commands()
     print(f"[DONE ] {config_name(config)} {target}")
 
 

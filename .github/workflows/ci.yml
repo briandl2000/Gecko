@@ -73,14 +73,14 @@ jobs:
           CXX: g++-14
         run: |
           python3 build.py sdk
-          python3 build.py release sdk-test
+          python3 build.py sdk-test --config release
 
       - name: Build and test SDK
         if: runner.os == 'Windows'
         shell: cmd
         run: |
           python build.py sdk
-          python build.py release sdk-test
+          python build.py sdk-test --config release
 
       - name: Package Linux engine
         if: runner.os == 'Linux' && github.event_name == 'push'

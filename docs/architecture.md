@@ -21,7 +21,11 @@ A module is a unit of code, dependencies, and resources described by `module.py`
 
 The engine itself is the root project producing the Gecko shared library. Core, Math, Platform, Graphics, and Debug Renderer are source or header modules with the same `module.py` contract used by external projects. Their dependencies are resolved topologically and a cycle stops the build before compilation. Each source module compiles its own unity file; the resulting objects are linked into one Gecko shared library, not separate engine libraries.
 
+The root `module.py` remains useful because it is the explicit engine project: it names the final engine glue source and selects the transitive module graph. One unity object per source module is the middle ground between a single giant translation unit and per-file compilation: clean builds stay small, changes normally rebuild only the affected module, and include-order accidents cannot leak between subsystems.
+
 Module descriptions are ordinary typed Python calls imported from `build.py`. They name a unity source, dependencies, includes, definitions, system libraries, and shaders. Compiler selection, platform behavior, output layout, shader embedding, and incremental checks remain in the single root `build.py` driver. Keeping that entrypoint at the root also makes it the one file copied into the downloadable SDK.
+
+Successful builds generate the ignored `compile_commands.json` from the compiler commands actually used. Zed/clangd consumes that file, so no tracked editor-only `compile_flags.txt` needs to mirror the build configuration.
 
 Shaders have logical names scoped to their module. The driver invokes `glslc -mfmt=c` and generates `<module>/Shaders.generated.h`; generated paths and symbols cannot collide across modules. Runtime shader loading can later use the same declarations without changing the Release embedding path.
 

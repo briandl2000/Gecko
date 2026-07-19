@@ -1,7 +1,7 @@
 # Generated build state
 /out/
 /.cache/
-/compile_commands.json
+compile_commands.json
 /scratch/
 __pycache__/
 *.pyc

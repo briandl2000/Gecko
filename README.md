@@ -7,11 +7,13 @@ Gecko is a handmade C++26 game engine for learning, experiments, and games. It b
 Gecko uses one Python 3.10+ build driver with no third-party Python packages:
 
 ```sh
-python3 build.py debug engine
-python3 build.py debug sandbox
-python3 build.py debug sdk-test
+python3 build.py engine
+python3 build.py sandbox
+python3 build.py sdk-test
 python3 build.py sdk
 ```
+
+The target comes first and Debug is the default; use `--config release` when needed. `python3 build.py --help` lists the complete interface, and `python3 build.py graph` prints the engine module order.
 
 On Windows, run the same commands with `python` from an MSVC Developer Command Prompt. Linux uses GCC. Building Gecko from source also requires the Vulkan development files and the Wayland/X11 development packages; projects with shaders require `glslc`.
 
@@ -35,8 +37,8 @@ Engine areas use the same description. Dependencies form a checked directed grap
 Build an external module with either a source checkout or an unpacked SDK:
 
 ```sh
-python3 ../Gecko/build.py debug ../MyProject
-python3 ../GeckoSDK/build.py debug ../MyProject
+python3 ../Gecko/build.py ../MyProject
+python3 ../GeckoSDK/build.py ../MyProject --config release
 ```
 
 See [development](docs/development.md), [architecture](docs/architecture.md), and [coding style](docs/coding-style.md).

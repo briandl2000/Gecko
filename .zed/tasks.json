@@ -2,7 +2,7 @@
   {
     "label": "Gecko: Build Sandbox",
     "command": "python3",
-    "args": ["build.py", "debug", "sandbox"],
+    "args": ["build.py", "sandbox"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
@@ -11,7 +11,7 @@
   {
     "label": "Gecko: Test SDK Consumer",
     "command": "python3",
-    "args": ["build.py", "debug", "sdk-test"],
+    "args": ["build.py", "sdk-test"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "use_new_terminal": false,
     "allow_concurrent_runs": false,
