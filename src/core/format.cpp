@@ -166,10 +166,10 @@ void AppendArgument(FormatBuffer& output, const FormatArg& argument, const Forma
     return;
   }
   case FormatArgKind::StringView: {
-    usize length = argument.Value.View.Count;
-    if (spec.HasPrecision && length > spec.Precision)
-      length = spec.Precision;
-    AppendField(output, argument.Value.View.Data, length, spec, false);
+    usize viewLength = argument.Value.View.Count;
+    if (spec.HasPrecision && viewLength > spec.Precision)
+      viewLength = spec.Precision;
+    AppendField(output, argument.Value.View.Data, viewLength, spec, false);
     return;
   }
   case FormatArgKind::Character:

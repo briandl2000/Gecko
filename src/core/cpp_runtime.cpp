@@ -78,7 +78,7 @@ extern "C" [[noreturn]] void __cxa_pure_virtual() noexcept
 
 #else
 
-extern "C" [[noreturn]] int __cdecl _purecall() noexcept
+extern "C" [[noreturn]] int __cdecl _purecall()
 {
   gecko::AssertFailure(gecko::AssertInfo {
       .Expression = "pure virtual function has an implementation",

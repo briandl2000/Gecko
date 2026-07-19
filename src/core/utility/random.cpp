@@ -26,7 +26,7 @@ u64 RandomRange(u64 range) noexcept
 {
   if (range == 0)
     return NextRandom();
-  const u64 threshold = static_cast<u64>(-range) % range;
+  const u64 threshold = (~range + 1ULL) % range;
   for (;;)
   {
     const u64 value = NextRandom();

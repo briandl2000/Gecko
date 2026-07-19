@@ -7,6 +7,13 @@
 #include "terminal.cpp"
 #include "window_event_input.cpp"
 #include "windows_interface.cpp"
+
+// WinUser.h maps CreateWindow to CreateWindowA/W. The macro must not leak
+// into Gecko's platform interface implementations in this unity unit.
+#if defined(CreateWindow)
+#undef CreateWindow
+#endif
+
 #include "private/null_monitors_backend.cpp"
 #include "private/null_windows_interface.cpp"
 
