@@ -4,7 +4,7 @@
 /// `IGpuSampler` interface for GPU-side profiling and the RAII zone
 /// helpers used by the `GECKO_GPU_*` macros.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/profiler.h"

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/array.h"
 #include "gecko/core/optional.h"
 #include "gecko/core/ptr.h"

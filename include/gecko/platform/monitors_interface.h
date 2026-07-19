@@ -7,7 +7,7 @@
 /// monitor APIs. Concrete backends live under `src/platform/<backend>/`
 /// and are constructed via `IMonitorsBackend::Create`.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/services/events.h"
 #include "gecko/platform/monitor.h"

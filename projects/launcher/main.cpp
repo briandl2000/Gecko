@@ -5,15 +5,15 @@ namespace {
 constexpr gecko::Label LauncherLabel = gecko::MakeLabel("gecko.launcher");
 
 #if defined(GECKO_PLATFORM_WINDOWS)
-constexpr const char* GameLibraryName = "gecko_game.dll";
+constexpr const char* PluginLibraryName = "gecko_sandbox.dll";
 #else
-constexpr const char* GameLibraryName = "libgecko_game.so";
+constexpr const char* PluginLibraryName = "libgecko_sandbox.so";
 #endif
 
-struct LoadedGame
+struct LoadedPlugin
 {
   gecko::platform::SharedLibrary Library;
-  const gecko::GameApi* Api {nullptr};
+  const gecko::PluginApi* Api {nullptr};
 };
 
 bool TextEquals(const char* a, const char* b) noexcept
@@ -53,7 +53,7 @@ bool ParseFrameCount(const char* argument, gecko::u64& frameCount) noexcept
   return true;
 }
 
-gecko::String ResolveGameLibraryPath() noexcept
+gecko::String ResolvePluginLibraryPath() noexcept
 {
   const gecko::String executable = gecko::platform::ExePath();
   const gecko::StringView path = executable.View();
@@ -65,58 +65,49 @@ gecko::String ResolveGameLibraryPath() noexcept
   gecko::String result;
   if (separator != gecko::StringView::NotFound)
     result.Assign(path.Substring(0, separator + 1U));
-  result.Append(GameLibraryName);
+  result.Append(PluginLibraryName);
   return result;
 }
 
-bool LoadGame(LoadedGame& game) noexcept
+bool LoadPlugin(LoadedPlugin& plugin) noexcept
 {
-  const gecko::String libraryPath = ResolveGameLibraryPath();
-  game.Library = gecko::platform::LoadSharedLibrary(libraryPath.CStr());
-  if (!game.Library.IsValid())
+  const gecko::String libraryPath = ResolvePluginLibraryPath();
+  plugin.Library = gecko::platform::LoadSharedLibrary(libraryPath.CStr());
+  if (!plugin.Library.IsValid())
   {
     GECKO_ERROR(LauncherLabel, "Could not load {}: {}", libraryPath, gecko::platform::SharedLibraryError());
     return false;
   }
 
   const auto getApi =
-      gecko::platform::FindSharedLibraryFunction<gecko::GetGameApiFn>(game.Library, gecko::GameApiSymbol);
+      gecko::platform::FindSharedLibraryFunction<gecko::GetPluginApiFn>(plugin.Library, gecko::PluginApiSymbol);
   if (getApi == nullptr)
   {
-    GECKO_ERROR(LauncherLabel, "{} does not export {}", libraryPath, gecko::GameApiSymbol);
-    gecko::platform::UnloadSharedLibrary(game.Library);
-    game = {};
+    GECKO_ERROR(LauncherLabel, "{} does not export {}", libraryPath, gecko::PluginApiSymbol);
+    gecko::platform::UnloadSharedLibrary(plugin.Library);
+    plugin = {};
     return false;
   }
 
-  game.Api = getApi();
-  if (game.Api == nullptr || game.Api->StructSize < gecko::GameApiV1Size ||
-      game.Api->ApiVersion != gecko::GameApiVersion || game.Api->Initialize == nullptr || game.Api->Update == nullptr ||
-      game.Api->Shutdown == nullptr)
+  plugin.Api = getApi();
+  if (plugin.Api == nullptr || plugin.Api->StructSize < gecko::PluginApiV1Size ||
+      plugin.Api->ApiVersion != gecko::PluginApiVersion || plugin.Api->Initialize == nullptr ||
+      plugin.Api->Update == nullptr || plugin.Api->Shutdown == nullptr)
   {
-    GECKO_ERROR(LauncherLabel, "Game API is missing or incompatible");
-    gecko::platform::UnloadSharedLibrary(game.Library);
-    game = {};
+    GECKO_ERROR(LauncherLabel, "Plugin API is missing or incompatible");
+    gecko::platform::UnloadSharedLibrary(plugin.Library);
+    plugin = {};
     return false;
   }
-  if (game.Api->BuiltWithEngineAbi != gecko::EngineAbiVersion)
-  {
-    GECKO_ERROR(LauncherLabel, "Game requires Gecko ABI {}, engine provides ABI {}", game.Api->BuiltWithEngineAbi,
-                gecko::EngineAbiVersion);
-    gecko::platform::UnloadSharedLibrary(game.Library);
-    game = {};
-    return false;
-  }
-
   return true;
 }
 
-void UnloadGame(LoadedGame& game) noexcept
+void UnloadPlugin(LoadedPlugin& plugin) noexcept
 {
-  if (game.Api != nullptr)
-    game.Api->Shutdown();
-  gecko::platform::UnloadSharedLibrary(game.Library);
-  game = {};
+  if (plugin.Api != nullptr)
+    plugin.Api->Shutdown();
+  gecko::platform::UnloadSharedLibrary(plugin.Library);
+  plugin = {};
 }
 
 }  // namespace
@@ -125,7 +116,6 @@ int main(int argumentCount, char** arguments)
 {
   gecko::GeckoConfig config {};
   config.AppName = "Gecko Sandbox";
-  config.GraphicsBackend = gecko::graphics::GraphicsBackend::Vulkan;
   gecko::u64 maxFrames = 0;
 
   for (int index = 1; index < argumentCount; ++index)
@@ -138,12 +128,12 @@ int main(int argumentCount, char** arguments)
     else if (TextEquals(argument, "--backend=null"))
       config.Platform.Backend = gecko::platform::DisplayBackendKind::Null;
     else if (TextEquals(argument, "--graphics=null"))
-      config.GraphicsBackend = gecko::graphics::GraphicsBackend::Null;
+      config.Graphics.Backend = gecko::graphics::GraphicsBackend::Null;
     else if (!ParseFrameCount(argument, maxFrames))
       return 64;
   }
 #if defined(_DEBUG)
-  config.EnableGraphicsDebug = true;
+  config.Graphics.Debug = true;
 #endif
 
   if (gecko::Initialize(config) != gecko::InitializeResult::Success)
@@ -151,27 +141,22 @@ int main(int argumentCount, char** arguments)
 
   GECKO_INFO(LauncherLabel, "Gecko {}", gecko::VersionFullString());
 
-  LoadedGame game {};
-  if (!LoadGame(game))
+  LoadedPlugin plugin {};
+  if (!LoadPlugin(plugin))
   {
     gecko::Shutdown();
     return 2;
   }
 
-  gecko::GameContext context {};
-  context.EngineVersion = gecko::VersionPacked();
-  context.EngineAbi = gecko::EngineAbiVersion;
-  if (!game.Api->Initialize(context))
+  const gecko::PluginContext context {};
+  if (!plugin.Api->Initialize(context))
   {
-    UnloadGame(game);
+    UnloadPlugin(plugin);
     gecko::Shutdown();
     return 3;
   }
 
-  GECKO_INFO(LauncherLabel, "Running game: {}", game.Api->Name != nullptr ? game.Api->Name : "unnamed");
-  GECKO_INFO(LauncherLabel, "Game engine build={} ABI={}",
-             game.Api->BuiltWithEngineRelease != nullptr ? game.Api->BuiltWithEngineRelease : "unknown",
-             game.Api->BuiltWithEngineAbi);
+  GECKO_INFO(LauncherLabel, "Running plugin: {}", plugin.Api->Name != nullptr ? plugin.Api->Name : "unnamed");
 
   gecko::u64 previousTime = gecko::MonotonicTimeNs();
   gecko::u64 frameIndex = 0;
@@ -179,17 +164,17 @@ int main(int argumentCount, char** arguments)
   while (running)
   {
     const gecko::u64 now = gecko::MonotonicTimeNs();
-    const gecko::GameFrame frame {
+    const gecko::PluginFrame frame {
         .DeltaSeconds = gecko::time::NsToSecondsF(now - previousTime),
         .FrameIndex = frameIndex++,
     };
     previousTime = now;
-    running = game.Api->Update(frame);
+    running = plugin.Api->Update(frame);
     if (maxFrames != 0 && frameIndex >= maxFrames)
       running = false;
   }
 
-  UnloadGame(game);
+  UnloadPlugin(plugin);
   gecko::Shutdown();
   return 0;
 }

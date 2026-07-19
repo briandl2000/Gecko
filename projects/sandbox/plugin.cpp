@@ -1,9 +1,12 @@
 #include "gecko/gecko.h"
 #include "gecko/platform/platform_events.h"
+#include "sandbox/Shaders.generated.h"
 
 namespace {
 
-constexpr gecko::Label GameLabel = gecko::MakeLabel("game.sandbox");
+static_assert(sizeof(gecko::sandbox::shaders::SmokeCompute) > 0);
+
+constexpr gecko::Label PluginLabel = gecko::MakeLabel("plugin.sandbox");
 
 gecko::platform::WindowHandle g_Window {};
 gecko::EventSubscription g_CloseSubscription {};
@@ -14,7 +17,7 @@ void OnCloseRequested(void*, const gecko::EventMeta&, gecko::EventView) noexcept
   g_Running = false;
 }
 
-bool GameInitialize(const gecko::GameContext&) noexcept
+bool PluginInitialize(const gecko::PluginContext&) noexcept
 {
   auto* windows = gecko::platform::GetWindows();
   if (windows == nullptr)
@@ -29,11 +32,11 @@ bool GameInitialize(const gecko::GameContext&) noexcept
 
   g_CloseSubscription = gecko::SubscribeEvent(gecko::platform::events::WindowCloseRequested, OnCloseRequested, nullptr);
   g_Running = true;
-  GECKO_INFO(GameLabel, "Sandbox initialized");
+  GECKO_INFO(PluginLabel, "Sandbox initialized");
   return true;
 }
 
-bool GameUpdate(const gecko::GameFrame&) noexcept
+bool PluginUpdate(const gecko::PluginFrame&) noexcept
 {
   auto* windows = gecko::platform::GetWindows();
   if (!g_Running || windows == nullptr || !windows->IsWindowAlive(g_Window))
@@ -46,26 +49,26 @@ bool GameUpdate(const gecko::GameFrame&) noexcept
   return g_Running;
 }
 
-void GameShutdown() noexcept
+void PluginShutdown() noexcept
 {
   g_CloseSubscription.Reset();
   if (auto* windows = gecko::platform::GetWindows(); windows != nullptr && g_Window.IsValid())
     windows->DestroyWindow(g_Window);
   g_Window = {};
   g_Running = false;
-  GECKO_INFO(GameLabel, "Sandbox shut down");
+  GECKO_INFO(PluginLabel, "Sandbox shut down");
 }
 
-const gecko::GameApi GameApi {
+const gecko::PluginApi PluginApi {
     .Name = "Sandbox",
-    .Initialize = GameInitialize,
-    .Update = GameUpdate,
-    .Shutdown = GameShutdown,
+    .Initialize = PluginInitialize,
+    .Update = PluginUpdate,
+    .Shutdown = PluginShutdown,
 };
 
 }  // namespace
 
-GECKO_GAME_EXPORT const gecko::GameApi* GeckoGame_GetApi() noexcept
+GECKO_PLUGIN_EXPORT const gecko::PluginApi* GeckoPlugin_GetApi() noexcept
 {
-  return &GameApi;
+  return &PluginApi;
 }

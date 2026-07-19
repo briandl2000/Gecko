@@ -1,16 +1,18 @@
 #pragma once
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
+#include "gecko/graphics/command_list.h"
 #include "gecko/graphics/gpu_profiler.h"
 #include "gecko/graphics/graphics_device.h"
+#include "gecko/graphics/graphics_types.h"
 
 namespace gecko::graphics {
 
 struct GraphicsConfig
 {
+  bool Enabled {true};
   GraphicsBackend Backend {GraphicsBackend::Vulkan};
   bool Debug {false};
-  const char* AppName {"Gecko"};
   GpuSamplerDesc Sampler {};
 };
 

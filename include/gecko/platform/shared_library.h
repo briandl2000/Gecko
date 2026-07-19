@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 
 namespace gecko::platform {
 

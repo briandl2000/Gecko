@@ -8,7 +8,7 @@
 /// virtual-terminal mode is enabled (Windows 10+); colour is suppressed
 /// automatically when the destination is not a TTY.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/string.h"
 #include "gecko/core/types.h"
 

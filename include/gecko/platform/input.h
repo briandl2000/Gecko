@@ -9,7 +9,7 @@
 /// report rising/falling edges. Apps that prefer push-style input can
 /// subscribe to keyboard/mouse events on the event bus instead.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/types.h"
 #include "gecko/core/string.h"
 #include "gecko/platform/input_codes.h"

@@ -7,12 +7,10 @@
 /// checked-in `gecko/version.h`. Use `VersionFullString()` for
 /// human-readable banners (includes prerelease tag).
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/version.h"
 
 namespace gecko {
-
-inline constexpr u32 EngineAbiVersion = 1;
 
 [[nodiscard]] constexpr u32 PackVersion(u32 major, u32 minor, u32 patch) noexcept
 {

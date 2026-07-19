@@ -66,72 +66,40 @@ jobs:
           cache: true
           stripdown: true
 
-      - name: Build Gecko and examples
+      - name: Build and test SDK
         if: runner.os == 'Linux'
         env:
           CC: gcc-14
           CXX: g++-14
         run: |
-          ./build.sh release build
-          ./build.sh release examples
+          python3 build.py sdk
+          python3 build.py release sdk-test
 
-      - name: Build Gecko and examples
+      - name: Build and test SDK
         if: runner.os == 'Windows'
         shell: cmd
         run: |
-          call build.bat release build
-          call build.bat release examples
-
-      - name: Headless smoke checks
-        if: runner.os == 'Linux'
-        working-directory: out/Linux-x86_64/Release/bin
-        run: |
-          ./gecko_launcher --backend=null --graphics=null --frames=2
-          ./gecko_example_app_skeleton --backend=null --no-window
-          ./gecko_example_core_example
-          ./gecko_example_math_example
-
-      - name: Headless smoke checks
-        if: runner.os == 'Windows'
-        shell: cmd
-        working-directory: out/Windows-x86_64/Release/bin
-        run: |
-          gecko_launcher.exe --backend=null --graphics=null --frames=2
-          gecko_example_app_skeleton.exe --backend=null --no-window
-          gecko_example_core_example.exe
-          gecko_example_math_example.exe
+          python build.py sdk
+          python build.py release sdk-test
 
       - name: Package Linux engine
         if: runner.os == 'Linux' && github.event_name == 'push'
         run: |
-          mkdir -p out/package/gecko/include out/package/gecko/bin
-          cp -R include/gecko out/package/gecko/include/
-          cp LICENSE README.md out/package/gecko/
-          cp out/Linux-x86_64/Release/bin/libGecko.so out/package/gecko/bin/
-          cp out/Linux-x86_64/Release/bin/gecko_launcher out/package/gecko/bin/
-          cp out/Linux-x86_64/Release/bin/libgecko_game.so out/package/gecko/bin/
-          cd out/package/gecko
+          cd out/sdk
           zip -r ../gecko-linux-x86_64.zip .
 
       - name: Package Windows engine
         if: runner.os == 'Windows' && github.event_name == 'push'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force out/package/gecko/include, out/package/gecko/bin
-          Copy-Item -Recurse include/gecko out/package/gecko/include/
-          Copy-Item LICENSE, README.md out/package/gecko/
-          Copy-Item out/Windows-x86_64/Release/bin/Gecko.dll out/package/gecko/bin/
-          Copy-Item out/Windows-x86_64/Release/bin/Gecko.lib out/package/gecko/bin/
-          Copy-Item out/Windows-x86_64/Release/bin/gecko_launcher.exe out/package/gecko/bin/
-          Copy-Item out/Windows-x86_64/Release/bin/gecko_game.dll out/package/gecko/bin/
-          Compress-Archive -Path out/package/gecko/* -DestinationPath out/package/gecko-windows-x86_64.zip
+          Compress-Archive -Path out/sdk/* -DestinationPath out/gecko-windows-x86_64.zip
 
       - name: Upload release package
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: gecko-${{ matrix.artifact }}
-          path: out/package/*.zip
+          path: out/*.zip
           retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
 
   release:

@@ -1,30 +1,36 @@
 # Architecture
 
-Gecko has one process-wide engine instance and one shared engine library. It owns memory, logging, profiling, jobs, events, platform state, and graphics state. These are concrete Gecko systems with small configuration structs, not injected interface graphs.
-
-The shipping shape is:
+Gecko is one shared library and one process-wide engine instance. Any executable may link it directly. A host may also load zero, one, or many shared-library plugins; a game is one possible plugin role.
 
 ```text
-gecko_launcher ─┐
-editor/tool exe ├── Gecko shared library ── OS + Vulkan
-game shared lib ┤
-plugin shared lib ┘
+standalone executable ----+----> Gecko shared library ----> OS + Vulkan
+editor / launcher --------+
+        |
+        +----> game plugin --------+
+        +----> tool plugin --------+----> same Gecko shared library
+        +----> other plugins ------+
 ```
 
-The launcher loads a game library with the platform shared-library functions and asks for exactly one known symbol, `GeckoGame_GetApi`. A game/plugin is compiled and linked against the same Gecko import library/shared object as the launcher. It does not search for every Gecko symbol itself and it does not embed a static copy of the engine.
+Every executable and plugin in a process links the same `Gecko.dll` or `libGecko.so`. Gecko therefore owns one allocator and one set of logging, profiling, job, event, platform, and graphics state.
 
-The game API is a flat, versioned function table containing fixed-width values, pointers, and callbacks. Gecko's normal C++ API is available because the game links Gecko, but reload/version negotiation stays at this narrow boundary. The loader checks both the game-table version and the engine ABI version. Compatible additions keep their existing numbers; a broken C++ boundary increments `EngineAbiVersion`, while a broken game-table contract increments `GameApiVersion`.
+The host resolves `GeckoPlugin_GetApi` from a plugin. The returned function table uses fixed-width values, pointers, and callbacks. During alpha development, `PluginApiVersion` and `StructSize` protect this loader contract; plugins are otherwise rebuilt with the engine.
 
-Subsystem boundaries are directories for navigation, not separately shipped libraries. Calls inside Gecko are ordinary direct calls. Function tables exist only where a real runtime boundary needs them: game/plugin loading or selecting an OS/graphics backend.
+## Build concepts
 
-The engine uses a deliberate unity build. Each subsystem has one unity source that includes its implementation files, and `src/gecko_engine.cpp` combines those subsystem units into the shared library. This keeps the build visible and makes internal name collisions real problems to fix instead of relying on accidental translation-unit isolation. Projects may include the complete public API through `<gecko/gecko.h>` or choose granular headers when parse time matters.
+A module is a unit of code, dependencies, and resources described by `module.py`. A project is the root module selected for a build. A plugin is a module packaged as a shared library; an executable is a module packaged as a program. A source module may instead contribute code to its requesting project.
 
-Memory belongs to Gecko. The shared library owns the allocator state, and every binary uses the exported allocation functions. OS allocation is the bottom layer. Graphics resource allocation is explicit Vulkan allocation. No third-party allocator or container library is part of the engine.
+The engine itself is a project producing the Gecko shared library. Core, Math, Platform, and Graphics are currently explicit engine areas combined by its unity source. They can become separately described source modules when that produces a real organizational benefit; doing so does not require separate shared libraries.
 
-Logging, profiling, jobs, and events are exported as direct functions backed by that same state. Their concrete types are private to the engine. There is no public service registry, null-service hierarchy, or implementation injection point; `GeckoConfig` only adjusts the behavior of the one implementation.
+Module descriptions are declarative. They name a unity source, dependencies, includes, definitions, system libraries, and shaders. Compiler selection, platform behavior, output layout, shader embedding, and incremental checks remain in the single `build.py` driver.
 
-Initialization and shutdown are explicit through `Initialize(config)` / `Shutdown()` and a typed initialization result. Destructors may clean up small local values, but correctness must not depend on global destructor order, exception unwinding, or hidden ownership chains.
+Shaders have logical names scoped to their module. The driver invokes `glslc -mfmt=c` and generates `<module>/Shaders.generated.h`; generated paths and symbols cannot collide across modules. Runtime shader loading can later use the same declarations without changing the Release embedding path.
 
-Linux currently links the OS-facing libc/pthread/math/compiler ABI surface, and Windows uses the platform/compiler startup runtime. Gecko does not link the C++ standard library on Linux and does not use its containers, ownership, formatting, I/O, or threading APIs. Removing more of the remaining platform runtime is a deliberate later project, not a hidden claim.
+## SDK boundary
 
-Wayland is preferred on Linux and X11 remains available for compatibility. Windows uses Win32. Platform selection happens once during initialization. Vulkan is required for hardware rendering; a null backend is useful for headless operation and a software renderer can be added as another explicit backend.
+The downloadable SDK contains `build.py`, public headers, a prebuilt Gecko module description, and Debug/Release libraries. The same module description builds against a source checkout or an unpacked SDK. CI stages the exact SDK directory, uses its copied driver and public artifacts to rebuild the sandbox consumer, runs it headlessly, and only then packages it.
+
+Configuration uses plain value structs with default member initializers. Module settings stay nested by value in `GeckoConfig`; there is no config registry, dependency injection graph, or interchangeable core service hierarchy.
+
+Initialization and shutdown are explicit through `Initialize(config)` and `Shutdown()`. Errors use typed results where callers can recover; assertions are for programmer errors. Important lifetime, allocation, and control flow must remain visible.
+
+Linux prefers Wayland and keeps X11 for compatibility. Windows uses Win32. Vulkan is the hardware renderer, Null supports headless work, and a software renderer can become another explicit backend.

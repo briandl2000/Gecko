@@ -3,7 +3,7 @@
 /// @file
 /// `ICommandList` interface for recording GPU work.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/labels.h"
 #include "gecko/graphics/graphics_types.h"
 

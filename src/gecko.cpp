@@ -1,13 +1,13 @@
+#include "core/runtime/private/event_bus.h"
+#include "core/runtime/private/immediate_logger.h"
+#include "core/runtime/private/ring_profiler.h"
+#include "core/runtime/private/thread_pool_job_system.h"
 #include "gecko/core/placement.h"
 #include "gecko/core/services/memory.h"
 #include "gecko/core/utility/time.h"
 #include "gecko/engine.h"
 #include "graphics/private/graphics_state.h"
 #include "platform/private/platform_state.h"
-#include "runtime/private/event_bus.h"
-#include "runtime/private/immediate_logger.h"
-#include "runtime/private/ring_profiler.h"
-#include "runtime/private/thread_pool_job_system.h"
 
 namespace gecko {
 
@@ -80,9 +80,9 @@ InitializeResult Initialize(const GeckoConfig& config) noexcept
 
   auto* state = new (memory, Placement) GeckoState();
   g_State = state;
-  state->Jobs.SetWorkerThreadCount(config.JobWorkerCount);
-  state->Logger.SetLevel(config.MinimumLogLevel);
-  state->Profiler.SetMinLevel(config.ProfilerLevel);
+  state->Jobs.SetWorkerThreadCount(config.Core.JobWorkerCount);
+  state->Logger.SetLevel(config.Core.MinimumLogLevel);
+  state->Profiler.SetMinLevel(config.Core.ProfilerLevel);
   if (!state->Jobs.Init())
     goto failed;
   state->JobsInitialized = true;
@@ -103,14 +103,9 @@ InitializeResult Initialize(const GeckoConfig& config) noexcept
     goto failed;
   state->PlatformInitialized = true;
 
-  if (config.EnableGraphics)
+  if (config.Graphics.Enabled)
   {
-    const graphics::GraphicsConfig graphicsConfig {
-        .Backend = config.GraphicsBackend,
-        .Debug = config.EnableGraphicsDebug,
-        .AppName = config.AppName,
-    };
-    if (!graphics::detail::Initialize(graphicsConfig))
+    if (!graphics::detail::Initialize(config.Graphics, config.AppName))
       goto failed;
     state->GraphicsInitialized = true;
   }

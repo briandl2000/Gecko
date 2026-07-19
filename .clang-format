@@ -69,7 +69,7 @@ ColumnLimit: 120
 ReflowComments: true
 
 # Includes
-IncludeBlocks: Regroup
+IncludeBlocks: Preserve
 IncludeCategories:
   # Corresponding header first (handled automatically)
   - Regex: '^".*\.h"$'
@@ -83,7 +83,7 @@ IncludeCategories:
   # Local includes (private headers)
   - Regex: '^"private/.*"$'
     Priority: 4
-SortIncludes: CaseInsensitive
+SortIncludes: Never
 
 # Pointers and references
 DerivePointerAlignment: false

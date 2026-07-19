@@ -8,7 +8,6 @@
 #include "gecko/gecko.h"
 
 #include "core/gecko_core.cpp"
-#include "runtime/gecko_runtime.cpp"
 #include "graphics/gecko_graphics.cpp"
 #include "platform/gecko_platform.cpp"
 

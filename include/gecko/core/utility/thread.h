@@ -3,7 +3,7 @@
 /// @file
 /// Thread-related helpers: sleeping, yielding, and identifying threads.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/types.h"
 #include "gecko/platform/threading.h"
 

@@ -9,13 +9,14 @@
 *.c   text eol=lf
 
 *.sh  text eol=lf
+*.py  text eol=lf
 *.md  text eol=lf
 *.txt  text eol=lf
 
 # Force CRLF for Windows-specific scripts
 *.bat  text eol=crlf
 
-# Binary files — never diff or merge
+# Binary files - never diff or merge
 *.png  binary
 *.jpg  binary
 *.ico  binary

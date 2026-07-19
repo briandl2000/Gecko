@@ -5,7 +5,7 @@
 /// backends. Resource-creation methods return handle types from
 /// `graphics_types.h`; the device must outlive every handle it produces.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/ptr.h"
 #include "gecko/core/types.h"
 #include "gecko/graphics/command_list.h"

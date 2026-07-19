@@ -7,7 +7,7 @@
 /// Stateless namespace functions; backed by pthread on Linux and
 /// Win32 on Windows, selected at compile time.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/types.h"
 
 namespace gecko::platform {

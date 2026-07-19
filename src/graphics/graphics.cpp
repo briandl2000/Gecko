@@ -16,7 +16,7 @@ IGpuSampler* g_Sampler = nullptr;
 
 }  // namespace
 
-bool detail::Initialize(const GraphicsConfig& config) noexcept
+bool detail::Initialize(const GraphicsConfig& config, const char* appName) noexcept
 {
   if (g_Device != nullptr)
     return true;
@@ -24,7 +24,7 @@ bool detail::Initialize(const GraphicsConfig& config) noexcept
   GraphicsDeviceDesc desc {};
   desc.Backend = config.Backend;
   desc.Debug = config.Debug;
-  desc.AppName = config.AppName;
+  desc.AppName = appName;
   g_OwnedDevice = CreateGraphicsDevice(desc);
   if (!g_OwnedDevice)
   {

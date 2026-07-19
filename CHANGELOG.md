@@ -6,15 +6,17 @@ Gecko development releases use the `v0.0.0-alpha.N` line.
 
 ### Added
 
-- Direct Linux and Windows build scripts with no generator or package manager.
-- One shared Gecko engine library linked by launchers, games, and plugins.
-- A versioned `GeckoGame_GetApi` boundary for dynamically loaded games.
-- Unity build entry points per subsystem and one top-level `gecko_engine.cpp`.
+- One Python build driver with declarative per-project module descriptions and no third-party Python packages.
+- One shared Gecko engine library linked by executables and plugins.
+- A versioned `GeckoPlugin_GetApi` boundary for dynamically loaded plugins.
+- Unity build entry points per module and one top-level `gecko_engine.cpp`.
 - A complete `<gecko/gecko.h>` public umbrella header.
 - Gecko-owned strings, arrays, spans, optional values, fixed maps, synchronization, and `{}` formatting.
 - One process-wide virtual-memory allocator shared by every engine consumer.
 - Concrete logger, profiler, job system, event bus, platform, and graphics systems owned by Gecko.
 - Typed initialization results and assertion handling without exceptions or RTTI.
+- A staged Debug/Release SDK containing public headers, libraries, debug symbols, and the build driver.
+- An external-consumer check that rebuilds and runs the sandbox through the staged SDK.
 
 ### Changed
 
@@ -23,31 +25,33 @@ Gecko development releases use the `v0.0.0-alpha.N` line.
 - Vulkan allocations are explicit and no longer use VMA.
 - Logging and profiling use typed `{}` formatting rather than printf-style format strings.
 - Version `0.0.0-alpha.4` is checked in directly and needs no configure step.
+- Linux and Windows use the same build commands, module descriptions, shader declarations, and output layout.
+- Shader compilation uses module-scoped `glslc` C initializers, with no custom embedding executable or runtime shader files.
 
 ### Fixed
 
-- Engine and game/plugin allocations resolve to one allocator authority in the shared Gecko library.
+- Engine and plugin allocations resolve to one allocator authority in the shared Gecko library.
 - Unity build freshness checks include implementation files as well as headers.
 
 ### Removed
 
-- CMake, the Python build wrapper, Docker, tests, examples, vendored third-party code, generated IDE state, and AI instruction/context files.
+- CMake, shell/batch build duplication, Docker, tests, the old example collection, vendored third-party code, generated IDE state, and AI instruction/context files.
 - The module registry and injectable runtime backend hierarchy.
 - Standard-library containers, strings, formatting, threading, ownership, and I/O from engine source.
 
 ## [0.0.0-alpha.2]
 
 ### Added
-- **Platform windowing** — full window lifecycle management (create, resize, move, minimize, maximize, fullscreen, close)
-- **Win32 window backend** — native Windows windowing with per-monitor DPI awareness
-- **Wayland window backend** — xdg-shell based windowing with resize constraints, decorations, and fullscreen support
-- **X11 window backend** — Xlib-based windowing for Linux
-- **Monitor system** — platform-specific monitor backends for Linux (X11 + Wayland) and Windows
-- **Platform event bus** — event dispatch for platform-level events (monitors, windows)
+- **Platform windowing** - full window lifecycle management (create, resize, move, minimize, maximize, fullscreen, close)
+- **Win32 window backend** - native Windows windowing with per-monitor DPI awareness
+- **Wayland window backend** - xdg-shell based windowing with resize constraints, decorations, and fullscreen support
+- **X11 window backend** - Xlib-based windowing for Linux
+- **Monitor system** - platform-specific monitor backends for Linux (X11 + Wayland) and Windows
+- **Platform event bus** - event dispatch for platform-level events (monitors, windows)
 - **Rect2D** structure and corresponding tests
-- **Unit tests** — core, platform, runtime, and math test modules (Catch2)
-- **Feature tests** — visible window tests gated behind `[.visible]` tag
-- **Cross-platform build infrastructure** — platform-separated build/output directories
+- **Unit tests** - core, platform, runtime, and math test modules (Catch2)
+- **Feature tests** - visible window tests gated behind `[.visible]` tag
+- **Cross-platform build infrastructure** - platform-separated build/output directories
 
 ### Changed
 - Platform API returns values instead of output references

@@ -20,7 +20,7 @@
 /// - **Wayland**: not yet implemented (needs a valid serial); returns
 ///   empty / no-op.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/string.h"
 
 namespace gecko::platform {

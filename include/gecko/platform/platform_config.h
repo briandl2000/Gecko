@@ -7,7 +7,7 @@
 /// `DisplayBackendKind::Auto` to let `Resolve` pick the best backend
 /// for the current platform.
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/types.h"
 
 namespace gecko::platform {

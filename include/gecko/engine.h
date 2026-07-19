@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gecko/core/api.h"
+#include "gecko/api.h"
 #include "gecko/core/services/log.h"
 #include "gecko/core/services/profiler.h"
 #include "gecko/core/types.h"
@@ -17,16 +17,19 @@ enum class InitializeResult : u8
   RuntimeFailed,
 };
 
-struct GeckoConfig
+struct CoreConfig
 {
-  const char* AppName {"Gecko"};
-  platform::PlatformConfig Platform {};
-  graphics::GraphicsBackend GraphicsBackend {graphics::GraphicsBackend::Vulkan};
   u32 JobWorkerCount {0};
   LogLevel MinimumLogLevel {LogLevel::Info};
   ProfLevel ProfilerLevel {ProfLevel::Detailed};
-  bool EnableGraphics {true};
-  bool EnableGraphicsDebug {false};
+};
+
+struct GeckoConfig
+{
+  const char* AppName {"Gecko"};
+  CoreConfig Core {};
+  platform::PlatformConfig Platform {};
+  graphics::GraphicsConfig Graphics {};
 };
 
 [[nodiscard]] GECKO_API InitializeResult Initialize(const GeckoConfig& config = {}) noexcept;
