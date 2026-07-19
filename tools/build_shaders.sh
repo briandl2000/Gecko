@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+RootScript="${BASH_SOURCE[0]}"
+
 if (( $# != 2 )); then
   echo "usage: tools/build_shaders.sh <source-dir> <output-dir>" >&2
   exit 2
@@ -39,11 +41,11 @@ while IFS= read -r -d '' Source; do
   esac
 
   Output="$OutputDir/${File%.hlsl}.spv"
-  if [[ -f "$Output" && "$Source" -ot "$Output" ]] &&
+  if [[ -f "$Output" && "$Source" -ot "$Output" && "$RootScript" -ot "$Output" ]] &&
      ! find "$SourceDir" -type f \( -name '*.hlsl' -o -name '*.hlsli' \) -newer "$Output" -print -quit | grep -q .; then
     continue
   fi
-  echo "  GLSLC ${Source#$SourceDir/}"
+  echo "[GLSLC] ${Source#$SourceDir/}"
   "$Compiler" -x hlsl -fshader-stage="$Stage" -fentry-point=main -I"$SourceDir" "$Source" -o "$Output"
 done < <(find "$SourceDir" -type f -name '*.hlsl' -print0 | sort -z)
 

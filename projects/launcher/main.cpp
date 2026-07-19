@@ -4,9 +4,9 @@ namespace {
 
 constexpr gecko::Label LauncherLabel = gecko::MakeLabel("gecko.launcher");
 
-#if !defined(GECKO_MONOLITHIC_GAME) && defined(GECKO_PLATFORM_WINDOWS)
+#if defined(GECKO_PLATFORM_WINDOWS)
 constexpr const char* GameLibraryName = "gecko_game.dll";
-#elif !defined(GECKO_MONOLITHIC_GAME)
+#else
 constexpr const char* GameLibraryName = "libgecko_game.so";
 #endif
 
@@ -15,10 +15,6 @@ struct LoadedGame
   gecko::platform::SharedLibrary Library;
   const gecko::GameApi* Api {nullptr};
 };
-
-#if defined(GECKO_MONOLITHIC_GAME)
-extern "C" const gecko::GameApi* GeckoGame_GetApi() noexcept;
-#endif
 
 bool TextEquals(const char* a, const char* b) noexcept
 {
@@ -57,7 +53,6 @@ bool ParseFrameCount(const char* argument, gecko::u64& frameCount) noexcept
   return true;
 }
 
-#if !defined(GECKO_MONOLITHIC_GAME)
 gecko::String ResolveGameLibraryPath() noexcept
 {
   const gecko::String executable = gecko::platform::ExePath();
@@ -73,13 +68,9 @@ gecko::String ResolveGameLibraryPath() noexcept
   result.Append(GameLibraryName);
   return result;
 }
-#endif
 
 bool LoadGame(LoadedGame& game) noexcept
 {
-#if defined(GECKO_MONOLITHIC_GAME)
-  game.Api = GeckoGame_GetApi();
-#else
   const gecko::String libraryPath = ResolveGameLibraryPath();
   game.Library = gecko::platform::LoadSharedLibrary(libraryPath.CStr());
   if (!game.Library.IsValid())
@@ -99,15 +90,12 @@ bool LoadGame(LoadedGame& game) noexcept
   }
 
   game.Api = getApi();
-#endif
   if (game.Api == nullptr || game.Api->StructSize < gecko::GameApiV1Size ||
       game.Api->ApiVersion != gecko::GameApiVersion || game.Api->Initialize == nullptr || game.Api->Update == nullptr ||
       game.Api->Shutdown == nullptr)
   {
     GECKO_ERROR(LauncherLabel, "Game API is missing or incompatible");
-#if !defined(GECKO_MONOLITHIC_GAME)
     gecko::platform::UnloadSharedLibrary(game.Library);
-#endif
     game = {};
     return false;
   }
@@ -115,9 +103,7 @@ bool LoadGame(LoadedGame& game) noexcept
   {
     GECKO_ERROR(LauncherLabel, "Game requires Gecko ABI {}, engine provides ABI {}", game.Api->BuiltWithEngineAbi,
                 gecko::EngineAbiVersion);
-#if !defined(GECKO_MONOLITHIC_GAME)
     gecko::platform::UnloadSharedLibrary(game.Library);
-#endif
     game = {};
     return false;
   }
@@ -129,9 +115,7 @@ void UnloadGame(LoadedGame& game) noexcept
 {
   if (game.Api != nullptr)
     game.Api->Shutdown();
-#if !defined(GECKO_MONOLITHIC_GAME)
   gecko::platform::UnloadSharedLibrary(game.Library);
-#endif
   game = {};
 }
 

@@ -5,12 +5,6 @@ set -euo pipefail
 Root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 Config="${1:-debug}"
 Action="${2:-build}"
-GameProject="${GECKO_GAME:-sandbox}"
-
-if [[ ! "$GameProject" =~ ^[A-Za-z0-9_-]+$ ]]; then
-  echo "GECKO_GAME must be a project name from projects/" >&2
-  exit 2
-fi
 
 case "$Config" in
   debug)
@@ -22,35 +16,30 @@ case "$Config" in
     ConfigFlags=(-O2 -g -DNDEBUG=1)
     ;;
   *)
-    echo "usage: ./build.sh [debug|release] [build|clean|monolithic|examples]" >&2
+    echo "usage: ./build.sh [debug|release] [build|clean|examples]" >&2
     exit 2
     ;;
 esac
 
 PlatformId="Linux-$(uname -m)"
-BuildDir="$Root/out/$PlatformId/handmade/$ConfigName"
+BuildDir="$Root/out/$PlatformId/$ConfigName"
 ObjectDir="$BuildDir/obj"
 GeneratedDir="$BuildDir/generated"
 BinaryDir="$BuildDir/bin"
-GameSource="$Root/projects/$GameProject/game.cpp"
 
 if [[ "$Action" == "clean" ]]; then
+  echo "[CLEAN] $BuildDir"
   rm -rf "$BuildDir"
   exit 0
 fi
 
-if [[ "$Action" != "build" && "$Action" != "monolithic" && "$Action" != "examples" ]]; then
+if [[ "$Action" != "build" && "$Action" != "examples" ]]; then
   echo "unknown action: $Action" >&2
   exit 2
 fi
 
-if [[ "$Action" != "examples" && ! -f "$GameSource" ]]; then
-  echo "game project not found: projects/$GameProject/game.cpp" >&2
-  exit 1
-fi
-
-Cxx="${CXX:-clang++}"
-Cc="${CC:-clang}"
+Cxx="${CXX:-g++}"
+Cc="${CC:-gcc}"
 Jobs="${GECKO_JOBS:-$(nproc)}"
 
 for Tool in "$Cxx" "$Cc" pkg-config wayland-scanner; do
@@ -76,7 +65,7 @@ if [[ ! -f "$GeneratedDir/xdg-decoration-client-protocol.h" || "$XdgDecoration" 
 fi
 
 CommonFlags=(
-  -std=c++23
+  -std=c++26
   -fPIC
   -fno-exceptions
   -fno-rtti
@@ -104,6 +93,21 @@ CommonFlags=(
 CommonLinkFlags=(
   -nostdlib++
 )
+FastLinkFlags=()
+if command -v ld.lld >/dev/null 2>&1; then
+  FastLinkFlags=(-fuse-ld=lld)
+fi
+
+SignatureFile="$ObjectDir/build-signature"
+BuildSignature="$Cxx:$($Cxx -dumpfullversion -dumpversion)|$Cc:$($Cc -dumpfullversion -dumpversion)|${CommonFlags[*]}|${ConfigFlags[*]}|${FastLinkFlags[*]}"
+PreviousSignature=""
+if [[ -f "$SignatureFile" ]]; then
+  IFS= read -r PreviousSignature < "$SignatureFile"
+fi
+ForceRebuild=false
+if [[ "$BuildSignature" != "$PreviousSignature" ]]; then
+  ForceRebuild=true
+fi
 
 EngineSources=(
   src/gecko_engine.cpp
@@ -125,16 +129,17 @@ wait_batch()
   fi
 }
 
-echo "Building Gecko $ConfigName ($Jobs parallel jobs)"
+echo "[GECKO] $ConfigName $Action ($Jobs jobs)"
 for Source in "${EngineSources[@]}"; do
   ObjectName="${Source//\//_}"
   Object="$ObjectDir/${ObjectName%.cpp}.o"
   Objects+=("$Object")
-  if [[ -f "$Object" && "$Root/$Source" -ot "$Object" ]] &&
+  if [[ "$ForceRebuild" == false && -f "$Object" && "$Root/$Source" -ot "$Object" &&
+        "$Root/build.sh" -ot "$Object" ]] &&
      ! find "$Root/include" "$Root/src" -type f \( -name '*.h' -o -name '*.cpp' \) -newer "$Object" -print -quit | grep -q .; then
     continue
   fi
-  echo "  CXX $Source"
+  echo "[CXX  ] $Source"
   "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" -DGECKO_BUILDING=1 \
     -c "$Root/$Source" -o "$Object" &
   Pending+=("$!")
@@ -148,29 +153,18 @@ ProtocolObjects=(
   "$ObjectDir/xdg-shell-protocol.o"
   "$ObjectDir/xdg-decoration-protocol.o"
 )
-if [[ ! -f "${ProtocolObjects[0]}" || "$GeneratedDir/xdg-shell-protocol.c" -nt "${ProtocolObjects[0]}" ]]; then
+if [[ "$ForceRebuild" == true || ! -f "${ProtocolObjects[0]}" ||
+      "$GeneratedDir/xdg-shell-protocol.c" -nt "${ProtocolObjects[0]}" ]]; then
   "$Cc" -fPIC -Wall -Wextra -Werror -I"$GeneratedDir" \
     -c "$GeneratedDir/xdg-shell-protocol.c" -o "${ProtocolObjects[0]}"
 fi
-if [[ ! -f "${ProtocolObjects[1]}" || "$GeneratedDir/xdg-decoration-protocol.c" -nt "${ProtocolObjects[1]}" ]]; then
+if [[ "$ForceRebuild" == true || ! -f "${ProtocolObjects[1]}" ||
+      "$GeneratedDir/xdg-decoration-protocol.c" -nt "${ProtocolObjects[1]}" ]]; then
   "$Cc" -fPIC -Wall -Wextra -Werror -I"$GeneratedDir" \
     -c "$GeneratedDir/xdg-decoration-protocol.c" -o "${ProtocolObjects[1]}"
 fi
 
 read -r -a PlatformLibraries <<<"$(pkg-config --libs wayland-client wayland-cursor xkbcommon x11 xrandr vulkan)"
-
-if [[ "$Action" == "monolithic" ]]; then
-  Monolithic="$BinaryDir/gecko_monolithic"
-  echo "  LINK gecko_monolithic"
-  "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" \
-    -DGECKO_MONOLITHIC_GAME=1 \
-    "$Root/projects/launcher/main.cpp" "$GameSource" \
-    "${Objects[@]}" "${ProtocolObjects[@]}" \
-    "${PlatformLibraries[@]}" -pthread -ldl -lm \
-    -o "$Monolithic"
-  echo "Built $Monolithic"
-  exit 0
-fi
 
 EngineLibrary="$BinaryDir/libGecko.so"
 LinkEngine=false
@@ -185,58 +179,76 @@ else
   done
 fi
 if [[ "$LinkEngine" == true ]]; then
-  echo "  LINK libGecko.so"
-  "$Cxx" "${CommonLinkFlags[@]}" -shared -fuse-ld=lld -Wl,-soname,libGecko.so \
+  echo "[LINK ] libGecko.so"
+  "$Cxx" "${CommonLinkFlags[@]}" "${FastLinkFlags[@]}" -shared -Wl,-soname,libGecko.so \
     "${Objects[@]}" "${ProtocolObjects[@]}" \
     "${PlatformLibraries[@]}" -pthread -ldl -lm \
     -o "$EngineLibrary"
 fi
 
 if [[ "$Action" == "examples" ]]; then
-  "$Root/tools/build_shaders.sh" "$Root/examples/triangle/shaders" "$BinaryDir/shaders"
-  for Example in core window triangle; do
+  ToolDir="$BuildDir/tools"
+  EmbedTool="$ToolDir/gecko_embed"
+  mkdir -p "$ToolDir"
+  if [[ "$ForceRebuild" == true || ! -f "$EmbedTool" || "$Root/tools/embed.cpp" -nt "$EmbedTool" ]]; then
+    echo "[TOOL ] gecko_embed"
+    "$Cxx" -std=c++26 -O2 "$Root/tools/embed.cpp" -o "$EmbedTool"
+  fi
+
+  ShaderDir="$GeneratedDir/graphics_example_shaders"
+  "$Root/tools/build_shaders.sh" "$Root/examples/graphics_example/shaders" "$ShaderDir"
+  echo "[EMBED] graphics_example/shaders.h"
+  "$EmbedTool" "$ShaderDir/shaders.h" gecko::examples::graphics_example::shaders \
+    "$ShaderDir/triangle.vert.spv" TriangleVert \
+    "$ShaderDir/triangle.frag.spv" TriangleFrag \
+    "$ShaderDir/fullscreen.vert.spv" FullscreenVert \
+    "$ShaderDir/fullscreen.frag.spv" FullscreenFrag \
+    "$ShaderDir/plasma.comp.spv" PlasmaComp
+  for Example in app_skeleton core_example math_example platform_example graphics_example; do
     Executable="$BinaryDir/gecko_example_$Example"
-    Source="$Root/examples/$Example/main.cpp"
-    if [[ ! -f "$Executable" || "$Source" -nt "$Executable" || "$EngineLibrary" -nt "$Executable" ]] ||
+    ExampleSources=("$Root/examples/$Example/src/"*.cpp)
+    Rebuild=false
+    if [[ ! -f "$Executable" || "$EngineLibrary" -nt "$Executable" || "$Root/build.sh" -nt "$Executable" ]]; then
+      Rebuild=true
+    else
+      for Source in "${ExampleSources[@]}"; do
+        if [[ "$Source" -nt "$Executable" ]]; then
+          Rebuild=true
+          break
+        fi
+      done
+    fi
+    if [[ "$Rebuild" == true ]] ||
        find "$Root/include" -type f -name '*.h' -newer "$Executable" -print -quit | grep -q .; then
-      echo "  LINK gecko_example_$Example"
+      echo "[LINK ] gecko_example_$Example"
       "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" \
-        "$Source" -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' -o "$Executable"
+        -I"$ShaderDir" "${ExampleSources[@]}" -L"$BinaryDir" -lGecko -lm -Wl,-rpath,'$ORIGIN' -o "$Executable"
     fi
   done
-  echo "Built Gecko examples in $BinaryDir"
+  printf '%s\n' "$BuildSignature" > "$SignatureFile"
+  echo "[DONE ] $BinaryDir/gecko_example_*"
   exit 0
 fi
 
-GameShaderDir="$Root/projects/$GameProject/shaders"
-if [[ -d "$GameShaderDir" ]] && find "$GameShaderDir" -type f -name '*.hlsl' -print -quit | grep -q .; then
-  "$Root/tools/build_shaders.sh" "$GameShaderDir" "$BinaryDir/shaders"
-fi
-
 GameLibrary="$BinaryDir/libgecko_game.so"
-GameStamp="$ObjectDir/game-project"
-BuiltGame=""
-if [[ -f "$GameStamp" ]]; then
-  IFS= read -r BuiltGame < "$GameStamp"
-fi
-if [[ "$BuiltGame" != "$GameProject" || ! -f "$GameLibrary" || "$GameSource" -nt "$GameLibrary" || "$EngineLibrary" -nt "$GameLibrary" ]] ||
+if [[ ! -f "$GameLibrary" || "$Root/projects/sandbox/game.cpp" -nt "$GameLibrary" || "$EngineLibrary" -nt "$GameLibrary" ]] ||
    find "$Root/include" -type f -name '*.h' -newer "$GameLibrary" -print -quit | grep -q .; then
-  echo "  LINK libgecko_game.so ($GameProject)"
+  echo "[LINK ] libgecko_game.so"
   "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" -shared \
-    "$GameSource" \
+    "$Root/projects/sandbox/game.cpp" \
     -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
     -o "$GameLibrary"
-  printf '%s\n' "$GameProject" > "$GameStamp"
 fi
 
 Launcher="$BinaryDir/gecko_launcher"
 if [[ ! -f "$Launcher" || "$Root/projects/launcher/main.cpp" -nt "$Launcher" || "$EngineLibrary" -nt "$Launcher" ]] ||
    find "$Root/include" -type f -name '*.h' -newer "$Launcher" -print -quit | grep -q .; then
-  echo "  LINK gecko_launcher"
+  echo "[LINK ] gecko_launcher"
   "$Cxx" "${CommonFlags[@]}" "${ConfigFlags[@]}" "${CommonLinkFlags[@]}" \
     "$Root/projects/launcher/main.cpp" \
     -L"$BinaryDir" -lGecko -Wl,-rpath,'$ORIGIN' \
     -o "$Launcher"
 fi
 
-echo "Built $BinaryDir/gecko_launcher and $BinaryDir/libgecko_game.so ($GameProject)"
+printf '%s\n' "$BuildSignature" > "$SignatureFile"
+echo "[DONE ] $BinaryDir/gecko_launcher"

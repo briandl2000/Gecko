@@ -15,7 +15,7 @@ The launcher loads a game library with the platform shared-library functions and
 
 The game API is a flat, versioned function table containing fixed-width values, pointers, and callbacks. Gecko's normal C++ API is available because the game links Gecko, but reload/version negotiation stays at this narrow boundary. The loader checks both the game-table version and the engine ABI version. Compatible additions keep their existing numbers; a broken C++ boundary increments `EngineAbiVersion`, while a broken game-table contract increments `GameApiVersion`.
 
-Subsystem boundaries are directories for navigation, not separately shipped libraries. Calls inside Gecko are ordinary direct calls. Function tables exist only where a real runtime boundary needs them: game/plugin loading or selecting an OS/graphics backend. A final monolithic build can compile the same game implementation into the executable and call the same API without dynamic loading.
+Subsystem boundaries are directories for navigation, not separately shipped libraries. Calls inside Gecko are ordinary direct calls. Function tables exist only where a real runtime boundary needs them: game/plugin loading or selecting an OS/graphics backend.
 
 The engine uses a deliberate unity build. Each subsystem has one unity source that includes its implementation files, and `src/gecko_engine.cpp` combines those subsystem units into the shared library. This keeps the build visible and makes internal name collisions real problems to fix instead of relying on accidental translation-unit isolation. Projects may include the complete public API through `<gecko/gecko.h>` or choose granular headers when parse time matters.
 

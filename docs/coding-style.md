@@ -1,6 +1,6 @@
 # Coding style
 
-Gecko uses C++23 as a better C: data and control flow should remain visible, layouts should be understandable, and costs should be predictable.
+Gecko uses C++26 as a better C: data and control flow should remain visible, layouts should be understandable, and costs should be predictable.
 
 - Use namespaces, `auto`, `constexpr`, enum classes, designated initialization, lambdas, concepts, and small templates when they make code clearer.
 - Templates belong in foundation containers, math, and compile-time utilities. Avoid template architecture, type-erased ownership webs, and error messages spanning the program. Keep implementation-only templates in private headers.

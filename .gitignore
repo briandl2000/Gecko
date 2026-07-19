@@ -6,10 +6,13 @@
 # Local editor state
 /.vscode/
 /.idea/
-/.zed/
 *.swp
 *.swo
 *~
+/AGENTS.md
+/REVIEW.md
+/.agents/
+/.codex/
 
 # Runtime output
 *.log

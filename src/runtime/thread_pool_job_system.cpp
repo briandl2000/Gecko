@@ -18,8 +18,6 @@
 
 namespace gecko::runtime {
 
-namespace {
-
 constexpr u32 MaxWorkers = 16;
 constexpr u32 MaxJobs = 4096;
 constexpr u32 MaxDependencies = 16;
@@ -47,8 +45,6 @@ struct WorkerStart
   ThreadPoolJobSystem* Owner {nullptr};
   u32 Index {0};
 };
-
-}  // namespace
 
 struct ThreadPoolState
 {

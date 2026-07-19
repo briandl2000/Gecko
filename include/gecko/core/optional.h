@@ -14,19 +14,19 @@ public:
   Optional() noexcept = default;
   Optional(const T& value) noexcept
   {
-    new (m_Storage, Placement) T(value);
+    new (&m_Storage.Value, Placement) T(value);
     m_HasValue = true;
   }
   Optional(T&& value) noexcept
   {
-    new (m_Storage, Placement) T(Move(value));
+    new (&m_Storage.Value, Placement) T(Move(value));
     m_HasValue = true;
   }
   Optional(const Optional& other) noexcept
   {
     if (other.m_HasValue)
     {
-      new (m_Storage, Placement) T(other.Value());
+      new (&m_Storage.Value, Placement) T(other.Value());
       m_HasValue = true;
     }
   }
@@ -34,7 +34,7 @@ public:
   {
     if (other.m_HasValue)
     {
-      new (m_Storage, Placement) T(Move(other.Value()));
+      new (&m_Storage.Value, Placement) T(Move(other.Value()));
       m_HasValue = true;
       other.Reset();
     }
@@ -51,7 +51,7 @@ public:
     Reset();
     if (other.m_HasValue)
     {
-      new (m_Storage, Placement) T(other.Value());
+      new (&m_Storage.Value, Placement) T(other.Value());
       m_HasValue = true;
     }
     return *this;
@@ -63,7 +63,7 @@ public:
     Reset();
     if (other.m_HasValue)
     {
-      new (m_Storage, Placement) T(Move(other.Value()));
+      new (&m_Storage.Value, Placement) T(Move(other.Value()));
       m_HasValue = true;
       other.Reset();
     }
@@ -87,12 +87,12 @@ public:
   [[nodiscard]] T& Value() noexcept
   {
     GECKO_ASSERT(m_HasValue, "Optional has no value");
-    return *reinterpret_cast<T*>(m_Storage);
+    return m_Storage.Value;
   }
   [[nodiscard]] const T& Value() const noexcept
   {
     GECKO_ASSERT(m_HasValue, "Optional has no value");
-    return *reinterpret_cast<const T*>(m_Storage);
+    return m_Storage.Value;
   }
   [[nodiscard]] T& operator*() noexcept
   {
@@ -112,7 +112,16 @@ public:
   }
 
 private:
-  alignas(T) byte m_Storage[sizeof(T)] {};
+  union Storage
+  {
+    constexpr Storage() noexcept : Empty {}
+    {}
+    ~Storage() noexcept
+    {}
+
+    byte Empty;
+    T Value;
+  } m_Storage;
   bool m_HasValue {false};
 };
 

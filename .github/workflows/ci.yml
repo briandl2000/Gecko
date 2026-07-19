@@ -1,0 +1,196 @@
+name: Build and Release
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  version-check:
+    name: Version check
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require a version change for main
+        shell: bash
+        run: |
+          current=$(sed -n 's/^#define GECKO_VERSION_FULL_STRING "\([^"]*\)"/\1/p' include/gecko/version.h)
+          previous=$(git show origin/main:include/gecko/version.h | sed -n 's/^#define GECKO_VERSION_FULL_STRING "\([^"]*\)"/\1/p')
+          echo "main=$previous pull-request=$current"
+          if [ -z "$current" ] || [ "$current" = "$previous" ]; then
+            echo "::error::Change GECKO_VERSION_FULL_STRING before merging to main."
+            exit 1
+          fi
+
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            artifact: linux-x86_64
+          - name: Windows x86_64
+            os: windows-latest
+            artifact: windows-x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-14 g++-14 lld glslc zip \
+            libvulkan-dev libx11-dev libxrandr-dev \
+            libwayland-dev wayland-protocols libwayland-cursor0 libxkbcommon-dev
+
+      - name: Enable MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Vulkan SDK
+        if: runner.os == 'Windows'
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          install_runtime: true
+          cache: true
+          stripdown: true
+
+      - name: Build Gecko and examples
+        if: runner.os == 'Linux'
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: |
+          ./build.sh release build
+          ./build.sh release examples
+
+      - name: Build Gecko and examples
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call build.bat release build
+          call build.bat release examples
+
+      - name: Headless smoke checks
+        if: runner.os == 'Linux'
+        working-directory: out/Linux-x86_64/Release/bin
+        run: |
+          ./gecko_launcher --backend=null --graphics=null --frames=2
+          ./gecko_example_app_skeleton --backend=null --no-window
+          ./gecko_example_core_example
+          ./gecko_example_math_example
+
+      - name: Headless smoke checks
+        if: runner.os == 'Windows'
+        shell: cmd
+        working-directory: out/Windows-x86_64/Release/bin
+        run: |
+          gecko_launcher.exe --backend=null --graphics=null --frames=2
+          gecko_example_app_skeleton.exe --backend=null --no-window
+          gecko_example_core_example.exe
+          gecko_example_math_example.exe
+
+      - name: Package Linux engine
+        if: runner.os == 'Linux' && github.event_name == 'push'
+        run: |
+          mkdir -p out/package/gecko/include out/package/gecko/bin
+          cp -R include/gecko out/package/gecko/include/
+          cp LICENSE README.md out/package/gecko/
+          cp out/Linux-x86_64/Release/bin/libGecko.so out/package/gecko/bin/
+          cp out/Linux-x86_64/Release/bin/gecko_launcher out/package/gecko/bin/
+          cp out/Linux-x86_64/Release/bin/libgecko_game.so out/package/gecko/bin/
+          cd out/package/gecko
+          zip -r ../gecko-linux-x86_64.zip .
+
+      - name: Package Windows engine
+        if: runner.os == 'Windows' && github.event_name == 'push'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out/package/gecko/include, out/package/gecko/bin
+          Copy-Item -Recurse include/gecko out/package/gecko/include/
+          Copy-Item LICENSE, README.md out/package/gecko/
+          Copy-Item out/Windows-x86_64/Release/bin/Gecko.dll out/package/gecko/bin/
+          Copy-Item out/Windows-x86_64/Release/bin/Gecko.lib out/package/gecko/bin/
+          Copy-Item out/Windows-x86_64/Release/bin/gecko_launcher.exe out/package/gecko/bin/
+          Copy-Item out/Windows-x86_64/Release/bin/gecko_game.dll out/package/gecko/bin/
+          Compress-Archive -Path out/package/gecko/* -DestinationPath out/package/gecko-windows-x86_64.zip
+
+      - name: Upload release package
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gecko-${{ matrix.artifact }}
+          path: out/package/*.zip
+          retention-days: ${{ github.ref == 'refs/heads/dev' && 7 || 90 }}
+
+  release:
+    name: Publish version
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: gecko-*
+
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          base=$(sed -n 's/^#define GECKO_VERSION_FULL_STRING "\([^"]*\)"/\1/p' include/gecko/version.h)
+          if [ -z "$base" ]; then
+            echo "Could not read GECKO_VERSION_FULL_STRING" >&2
+            exit 1
+          fi
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            version="${base}-dev.$(date -u +%Y%m%d%H%M%S)"
+            prerelease=true
+          else
+            version="$base"
+            case "$base" in
+              *-*) prerelease=true ;;
+              *) prerelease=false ;;
+            esac
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+      - name: Collect packages
+        run: |
+          mkdir release
+          find artifacts -name '*.zip' -exec cp {} release/ \;
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          flags=(--generate-notes)
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+          if [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            flags+=(--latest=false)
+          fi
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "Gecko ${{ steps.version.outputs.version }}" \
+            "${flags[@]}" release/*.zip

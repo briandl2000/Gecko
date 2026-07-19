@@ -1,4 +1,4 @@
--std=c++23
+-std=c++26
 -xc++
 -fPIC
 -fno-exceptions
@@ -15,4 +15,5 @@
 -Iinclude
 -Isrc/core
 -Isrc/graphics
--Iout/Linux-x86_64/handmade/Debug/generated
+-Iout/Linux-x86_64/Debug/generated
+-Iout/Linux-x86_64/Debug/generated/graphics_example_shaders

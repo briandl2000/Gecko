@@ -1,15 +1,24 @@
-# Examples
+# Gecko examples
 
-These are small, deliberately direct programs built against the single Gecko
-shared library:
+The examples are small tours of the public Gecko API. Build all of them with:
 
-- `core`: headless initialization, jobs, logging, and memory statistics.
-- `window`: native Wayland/X11/Win32 window and event loop.
-- `triangle`: Vulkan rendering with HLSL compiled to SPIR-V before the C++ link.
+```sh
+./build.sh debug examples
+```
 
-Build all examples with `./build.sh debug examples` or
-`build.bat debug examples`. Run them from the generated `bin` directory so the
-shared library and the triangle's `shaders` directory are beside the program.
+On Windows, use `build.bat debug examples` from a Visual Studio Developer
+Command Prompt.
 
-The examples are learning references, not framework layers. Copy useful code
-into an experiment and change it freely.
+- [`app_skeleton`](app_skeleton/README.md) is the minimal standalone
+  application and the best starting point for a new experiment.
+- [`core_example`](core_example/README.md) demonstrates memory, events,
+  threading, jobs, logging, and profiling.
+- [`math_example`](math_example/README.md) tours the header-only math API.
+- [`platform_example`](platform_example/README.md) is the interactive window,
+  monitor, and input showcase.
+- [`graphics_example`](graphics_example/README.md) is the full Vulkan example,
+  including embedded shaders, compute, multiple swapchains, and GPU profiling.
+
+Start with `app_skeleton`, then read only the example for the subsystem you are
+currently learning. The examples link the same shared Gecko library as the
+launcher and game library; they do not contain a private engine copy.

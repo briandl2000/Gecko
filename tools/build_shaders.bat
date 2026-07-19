@@ -32,7 +32,7 @@ for /R "%SourceDir%" %%F in (*.hlsl) do (
   if defined Stage (
     set "Found=1"
     set "Stem=%%~nF"
-    echo   GLSLC %%~nxF
+    echo [GLSLC] %%~nxF
     "%Compiler%" -x hlsl -fshader-stage=!Stage! -fentry-point=main -I"%SourceDir%" "%%~fF" -o "%OutputDir%\!Stem!.spv"
     if errorlevel 1 exit /b 1
   )

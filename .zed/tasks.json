@@ -1,0 +1,29 @@
+[
+  {
+    "label": "Gecko: Build Debug",
+    "command": "./build.sh",
+    "args": ["debug", "build"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Gecko: Build Examples",
+    "command": "./build.sh",
+    "args": ["debug", "examples"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  },
+  {
+    "label": "Gecko: Run Headless",
+    "command": "./gecko_launcher",
+    "args": ["--backend=null", "--graphics=null", "--frames=2"],
+    "cwd": "$ZED_WORKTREE_ROOT/out/Linux-x86_64/Debug/bin",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always"
+  }
+]

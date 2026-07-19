@@ -1448,18 +1448,7 @@ VkShaderModule VulkanDevice::CreateShaderModule(const ShaderCode& code) noexcept
     return VK_NULL_HANDLE;
   }
 
-  platform::ReadResult file;
   Span<const byte> bytes = code.Bytes;
-  if (bytes.empty() && code.Path != nullptr)
-  {
-    file = platform::Read(code.Path);
-    if (!file)
-    {
-      GECKO_ERROR(labels::Vulkan, "VulkanDevice: could not read shader '{}'", code.Path);
-      return VK_NULL_HANDLE;
-    }
-    bytes = file.Data();
-  }
 
   // SPIR-V requires codeSize to be a multiple of 4 and pCode to be 4-byte
   // aligned. Copy into an aligned temporary if the caller's buffer isn't.
