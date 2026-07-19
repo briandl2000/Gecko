@@ -893,8 +893,10 @@ def build_project(driver_root: Path, module_root: Path, config: str, output_base
 def stage_sdk(root: Path, config: str, destination: Path) -> None:
     artifact = build_engine(root, config)
     shutil.copytree(root / "include", destination / "include", dirs_exist_ok=True)
+    shutil.copytree(root / "docs", destination / "docs", dirs_exist_ok=True)
     shutil.copy2(root / "build.py", destination / "build.py")
     shutil.copy2(root / "LICENSE", destination / "LICENSE")
+    shutil.copy2(root / "THIRD_PARTY_NOTICES.md", destination / "THIRD_PARTY_NOTICES.md")
     shutil.copy2(root / "README.md", destination / "README.md")
     module_dir = destination / "modules" / "gecko"
     module_dir.mkdir(parents=True, exist_ok=True)

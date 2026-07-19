@@ -41,8 +41,20 @@ python3 ../Gecko/build.py ../MyProject
 python3 ../GeckoSDK/build.py ../MyProject --config release
 ```
 
-See the [build-system guide](docs/build-system.md), [development workflow](docs/development.md), [architecture](docs/architecture.md), and [coding style](docs/coding-style.md).
+Start with the [SDK project tutorial](docs/sdk-project.md). The
+[build-system guide](docs/build-system.md), [development workflow](docs/development.md),
+[architecture](docs/architecture.md), and [coding style](docs/coding-style.md)
+cover engine development in more detail.
 
 Development releases use `v0.0.0-alpha.N`. Pull requests and pushes to `dev` or `main` build and test Linux and Windows SDKs; pushes publish the tested packages.
 
-MIT licensed.
+## License
+
+Gecko is [MIT licensed](LICENSE). You may use and modify it in commercial,
+closed-source, or open-source games; the license does not determine the
+license of your own game code or assets. When distributing Gecko itself—such
+as `Gecko.dll`, `libGecko.so`, source, or an SDK—include `LICENSE` and
+`THIRD_PARTY_NOTICES.md` with it.
+
+The SDK does not bundle the Vulkan SDK, shader compiler, or platform shared
+libraries. Their licenses remain with their respective installations.

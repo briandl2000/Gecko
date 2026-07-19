@@ -23,7 +23,7 @@ The engine itself is the root project producing the Gecko shared library. Core, 
 
 The `src/module.py` descriptor makes the source tree itself the explicit engine project: it names the final engine glue source and selects the transitive module graph. One unity object per source module is the middle ground between a single giant translation unit and per-file compilation: clean builds stay small, changes normally rebuild only the affected module, and include-order accidents cannot leak between subsystems.
 
-Module descriptions are ordinary typed Python calls imported from `build.py`. They name a unity source, dependencies, includes, definitions, system libraries, and shaders. Compiler selection, platform behavior, output layout, shader embedding, and incremental checks remain in the single root `build.py` driver. Keeping that entrypoint at the root also makes it the one file copied into the downloadable SDK.
+Module descriptions are ordinary typed Python calls imported from `build.py`. They name a unity source, dependencies, includes, shaders, and platform-specific compile and link requirements. Compiler selection, tool invocation, output layout, shader embedding, and incremental checks remain in the single root `build.py` driver. Keeping that entrypoint at the root also makes it the one build file copied into the downloadable SDK.
 
 Successful builds generate the ignored `compile_commands.json` from the compiler commands actually used. Zed/clangd consumes that file, so no tracked editor-only `compile_flags.txt` needs to mirror the build configuration.
 

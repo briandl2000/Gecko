@@ -2,6 +2,9 @@
 
 Gecko uses one Python-standard-library driver for source development and the downloadable SDK. Run `python3 build.py --help` for the complete command list; the common loop is:
 
+For a first project made from a downloaded SDK, follow the
+[SDK project tutorial](sdk-project.md).
+
 ```sh
 python3 build.py engine
 python3 build.py sandbox

@@ -1,6 +1,18 @@
-MIT License
+# Third-party notices
 
-Copyright (c) 2024-2026 briandl2000
+Gecko's Linux library contains client protocol code generated from the
+Wayland `xdg-shell` and `xdg-decoration` protocol descriptions. The following
+notice applies to that generated code.
+
+## Wayland protocols
+
+Copyright © 2008-2013 Kristian Høgsberg  
+Copyright © 2013 Rafael Antognolli  
+Copyright © 2013 Jasper St. Pierre  
+Copyright © 2010-2013 Intel Corporation  
+Copyright © 2015-2017 Samsung Electronics Co., Ltd  
+Copyright © 2015-2017 Red Hat Inc.  
+Copyright © 2018 Simon Ser
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -9,8 +21,9 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+The above copyright notice and this permission notice (including the next
+paragraph) shall be included in all copies or substantial portions of the
+Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
